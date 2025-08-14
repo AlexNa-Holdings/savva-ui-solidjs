@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Let the `dark` class control the theme */
+html, body, #root { height: 100%; }
