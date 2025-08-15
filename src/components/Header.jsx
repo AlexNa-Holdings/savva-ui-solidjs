@@ -1,11 +1,12 @@
 // src/components/Header.jsx
-import { Show, createSignal } from "solid-js";
+import { Show, createSignal, onMount } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import {
   connectWallet,
   walletAccount,
   walletChainId,
   isWalletAvailable,
+  eagerConnect,             // ← NEW
 } from "../blockchain/wallet";
 import { getChainLogo } from "../blockchain/chainLogos";
 
@@ -16,17 +17,28 @@ function shortAddr(addr) {
 
 export default function Header({ onTogglePane }) {
   const app = useApp();
-  const [copyState, setCopyState] = createSignal(""); // "", "copied"
+  const [copyState, setCopyState] = createSignal("");
+  const [eagerDone, setEagerDone] = createSignal(false);   // ← NEW
 
-  const desiredId = () => app.desiredChainId();   // number | null
+  const desiredId = () => app.desiredChainId();
   const mismatched = () =>
     walletChainId() != null &&
     desiredId() != null &&
     walletChainId() !== desiredId();
 
+  onMount(async () => {
+    if (isWalletAvailable()) {
+      // Try rehydrate silently (no prompt)
+      await eagerConnect();
+      // (Do NOT auto-switch network on eager connect; we only hint via UI.)
+    }
+    setEagerDone(true);
+  });
+
   async function onConnect() {
     try {
       await connectWallet();
+      // After manual connect, we can try switching to backend’s chain
       if (desiredId()) {
         try { await app.ensureWalletOnDesiredChain(); } catch {}
       }
@@ -69,14 +81,16 @@ export default function Header({ onTogglePane }) {
         <Show
           when={walletAccount()}
           fallback={
-            <button
-              class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60"
-              onClick={onConnect}
-              disabled={!isWalletAvailable()}
-              title={isWalletAvailable() ? "Connect your wallet" : "No wallet detected"}
-            >
-              Connect wallet
-            </button>
+            // Only show Connect after we *tried* eager connect; hide if no wallet installed
+            <Show when={eagerDone() && isWalletAvailable()}>
+              <button
+                class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600"
+                onClick={onConnect}
+                title="Connect your wallet"
+              >
+                Connect wallet
+              </button>
+            </Show>
           }
         >
           <div class="flex items-center gap-2">
@@ -90,15 +104,18 @@ export default function Header({ onTogglePane }) {
             </button>
 
             {/* If chain is correct → logo only; if wrong → red Change chain button */}
-            <Show when={!mismatched()} fallback={
-              <button
-                class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
-                onClick={onSwitchChain}
-                title="Switch to the required network"
-              >
-                Change chain
-              </button>
-            }>
+            <Show
+              when={!mismatched()}
+              fallback={
+                <button
+                  class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                  onClick={onSwitchChain}
+                  title="Switch to the required network"
+                >
+                  Change chain
+                </button>
+              }
+            >
               <Show when={chainLogoSrc()}>
                 <img
                   src={chainLogoSrc()}
@@ -122,13 +139,7 @@ export default function Header({ onTogglePane }) {
           onClick={onTogglePane}
           aria-label="Open menu"
         >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>

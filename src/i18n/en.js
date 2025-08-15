@@ -46,5 +46,41 @@ export default {
   "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
   "rightPane.switch.domain.website": "Website",
 
+  "settings.title": "Settings",
+
+  "settings.localIpfs.title": "Local IPFS",
+  "settings.localIpfs.enableCheckbox": "Use local IPFS node",
+  "settings.localIpfs.apiUrl.label": "Local IPFS API URL",
+  "settings.localIpfs.apiUrl.help": "We will call",
+  "settings.localIpfs.testEnable": "Test & enable",
+  "settings.localIpfs.disable": "Disable",
+  "settings.localIpfs.status.label": "Status",
+  "settings.localIpfs.gateway.label": "Gateway",
+
+  "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
+  "settings.localIpfs.help.toggle.hide": "Hide help",
+  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
+  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
+  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
+  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
+  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
+  "settings.localIpfs.help.restart.title": "3) Restart the daemon",
+  "settings.localIpfs.help.verify.title": "4) Verify",
+  "settings.localIpfs.help.verify.note": "The gateway is usually",
+  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
+  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
+  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
+
+  "settings.developer.title": "Developer",
+  "settings.developer.preview": "Preview:",
+
+  "settings.debug.gateways.title": "IPFS Gateways (active order)",
+
+  "common.checking": "Checking…",
+
   "common.loading": "Loading…",
-};
+    "settings.developer.title": "Developer",
+  "settings.developer.showKeys": "Show translation keys", 
+  "settings.debug.gateways.title": "IPFS Gateways (active order)",  
+
+}

@@ -170,12 +170,15 @@ export function AppProvider(props) {
     return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
   });
 
-  const activeIpfsGateways = createMemo(() => {
-    if (localIpfsEnabled() && localIpfsGateway()) {
-      return [ensureSlash(localIpfsGateway()), ...remoteIpfsGateways()];
-    }
-    return remoteIpfsGateways();
-  });
+const activeIpfsGateways = createMemo(() => {
+  // STRICT MODE: if local IPFS is enabled, use ONLY the local gateway
+  if (localIpfsEnabled() && localIpfsGateway()) {
+    return [ensureSlash(localIpfsGateway())];
+  }
+  // otherwise use the remote list from /info
+  return remoteIpfsGateways();
+});
+
 
   // ----- Local IPFS: probe + monitor -----
   async function probeLocalIpfs(apiUrl) {
@@ -191,26 +194,59 @@ export function AppProvider(props) {
     return ensureSlash(gw);
   }
 
-  async function enableLocalIpfs(apiUrl) {
-    try {
-      const gw = await probeLocalIpfs(apiUrl);
-      setLocalIpfsEnabled(true);
-      setLocalIpfsApiUrl(apiUrl);
-      setLocalIpfsGateway(gw);
-      localStorage.setItem(IPFS_LOCAL_KEY, "1");
-      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
-      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-      setLocalIpfsStatus("ok");
-      pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
-      startLocalIpfsMonitor();
-      return gw;
-    } catch (e) {
-      setLocalIpfsEnabled(false);
-      setLocalIpfsStatus("down");
-      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
-      throw e;
-    }
+async function enableLocalIpfs(apiUrl) {
+  try {
+    const gw = await probeLocalIpfs(apiUrl);  // already normalized to http://.../
+    setLocalIpfsEnabled(true);
+    setLocalIpfsApiUrl(apiUrl);
+    setLocalIpfsGateway(gw);
+    localStorage.setItem(IPFS_LOCAL_KEY, "1");
+    localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+    localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+    setLocalIpfsStatus("ok");
+    pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
+    startLocalIpfsMonitor();
+    return gw;
+  } catch (e) {
+    setLocalIpfsEnabled(false);
+    setLocalIpfsStatus("down");
+    pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+    throw e;
   }
+}
+
+function multiaddrToHttp(ma) {
+  if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
+  const parts = ma.split("/").filter(Boolean);
+  let host = null, port = null;
+  for (let i = 0; i < parts.length; i += 2) {
+    const k = parts[i], v = parts[i+1];
+    if (k === "ip4" || k === "dns4" || k === "dns6") host = v;
+    else if (k === "ip6") host = v && v.includes(":") ? `[${v}]` : v;
+    else if (k === "tcp") port = v;
+  }
+  if (!host || !port) return ma;
+  return `http://${host}:${port}/`;
+}
+
+function normalizeGatewayBase(g) {
+  const base = g.startsWith("/") ? multiaddrToHttp(g) : g;
+  return ensureSlash(base);
+}
+
+
+  async function probeLocalIpfs(apiUrl) {
+  const base = trimSlash(apiUrl || "");
+  if (!base) throw new Error("Local IPFS API URL is empty");
+  const url = `${base}/api/v0/config/show`;
+  const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
+  if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
+  const cfg = await res.json();
+  let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
+  if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
+  const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // <-- normalize
+  return ensureSlash(httpGw);
+}
 
   function disableLocalIpfs() {
     stopLocalIpfsMonitor();

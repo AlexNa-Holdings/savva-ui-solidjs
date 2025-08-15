@@ -18,12 +18,12 @@ function normalizeInput(input) {
 }
 
 function buildUrl(baseGateway, cidPath) {
-  // baseGateway may be ".../ipfs/" or a raw origin.
-  const g = baseGateway.replace(/\/+$/g, ""); // remove trailing slashes
-  const hasIpfs = /\/ipfs$/i.test(g);
-  const prefix = hasIpfs ? g + "/" : g + "/ipfs/";
+  const base = normalizeGatewayBase(baseGateway).replace(/\/+$/g, "");
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? base + "/" : base + "/ipfs/";
   return prefix + cidPath.replace(/^\/+/g, "");
 }
+
 
 async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
   const controller = new AbortController();
