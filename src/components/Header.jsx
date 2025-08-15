@@ -1,9 +1,13 @@
 // src/components/Header.jsx
+import { useI18n } from "../i18n/useI18n";
+
 export default function Header({ onTogglePane }) {
+  const { t } = useI18n();
+
   return (
     <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
       <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
-        SAVVA · SolidJS
+        {t("app.title")}
       </h1>
       <button
         class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"

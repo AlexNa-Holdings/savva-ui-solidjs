@@ -2,9 +2,11 @@
 import { createSignal, onMount } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
+import { useI18n } from "./i18n/useI18n"; // ← add
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
+  const { t } = useI18n(); // ← add
 
   onMount(() => {
     const handleKeydown = (e) => {
@@ -24,11 +26,13 @@ export default function App() {
       <Header onTogglePane={togglePane} />
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <main class="p-4 max-w-7xl mx-auto">
-        <h2 class="text-xl">Hello, Alex 👋</h2>
+        <h2 class="text-xl">{t("greeting.hello")}</h2> {/* ← was "Hello, Alex 👋" */}
         <div class="card bg-white dark:bg-gray-800 p-6 rounded shadow">
-          <p>Tailwind works?</p>
-          <p>Right Pane Open: {isPaneOpen() ? "Yes" : "No"}</p>
-          <p>Theme: {RightPane.theme ? RightPane.theme() === "dark" ? "Dark" : "Light" : "Light"}</p>
+          <p>{t("card.tailwindWorks")}</p> {/* ← was "Tailwind works?" */}
+          <p>{t("debug.rightOpen")}: {isPaneOpen() ? "Yes" : "No"}</p>
+          <p>
+            {t("debug.theme")}: {RightPane.theme ? (RightPane.theme() === "dark" ? "Dark" : "Light") : "Light"}
+          </p>
         </div>
       </main>
     </div>
