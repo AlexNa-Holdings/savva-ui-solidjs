@@ -1,3 +1,4 @@
+// vite.config.js
 import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 
