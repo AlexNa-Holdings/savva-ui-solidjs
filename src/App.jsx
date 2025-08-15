@@ -22,12 +22,13 @@ export default function App() {
   return (
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <Header onTogglePane={togglePane} />
-      <RightPane isOpen={isPaneOpen} onClose={togglePane} /> {/* Pass signal directly */}
+      <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <main class="p-4 max-w-7xl mx-auto">
         <h2 class="text-xl">Hello, Alex 👋</h2>
         <div class="card bg-white dark:bg-gray-800 p-6 rounded shadow">
           <p>Tailwind works?</p>
           <p>Right Pane Open: {isPaneOpen() ? "Yes" : "No"}</p>
+          <p>Theme: {RightPane.theme ? RightPane.theme() === "dark" ? "Dark" : "Light" : "Light"}</p>
         </div>
       </main>
     </div>

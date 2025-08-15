@@ -1,34 +1,26 @@
 // src/hooks/useTheme.js
 import { createSignal, onMount } from "solid-js";
 
-let themeSignal; // <-- singleton holder
-
 export function useTheme() {
-  if (!themeSignal) {
-    const [theme, setTheme] = createSignal("light");
+  const [theme, setTheme] = createSignal("light");
 
-    const apply = (t) => {
-      // Flip the html.dark class
-      document.documentElement.classList.toggle("dark", t === "dark");
-      try { localStorage.setItem("theme", t); } catch {}
-    };
+  onMount(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    setTheme(savedTheme);
+    document.documentElement.classList.toggle("dark", savedTheme === "dark");
+    console.log("Initial theme:", savedTheme, "dark class:", document.documentElement.classList.contains("dark")); // Debug
+  });
 
-    onMount(() => {
-      // Respect saved pref, or system
-      const saved = localStorage.getItem("theme");
-      const systemDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
-      const initial = saved || (systemDark ? "dark" : "light");
-      setTheme(initial);
-      apply(initial);
-    });
+  const toggleTheme = () => {
+    const next = theme() === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try { localStorage.setItem("theme", next); } catch {}
+    console.log("Toggled to:", next, "dark class:", document.documentElement.classList.contains("dark")); // Debug
+  };
 
-    const toggleTheme = () => {
-      const next = theme() === "dark" ? "light" : "dark";
-      setTheme(next);
-      apply(next);
-    };
+  // Expose theme signal for external use
+  useTheme.theme = theme;
 
-    themeSignal = [theme, toggleTheme];
-  }
-  return themeSignal;
+  return [theme, toggleTheme];
 }
