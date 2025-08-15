@@ -1,6 +1,8 @@
 // src/context/AppContext.jsx
 import { createContext, useContext, createSignal, onMount, createMemo } from "solid-js";
 import { parse } from "yaml";
+import { getChainMeta } from "../blockchain/chains";          // <-- relative import
+import { switchOrAddChain } from "../blockchain/wallet";       // <-- relative import
 
 const AppContext = createContext();
 
@@ -37,7 +39,7 @@ function saveOverride(obj) {
 
 export function AppProvider(props) {
   const [config, setConfig] = createSignal(null);
-  const [info, setInfo] = createSignal(null);          // ← /info lives here
+  const [info, setInfo] = createSignal(null);          // /info payload
   const [error, setError] = createSignal(null);
   const [loading, setLoading] = createSignal(true);
   const [lastUpdatedAt, setLastUpdatedAt] = createSignal(null);
@@ -51,7 +53,7 @@ export function AppProvider(props) {
   async function applyConfig(nextCfg) {
     setConfig(nextCfg);
     const data = await fetchInfo(nextCfg);
-    setInfo(data);                         // ← store /info in context
+    setInfo(data);                         // store /info in context
     setLastUpdatedAt(Date.now());
   }
 
@@ -82,7 +84,7 @@ export function AppProvider(props) {
     }
   }
 
-  // Change both backend and/or domain; refetches /info when backendLink changes.
+  // Change backend and/or domain
   async function updateConnect(partial) {
     try {
       setLoading(true);
@@ -94,16 +96,15 @@ export function AppProvider(props) {
         backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink),
       };
 
-      // If backendLink changed, re-fetch /info. If only domain changed, keep existing info.
       const backendChanged = next.backendLink !== cur.backendLink;
       if (backendChanged) {
         await applyConfig(next);
       } else {
         setConfig(next);
+        setLastUpdatedAt(Date.now());
       }
 
       saveOverride(next);
-      if (!backendChanged) setLastUpdatedAt(Date.now());
     } catch (e) {
       setError(e);
     } finally {
@@ -111,7 +112,6 @@ export function AppProvider(props) {
     }
   }
 
-  // Change only domain (no /info refetch).
   function setDomain(nextDomain) {
     const cur = config() || {};
     const next = { ...cur, domain: nextDomain || "" };
@@ -127,8 +127,7 @@ export function AppProvider(props) {
 
   onMount(init);
 
-  // ---- Derived helpers (convenience across the app) ----
-  // Normalized list of domain names from the current info payload.
+  // Derived helpers
   const supportedDomains = createMemo(() => {
     const data = info();
     const list = Array.isArray(data?.domains) ? data.domains : [];
@@ -137,7 +136,6 @@ export function AppProvider(props) {
       .filter((name) => typeof name === "string" && name.trim().length > 0);
   });
 
-  // Selected domain object (from info.domains) that matches config.domain, or null.
   const selectedDomain = createMemo(() => {
     const data = info();
     const cur = config();
@@ -146,23 +144,42 @@ export function AppProvider(props) {
     return list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) || null;
   });
 
+  const desiredChainId = createMemo(() => {
+    const id = info()?.blockchain_id;
+    return typeof id === "number" ? id : null;
+  });
+
+  const desiredChain = createMemo(() => {
+    const id = desiredChainId();
+    return id ? getChainMeta(id) : null;
+  });
+
+  async function ensureWalletOnDesiredChain() {
+    const meta = desiredChain();
+    if (!meta) throw new Error("Unknown target chain");
+    await switchOrAddChain(meta);
+  }
+
   const value = {
     // state
     config,
-    info,                   // ← full /info JSON available everywhere
+    info,
     error,
     loading,
     lastUpdatedAt,
 
     // convenience
-    supportedDomains,       // ← string[]
-    selectedDomain,         // ← object | string | null
+    supportedDomains,
+    selectedDomain,
+    desiredChainId,
+    desiredChain,
 
     // actions
     reload: init,
     updateConnect,
     clearConnectOverride,
     setDomain,
+    ensureWalletOnDesiredChain,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
