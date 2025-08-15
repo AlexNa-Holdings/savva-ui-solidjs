@@ -18,4 +18,33 @@ export default {
   "settings.debug.showKeys.label": "Show translation keys",
   "settings.debug.showKeys.help":
     "When enabled, every translated string will append its key in square brackets.",
+      "rightPane.close": "Close menu",
+  "rightPane.settings": "Settings",
+  "rightPane.switch.open": "Switch backend / domain",
+  "rightPane.switch.title": "Switch backend / domain",
+  "rightPane.switch.domain.label": "Domain",
+  "rightPane.switch.backend.label": "Backend URL (ends with /)",
+  "rightPane.switch.reset": "Reset to defaults",
+  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
+
+  "init.title": "SAVVA · Init",
+  "init.loading": "Loading configuration…",
+
+  "common.cancel": "Cancel",
+  "common.apply": "Apply",
+  "common.applying": "Applying…",
+  "common.error": "Error",
+  "common.retry": "Retry",
+    "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.reload": "Load domains",
+  "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
+
+  "rightPane.switch.domain.help": "Choose the domain from the backend reporting supported list.",
+  "rightPane.switch.domain.empty": "No domains available. Check backend URL and try loading again.",
+  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.validation.domain": "Domain cannot be empty.",
+  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
+  "rightPane.switch.domain.website": "Website",
+
+  "common.loading": "Loading…",
 };

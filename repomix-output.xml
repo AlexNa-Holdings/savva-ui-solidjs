@@ -41,7 +41,10 @@ The content is organized as follows:
 
 <directory_structure>
 public/
+  default_connect.yaml
   vite.svg
+scripts/
+  i18n-sync.mjs
 src/
   assets/
     solid.svg
@@ -50,6 +53,14 @@ src/
     RightPane.jsx
   hooks/
     useTheme.js
+  i18n/
+    en.js
+    ru.js
+    useI18n.js
+  pages/
+    Settings.jsx
+  routing/
+    hashRouter.js
   App.jsx
   index.css
   index.jsx
@@ -68,203 +79,325 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-export default function Header({ onTogglePane }) {
-  return (
-    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
-        SAVVA · SolidJS
-      </h1>
-      <button
-        class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
-        onClick={onTogglePane}
-        aria-label="Open menu"
-      >
-        <svg
-          class="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
-      </button>
-    </header>
-  );
-}
-</file>
-
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createEffect } from "solid-js";
-import { useTheme } from "../hooks/useTheme";
-
-export default function RightPane({ isOpen, onClose }) {
-  const [theme, toggleTheme] = useTheme();
-
-  createEffect(() => {
-    console.log("RightPane: isOpen changed to:", isOpen()); // Debug reactivity
-  });
-
-  const handlePanelClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose(); // Close only if clicking the panel's outer edge (not its content)
-    }
-  };
-
-  return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${
-          isOpen() ? "right-0" : "right-[-256px]"
-        } transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-      >
-        <div class="p-4">
-          <button
-            class="mb-4 p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-            onClick={onClose}
-            aria-label="Close menu"
-          >
-            <svg
-              class="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-          <ul class="space-y-2">
-            <li>
-              <button
-                onClick={() => {
-                  toggleTheme();
-                  console.log("Theme toggled, new theme:", theme()); // Debug log
-                }}
-                class="w-full text-left px-4 py-2 bg-blue-500 dark:bg-blue-700 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-800 transition"
-              >
-                {theme() === "dark" ? "Dark" : "Light"} mode
-                <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
-              </button>
-            </li>
-            <li>
-              <button class="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-gray-100">
-                Option 1
-              </button>
-            </li>
-            <li>
-              <button class="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-gray-100">
-                Option 2
-              </button>
-            </li>
-            <li>
-              <button class="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-gray-100">
-                Option 3
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-      {isOpen() && (
-        <div
-          class="fixed inset-0 bg-black opacity-20 z-20"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }} // Fallback inline style
-          data-testid="overlay"
-        ></div>
-      )}
-    </>
-  );
-}
-</file>
-
-<file path="src/hooks/useTheme.js">
-// src/hooks/useTheme.js
-import { createSignal, onMount } from "solid-js";
-
-export function useTheme() {
-  const [theme, setTheme] = createSignal("light");
-
-  onMount(() => {
-    const savedTheme = localStorage.getItem("theme") || "light";
-    setTheme(savedTheme);
-    document.documentElement.classList.toggle("dark", savedTheme === "dark");
-  });
-
-  const toggleTheme = () => {
-    const next = theme() === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-    try { localStorage.setItem("theme", next); } catch {}
-  };
-
-  return [theme, toggleTheme];
-}
+<file path="public/default_connect.yaml">
+domain: savva.app
+backendLink: https://ui.savva.app/api/
+default_ipfs_link: https://savva.myfilebase.com/ipfs/
 </file>
 
 <file path="public/vite.svg">
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
 </file>
 
+<file path="scripts/i18n-sync.mjs">
+#!/usr/bin/env node
+/**
+ * i18n sync:
+ * - Scan source files for t("key") usages
+ * - Keep only used keys in en.js (and other languages)
+ * - Add missing keys to non-English languages with value "???"
+ * - Sort keys alphabetically
+ *
+ * Usage:
+ *   node scripts/i18n-sync.mjs           # rewrite lang files
+ *   node scripts/i18n-sync.mjs --dry     # show changes only
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+const ROOT = process.cwd();
+const SRC_DIR = path.join(ROOT, "src");
+const I18N_DIR = path.join(SRC_DIR, "i18n");
+
+const DRY = process.argv.includes("--dry");
+
+// 1) Collect used keys from source by scanning t("...") calls
+const exts = [".js", ".jsx", ".ts", ".tsx"];
+const usedKeys = new Set();
+
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      // skip node_modules just in case someone copied examples into src
+      if (entry.name === "node_modules") continue;
+      walk(p);
+    } else if (exts.includes(path.extname(entry.name))) {
+      const text = fs.readFileSync(p, "utf8");
+      // match t("foo.bar") and t('foo.bar')
+      const re = /\bt\(\s*(['"])([^'"]+)\1\s*\)/g;
+      let m;
+      while ((m = re.exec(text))) {
+        usedKeys.add(m[2]);
+      }
+    }
+  }
+}
+
+walk(SRC_DIR);
+
+// 2) Load language files (ESM default exports)
+//    (ignore non-dictionary files like useI18n.js)
+function isLangFile(name) {
+  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
+}
+
+function toModuleURL(filePath) {
+  return pathToFileURL(filePath).href;
+}
+
+async function loadLang(filePath) {
+  const mod = await import(toModuleURL(filePath));
+  const dict = mod?.default || {};
+  // force string values only; non-strings converted to string
+  const normalized = {};
+  for (const [k, v] of Object.entries(dict)) {
+    normalized[k] = typeof v === "string" ? v : String(v);
+  }
+  return normalized;
+}
+
+// 3) Write a sorted object as ESM export default
+function writeLang(filePath, obj) {
+  const sorted = Object.keys(obj).sort().reduce((acc, k) => {
+    acc[k] = obj[k];
+    return acc;
+  }, {});
+  const body =
+    "// Auto-generated by i18n-sync.mjs. Do not edit by hand.\n" +
+    "export default " +
+    JSON.stringify(sorted, null, 2) +
+    ";\n";
+  if (DRY) {
+    console.log(`\n[DRY] Would write ${path.relative(ROOT, filePath)}:\n${body}`);
+  } else {
+    fs.writeFileSync(filePath, body, "utf8");
+    console.log(`[i18n] Updated ${path.relative(ROOT, filePath)} (${Object.keys(sorted).length} keys)`);
+  }
+}
+
+(async function main() {
+  // assert i18n dir exists
+  if (!fs.existsSync(I18N_DIR)) {
+    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
+    process.exit(1);
+  }
+
+  // find lang files
+  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
+  if (langFiles.length === 0) {
+    console.error("[i18n] No language files found in src/i18n");
+    process.exit(1);
+  }
+
+  // ensure English exists
+  const enPath = path.join(I18N_DIR, "en.js");
+  if (!fs.existsSync(enPath)) {
+    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
+    process.exit(1);
+  }
+
+  // load all dictionaries
+  const dicts = {};
+  for (const f of langFiles) {
+    dicts[f] = await loadLang(path.join(I18N_DIR, f));
+  }
+
+  const en = dicts["en.js"];
+  if (!en) {
+    console.error("[i18n] Failed to load en.js");
+    process.exit(1);
+  }
+
+  // 4) Compute the final set of keys we actually want to keep,
+  //    based on real usage in code.
+  //    (Only keys referenced by t("...") are kept.)
+  const desiredKeys = new Set(usedKeys);
+
+  // 5) Prune + fill for each language
+  for (const f of langFiles) {
+    const langDict = dicts[f];
+
+    // prune: drop anything not used
+    const pruned = {};
+    for (const k of desiredKeys) {
+      if (langDict[k] != null) {
+        pruned[k] = langDict[k];
+      }
+    }
+
+    // For all languages (including English): add missing keys as "???"
+    for (const k of desiredKeys) {
+      if (pruned[k] == null) pruned[k] = "???";
+    }
+
+    // write back sorted
+    writeLang(path.join(I18N_DIR, f), pruned);
+  }
+  // 6) Report summary
+  console.log("\n[i18n] Done.");
+  console.log(`[i18n] Used keys found: ${desiredKeys.size}`);
+  if (DRY) console.log("[i18n] (dry run, no files were modified)");
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+</file>
+
 <file path="src/assets/solid.svg">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
 </file>
 
-<file path="src/App.jsx">
-// src/App.jsx
-import { createSignal, onMount } from "solid-js";
-import Header from "./components/Header";
-import RightPane from "./components/RightPane";
+<file path="src/i18n/useI18n.js">
+// src/i18n/useI18n.js
+import { createSignal } from "solid-js";
+import en from "./en";
+import ru from "./ru";
 
-export default function App() {
-  const [isPaneOpen, setIsPaneOpen] = createSignal(false);
+const DICTS = { en, ru };
+const DEFAULT_LANG = "en";
+const LANG_KEY = "lang";
+const SHOW_KEYS_KEY = "i18n_show_keys";
 
-  onMount(() => {
-    const handleKeydown = (e) => {
-      if (e.key === "Escape") setIsPaneOpen(false);
+let i18nSingleton;
+
+function resolveKey(lang, key) {
+  const dict = DICTS[lang] || {};
+  if (dict[key] != null) return dict[key];
+  if (DICTS[DEFAULT_LANG] && DICTS[DEFAULT_LANG][key] != null) return DICTS[DEFAULT_LANG][key];
+  return `[${key}]`;
+}
+
+export const LANG_INFO = {
+  en: { code: "EN", name: "English" },
+  ru: { code: "RU", name: "Русский" }
+};
+
+
+export function useI18n() {
+  if (!i18nSingleton) {
+    const initialLang = (() => {
+      try {
+        const saved = localStorage.getItem(LANG_KEY);
+        return saved && DICTS[saved] ? saved : DEFAULT_LANG;
+      } catch { return DEFAULT_LANG; }
+    })();
+
+    const initialShowKeys = (() => {
+      try {
+        return localStorage.getItem(SHOW_KEYS_KEY) === "1";
+      } catch { return false; }
+    })();
+
+    const [lang, setLangSignal] = createSignal(initialLang);
+    const [showKeys, setShowKeysSignal] = createSignal(initialShowKeys);
+
+    const setLang = (next) => {
+      const value = DICTS[next] ? next : DEFAULT_LANG;
+      setLangSignal(value);
+      try { localStorage.setItem(LANG_KEY, value); } catch {}
     };
-    document.addEventListener("keydown", handleKeydown);
-    return () => document.removeEventListener("keydown", handleKeydown);
-  });
 
-  const togglePane = () => {
-    setIsPaneOpen(!isPaneOpen());
-    console.log("App: Pane toggled, isOpen:", isPaneOpen()); // Debug log
-  };
+    const setShowKeys = (on) => {
+      setShowKeysSignal(!!on);
+      try { localStorage.setItem(SHOW_KEYS_KEY, on ? "1" : "0"); } catch {}
+    };
+
+    const t = (key) => {
+      const base = resolveKey(lang(), key);
+      return showKeys() ? `${base} [${key}]` : base;
+    };
+
+    i18nSingleton = {
+      t,
+      lang,
+      setLang,
+      showKeys,
+      setShowKeys,
+      available: Object.keys(DICTS),
+    };
+  }
+  return i18nSingleton;
+}
+</file>
+
+<file path="src/pages/Settings.jsx">
+// src/pages/Settings.jsx
+import { navigate } from "../routing/hashRouter";
+import { useI18n } from "../i18n/useI18n";
+
+export default function Settings() {
+  const { t, showKeys, setShowKeys } = useI18n();
 
   return (
-    <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-      <Header onTogglePane={togglePane} />
-      <RightPane isOpen={isPaneOpen} onClose={togglePane} /> {/* Pass signal directly */}
-      <main class="p-4 max-w-7xl mx-auto">
-        <h2 class="text-xl">Hello, Alex 👋</h2>
-        <div class="card bg-white dark:bg-gray-800 p-6 rounded shadow">
-          <p>Tailwind works?</p>
-          <p>Right Pane Open: {isPaneOpen() ? "Yes" : "No"}</p>
+    <div class="p-4 max-w-7xl mx-auto">
+      <div class="bg-white dark:bg-gray-800 p-6 rounded shadow">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl">{t("settings.title")}</h2>
+          <button
+            class="px-3 py-1 rounded bg-blue-500 dark:bg-blue-700 text-white hover:bg-blue-600 dark:hover:bg-blue-800 transition"
+            onClick={() => navigate("/", { replace: true })}
+          >
+            {t("settings.close")}
+          </button>
         </div>
-      </main>
+
+        {/* Debug section */}
+        <section class="mt-4">
+          <h3 class="font-bold mb-2 text-gray-900 dark:text-gray-100">
+            {t("settings.debug.title")}
+          </h3>
+          <div class="rounded border border-gray-200 dark:border-gray-700 p-4">
+            <label class="flex items-center gap-2 cursor-pointer text-gray-900 dark:text-gray-100">
+              <input
+                type="checkbox"
+                class="h-4 w-4"
+                checked={showKeys()}
+                onInput={(e) => setShowKeys(e.currentTarget.checked)}
+              />
+              <span>{t("settings.debug.showKeys.label")}</span>
+            </label>
+            <p class="text-sm mt-2 text-gray-600 dark:text-gray-200">
+              {t("settings.debug.showKeys.help")}
+            </p>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
 </file>
 
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
+<file path="src/routing/hashRouter.js">
+import { createSignal, onCleanup, onMount } from "solid-js";
+
+function readHashPath() {
+  const raw = window.location.hash || "";
+  return raw.replace(/^#/, "") || "/";
+}
+
+const [route, setRoute] = createSignal(readHashPath());
+
+function setFromHash() {
+  setRoute(readHashPath());
+}
+
+export function navigate(path, { replace = false } = {}) {
+  const target = path.startsWith("#") ? path : `#${path}`;
+  if (replace) window.location.replace(target);
+  else window.location.hash = path.startsWith("#") ? path.slice(1) : path;
+}
+
+export function useHashRouter() {
+  onMount(() => {
+    window.addEventListener("hashchange", setFromHash);
+  });
+  onCleanup(() => {
+    window.removeEventListener("hashchange", setFromHash);
+  });
+  return { route, navigate };
+}
 </file>
 
 <file path="src/index.jsx">
@@ -308,71 +441,6 @@ dist-ssr
 *.sw?
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SAVVA · SolidJS</title>
-
-    <!-- Preload theme to avoid flash -->
-    <script>
-      (function () {
-        try {
-          const saved = localStorage.getItem("theme");
-          const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          const theme = saved || (systemDark ? "dark" : "light");
-          document.documentElement.classList.toggle("dark", theme === "dark");
-        } catch {}
-      })();
-    </script>
-
-    <!-- Load app after theme class is set -->
-    <script type="module" src="/src/index.jsx"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>
-</file>
-
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "solid-js": "^1.9.8"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
-  }
-}
-</file>
-
-<file path="postcss.config.js">
-// postcss.config.js
-export default {
-  plugins: {
-    '@tailwindcss/postcss': {},
-    autoprefixer: {},
-  },
-};
-</file>
-
 <file path="README.md">
 ## Usage
 
@@ -402,17 +470,6 @@ Your app is ready to be deployed!
 ## Deployment
 
 Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)
-</file>
-
-<file path="tailwind.config.js">
-// tailwind.config.js
-/** @type {import("tailwindcss").Config} */
-export default {
-  darkMode: "class",
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-  theme: { extend: {} },
-  plugins: [],
-};
 </file>
 
 <file path="tsconfig.app.json">
@@ -474,6 +531,201 @@ export default {
 }
 </file>
 
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { useI18n } from "../i18n/useI18n";
+
+export default function Header({ onTogglePane }) {
+  const { t } = useI18n();
+
+  return (
+    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
+      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
+        {t("app.title")}
+      </h1>
+      <button
+        class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
+        onClick={onTogglePane}
+        aria-label="Open menu"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+      </button>
+    </header>
+  );
+}
+</file>
+
+<file path="src/hooks/useTheme.js">
+// src/hooks/useTheme.js
+import { createSignal, onMount } from "solid-js";
+
+export function useTheme() {
+  const [theme, setTheme] = createSignal("light");
+
+  onMount(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    setTheme(savedTheme);
+    document.documentElement.classList.toggle("dark", savedTheme === "dark");
+    console.log("Initial theme:", savedTheme, "dark class:", document.documentElement.classList.contains("dark")); // Debug
+  });
+
+  const toggleTheme = () => {
+    const next = theme() === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try { localStorage.setItem("theme", next); } catch {}
+    console.log("Toggled to:", next, "dark class:", document.documentElement.classList.contains("dark")); // Debug
+  };
+
+  // Expose theme signal for external use
+  useTheme.theme = theme;
+
+  return [theme, toggleTheme];
+}
+</file>
+
+<file path="src/i18n/en.js">
+// Auto-generated by i18n-sync.mjs. Do not edit by hand.
+export default {
+  "app.title": "SAVVA · SolidJS",
+  "card.tailwindWorks": "Tailwind works?",
+  "debug.rightOpen": "???",
+  "debug.theme": "???",
+  "greeting.hello": "Hello, Alex 👋",
+  "rightPane.language": "Language",
+  "rightPane.option1": "Option 1",
+  "rightPane.option2": "Option 2",
+  "rightPane.option3": "Option 3",
+  "rightPane.showKeys": "Show translation keys",
+  "ui.mode.dark": "Dark mode",
+  "ui.mode.light": "Light mode",
+  "settings.title": "Settings",
+  "settings.close": "Close",
+  "settings.debug.title": "Debug",
+  "settings.debug.showKeys.label": "Show translation keys",
+  "settings.debug.showKeys.help":
+    "When enabled, every translated string will append its key in square brackets.",
+};
+</file>
+
+<file path="src/i18n/ru.js">
+// Auto-generated by i18n-sync.mjs. Do not edit by hand.
+export default {
+  "app.title": "SAVVA · SolidJS",
+  "card.tailwindWorks": "Tailwind работает?",
+  "debug.rightOpen": "???",
+  "debug.theme": "???",
+  "greeting.hello": "Привет, Алекс 👋",
+  "rightPane.language": "Язык",
+  "rightPane.option1": "Опция 1",
+  "rightPane.option2": "Опция 2",
+  "rightPane.option3": "Опция 3",
+  "rightPane.showKeys": "Показывать ключи",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "settings.title": "Настройки",
+  "settings.close": "Закрыть",
+  "settings.debug.title": "Отладка",
+  "settings.debug.showKeys.label": "Показывать ключи переводов",
+  "settings.debug.showKeys.help":
+    "Если включено, каждая строка добавит в конец свой ключ в квадратных скобках.",
+};
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVVA · SolidJS</title>
+
+  <!-- Preload theme to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      } catch { }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form: /#/settings
+      if (!location.hash && location.pathname !== "/") {
+        var newHash = "#" + location.pathname + location.search + location.hash;
+        history.replaceState(null, "", "/" + newHash);
+      }
+    })();
+  </script>
+
+
+  <!-- Load app after theme class is set -->
+  <script type="module" src="/src/index.jsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
+</file>
+
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@solidjs/router": "^0.15.3",
+    "solid-js": "^1.9.8",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
+}
+</file>
+
+<file path="postcss.config.js">
+// postcss.config.js
+export default {
+  plugins: {
+    '@tailwindcss/postcss': { config: './tailwind.config.js' },
+    autoprefixer: {},
+  },
+};
+</file>
+
 <file path="vite.config.js">
 // vite.config.js
 import { defineConfig } from 'vite';
@@ -488,6 +740,157 @@ export default defineConfig({
     target: 'esnext',
   },
 });
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+</file>
+
+<file path="tailwind.config.js">
+// tailwind.config.js
+export default {
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
+};
+</file>
+
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createEffect } from "solid-js";
+import { useTheme } from "../hooks/useTheme";
+import { useI18n, LANG_INFO } from "../i18n/useI18n";
+import { navigate } from "../routing/hashRouter";
+
+export default function RightPane({ isOpen, onClose }) {
+  const [theme, toggleTheme] = useTheme();
+  const { t, lang, setLang, available } = useI18n();
+
+  createEffect(() => {
+    console.log("RightPane: isOpen changed to:", isOpen());
+  });
+
+  const handlePanelClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  RightPane.theme = theme;
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${
+          isOpen() ? "right-0" : "right-[-256px]"
+        } transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+      >
+        <div class="p-4 space-y-2">
+          <button
+            class="mb-4 p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            onClick={onClose}
+            aria-label="Close menu"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Theme toggle */}
+          <button
+            onClick={() => { toggleTheme(); console.log("Theme toggled, new theme:", theme()); }}
+            class="w-full text-left px-4 py-2 bg-blue-500 dark:bg-blue-700 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-800 transition"
+          >
+            {theme() === "dark" ? t("ui.mode.dark") : t("ui.mode.light")}
+            <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
+          </button>
+
+          {/* Language selector */}
+          <div class="pt-2">
+            <label class="block text-gray-900 dark:text-gray-100 mb-1">{t("rightPane.language")}</label>
+            <select
+              class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
+              value={lang()}
+              onInput={(e) => setLang(e.currentTarget.value)}
+            >
+              {available.map((code) => {
+                const info = LANG_INFO[code] || { code: code.toUpperCase(), name: code };
+                return (
+                  <option value={code}>
+                    [{info.code}] {info.name}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Settings entry */}
+          <button
+            class="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-gray-100"
+            onClick={() => { navigate("/settings"); onClose(); }}
+          >
+            {/* You can i18n this label later if needed */}
+            Settings
+          </button>
+        </div>
+      </div>
+
+      {isOpen() && (
+        <div
+          class="fixed inset-0 bg-black opacity-20 z-20"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          data-testid="overlay"
+          onClick={onClose}
+        />
+      )}
+    </>
+  );
+}
+</file>
+
+<file path="src/App.jsx">
+import { createSignal, onMount, Show } from "solid-js";
+import Header from "./components/Header";
+import RightPane from "./components/RightPane";
+import Settings from "./pages/Settings";
+import { useHashRouter } from "./routing/hashRouter"; // ← add
+
+export default function App() {
+  const [isPaneOpen, setIsPaneOpen] = createSignal(false);
+  const { route } = useHashRouter(); // ← add
+
+  onMount(() => {
+    const handleKeydown = (e) => { if (e.key === "Escape") setIsPaneOpen(false); };
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  });
+
+  const togglePane = () => setIsPaneOpen(!isPaneOpen());
+
+  return (
+    <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+      <Header onTogglePane={togglePane} />
+      <RightPane isOpen={isPaneOpen} onClose={togglePane} />
+
+      <Show when={route() === "/settings"} fallback={
+        <main class="p-4 max-w-7xl mx-auto">
+          <h2 class="text-xl">Hello, Alex 👋</h2>
+          <div class="card bg-white dark:bg-gray-800 p-6 rounded shadow">
+            <p>Tailwind works?</p>
+            <p>Right Pane Open: {isPaneOpen() ? "Yes" : "No"}</p>
+            <p>Theme: {RightPane.theme ? (RightPane.theme() === "dark" ? "Dark" : "Light") : "Light"}</p>
+          </div>
+        </main>
+      }>
+        <Settings />
+      </Show>
+    </div>
+  );
+}
 </file>
 
 </files>

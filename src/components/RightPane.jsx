@@ -1,12 +1,15 @@
 // src/components/RightPane.jsx
-import { createEffect } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { useTheme } from "../hooks/useTheme";
 import { useI18n, LANG_INFO } from "../i18n/useI18n";
 import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const [theme, toggleTheme] = useTheme();
   const { t, lang, setLang, available } = useI18n();
+  const app = useApp();
 
   createEffect(() => {
     console.log("RightPane: isOpen changed to:", isOpen());
@@ -18,6 +21,18 @@ export default function RightPane({ isOpen, onClose }) {
 
   RightPane.theme = theme;
 
+  const [showSwitch, setShowSwitch] = createSignal(false);
+
+  async function applySwitch(values) {
+    await app.updateConnect(values);
+    setShowSwitch(false);
+  }
+
+  async function resetDefaults() {
+    await app.clearConnectOverride();
+    setShowSwitch(false);
+  }
+
   return (
     <>
       <div
@@ -27,28 +42,26 @@ export default function RightPane({ isOpen, onClose }) {
         onClick={handlePanelClick}
         data-testid="right-pane"
       >
-        <div class="p-4 space-y-2">
+        <div class="p-4 space-y-3">
           <button
-            class="mb-4 p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            class="p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
             onClick={onClose}
-            aria-label="Close menu"
+            aria-label={t("rightPane.close")}
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
 
-          {/* Theme toggle */}
           <button
-            onClick={() => { toggleTheme(); console.log("Theme toggled, new theme:", theme()); }}
+            onClick={() => { toggleTheme(); console.log("Theme toggled:", theme()); }}
             class="w-full text-left px-4 py-2 bg-blue-500 dark:bg-blue-700 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-800 transition"
           >
             {theme() === "dark" ? t("ui.mode.dark") : t("ui.mode.light")}
             <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
           </button>
 
-          {/* Language selector */}
-          <div class="pt-2">
+          <div class="pt-1">
             <label class="block text-gray-900 dark:text-gray-100 mb-1">{t("rightPane.language")}</label>
             <select
               class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
@@ -66,14 +79,46 @@ export default function RightPane({ isOpen, onClose }) {
             </select>
           </div>
 
-          {/* Settings entry */}
-          <button
-            class="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-gray-100"
-            onClick={() => { navigate("/settings"); onClose(); }}
-          >
-            {/* You can i18n this label later if needed */}
-            Settings
-          </button>
+          {/* Menu list */}
+          <nav class="pt-2">
+            <ul class="space-y-1">
+              <li>
+                <div
+                  class="px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { navigate("/settings"); onClose(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate("/settings"); onClose();
+                    }
+                  }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setShowSwitch(true);
+                      }
+                    }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
+            </ul>
+          </nav>
         </div>
       </div>
 
@@ -85,6 +130,17 @@ export default function RightPane({ isOpen, onClose }) {
           onClick={onClose}
         />
       )}
+
+      <SwitchConnectDialog
+        open={showSwitch()}
+        domain={app.config()?.domain}
+        backendLink={app.config()?.backendLink}
+        loading={app.loading()}
+        error={app.error()}
+        onApply={applySwitch}
+        onReset={resetDefaults}
+        onClose={() => setShowSwitch(false)}
+      />
     </>
   );
 }
