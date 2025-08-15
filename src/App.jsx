@@ -5,6 +5,7 @@ import Settings from "./pages/Settings";
 import { useHashRouter } from "./routing/hashRouter";
 import { useApp } from "./context/AppContext.jsx";
 import { useI18n } from "./i18n/useI18n";
+import Toaster from "./components/Toaster";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -52,13 +53,14 @@ export default function App() {
             </div>
 
             <pre class="mt-3 text-xs bg-black/10 p-3 rounded overflow-auto">
-{JSON.stringify(app.info(), null, 2)}
+              {JSON.stringify(app.info(), null, 2)}
             </pre>
           </Show>
         </main>
       }>
         <Settings />
       </Show>
+      <Toaster />
     </div>
   );
 }

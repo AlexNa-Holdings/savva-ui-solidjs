@@ -40,6 +40,10 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
+assets/
+  ethereum.svg
+  puilsechain-test--v4.svg
+  pulsechain.svg
 public/
   default_connect.yaml
   vite.svg
@@ -48,19 +52,32 @@ scripts/
 src/
   assets/
     solid.svg
+  blockchain/
+    chainLogos.js
+    chains.js
+    wallet.js
   components/
     Header.jsx
     RightPane.jsx
+    SwitchConnectDialog.jsx
+    Toaster.jsx
+  context/
+    AppContext.jsx
   hooks/
+    useConnect.js
     useTheme.js
   i18n/
     en.js
     ru.js
     useI18n.js
+  ipfs/
+    index.js
   pages/
     Settings.jsx
   routing/
     hashRouter.js
+  ux/
+    toast.js
   App.jsx
   index.css
   index.jsx
@@ -79,10 +96,315 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
+<file path="src/components/Toaster.jsx">
+import { For, Show } from "solid-js";
+import { toasts, dismissToast, toggleToast } from "../ux/toast";
+
+const typeStyles = {
+  info:    "bg-blue-600",
+  success: "bg-emerald-600",
+  warning: "bg-amber-600",
+  error:   "bg-red-600",
+};
+
+function pretty(obj) {
+  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); } catch {}
+}
+
+export default function Toaster() {
+  return (
+    // bottom-right placement
+    <div class="fixed bottom-3 right-3 z-[1000] space-y-2 max-w-[92vw] sm:max-w-[28rem]">
+      <For each={toasts()}>
+        {(t) => (
+          <div
+            class={`text-white rounded shadow overflow-hidden`}
+            role="status"
+          >
+            {/* Header bar */}
+            <div class={`flex items-center justify-between px-3 py-2 ${typeStyles[t.type] || typeStyles.info}`}>
+              <span class="text-sm font-medium">{t.message}</span>
+              <div class="flex items-center gap-1">
+                <Show when={t.details}>
+                  <button
+                    class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
+                    onClick={() => toggleToast(t.id)}
+                    aria-expanded={t.expanded}
+                    title={t.expanded ? "Hide details" : "Show details"}
+                  >
+                    {t.expanded ? "Hide" : "Details"}
+                  </button>
+                </Show>
+                <button
+                  class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
+                  onClick={() => dismissToast(t.id)}
+                  aria-label="Close notification"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Details panel */}
+            <Show when={t.expanded && t.details}>
+              <div class="bg-gray-900 text-gray-100 px-3 py-2">
+                <pre class="whitespace-pre-wrap break-words text-[11px] leading-tight">
+{pretty(t.details)}
+                </pre>
+                <div class="mt-2 flex justify-end">
+                  <button
+                    class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
+                    onClick={() => copy(pretty(t.details))}
+                    title="Copy details to clipboard"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </Show>
+          </div>
+        )}
+      </For>
+    </div>
+  );
+}
+</file>
+
+<file path="src/ipfs/index.js">
+// Minimal IPFS client with gateway fallback.
+// Usage:
+//   import { ipfs } from "../ipfs";
+//   const res = await ipfs.fetch("Qm.../file.json", { gateways: myGateways });
+//   const json = await ipfs.getJSON("ipfs://Qm.../file.json", { gateways: myGateways });
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+
+function normalizeInput(input) {
+  // Accepts: "ipfs://CID/path", "/ipfs/CID/path", "CID[/path]"
+  let s = String(input || "").trim();
+  if (!s) throw new Error("ipfs: empty input");
+  s = stripPrefix(s, "ipfs://");
+  s = stripPrefix(s, "/ipfs/");
+  s = stripPrefix(s, "ipfs/");
+  return s; // "CID[/path]"
+}
+
+function buildUrl(baseGateway, cidPath) {
+  // baseGateway may be ".../ipfs/" or a raw origin.
+  const g = baseGateway.replace(/\/+$/g, ""); // remove trailing slashes
+  const hasIpfs = /\/ipfs$/i.test(g);
+  const prefix = hasIpfs ? g + "/" : g + "/ipfs/";
+  return prefix + cidPath.replace(/^\/+/g, "");
+}
+
+async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
+  const compositeSignal = signal
+    ? new AbortController()
+    : null;
+
+  // If a signal was provided, abort our controller when it aborts.
+  if (signal && compositeSignal) {
+    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) return { res, url, gateway: gw };
+      // Treat non-2xx as failure and continue
+      errors.push(new Error(`Gateway ${gw} -> HTTP ${res.status}`));
+    } catch (e) {
+      errors.push(new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`));
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  throw err;
+}
+
+async function fetchIpfs(input, opts = {}) {
+  const {
+    gateways = [],
+    timeoutMs = 8000,
+    signal,
+    cache = "default",
+    headers,
+    method = "GET",
+  } = opts;
+
+  if (!gateways || gateways.length === 0) {
+    throw new Error("ipfs.fetch: no gateways provided");
+  }
+  const cidPath = normalizeInput(input);
+  const { res, url, gateway } = await tryGateways(cidPath, gateways, {
+    timeoutMs,
+    init: { method, headers, cache, signal }
+  });
+  return { response: res, url, gateway };
+}
+
+async function getJSON(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
+  return { data: await response.json(), url, gateway };
+}
+
+async function getText(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.text(), url, gateway };
+}
+
+async function getBlob(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.blob(), url, gateway };
+}
+
+async function getArrayBuffer(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.arrayBuffer(), url, gateway };
+}
+
+export const ipfs = {
+  fetch: fetchIpfs,
+  getJSON,
+  getText,
+  getBlob,
+  getArrayBuffer,
+  // Utils you may want in other places:
+  normalizeInput,
+  buildUrl,
+};
+</file>
+
+<file path="src/ux/toast.js">
+import { createSignal } from "solid-js";
+
+export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
+
+let counter = 0;
+
+export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
+  const id = ++counter;
+  const item = { id, type, message: String(message || ""), details, expanded: false };
+  setToasts((curr) => [...curr, item]);
+  if (autohideMs > 0 && type !== "error") {
+    setTimeout(() => dismissToast(id), autohideMs);
+  }
+  return id;
+}
+
+export function dismissToast(id) {
+  setToasts((curr) => curr.filter((t) => t.id !== id));
+}
+
+export function toggleToast(id) {
+  setToasts((curr) =>
+    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
+  );
+}
+
+/** Convenience: turn any Error (or unknown) into a compact, useful details object */
+export function errorDetails(err, extra = {}) {
+  if (!err) return extra || {};
+  const base = {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    type: err.type,
+    status: err.status,
+    stack: err.stack,
+    cause: err.cause && typeof err.cause === "object" ? {
+      name: err.cause.name,
+      message: err.cause.message,
+      code: err.cause.code,
+      status: err.cause.status,
+    } : undefined,
+  };
+  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
+  if (Array.isArray(err.causes)) {
+    base.causes = err.causes.map((e) => ({
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+    }));
+  }
+  // Merge caller-provided context (like URL, gateway, endpoint)
+  return { ...base, ...extra };
+}
+
+/** push an error toast with extracted details */
+export function pushErrorToast(err, context = {}) {
+  return pushToast({
+    type: "error",
+    message: err?.message || "Unexpected error",
+    details: errorDetails(err, context),
+    autohideMs: 0, // errors stay until closed
+  });
+}
+</file>
+
+<file path="assets/ethereum.svg">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 540 879.4">
+  <path d="m269.9 325.2-269.9 122.7 269.9 159.6 270-159.6z" opacity=".6"/>
+  <path d="m0.1 447.8 269.9 159.6v-607.4z" opacity=".45"/>
+  <path d="m270 0v607.4l269.9-159.6z" opacity=".8"/>
+  <path d="m0 499 269.9 380.4v-220.9z" opacity=".45"/>
+  <path d="m269.9 658.5v220.9l270.1-380.4z" opacity=".8"/>
+</svg>
+</file>
+
+<file path="assets/puilsechain-test--v4.svg">
+<svg width="433" height="402" viewBox="0 0 433 402" xmlns="http://www.w3.org/2000/svg">
+  <title>PulseChain Logo · Testnet (monochrome)</title>
+  <g fill="#000000" fill-rule="evenodd" transform="translate(-133, -149)">
+    <path d="M565.598765,372.951028 C565.598765,375.002407 565.123895,376.952504 564.22332,378.644848 L471.558363,539.145156 C467.628442,545.95198 460.365648,550.145156 452.505805,550.145156 L246.592961,550.145156 C238.733118,550.145156 231.470323,545.95198 227.540402,539.145156 L134.86679,378.629552 C133.968844,376.940022 133.5,374.999302 133.5,372.951028 C133.5,366.307901 138.885318,360.922583 145.528445,360.922583 L247.199342,360.922583 L272.965382,404.687949 L273.123755,404.949452 C276.56213,410.470142 283.796681,412.269462 289.433324,408.951035 L289.725027,408.773687 C292.323961,407.142692 294.205446,404.576775 294.976025,401.597905 L327.807505,274.677705 L355.998349,479.011885 C357.082331,485.72482 363.072426,490.1783 369.557845,489.283548 L369.85245,489.239203 C374.548041,488.473143 378.362876,485.004494 379.559058,480.380352 L419.133013,327.39653 L435.381735,354.996566 C437.735954,358.77701 441.59028,360.922583 445.747249,360.922583 L553.57032,360.922583 C560.213447,360.922583 565.598765,366.307901 565.598765,372.951028 Z M452.505805,149.493649 C460.365648,149.493649 467.628442,153.686825 471.558363,160.493649 L564.229106,321.001259 C565.125282,322.691832 565.598765,324.640838 565.598765,326.687777 C565.598765,333.330904 560.213447,338.716222 553.57032,338.716222 L451.566328,338.716222 L425.800288,294.950856 C423.991945,292.060218 421.426028,290.178734 418.447158,289.408155 L418.167463,289.339295 C411.826545,287.85703 405.429227,291.702682 403.789645,298.040901 L370.95724,424.960175 L342.767321,220.62692 C341.956916,215.636723 338.488267,211.821889 333.864125,210.625707 C327.432698,208.962014 320.870306,212.827026 319.206612,219.258453 L279.631731,372.24135 L263.383935,344.64224 C261.029716,340.861796 257.17539,338.716222 253.018421,338.716222 L145.528445,338.716222 C138.885318,338.716222 133.5,333.330904 133.5,326.687777 C133.5,324.65653 133.956256,322.735416 134.837658,321.056157 L227.540402,160.493649 C231.470323,153.686825 238.733118,149.493649 246.592961,149.493649 L452.505805,149.493649 Z"/>
+  </g>
+</svg>
+</file>
+
+<file path="assets/pulsechain.svg">
+<svg width="433px" height="402px" viewBox="0 0 433 402" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>PulseChain Logo Shape</title>
+    <defs>
+        <linearGradient x1="76.2262818%" y1="7.45934826%" x2="23.6511094%" y2="92.5655852%" id="linearGradient-1">
+            <stop stop-color="#00EAFF" offset="0%"></stop>
+            <stop stop-color="#0080FF" offset="25.2530882%"></stop>
+            <stop stop-color="#8000FF" offset="49.7394282%"></stop>
+            <stop stop-color="#E619E6" offset="74.9912298%"></stop>
+            <stop stop-color="#FF0000" offset="99.9136118%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Logo" transform="translate(-133.000000, -149.000000)" fill="url(#linearGradient-1)">
+            <path d="M565.598765,372.951028 C565.598765,375.002407 565.123895,376.952504 564.22332,378.644848 L471.558363,539.145156 C467.628442,545.95198 460.365648,550.145156 452.505805,550.145156 L246.592961,550.145156 C238.733118,550.145156 231.470323,545.95198 227.540402,539.145156 L134.86679,378.629552 C133.968844,376.940022 133.5,374.999302 133.5,372.951028 C133.5,366.307901 138.885318,360.922583 145.528445,360.922583 L247.199342,360.922583 L272.965382,404.687949 L273.123755,404.949452 C276.56213,410.470142 283.796681,412.269462 289.433324,408.951035 L289.433324,408.951035 L289.725027,408.773687 C292.323961,407.142692 294.205446,404.576775 294.976025,401.597905 L294.976025,401.597905 L327.807505,274.677705 L355.998349,479.011885 L356.041062,479.296747 C357.082331,485.72482 363.072426,490.1783 369.557845,489.283548 L369.557845,489.283548 L369.85245,489.239203 C374.548041,488.473143 378.362876,485.004494 379.559058,480.380352 L379.559058,480.380352 L419.133013,327.39653 L435.381735,354.996566 L435.543066,355.262694 C437.735954,358.77701 441.59028,360.922583 445.747249,360.922583 L445.747249,360.922583 L553.57032,360.922583 L553.57032,360.922583 C560.213447,360.922583 565.598765,366.307901 565.598765,372.951028 Z M452.505805,149.493649 C460.365648,149.493649 467.628442,153.686825 471.558363,160.493649 L564.229106,321.001259 C565.125282,322.691832 565.598765,324.640838 565.598765,326.687777 C565.598765,333.330904 560.213447,338.716222 553.57032,338.716222 L451.566328,338.716222 L425.800288,294.950856 L425.62294,294.659153 C423.991945,292.060218 421.426028,290.178734 418.447158,289.408155 L418.447158,289.408155 L418.167463,289.339295 C411.826545,287.85703 405.429227,291.702682 403.789645,298.040901 L403.789645,298.040901 L370.95724,424.960175 L342.767321,220.62692 L342.722976,220.332314 C341.956916,215.636723 338.488267,211.821889 333.864125,210.625707 C327.432698,208.962014 320.870306,212.827026 319.206612,219.258453 L319.206612,219.258453 L279.631731,372.24135 L263.383935,344.64224 L263.222604,344.376112 C261.029716,340.861796 257.17539,338.716222 253.018421,338.716222 L253.018421,338.716222 L145.528445,338.716222 L145.528445,338.716222 C138.885318,338.716222 133.5,333.330904 133.5,326.687777 C133.5,324.65653 133.956256,322.735416 134.837658,321.056157 L227.540402,160.493649 C231.470323,153.686825 238.733118,149.493649 246.592961,149.493649 L452.505805,149.493649 Z" id="PulseChain-Logo-Shape"></path>
+        </g>
+    </g>
+</svg>
+</file>
+
 <file path="public/default_connect.yaml">
 domain: savva.app
 backendLink: https://ui.savva.app/api/
-default_ipfs_link: https://savva.myfilebase.com/ipfs/
+gear: true
 </file>
 
 <file path="public/vite.svg">
@@ -249,6 +571,393 @@ function writeLang(filePath, obj) {
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
 </file>
 
+<file path="src/blockchain/chainLogos.js">
+// src/blockchain/chainLogos.js
+export const CHAIN_LOGOS = {
+  1: "/assets/ethereum.svg", // Ethereum Mainnet
+  943: "/assets/pulsechain-test-v4.svg", // PulseChain Testnet
+  369: "/assets/pulsechain.svg", // PulseChain Mainnet
+  // Add more as you need
+};
+
+export function getChainLogo(chainId) {
+  return CHAIN_LOGOS[chainId] || null;
+}
+</file>
+
+<file path="src/blockchain/chains.js">
+// src/blockchain/chains.js
+export const CHAINS = {
+  943: {
+    id: 943,
+    name: "PulseChain Testnet v4",
+    rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
+    nativeCurrency: { name: "tPLS", symbol: "tPLS", decimals: 18 },
+    blockExplorers: [{ name: "Scan", url: "https://scan.v4.testnet.pulsechain.com" }],
+  },
+  369: {
+    id: 369,
+    name: "PulseChain",
+    rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
+    nativeCurrency: { name: "tPLS", symbol: "tPLS", decimals: 18 },
+    blockExplorers: [{ name: "Scan", url: "https://scan.v4.testnet.pulsechain.com" }],
+  },
+  // Add more chains as needed
+};
+
+export function getChainMeta(chainId) {
+  return CHAINS[chainId] || null;
+}
+</file>
+
+<file path="src/blockchain/wallet.js">
+// src/blockchain/wallet.js
+import { createSignal } from "solid-js";
+
+export const [walletAccount, setWalletAccount] = createSignal(null);
+export const [walletChainId, setWalletChainId] = createSignal(null);
+export const [walletReady, setWalletReady] = createSignal(false);
+
+function hasProvider() {
+  return typeof window !== "undefined" && window.ethereum;
+}
+
+function onAccountsChanged(accs) {
+  setWalletAccount(Array.isArray(accs) && accs.length ? accs[0] : null);
+}
+
+function onChainChanged(chainHex) {
+  const id = typeof chainHex === "string" ? parseInt(chainHex, 16) : Number(chainHex);
+  setWalletChainId(id || null);
+}
+
+export async function connectWallet() {
+  if (!hasProvider()) throw new Error("No EVM wallet found");
+  const eth = window.ethereum;
+
+  const accounts = await eth.request({ method: "eth_requestAccounts" });
+  setWalletAccount(accounts?.[0] || null);
+
+  const chainHex = await eth.request({ method: "eth_chainId" });
+  setWalletChainId(parseInt(chainHex, 16));
+  setWalletReady(true);
+
+  eth.removeListener?.("accountsChanged", onAccountsChanged);
+  eth.removeListener?.("chainChanged", onChainChanged);
+  eth.on?.("accountsChanged", onAccountsChanged);
+  eth.on?.("chainChanged", onChainChanged);
+}
+
+export function isWalletAvailable() {
+  return hasProvider();
+}
+
+export async function switchOrAddChain(chainMeta) {
+  if (!hasProvider()) throw new Error("No EVM wallet found");
+  if (!chainMeta) throw new Error("Unknown chain");
+
+  const eth = window.ethereum;
+  const chainIdHex = "0x" + Number(chainMeta.id).toString(16);
+
+  try {
+    await eth.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: chainIdHex }],
+    });
+  } catch (err) {
+    if (err?.code === 4902 || /unrecognized chain/i.test(err?.message || "")) {
+      await eth.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: chainIdHex,
+          chainName: chainMeta.name,
+          nativeCurrency: chainMeta.nativeCurrency,
+          rpcUrls: chainMeta.rpcUrls,
+          blockExplorerUrls: (chainMeta.blockExplorers || []).map(b => b.url),
+        }],
+      });
+      await eth.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainIdHex }],
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+</file>
+
+<file path="src/components/SwitchConnectDialog.jsx">
+import { createSignal, createEffect, Show, createMemo } from "solid-js";
+import { useI18n } from "../i18n/useI18n";
+
+function ensureSlash(s) {
+  if (!s) return "";
+  return s.endsWith("/") ? s : s + "/";
+}
+
+async function fetchInfoJSON(baseUrl, { signal } = {}) {
+  const url = ensureSlash(baseUrl) + "info";
+  const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+  return await res.json();
+}
+
+export default function SwitchConnectDialog(props) {
+  const { t } = useI18n();
+
+  // Form state
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? "");
+  const [domain, setDomain] = createSignal(props.domain ?? "");
+  const [domains, setDomains] = createSignal([]); // array of { name, ... }
+  const [fetching, setFetching] = createSignal(false);
+  const [localError, setLocalError] = createSignal("");
+
+  // Helper: current domain object
+  const selectedDomainObj = createMemo(() =>
+    (domains() || []).find((d) => d?.name === domain()) || null
+  );
+
+  // On open: fetch /info and populate domains (from info.domains[].name)
+  createEffect(async () => {
+    if (!props.open) return;
+
+    setLocalError("");
+    setBackendUrl(props.backendLink ?? "");
+    setDomain(props.domain ?? "");
+    setDomains([]);
+
+    // Validate URL; if invalid, show a tip and skip autopopulate
+    try {
+      const u = new URL(ensureSlash(backendUrl()));
+      if (!/^https?:$/.test(u.protocol)) throw new Error("bad protocol");
+    } catch {
+      setLocalError(t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    const controller = new AbortController();
+    setFetching(true);
+    try {
+      const info = await fetchInfoJSON(backendUrl(), { signal: controller.signal });
+      const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
+
+      // Expect objects with a .name string; fallback to []
+      const normalized = list
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => d && typeof d.name === "string" && d.name.trim().length > 0);
+
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        if (props.domain && normalized.some((d) => d.name === props.domain)) {
+          setDomain(props.domain);
+        } else {
+          setDomain(normalized[0].name);
+        }
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+
+    return () => controller.abort();
+  });
+
+  async function handleReload() {
+    setLocalError("");
+    try {
+      const u = new URL(ensureSlash(backendUrl()));
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+    } catch (e) {
+      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    setFetching(true);
+    try {
+      const info = await fetchInfoJSON(backendUrl());
+      const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
+      const normalized = list
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => d && typeof d.name === "string" && d.name.trim().length > 0);
+
+      setDomains(normalized);
+
+      if (normalized.length > 0 && !normalized.some((d) => d.name === domain())) {
+        setDomain(normalized[0].name);
+      }
+      if (normalized.length === 0) setLocalError(t("rightPane.switch.noDomains"));
+    } catch (e) {
+      setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function onApply() {
+    setLocalError("");
+    try {
+      const u = new URL(ensureSlash(backendUrl()));
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+      const chosen = (domain() || "").trim();
+      if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
+
+      await props.onApply({
+        backendLink: ensureSlash(backendUrl().trim()),
+        domain: chosen,
+      });
+    } catch (e) {
+      setLocalError(e.message || String(e));
+    }
+  }
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            {t("rightPane.switch.title")}
+          </h3>
+
+          {/* Backend URL first */}
+          <label class="block mb-3">
+            <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.backend.label")}</span>
+            <div class="mt-1 flex gap-2">
+              <input
+                class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                value={backendUrl()}
+                onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                placeholder="https://ui.savva.app/api/"
+                spellcheck={false}
+              />
+              <button
+                class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                onClick={handleReload}
+                disabled={fetching()}
+                title={t("rightPane.switch.reload.title")}
+              >
+                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+              </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
+          </label>
+
+          {/* Domain depends on backend /info */}
+          <label class="block mb-1">
+            <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
+          </label>
+          <select
+            class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+            value={domain()}
+            onChange={(e) => setDomain(e.currentTarget.value)}
+            disabled={fetching() || domains().length === 0}
+          >
+            {domains().map((d) => (
+              <option value={d.name}>{d.name}</option>
+            ))}
+          </select>
+
+          {/* Small details for selected domain (optional, helpful) */}
+          <Show when={selectedDomainObj()}>
+            <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
+              <Show when={selectedDomainObj().website}>
+                <div>
+                  {t("rightPane.switch.domain.website")}:{" "}
+                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                    {selectedDomainObj().website}
+                  </a>
+                </div>
+              </Show>
+
+            </div>
+          </Show>
+
+          {/* Errors */}
+          <Show when={localError() || props.error}>
+            <p class="mt-2 text-sm text-red-500">
+              {t("common.error")}: {localError() || props.error?.message}
+            </p>
+          </Show>
+
+          {/* Actions */}
+          <div class="mt-4 flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-red-500 text-white hover:bg-red-600"
+              onClick={props.onReset}
+              title={t("rightPane.switch.reset.title")}
+            >
+              {t("rightPane.switch.reset")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              onClick={onApply}
+              disabled={props.loading || fetching()}
+            >
+              {props.loading || fetching() ? t("common.applying") : t("common.apply")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
+<file path="src/hooks/useConnect.js">
+import { createSignal, onMount } from "solid-js";
+import { parse } from "yaml";
+
+export function useConnect() {
+  const [config, setConfig] = createSignal(null);
+  const [info, setInfo] = createSignal(null);
+  const [error, setError] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+
+  onMount(async () => {
+    try {
+      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
+      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
+      const text = await res.text();
+      const data = parse(text);
+      if (!data.backendLink) throw new Error("Missing backendLink in config");
+
+      const backend = data.backendLink.endsWith("/")
+        ? data.backendLink
+        : data.backendLink + "/";
+
+      const cfg = {
+        domain: data.domain || "",
+        backendLink: backend,
+        default_ipfs_link: data.default_ipfs_link || ""
+      };
+      setConfig(cfg);
+
+      const infoRes = await fetch(cfg.backendLink + "info");
+      if (!infoRes.ok) throw new Error(`/info failed: ${infoRes.status}`);
+      setInfo(await infoRes.json());
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  return { config, info, error, loading };
+}
+</file>
+
 <file path="src/i18n/useI18n.js">
 // src/i18n/useI18n.js
 import { createSignal } from "solid-js";
@@ -323,48 +1032,117 @@ export function useI18n() {
 </file>
 
 <file path="src/pages/Settings.jsx">
-// src/pages/Settings.jsx
-import { navigate } from "../routing/hashRouter";
-import { useI18n } from "../i18n/useI18n";
+import { createSignal, Show } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
 
 export default function Settings() {
-  const { t, showKeys, setShowKeys } = useI18n();
+  const app = useApp();
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
+
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      await app.enableLocalIpfs(apiUrl().trim());
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
-    <div class="p-4 max-w-7xl mx-auto">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded shadow">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl">{t("settings.title")}</h2>
-          <button
-            class="px-3 py-1 rounded bg-blue-500 dark:bg-blue-700 text-white hover:bg-blue-600 dark:hover:bg-blue-800 transition"
-            onClick={() => navigate("/", { replace: true })}
-          >
-            {t("settings.close")}
-          </button>
+    <main class="p-4 max-w-3xl mx-auto space-y-6">
+      <h2 class="text-2xl font-semibold">Settings</h2>
+
+      {/* Local IPFS */}
+      <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+        <h3 class="text-lg font-medium">Local IPFS</h3>
+
+        <label class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={app.localIpfsEnabled()}
+            onInput={(e) => {
+              const checked = e.currentTarget.checked;
+              if (!checked) {
+                app.disableLocalIpfs();
+              }
+            }}
+          />
+          <span>Use local IPFS node</span>
+        </label>
+
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-end">
+          <label class="block">
+            <span class="text-sm text-gray-700 dark:text-gray-300">Local IPFS API URL</span>
+            <input
+              class="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              value={apiUrl()}
+              onInput={(e) => setApiUrl(e.currentTarget.value)}
+              placeholder="http://localhost:5001"
+              spellcheck={false}
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              We will call <code>/api/v0/config/show</code> to discover your local Gateway URL.
+            </p>
+          </label>
+
+          <Show when={!app.localIpfsEnabled()} fallback={
+            <button
+              class="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+              onClick={() => app.disableLocalIpfs()}
+            >
+              Disable
+            </button>
+          }>
+            <button
+              class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              onClick={onEnableLocal}
+              disabled={testing()}
+              title="Probe local IPFS and enable"
+            >
+              {testing() ? "Checking…" : "Test & enable"}
+            </button>
+          </Show>
         </div>
 
-        {/* Debug section */}
-        <section class="mt-4">
-          <h3 class="font-bold mb-2 text-gray-900 dark:text-gray-100">
-            {t("settings.debug.title")}
-          </h3>
-          <div class="rounded border border-gray-200 dark:border-gray-700 p-4">
-            <label class="flex items-center gap-2 cursor-pointer text-gray-900 dark:text-gray-100">
-              <input
-                type="checkbox"
-                class="h-4 w-4"
-                checked={showKeys()}
-                onInput={(e) => setShowKeys(e.currentTarget.checked)}
-              />
-              <span>{t("settings.debug.showKeys.label")}</span>
-            </label>
-            <p class="text-sm mt-2 text-gray-600 dark:text-gray-200">
-              {t("settings.debug.showKeys.help")}
-            </p>
-          </div>
-        </section>
-      </div>
-    </div>
+        <div class="text-sm text-gray-600 dark:text-gray-300">
+          Status:{" "}
+          <span class={
+            app.localIpfsStatus() === "ok" ? "text-emerald-600" :
+              app.localIpfsStatus() === "down" ? "text-red-500" : "opacity-70"
+          }>
+            {app.localIpfsStatus()}
+          </span>
+          <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+            <span class="ml-2 opacity-70">• Gateway: {app.localIpfsGateway()}</span>
+          </Show>
+        </div>
+      </section>
+
+      <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+        <h3 class="text-lg font-medium">Developer</h3>
+
+        <label class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={showKeys()}
+            onInput={(e) => setShowKeys(e.currentTarget.checked)}
+          />
+          <span>Show i18n keys instead of translations</span>
+        </label>
+
+        <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <p class="mb-1 opacity-80">Preview:</p>
+          <ul class="list-disc pl-6">
+            <li>{t("rightPane.switch.title")}</li>
+            <li>{t("rightPane.switch.backend.label")}</li>
+            <li>{t("rightPane.switch.domain.label")}</li>
+            <li>{t("common.apply")}</li>
+            <li>{t("common.cancel")}</li>
+          </ul>
+        </div>
+      </section>
+    </main>
   );
 }
 </file>
@@ -398,16 +1176,6 @@ export function useHashRouter() {
   });
   return { route, navigate };
 }
-</file>
-
-<file path="src/index.jsx">
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./App";
-
-const root = document.getElementById("root");
-
-render(() => <App />, root);
 </file>
 
 <file path="src/vite-env.d.js">
@@ -531,40 +1299,302 @@ Learn more about deploying your application with the [documentations](https://vi
 }
 </file>
 
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
+<file path="src/context/AppContext.jsx">
+import { createContext, useContext, createSignal, onMount, createMemo, onCleanup } from "solid-js";
+import { parse } from "yaml";
+import { getChainMeta } from "../blockchain/chains";
+import { switchOrAddChain } from "../blockchain/wallet";
+import { pushToast, pushErrorToast, errorDetails } from "../ux/toast";
 import { useI18n } from "../i18n/useI18n";
 
-export default function Header({ onTogglePane }) {
-  const { t } = useI18n();
 
-  return (
-    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
-        {t("app.title")}
-      </h1>
-      <button
-        class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
-        onClick={onTogglePane}
-        aria-label="Open menu"
-      >
-        <svg
-          class="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
-      </button>
-    </header>
-  );
+
+// ---------- helpers ----------
+function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
+function trimSlash(s) { return (s || "").replace(/\/+$/g, ""); }
+async function fetchWithTimeout(url, { timeoutMs = 7000, method = "GET", headers, signal, body } = {}) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
+  if (signal) signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  try {
+    const res = await fetch(url, { method, headers, body, signal: controller.signal, cache: "no-store" });
+    return res;
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
+// ---------- context ----------
+const AppContext = createContext();
+const OVERRIDE_KEY = "connect_override_v1";
+const IPFS_LOCAL_KEY = "ipfs_local_enabled_v1";
+const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
+const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway_v1";
+
+function pickPersistable(cfg) {
+  if (!cfg) return null;
+  return {
+    domain: cfg.domain || "",
+    backendLink: ensureSlash(cfg.backendLink || "")
+  };
+}
+
+function loadOverride() {
+  try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; }
+}
+function saveOverride(obj) {
+  try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { }
+}
+
+export function AppProvider(props) {
+  const i18n = useI18n();
+  const [config, setConfig] = createSignal(null);
+  const [info, setInfo] = createSignal(null);
+  const [error, setError] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = createSignal(null);
+
+  // Local IPFS prefs/state
+  const [localIpfsEnabled, setLocalIpfsEnabled] = createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
+  const [localIpfsApiUrl, setLocalIpfsApiUrl] = createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
+  const [localIpfsGateway, setLocalIpfsGateway] = createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
+  const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown"); // "unknown" | "ok" | "down"
+  let ipfsMonitorTid = null;
+
+  async function fetchInfo(cfg) {
+    const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+    return await res.json();
+  }
+
+  async function applyConfig(nextCfg) {
+    setConfig(nextCfg);
+    const data = await fetchInfo(nextCfg);
+    setInfo(data);
+    setLastUpdatedAt(Date.now());
+  }
+
+  async function init() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
+      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
+      const text = await res.text();
+      const data = parse(text) || {};
+      if (!data.backendLink) throw new Error("Missing backendLink in config");
+
+      const baseCfg = {
+        domain: data.domain || "",
+        backendLink: ensureSlash(data.backendLink),
+        gear: !!data.gear,
+      };
+      const ovr = loadOverride();
+      const merged = { ...baseCfg, ...(ovr ? { ...ovr } : {}) };
+      await applyConfig(merged);
+
+      // kick off local IPFS monitor if enabled
+      if (localIpfsEnabled() && localIpfsApiUrl()) startLocalIpfsMonitor();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ----- Connect changes -----
+  async function updateConnect(partial) {
+    try {
+      setLoading(true);
+      setError(null);
+      const cur = config() || {};
+      const next = {
+        ...cur,
+        ...partial,
+        backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink),
+      };
+      const backendChanged = next.backendLink !== cur.backendLink;
+      if (backendChanged) {
+        await applyConfig(next);
+      } else {
+        setConfig(next);
+        setLastUpdatedAt(Date.now());
+      }
+      saveOverride(next);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function setDomain(nextDomain) {
+    const cur = config() || {};
+    const next = { ...cur, domain: nextDomain || "" };
+    setConfig(next);
+    saveOverride(next);
+    setLastUpdatedAt(Date.now());
+  }
+
+  async function clearConnectOverride() {
+    saveOverride(null);
+    await init();
+  }
+
+  onMount(init);
+  onCleanup(() => stopLocalIpfsMonitor());
+
+  // ----- Derived helpers from /info -----
+  const supportedDomains = createMemo(() => {
+    const data = info();
+    const list = Array.isArray(data?.domains) ? data.domains : [];
+    return list.map((d) => (typeof d === "string" ? d : d?.name)).filter((name) => typeof name === "string" && name.trim().length > 0);
+  });
+
+  const selectedDomain = createMemo(() => {
+    const data = info();
+    const cur = config();
+    if (!data || !cur) return null;
+    const list = Array.isArray(data.domains) ? data.domains : [];
+    return list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) || null;
+  });
+
+  const desiredChainId = createMemo(() => (typeof info()?.blockchain_id === "number" ? info().blockchain_id : null));
+  const desiredChain = createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
+  async function ensureWalletOnDesiredChain() {
+    const meta = desiredChain();
+    if (!meta) throw new Error("Unknown target chain");
+    await switchOrAddChain(meta);
+  }
+
+  const remoteIpfsGateways = createMemo(() => {
+    const arr = info()?.ipfs_gateways;
+    return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
+  });
+
+  const activeIpfsGateways = createMemo(() => {
+    if (localIpfsEnabled() && localIpfsGateway()) {
+      return [ensureSlash(localIpfsGateway()), ...remoteIpfsGateways()];
+    }
+    return remoteIpfsGateways();
+  });
+
+  // ----- Local IPFS: probe + monitor -----
+  async function probeLocalIpfs(apiUrl) {
+    const base = trimSlash(apiUrl || "");
+    if (!base) throw new Error("Local IPFS API URL is empty");
+    // CORS note: browser needs CORS on local node
+    const url = `${base}/api/v0/config/show`;
+    const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
+    if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
+    const cfg = await res.json();
+    let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
+    if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
+    return ensureSlash(gw);
+  }
+
+  async function enableLocalIpfs(apiUrl) {
+    try {
+      const gw = await probeLocalIpfs(apiUrl);
+      setLocalIpfsEnabled(true);
+      setLocalIpfsApiUrl(apiUrl);
+      setLocalIpfsGateway(gw);
+      localStorage.setItem(IPFS_LOCAL_KEY, "1");
+      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+      setLocalIpfsStatus("ok");
+      pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
+      startLocalIpfsMonitor();
+      return gw;
+    } catch (e) {
+      setLocalIpfsEnabled(false);
+      setLocalIpfsStatus("down");
+      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+      throw e;
+    }
+  }
+
+  function disableLocalIpfs() {
+    stopLocalIpfsMonitor();
+    setLocalIpfsEnabled(false);
+    setLocalIpfsGateway("");
+    setLocalIpfsStatus("unknown");
+    localStorage.setItem(IPFS_LOCAL_KEY, "0");
+    localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
+    pushToast({ type: "info", message: "Local IPFS disabled" });
+  }
+
+  async function pingLocalIpfs() {
+    try {
+      const base = trimSlash(localIpfsApiUrl());
+      if (!base) throw new Error("No API URL");
+      const res = await fetchWithTimeout(`${base}/api/v0/id`, { method: "POST", timeoutMs: 5000 });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setLocalIpfsStatus("ok");
+      return true;
+    } catch (e) {                      // <-- add (e)
+      setLocalIpfsStatus("down");
+      pushErrorToast(e, { op: "pingLocalIpfs", apiUrl: localIpfsApiUrl() });
+      return false;
+    }
+  }
+
+  function startLocalIpfsMonitor() {
+    stopLocalIpfsMonitor();
+    // first immediate ping (don’t spam toasts on the very first success)
+    pingLocalIpfs();
+    ipfsMonitorTid = setInterval(pingLocalIpfs, 20000);
+  }
+  function stopLocalIpfsMonitor() {
+    if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
+  }
+
+  const value = {
+    // state
+    config, info, error, loading, lastUpdatedAt,
+
+    // preferences/state: local IPFS
+    localIpfsEnabled,
+    localIpfsApiUrl,
+    localIpfsGateway,
+    localIpfsStatus,
+
+    // convenience
+    supportedDomains,
+    selectedDomain,
+    desiredChainId,
+    desiredChain,
+    remoteIpfsGateways,
+    activeIpfsGateways,
+
+    // actions
+    reload: init,
+    updateConnect,
+    clearConnectOverride,
+    setDomain,
+    ensureWalletOnDesiredChain,
+
+    // local IPFS actions
+    enableLocalIpfs,
+    disableLocalIpfs,
+    setLocalIpfsApiUrl, // so Settings can update the URL field live
+
+    // i18n (now globally available through AppContext)
+    t: i18n.t,
+    lang: i18n.lang,
+    setLang: i18n.setLang,
+    showKeys: i18n.showKeys,
+    setShowKeys: i18n.setShowKeys,
+    i18nAvailable: i18n.available,
+  };
+
+  return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
+}
+
+export function useApp() {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
+  return ctx;
 }
 </file>
 
@@ -597,30 +1627,6 @@ export function useTheme() {
 }
 </file>
 
-<file path="src/i18n/en.js">
-// Auto-generated by i18n-sync.mjs. Do not edit by hand.
-export default {
-  "app.title": "SAVVA · SolidJS",
-  "card.tailwindWorks": "Tailwind works?",
-  "debug.rightOpen": "???",
-  "debug.theme": "???",
-  "greeting.hello": "Hello, Alex 👋",
-  "rightPane.language": "Language",
-  "rightPane.option1": "Option 1",
-  "rightPane.option2": "Option 2",
-  "rightPane.option3": "Option 3",
-  "rightPane.showKeys": "Show translation keys",
-  "ui.mode.dark": "Dark mode",
-  "ui.mode.light": "Light mode",
-  "settings.title": "Settings",
-  "settings.close": "Close",
-  "settings.debug.title": "Debug",
-  "settings.debug.showKeys.label": "Show translation keys",
-  "settings.debug.showKeys.help":
-    "When enabled, every translated string will append its key in square brackets.",
-};
-</file>
-
 <file path="src/i18n/ru.js">
 // Auto-generated by i18n-sync.mjs. Do not edit by hand.
 export default {
@@ -643,6 +1649,21 @@ export default {
   "settings.debug.showKeys.help":
     "Если включено, каждая строка добавит в конец свой ключ в квадратных скобках.",
 };
+</file>
+
+<file path="src/index.jsx">
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./context/AppContext.jsx";
+
+const root = document.getElementById("root");
+
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
 </file>
 
 <file path="index.html">
@@ -689,33 +1710,6 @@ export default {
 </html>
 </file>
 
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@solidjs/router": "^0.15.3",
-    "solid-js": "^1.9.8",
-    "yaml": "^2.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
-  }
-}
-</file>
-
 <file path="postcss.config.js">
 // postcss.config.js
 export default {
@@ -742,6 +1736,200 @@ export default defineConfig({
 });
 </file>
 
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import {
+  connectWallet,
+  walletAccount,
+  walletChainId,
+  isWalletAvailable,
+} from "../blockchain/wallet";
+import { getChainLogo } from "../blockchain/chainLogos";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const [copyState, setCopyState] = createSignal(""); // "", "copied"
+
+  const desiredId = () => app.desiredChainId();   // number | null
+  const mismatched = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  async function onConnect() {
+    try {
+      await connectWallet();
+      if (desiredId()) {
+        try { await app.ensureWalletOnDesiredChain(); } catch {}
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+      setCopyState("copied");
+      setTimeout(() => setCopyState(""), 1200);
+    } catch {}
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  const chainLogoSrc = () => {
+    const id = desiredId();
+    return id ? getChainLogo(id) : null;
+  };
+
+  return (
+    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
+      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
+        {app.config()?.domain || "…"}
+      </h1>
+
+      <div class="flex items-center gap-2 mr-2">
+        {/* Wallet area */}
+        <Show
+          when={walletAccount()}
+          fallback={
+            <button
+              class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60"
+              onClick={onConnect}
+              disabled={!isWalletAvailable()}
+              title={isWalletAvailable() ? "Connect your wallet" : "No wallet detected"}
+            >
+              Connect wallet
+            </button>
+          }
+        >
+          <div class="flex items-center gap-2">
+            {/* Address pill */}
+            <button
+              class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+              onClick={copyAddress}
+              title="Click to copy address"
+            >
+              {shortAddr(walletAccount())}
+            </button>
+
+            {/* If chain is correct → logo only; if wrong → red Change chain button */}
+            <Show when={!mismatched()} fallback={
+              <button
+                class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                onClick={onSwitchChain}
+                title="Switch to the required network"
+              >
+                Change chain
+              </button>
+            }>
+              <Show when={chainLogoSrc()}>
+                <img
+                  src={chainLogoSrc()}
+                  alt="chain"
+                  class="w-5 h-5"
+                  title="Connected to the required network"
+                />
+              </Show>
+            </Show>
+
+            {/* tiny copied hint */}
+            <Show when={copyState() === "copied"}>
+              <span class="text-xs text-emerald-600">Copied</span>
+            </Show>
+          </div>
+        </Show>
+
+        {/* Right menu toggle */}
+        <button
+          class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
+          onClick={onTogglePane}
+          aria-label="Open menu"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </header>
+  );
+}
+</file>
+
+<file path="src/i18n/en.js">
+// Auto-generated by i18n-sync.mjs. Do not edit by hand.
+export default {
+  "app.title": "SAVVA · SolidJS",
+  "card.tailwindWorks": "Tailwind works?",
+  "debug.rightOpen": "???",
+  "debug.theme": "???",
+  "greeting.hello": "Hello, Alex 👋",
+  "rightPane.language": "Language",
+  "rightPane.option1": "Option 1",
+  "rightPane.option2": "Option 2",
+  "rightPane.option3": "Option 3",
+  "rightPane.showKeys": "Show translation keys",
+  "ui.mode.dark": "Dark mode",
+  "ui.mode.light": "Light mode",
+  "settings.title": "Settings",
+  "settings.close": "Close",
+  "settings.debug.title": "Debug",
+  "settings.debug.showKeys.label": "Show translation keys",
+  "settings.debug.showKeys.help":
+    "When enabled, every translated string will append its key in square brackets.",
+      "rightPane.close": "Close menu",
+  "rightPane.settings": "Settings",
+  "rightPane.switch.open": "Switch backend / domain",
+  "rightPane.switch.title": "Switch backend / domain",
+  "rightPane.switch.domain.label": "Domain",
+  "rightPane.switch.backend.label": "Backend URL (ends with /)",
+  "rightPane.switch.reset": "Reset to defaults",
+  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
+
+  "init.title": "SAVVA · Init",
+  "init.loading": "Loading configuration…",
+
+  "common.cancel": "Cancel",
+  "common.apply": "Apply",
+  "common.applying": "Applying…",
+  "common.error": "Error",
+  "common.retry": "Retry",
+    "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.reload": "Load domains",
+  "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
+
+  "rightPane.switch.domain.help": "Choose the domain from the backend reporting supported list.",
+  "rightPane.switch.domain.empty": "No domains available. Check backend URL and try loading again.",
+  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.validation.domain": "Domain cannot be empty.",
+  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
+  "rightPane.switch.domain.website": "Website",
+
+  "common.loading": "Loading…",
+};
+</file>
+
 <file path="src/index.css">
 /* src/index.css */
 @import "tailwindcss";
@@ -759,16 +1947,47 @@ export default {
 };
 </file>
 
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@solidjs/router": "^0.15.3",
+    "solid-js": "^1.9.8",
+    "viem": "^2.33.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
+}
+</file>
+
 <file path="src/components/RightPane.jsx">
 // src/components/RightPane.jsx
-import { createEffect } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { useTheme } from "../hooks/useTheme";
 import { useI18n, LANG_INFO } from "../i18n/useI18n";
 import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const [theme, toggleTheme] = useTheme();
   const { t, lang, setLang, available } = useI18n();
+  const app = useApp();
 
   createEffect(() => {
     console.log("RightPane: isOpen changed to:", isOpen());
@@ -780,6 +1999,18 @@ export default function RightPane({ isOpen, onClose }) {
 
   RightPane.theme = theme;
 
+  const [showSwitch, setShowSwitch] = createSignal(false);
+
+  async function applySwitch(values) {
+    await app.updateConnect(values);
+    setShowSwitch(false);
+  }
+
+  async function resetDefaults() {
+    await app.clearConnectOverride();
+    setShowSwitch(false);
+  }
+
   return (
     <>
       <div
@@ -789,28 +2020,26 @@ export default function RightPane({ isOpen, onClose }) {
         onClick={handlePanelClick}
         data-testid="right-pane"
       >
-        <div class="p-4 space-y-2">
+        <div class="p-4 space-y-3">
           <button
-            class="mb-4 p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            class="p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
             onClick={onClose}
-            aria-label="Close menu"
+            aria-label={t("rightPane.close")}
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
 
-          {/* Theme toggle */}
           <button
-            onClick={() => { toggleTheme(); console.log("Theme toggled, new theme:", theme()); }}
+            onClick={() => { toggleTheme(); console.log("Theme toggled:", theme()); }}
             class="w-full text-left px-4 py-2 bg-blue-500 dark:bg-blue-700 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-800 transition"
           >
             {theme() === "dark" ? t("ui.mode.dark") : t("ui.mode.light")}
             <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
           </button>
 
-          {/* Language selector */}
-          <div class="pt-2">
+          <div class="pt-1">
             <label class="block text-gray-900 dark:text-gray-100 mb-1">{t("rightPane.language")}</label>
             <select
               class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
@@ -828,14 +2057,46 @@ export default function RightPane({ isOpen, onClose }) {
             </select>
           </div>
 
-          {/* Settings entry */}
-          <button
-            class="w-full text-left px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-gray-100"
-            onClick={() => { navigate("/settings"); onClose(); }}
-          >
-            {/* You can i18n this label later if needed */}
-            Settings
-          </button>
+          {/* Menu list */}
+          <nav class="pt-2">
+            <ul class="space-y-1">
+              <li>
+                <div
+                  class="px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { navigate("/settings"); onClose(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate("/settings"); onClose();
+                    }
+                  }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setShowSwitch(true);
+                      }
+                    }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
+            </ul>
+          </nav>
         </div>
       </div>
 
@@ -847,6 +2108,17 @@ export default function RightPane({ isOpen, onClose }) {
           onClick={onClose}
         />
       )}
+
+      <SwitchConnectDialog
+        open={showSwitch()}
+        domain={app.config()?.domain}
+        backendLink={app.config()?.backendLink}
+        loading={app.loading()}
+        error={app.error()}
+        onApply={applySwitch}
+        onReset={resetDefaults}
+        onClose={() => setShowSwitch(false)}
+      />
     </>
   );
 }
@@ -857,11 +2129,16 @@ import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
 import Settings from "./pages/Settings";
-import { useHashRouter } from "./routing/hashRouter"; // ← add
+import { useHashRouter } from "./routing/hashRouter";
+import { useApp } from "./context/AppContext.jsx";
+import { useI18n } from "./i18n/useI18n";
+import Toaster from "./components/Toaster";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
-  const { route } = useHashRouter(); // ← add
+  const { route } = useHashRouter();
+  const app = useApp();
+  const { t } = useI18n();
 
   onMount(() => {
     const handleKeydown = (e) => { if (e.key === "Escape") setIsPaneOpen(false); };
@@ -878,16 +2155,39 @@ export default function App() {
 
       <Show when={route() === "/settings"} fallback={
         <main class="p-4 max-w-7xl mx-auto">
-          <h2 class="text-xl">Hello, Alex 👋</h2>
-          <div class="card bg-white dark:bg-gray-800 p-6 rounded shadow">
-            <p>Tailwind works?</p>
-            <p>Right Pane Open: {isPaneOpen() ? "Yes" : "No"}</p>
-            <p>Theme: {RightPane.theme ? (RightPane.theme() === "dark" ? "Dark" : "Light") : "Light"}</p>
-          </div>
+          <h2 class="text-xl">{t("init.title")}</h2>
+
+          <Show when={app.loading()}>
+            <p>{t("init.loading")}</p>
+          </Show>
+
+          <Show when={app.error()}>
+            <div class="text-red-500">
+              {t("common.error")}: {app.error().message}
+              <button
+                class="ml-3 px-2 py-1 rounded bg-blue-500 text-white"
+                onClick={app.reload}
+              >
+                {t("common.retry")}
+              </button>
+            </div>
+          </Show>
+
+          <Show when={!app.loading() && !app.error()}>
+            <div class="space-y-2 text-sm">
+              <div><span class="opacity-60">domain:</span> {app.config()?.domain}</div>
+              <div><span class="opacity-60">backend:</span> {app.config()?.backendLink}</div>
+            </div>
+
+            <pre class="mt-3 text-xs bg-black/10 p-3 rounded overflow-auto">
+              {JSON.stringify(app.info(), null, 2)}
+            </pre>
+          </Show>
         </main>
       }>
         <Settings />
       </Show>
+      <Toaster />
     </div>
   );
 }
