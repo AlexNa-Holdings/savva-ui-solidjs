@@ -11,5 +11,11 @@ export default {
   "rightPane.option3": "Option 3",
   "rightPane.showKeys": "Show translation keys",
   "ui.mode.dark": "Dark mode",
-  "ui.mode.light": "Light mode"
+  "ui.mode.light": "Light mode",
+  "settings.title": "Settings",
+  "settings.close": "Close",
+  "settings.debug.title": "Debug",
+  "settings.debug.showKeys.label": "Show translation keys",
+  "settings.debug.showKeys.help":
+    "When enabled, every translated string will append its key in square brackets.",
 };

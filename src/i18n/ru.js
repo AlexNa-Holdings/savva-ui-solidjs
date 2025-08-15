@@ -11,5 +11,11 @@ export default {
   "rightPane.option3": "Опция 3",
   "rightPane.showKeys": "Показывать ключи",
   "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема"
+  "ui.mode.light": "Светлая тема",
+  "settings.title": "Настройки",
+  "settings.close": "Закрыть",
+  "settings.debug.title": "Отладка",
+  "settings.debug.showKeys.label": "Показывать ключи переводов",
+  "settings.debug.showKeys.help":
+    "Если включено, каждая строка добавит в конец свой ключ в квадратных скобках.",
 };
