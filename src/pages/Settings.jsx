@@ -2,7 +2,8 @@
 import { useApp } from "../context/AppContext.jsx";
 import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
 import BackIconButton from "../components/ui/BackIconButton.jsx";
-import Assets from "../components/settings/Assets.jsx";  
+import Assets from "../components/settings/Assets.jsx";
+import DeveloperSection from "../components/settings/DeveloperSection.jsx";
 
 export default function Settings() {
   const app = useApp();
@@ -15,26 +16,11 @@ export default function Settings() {
         <BackIconButton title={t("settings.back")} />
       </div>
 
-      {/* Local IPFS (separate component) */}
       <LocalIpfsSection />
+      <Assets />
 
-      <Assets/>
-
-      {/* Developer */}
-      <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
-        <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
-
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={app.showKeys()}
-            onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
-          />
-          <span>{t("settings.developer.showKeys")}</span>
-        </label>
-
-      </section>
+      {/* Developer (modular) */}
+      <DeveloperSection />
     </main>
   );
 }
-

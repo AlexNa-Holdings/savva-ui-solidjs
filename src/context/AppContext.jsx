@@ -12,6 +12,8 @@ import { fetchWithTimeout } from "../utils/net.js";
 // ───────────────────────────────────────────────────────────────────────────────
 function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
 function trimSlash(s) { if (!s) return ""; return s.endsWith("/") ? s.slice(0, -1) : s; }
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 // ---------- context ----------
 const AppContext = createContext();
@@ -113,30 +115,38 @@ export function AppProvider(props) {
   }
 
   // ----- Connect changes -----
-  async function updateConnect(partial) {
-    try {
-      setLoading(true);
-      setError(null);
-      const cur = config() || {};
-      const next = {
-        ...cur,
-        ...partial,
-        backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink),
-      };
-      const backendChanged = next.backendLink !== cur.backendLink;
-      if (backendChanged) {
-        await applyConfig(next);
-      } else {
-        setConfig(next);
-        setLastUpdatedAt(Date.now());
-      }
-      saveOverride(next);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
+async function updateConnect(partial) {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const cur = config() || {};
+    const next = {
+      ...cur,
+      ...partial,
+      backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink),
+    };
+    const backendChanged = next.backendLink !== cur.backendLink;
+
+    if (backendChanged) {
+      await applyConfig(next);
+    } else {
+      setConfig(next);
+      setLastUpdatedAt(Date.now());
     }
+    saveOverride(next);
+  } catch (e) {
+    setError(e);
+    // 🔔 Make the error visible globally (dialog may close after Apply)
+    pushErrorToast(e, {
+      op: "updateConnect",
+      backendLink: partial?.backendLink ?? cur?.backendLink,
+      domain: partial?.domain ?? cur?.domain,
+    });
+  } finally {
+    setLoading(false);
   }
+}
 
   function setDomain(nextDomain) {
     const cur = config() || {};
@@ -163,16 +173,20 @@ export function AppProvider(props) {
       .filter((name) => typeof name === "string" && name.trim().length > 0);
   });
 
+  // ✅ Single source of truth for domain:
+  // Prefer explicit config().domain, even if /info hasn't listed it yet.
   const selectedDomain = createMemo(() => {
-    const data = info();
-    const cur = config();
-    if (!data || !cur) return null;
-    const list = Array.isArray(data.domains) ? data.domains : [];
-    return (
-      list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) ||
-      null
-    );
+    const curDomain = (config()?.domain || "").trim();
+    const list = Array.isArray(info()?.domains) ? info().domains : [];
+    if (curDomain) {
+      const found = list.find((d) => eq(dn(d), curDomain));
+      return found ? (typeof found === "string" ? { name: found } : found) : { name: curDomain };
+    }
+    const first = list[0];
+    return typeof first === "string" ? { name: first } : first || null;
   });
+
+  const selectedDomainName = createMemo(() => dn(selectedDomain()) || "");
 
   const desiredChainId = createMemo(() =>
     typeof info()?.blockchain_id === "number" ? info().blockchain_id : null
@@ -216,17 +230,10 @@ export function AppProvider(props) {
     return ensureSlash(raw || "");
   });
 
-  // Current domain name string
-  const selectedDomainName = createMemo(() => {
-    const d = selectedDomain();
-    if (!d) return "";
-    return typeof d === "string" ? d : d?.name || "";
-  });
-
   // Prefix like <assetsBase>/<domain>/
   const domainAssetsPrefix = createMemo(() => {
     const base = assetsBaseUrl();
-    const dom = selectedDomainName();
+    const dom  = selectedDomainName();
     if (!base || !dom) return "";
     return ensureSlash(base) + dom.replace(/^\//, "") + "/";
   });
@@ -242,22 +249,35 @@ export function AppProvider(props) {
 
   // Helper: load & parse the default pack config so components (BrandLogo, etc.)
   // can still read logos/locales when there is no per-domain config.
-  async function loadDefaultAssetsConfig(fallbackError) {
+  // Now stamp-aware and non-clobbering by default.
+  async function loadDefaultAssetsConfig(fallbackError, { stamp, force = false } = {}) {
     try {
+      // If a newer refresh started, bail
+      if (stamp && stamp !== assetsLoadSeq) return;
+
+      // Unless explicitly forced (real failure/new domain), never clobber
+      // an already active remote pack with the default pack during transient states.
+      if (!force && domainAssetsState().source === "remote") return;
+
       const res = await fetchWithTimeout(`${DEFAULT_DOMAIN_ASSETS_PREFIX}config.yaml`, { timeoutMs: 8000 });
       let parsed = null;
       if (res.ok) {
         const text = await res.text();
         try { parsed = parse(text) || null; } catch { parsed = null; }
       }
+
+      // Recheck staleness again right before committing
+      if (stamp && stamp !== assetsLoadSeq) return;
+
       setDomainAssetsState({
-        config: parsed,                     // <— critical: expose default config
+        config: parsed,
         loadedAt: new Date(),
         error: null,
         source: "default",
         prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
       });
     } catch (e) {
+      if (stamp && stamp !== assetsLoadSeq) return;
       setDomainAssetsState({
         config: null,
         loadedAt: new Date(),
@@ -268,23 +288,39 @@ export function AppProvider(props) {
     }
   }
 
+  // ✅ Prevent stale loads from clobbering current domain pack
+  let assetsLoadSeq = 0;
+
   // Loader for per-domain config with fallback to domain_default (parsed!)
   async function refreshDomainAssets() {
     const prefix = domainAssetsPrefix();
-    const url = `${prefix}config.yaml`;
+    const stamp  = ++assetsLoadSeq;
 
+    // If we don't yet have a computed prefix (e.g., info/domain not resolved),
+    // DO NOT clobber a good remote pack with default. Seed default only if nothing loaded.
+    if (!prefix) {
+      if (!domainAssetsState().source) {
+        await loadDefaultAssetsConfig(undefined, { stamp, force: false });
+      }
+      return;
+    }
+
+    const url = `${prefix}config.yaml`;
     try {
       const res = await fetchWithTimeout(url, { timeoutMs: 8000 });
 
+      // If this response is stale, ignore it
+      if (stamp !== assetsLoadSeq) return;
+
       if (res.status === 404) {
-        // no domain config -> use parsed /domain_default/config.yaml
-        await loadDefaultAssetsConfig();
+        await loadDefaultAssetsConfig(new Error("404"), { stamp, force: true });
         return;
       }
-
       if (!res.ok) {
-        // other HTTP errors; fall back to parsed default
-        await loadDefaultAssetsConfig(new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`));
+        await loadDefaultAssetsConfig(
+          new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`),
+          { stamp, force: true }
+        );
         return;
       }
 
@@ -293,12 +329,12 @@ export function AppProvider(props) {
       try {
         parsed = parse(text) || null;
       } catch (e) {
-        // parsing failed -> parsed default pack
-        await loadDefaultAssetsConfig(e);
+        await loadDefaultAssetsConfig(e, { stamp, force: true });
         return;
       }
 
-      // success → remote (per-domain) assets
+      // Still current? Commit it.
+      if (stamp !== assetsLoadSeq) return;
       setDomainAssetsState({
         config: parsed,
         loadedAt: new Date(),
@@ -307,11 +343,12 @@ export function AppProvider(props) {
         prefix, // ASSETS_BASE/<domain>/
       });
     } catch (e) {
-      // network/timeout → parsed default pack
-      await loadDefaultAssetsConfig(e);
+      if (stamp !== assetsLoadSeq) return;
+      await loadDefaultAssetsConfig(e, { stamp, force: true });
     }
   }
 
+  
   // Resolve an asset path using the *active* prefix (domain or default)
   function assetUrl(relPath) {
     if (!relPath) return "";
@@ -418,7 +455,7 @@ export function AppProvider(props) {
 
     // convenience
     supportedDomains,
-    selectedDomain,
+    selectedDomain,           // object with {name,...} (or null)
     desiredChainId,
     desiredChain,
     remoteIpfsGateways,

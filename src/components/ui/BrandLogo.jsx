@@ -1,6 +1,8 @@
 // src/components/ui/BrandLogo.jsx
-import { createMemo, createSignal, onMount, onCleanup, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
+/* src/components/ui/BrandLogo.jsx */
+import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { dbg } from "../../utils/debug";
 
 export default function BrandLogo(props) {
   const app = useApp();
@@ -63,6 +65,21 @@ export default function BrandLogo(props) {
 
   const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
 
+  // 🔎 Debug: log whenever the chosen logo src changes
+  createEffect(() => {
+    const s = src();
+    if (!s) return;
+    dbg.log("logo", "BrandLogo src picked", {
+      src: s,
+      relPath: relPath(),
+      dark: isDark(),
+      mobile: isMobile(),
+      domain: app.config?.()?.domain,
+      activePrefix: app.domainAssetsPrefix?.(),
+      source: app.domainAssetsSource?.(),
+    });
+  });
+
   const [imgBroken, setImgBroken] = createSignal(false);
   // reset broken flag whenever src changes
   createMemo(() => { src(); setImgBroken(false); });
@@ -78,7 +95,10 @@ export default function BrandLogo(props) {
           class={props.class || "h-8 w-auto"}
           decoding="async"
           loading="eager"
-          onError={() => setImgBroken(true)}
+          onError={() => {
+            dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
+            setImgBroken(true);
+          }}
         />
       </Show>
     </div>

@@ -1,6 +1,7 @@
 // src/components/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
+import { pushErrorToast } from "../ux/toast"; // ⬅️ new import
 
 function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
@@ -71,7 +72,11 @@ export default function SwitchConnectDialog(props) {
         setLocalError(t("rightPane.switch.noDomains"));
       }
     } catch (e) {
-      setLocalError(e.message || String(e));
+      // Do not show noise from fetch aborts
+      const msg = String(e?.message || e || "");
+      if (!(e?.name === "AbortError" || /aborted/i.test(msg))) {
+        setLocalError(msg);
+      }
     } finally {
       setFetching(false);
     }
@@ -107,7 +112,11 @@ export default function SwitchConnectDialog(props) {
         setLocalError(t("rightPane.switch.noDomains"));
       }
     } catch (e) {
-      setLocalError(e.message || String(e));
+      // Ignore abort noise here as well
+      const msg = String(e?.message || e || "");
+      if (!(e?.name === "AbortError" || /aborted/i.test(msg))) {
+        setLocalError(msg);
+      }
     } finally {
       setFetching(false);
     }
@@ -129,14 +138,16 @@ export default function SwitchConnectDialog(props) {
         await props.onApply({ backendLink: url, domain: chosen });
       }
 
-      // Enforce in the global app context (this is the fix)
-      await app.updateConnect?.({ backendLink: url });     // persists override & /info refresh if URL changed
-      await app.setDomain?.(chosen);                       // single source of truth for domain
-      await app.refreshDomainAssets?.();                   // immediate asset reload
+      // Enforce globally
+      await app.updateConnect?.({ backendLink: url }); // persists override & refresh /info if URL changed
+      await app.setDomain?.(chosen);                   // single source of truth for domain
+      await app.refreshDomainAssets?.();               // immediate asset reload
     } catch (e) {
-      setLocalError(e.message || String(e));
+      // Push to the global toast (persistent), clear local error line
+      pushErrorToast(e, { op: "switchConnect.apply", backendLink: (backendUrl() || "").trim(), domain: (domain() || "").trim() });
+      setLocalError("");
       setApplying(false);
-      return; // keep dialog open on error
+      return; // keep dialog open if needed
     }
 
     setApplying(false);
@@ -176,22 +187,20 @@ export default function SwitchConnectDialog(props) {
             <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
           </label>
 
-          {/* Domain select */}
-          <label class="block mb-1">
+          {/* Domain */}
+          <label class="block mb-3">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
+            <select
+              class="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              value={domain()}
+              onInput={(e) => setDomain(e.currentTarget.value)}
+            >
+              <For each={domains()}>{(d) => <option value={d.name}>{d.name}</option>}</For>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.domain.help")}</p>
           </label>
-          <select
-            class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name}>{d.name}</option>
-            ))}
-          </select>
 
-          {/* Optional details */}
+          {/* Optional domain details */}
           <Show when={selectedDomainObj()}>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
               <Show when={selectedDomainObj().website}>
@@ -205,7 +214,7 @@ export default function SwitchConnectDialog(props) {
             </div>
           </Show>
 
-          {/* Errors */}
+          {/* Inline errors (suppressed on Apply, still used for local validation / reload) */}
           <Show when={localError() || props.error}>
             <p class="mt-2 text-sm text-red-500">
               {t("common.error")}: {localError() || props.error?.message}

@@ -1,4 +1,5 @@
 // src/App.jsx
+/* src/App.jsx */
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -8,6 +9,7 @@ import { useApp } from "./context/AppContext.jsx";
 import { useI18n } from "./i18n/useI18n";
 import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
+import AssetDebugTap from "./dev/AssetDebugTap.jsx"; // ⬅️ debug tap (no UI)
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -25,6 +27,9 @@ export default function App() {
 
   return (
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+      {/* Passive logger; renders nothing */}
+      <AssetDebugTap />
+
       <Header onTogglePane={togglePane} />
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
 
