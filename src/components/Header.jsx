@@ -1,4 +1,4 @@
-// src/components/Header.jsx
+// File: src/components/Header.jsx
 import { Show, createSignal, onMount } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import {
@@ -6,9 +6,10 @@ import {
   walletAccount,
   walletChainId,
   isWalletAvailable,
-  eagerConnect,             // ← NEW
+  eagerConnect,
 } from "../blockchain/wallet";
 import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx"; // NEW import
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -18,7 +19,7 @@ function shortAddr(addr) {
 export default function Header({ onTogglePane }) {
   const app = useApp();
   const [copyState, setCopyState] = createSignal("");
-  const [eagerDone, setEagerDone] = createSignal(false);   // ← NEW
+  const [eagerDone, setEagerDone] = createSignal(false);
 
   const desiredId = () => app.desiredChainId();
   const mismatched = () =>
@@ -28,9 +29,7 @@ export default function Header({ onTogglePane }) {
 
   onMount(async () => {
     if (isWalletAvailable()) {
-      // Try rehydrate silently (no prompt)
       await eagerConnect();
-      // (Do NOT auto-switch network on eager connect; we only hint via UI.)
     }
     setEagerDone(true);
   });
@@ -38,7 +37,6 @@ export default function Header({ onTogglePane }) {
   async function onConnect() {
     try {
       await connectWallet();
-      // After manual connect, we can try switching to backend’s chain
       if (desiredId()) {
         try { await app.ensureWalletOnDesiredChain(); } catch {}
       }
@@ -72,23 +70,25 @@ export default function Header({ onTogglePane }) {
 
   return (
     <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
-        {app.config()?.domain || "…"}
-      </h1>
+      {/* Left: brand logo or title */}
+      <div class="ml-2 flex items-center">
+        <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-gray-900 dark:text-gray-100" />
+      </div>
 
+      {/* Right: wallet + menu */}
       <div class="flex items-center gap-2 mr-2">
         {/* Wallet area */}
         <Show
           when={walletAccount()}
           fallback={
-            // Only show Connect after we *tried* eager connect; hide if no wallet installed
             <Show when={eagerDone() && isWalletAvailable()}>
               <button
                 class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600"
                 onClick={onConnect}
-                title="Connect your wallet"
+                title={app.t("wallet.connect")}
+                aria-label={app.t("wallet.connect")}
               >
-                Connect wallet
+                {app.t("wallet.connect")}
               </button>
             </Show>
           }
@@ -98,7 +98,8 @@ export default function Header({ onTogglePane }) {
             <button
               class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
               onClick={copyAddress}
-              title="Click to copy address"
+              title={app.t("wallet.copyAddress")}
+              aria-label={app.t("wallet.copyAddress")}
             >
               {shortAddr(walletAccount())}
             </button>
@@ -110,9 +111,10 @@ export default function Header({ onTogglePane }) {
                 <button
                   class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
                   onClick={onSwitchChain}
-                  title="Switch to the required network"
+                  title={app.t("wallet.changeChain")}
+                  aria-label={app.t("wallet.changeChain")}
                 >
-                  Change chain
+                  {app.t("wallet.changeChain")}
                 </button>
               }
             >
@@ -121,14 +123,14 @@ export default function Header({ onTogglePane }) {
                   src={chainLogoSrc()}
                   alt="chain"
                   class="w-5 h-5"
-                  title="Connected to the required network"
+                  title={app.t("wallet.onRequiredNetwork")}
                 />
               </Show>
             </Show>
 
             {/* tiny copied hint */}
             <Show when={copyState() === "copied"}>
-              <span class="text-xs text-emerald-600">Copied</span>
+              <span class="text-xs text-emerald-600">{app.t("wallet.copied")}</span>
             </Show>
           </div>
         </Show>
@@ -137,7 +139,8 @@ export default function Header({ onTogglePane }) {
         <button
           class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
           onClick={onTogglePane}
-          aria-label="Open menu"
+          aria-label={app.t("menu.open")}
+          title={app.t("menu.open")}
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
