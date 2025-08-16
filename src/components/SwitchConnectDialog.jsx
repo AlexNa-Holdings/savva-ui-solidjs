@@ -1,10 +1,10 @@
-import { createSignal, createEffect, Show, createMemo } from "solid-js";
-import { useI18n } from "../i18n/useI18n";
+// src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
 
-function ensureSlash(s) {
-  if (!s) return "";
-  return s.endsWith("/") ? s : s + "/";
-}
+function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
 
 async function fetchInfoJSON(baseUrl, { signal } = {}) {
   const url = ensureSlash(baseUrl) + "info";
@@ -14,57 +14,59 @@ async function fetchInfoJSON(baseUrl, { signal } = {}) {
 }
 
 export default function SwitchConnectDialog(props) {
-  const { t } = useI18n();
+  const app = useApp();
+  const { t } = app;
 
-  // Form state
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? "");
-  const [domain, setDomain] = createSignal(props.domain ?? "");
-  const [domains, setDomains] = createSignal([]); // array of { name, ... }
+  // form state
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains] = createSignal([]); // [{ name }]
   const [fetching, setFetching] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
   const [localError, setLocalError] = createSignal("");
 
-  // Helper: current domain object
-  const selectedDomainObj = createMemo(() =>
-    (domains() || []).find((d) => d?.name === domain()) || null
-  );
+  let aborter;
 
-  // On open: fetch /info and populate domains (from info.domains[].name)
+  // selected domain object (from fetched /info)
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
+  });
+
+  // When dialog opens: hydrate fields from AppContext (single source of truth),
+  // fetch /info, and preselect the current domain if present.
   createEffect(async () => {
     if (!props.open) return;
 
     setLocalError("");
-    setBackendUrl(props.backendLink ?? "");
-    setDomain(props.domain ?? "");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
     setDomains([]);
 
-    // Validate URL; if invalid, show a tip and skip autopopulate
-    try {
-      const u = new URL(ensureSlash(backendUrl()));
-      if (!/^https?:$/.test(u.protocol)) throw new Error("bad protocol");
-    } catch {
-      setLocalError(t("rightPane.switch.validation.protocol"));
-      return;
-    }
-
-    const controller = new AbortController();
+    aborter?.abort();
+    aborter = new AbortController();
     setFetching(true);
-    try {
-      const info = await fetchInfoJSON(backendUrl(), { signal: controller.signal });
-      const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
 
-      // Expect objects with a .name string; fallback to []
-      const normalized = list
+    try {
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
         .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => d && typeof d.name === "string" && d.name.trim().length > 0);
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
 
       setDomains(normalized);
 
       if (normalized.length > 0) {
-        if (props.domain && normalized.some((d) => d.name === props.domain)) {
-          setDomain(props.domain);
-        } else {
-          setDomain(normalized[0].name);
-        }
+        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
+        const resolved =
+          normalized.find((d) => eq(d.name, wanted)) ||
+          normalized.find((d) => eq(d.name, domain())) ||
+          normalized[0];
+        setDomain(resolved.name);
       } else {
         setLocalError(t("rightPane.switch.noDomains"));
       }
@@ -73,14 +75,14 @@ export default function SwitchConnectDialog(props) {
     } finally {
       setFetching(false);
     }
-
-    return () => controller.abort();
   });
+
+  onCleanup(() => aborter?.abort());
 
   async function handleReload() {
     setLocalError("");
     try {
-      const u = new URL(ensureSlash(backendUrl()));
+      const u = new URL((backendUrl() || "").trim());
       if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
     } catch (e) {
       setLocalError(e.message || t("rightPane.switch.validation.protocol"));
@@ -88,19 +90,22 @@ export default function SwitchConnectDialog(props) {
     }
 
     setFetching(true);
+    aborter?.abort();
+    aborter = new AbortController();
     try {
-      const info = await fetchInfoJSON(backendUrl());
-      const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
-      const normalized = list
+      const info = await fetchInfoJSON((backendUrl() || "").trim(), { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
         .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => d && typeof d.name === "string" && d.name.trim().length > 0);
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
 
       setDomains(normalized);
-
-      if (normalized.length > 0 && !normalized.some((d) => d.name === domain())) {
-        setDomain(normalized[0].name);
+      if (normalized.length > 0) {
+        const keep = normalized.find((d) => eq(d.name, domain()));
+        setDomain(keep?.name || normalized[0].name);
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
       }
-      if (normalized.length === 0) setLocalError(t("rightPane.switch.noDomains"));
     } catch (e) {
       setLocalError(e.message || String(e));
     } finally {
@@ -108,21 +113,34 @@ export default function SwitchConnectDialog(props) {
     }
   }
 
+  // Apply ALWAYS writes to AppContext so the whole app shares the same state.
   async function onApply() {
     setLocalError("");
+    setApplying(true);
     try {
-      const u = new URL(ensureSlash(backendUrl()));
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+      const url = (backendUrl() || "").trim();
       const chosen = (domain() || "").trim();
+      const u = new URL(url);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
       if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
 
-      await props.onApply({
-        backendLink: ensureSlash(backendUrl().trim()),
-        domain: chosen,
-      });
+      // Optional parent hook (no-op safe)
+      if (typeof props.onApply === "function") {
+        await props.onApply({ backendLink: url, domain: chosen });
+      }
+
+      // Enforce in the global app context (this is the fix)
+      await app.updateConnect?.({ backendLink: url });     // persists override & /info refresh if URL changed
+      await app.setDomain?.(chosen);                       // single source of truth for domain
+      await app.refreshDomainAssets?.();                   // immediate asset reload
     } catch (e) {
       setLocalError(e.message || String(e));
+      setApplying(false);
+      return; // keep dialog open on error
     }
+
+    setApplying(false);
+    props.onClose?.();
   }
 
   return (
@@ -135,7 +153,7 @@ export default function SwitchConnectDialog(props) {
             {t("rightPane.switch.title")}
           </h3>
 
-          {/* Backend URL first */}
+          {/* Backend URL */}
           <label class="block mb-3">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.backend.label")}</span>
             <div class="mt-1 flex gap-2">
@@ -143,7 +161,7 @@ export default function SwitchConnectDialog(props) {
                 class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 value={backendUrl()}
                 onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder="https://ui.savva.app/api/"
+                placeholder={t("rightPane.switch.backend.placeholder")}
                 spellcheck={false}
               />
               <button
@@ -158,7 +176,7 @@ export default function SwitchConnectDialog(props) {
             <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
           </label>
 
-          {/* Domain depends on backend /info */}
+          {/* Domain select */}
           <label class="block mb-1">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
           </label>
@@ -173,7 +191,7 @@ export default function SwitchConnectDialog(props) {
             ))}
           </select>
 
-          {/* Small details for selected domain (optional, helpful) */}
+          {/* Optional details */}
           <Show when={selectedDomainObj()}>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
               <Show when={selectedDomainObj().website}>
@@ -184,7 +202,6 @@ export default function SwitchConnectDialog(props) {
                   </a>
                 </div>
               </Show>
-
             </div>
           </Show>
 
@@ -213,9 +230,9 @@ export default function SwitchConnectDialog(props) {
             <button
               class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
               onClick={onApply}
-              disabled={props.loading || fetching()}
+              disabled={props.loading || fetching() || applying()}
             >
-              {props.loading || fetching() ? t("common.applying") : t("common.apply")}
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
             </button>
           </div>
         </div>

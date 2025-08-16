@@ -1,15 +1,15 @@
 // src/components/RightPane.jsx
 import { createEffect, createSignal, Show } from "solid-js";
 import { useTheme } from "../hooks/useTheme";
-import { useI18n, LANG_INFO } from "../i18n/useI18n";
+import { LANG_INFO } from "../i18n/useI18n";
 import { navigate } from "../routing/hashRouter";
 import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const [theme, toggleTheme] = useTheme();
-  const { t, lang, setLang, available } = useI18n();
   const app = useApp();
+  const { t } = app;
 
   createEffect(() => {
     console.log("RightPane: isOpen changed to:", isOpen());
@@ -19,19 +19,10 @@ export default function RightPane({ isOpen, onClose }) {
     if (e.target === e.currentTarget) onClose();
   };
 
-  RightPane.theme = theme;
-
   const [showSwitch, setShowSwitch] = createSignal(false);
 
-  async function applySwitch(values) {
-    await app.updateConnect(values);
-    setShowSwitch(false);
-  }
-
-  async function resetDefaults() {
-    await app.clearConnectOverride();
-    setShowSwitch(false);
-  }
+  // Parent no longer writes config; dialog does it and then calls onClose
+  const noopApply = () => {};
 
   return (
     <>
@@ -48,7 +39,7 @@ export default function RightPane({ isOpen, onClose }) {
             onClick={onClose}
             aria-label={t("rightPane.close")}
           >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -65,10 +56,10 @@ export default function RightPane({ isOpen, onClose }) {
             <label class="block text-gray-900 dark:text-gray-100 mb-1">{t("rightPane.language")}</label>
             <select
               class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
-              value={lang()}
-              onInput={(e) => setLang(e.currentTarget.value)}
+              value={app.lang()}
+              onInput={(e) => app.setLang(e.currentTarget.value)}
             >
-              {available.map((code) => {
+              {app.i18nAvailable.map((code) => {
                 const info = LANG_INFO[code] || { code: code.toUpperCase(), name: code };
                 return (
                   <option value={code}>
@@ -131,16 +122,21 @@ export default function RightPane({ isOpen, onClose }) {
         />
       )}
 
-      <SwitchConnectDialog
-        open={showSwitch()}
-        domain={app.config()?.domain}
-        backendLink={app.config()?.backendLink}
-        loading={app.loading()}
-        error={app.error()}
-        onApply={applySwitch}
-        onReset={resetDefaults}
-        onClose={() => setShowSwitch(false)}
-      />
+      {/* Mount/unmount the dialog so it always re-seeds from AppContext */}
+      <Show when={showSwitch()} keyed>
+        {() => (
+          <SwitchConnectDialog
+            open={true}
+            domain={app.config()?.domain}
+            backendLink={app.config()?.backendLink}
+            loading={app.loading()}
+            error={app.error()}
+            onApply={noopApply}
+            onReset={app.clearConnectOverride}
+            onClose={() => setShowSwitch(false)}
+          />
+        )}
+      </Show>
     </>
   );
 }

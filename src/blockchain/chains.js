@@ -2,21 +2,55 @@
 export const CHAINS = {
   943: {
     id: 943,
+    chainId: 943, // required by wallet.js
     name: "PulseChain Testnet v4",
     rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
-    nativeCurrency: { name: "tPLS", symbol: "tPLS", decimals: 18 },
-    blockExplorers: [{ name: "Scan", url: "https://scan.v4.testnet.pulsechain.com" }],
+    nativeCurrency: { name: "Test Pulse", symbol: "tPLS", decimals: 18 },
+    // wallet_addEthereumChain expects an array of URLs, not objects
+    blockExplorers: ["https://scan.v4.testnet.pulsechain.com"],
   },
   369: {
     id: 369,
+    chainId: 369, // required by wallet.js
     name: "PulseChain",
-    rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
-    nativeCurrency: { name: "tPLS", symbol: "tPLS", decimals: 18 },
-    blockExplorers: [{ name: "Scan", url: "https://scan.v4.testnet.pulsechain.com" }],
+    rpcUrls: ["https://rpc.pulsechain.com"],
+    nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
+    blockExplorers: ["https://scan.pulsechain.com"],
   },
   // Add more chains as needed
 };
 
+/**
+ * Return chain meta in the shape expected by switchOrAddChain():
+ * {
+ *   chainId: number, name: string, nativeCurrency, rpcUrls: string[],
+ *   blockExplorers: string[]
+ * }
+ */
 export function getChainMeta(chainId) {
-  return CHAINS[chainId] || null;
+  const raw = CHAINS[chainId];
+  if (!raw) return null;
+
+  // normalize shapes to be resilient to older entries
+  const chainIdNum = raw.chainId ?? raw.id ?? Number(chainId);
+  const rpcUrls = Array.isArray(raw.rpcUrls)
+    ? raw.rpcUrls
+    : raw.rpcUrls ? [raw.rpcUrls] : [];
+
+  let explorers = [];
+  if (Array.isArray(raw.blockExplorers)) {
+    explorers = raw.blockExplorers
+      .map((x) => (typeof x === "string" ? x : x?.url))
+      .filter(Boolean);
+  } else if (Array.isArray(raw.blockExplorerUrls)) {
+    explorers = raw.blockExplorerUrls.filter(Boolean);
+  }
+
+  return {
+    chainId: chainIdNum,
+    name: raw.name,
+    nativeCurrency: raw.nativeCurrency,
+    rpcUrls,
+    blockExplorers: explorers,
+  };
 }

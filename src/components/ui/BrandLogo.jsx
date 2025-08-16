@@ -1,126 +1,86 @@
 // src/components/ui/BrandLogo.jsx
-import { createSignal, createMemo, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { useI18n } from "../../i18n/useI18n";
-
-// Conventional defaults for the shared "domain_default" asset pack
-const DEFAULT_LOGOS = {
-  light: "images/logo_light.png",
-  dark: "images/logo_dark.png",
-  light_mobile: "images/logo_light.png",
-  dark_mobile: "images/logo_dark.png",
-};
+import { createMemo, createSignal, onMount, onCleanup, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
 
 export default function BrandLogo(props) {
-  const { domainAssetsConfig, assetUrl, selectedDomain, t } = useApp();
-  const { lang } = useI18n();
+  const app = useApp();
+  const { t, domainAssetsConfig, assetUrl } = app;
 
-  // Track theme and a simple mobile breakpoint
-  const [isDark, setIsDark] = createSignal(
-    typeof document !== "undefined" &&
-      document.documentElement.classList.contains("dark")
-  );
-  const [isMobile, setIsMobile] = createSignal(
-    typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 640px)").matches
-  );
+  // Single source of truth for the domain name (falls back to i18n brand name)
+  const domainTitle = createMemo(() => {
+    const fromCfg = app.config?.()?.domain?.trim();
+    const fallback = t("brand.name");
+    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
+  });
 
+  // Theme + mobile detection
+  const [isDark, setIsDark] = createSignal(false);
+  const [isMobile, setIsMobile] = createSignal(false);
   onMount(() => {
-    const root = document.documentElement;
-    const mo = new MutationObserver(() => setIsDark(root.classList.contains("dark")));
-    mo.observe(root, { attributes: true, attributeFilter: ["class"] });
+    const el = document.documentElement;
+    const updateDark = () => setIsDark(el.classList.contains("dark"));
+    updateDark();
+    const mo = new MutationObserver(updateDark);
+    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
 
-    const mq = window.matchMedia("(max-width: 640px)");
-    const mqHandler = (e) => setIsMobile(e.matches);
-    if (mq.addEventListener) mq.addEventListener("change", mqHandler);
-    else mq.addListener && mq.addListener(mqHandler);
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onMQ = (e) => setIsMobile(!!e.matches);
+    onMQ(mql);
+    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
 
     onCleanup(() => {
       mo.disconnect();
-      if (mq.removeEventListener) mq.removeEventListener("change", mqHandler);
-      else mq.removeListener && mq.removeListener(mqHandler);
+      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
     });
   });
 
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    if (!d) return "";
-    return typeof d === "string" ? d : d.name || "";
+  // logos from active domain assets config
+  const logos = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const raw = cfg?.logos ?? cfg?.logo ?? null;
+    if (!raw) return null;
+    if (typeof raw === "string") return { default: raw };
+    return {
+      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+      mobile:       raw.mobile       ?? null,
+      dark:         raw.dark         ?? null,
+      light:        raw.light        ?? null,
+      default:      raw.default      ?? raw.fallback     ?? null,
+    };
   });
 
-  // Detect if the active domain actually provides its own logo set
-  const hasDomainLogos = (cfg) =>
-    !!cfg?.logo &&
-    (cfg.logo.light || cfg.logo.dark || cfg.logo.light_mobile || cfg.logo.dark_mobile);
-
-  const activeCfg = createMemo(() => domainAssetsConfig?.() || null);
-  const usingDefaultPack = createMemo(() => !hasDomainLogos(activeCfg()));
-
-  // Effective config: domain’s if present; else synthetic default pack
-  const effectiveCfg = createMemo(() => {
-    const cfg = activeCfg();
-    if (hasDomainLogos(cfg)) return cfg;
-    return { logo: DEFAULT_LOGOS, default_locale: "en", locales: [] };
+  const relPath = createMemo(() => {
+    const l = logos();
+    if (!l) return "";
+    const dark = isDark();
+    const mobile = isMobile();
+    const order = dark
+      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
+      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
+    return order.find(Boolean) || "";
   });
 
-  const domainTitle = createMemo(() => {
-    const cfg = effectiveCfg();
-    const cur = (typeof lang === "function" ? lang() : lang) || cfg?.default_locale || "en";
-    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
-    const byLang = locales.find((l) => l?.code === cur)?.title;
-    const byDefault = cfg?.default_locale
-      ? locales.find((l) => l?.code === cfg.default_locale)?.title
-      : null;
-    return byLang || byDefault || domainName() || t("brand.defaultName");
-  });
+  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
 
-  // Choose the best logo key
-  const logoPath = createMemo(() => {
-    const logos = effectiveCfg()?.logo;
-    if (!logos) return null;
+  const [imgBroken, setImgBroken] = createSignal(false);
+  // reset broken flag whenever src changes
+  createMemo(() => { src(); setImgBroken(false); });
 
-    if (isDark()) {
-      if (isMobile() && logos.dark_mobile) return logos.dark_mobile;
-      if (logos.dark) return logos.dark;
-    } else {
-      if (isMobile() && logos.light_mobile) return logos.light_mobile;
-      if (logos.light) return logos.light;
-    }
-    return null;
-  });
-
-  // Final URL:
-  // - default pack → "/domain_default/<rel>"
-  // - domain pack  → assetUrl(rel)
-  const src = createMemo(() => {
-    const rel = logoPath();
-    if (!rel) return null;
-    const clean = String(rel).replace(/^\/+/, "");
-
-    if (usingDefaultPack()) {
-      return `/domain_default/${clean}`;
-    }
-
-    try {
-      const url = assetUrl ? assetUrl(rel) : undefined;
-      if (typeof url === "string" && url.trim()) return url;
-    } catch {
-      // ignore and fall through
-    }
-    // If assetUrl misbehaves, still serve something sensible from default pack:
-    return `/domain_default/${clean}`;
-  });
-
-  return src() ? (
-    <img
-      src={src()}
-      alt={t("brand.logoAlt", { domain: domainTitle() })}
-      class={props.class || "h-6 sm:h-7"}
-      decoding="async"
-      loading="eager"
-      fetchpriority="high"
-    />
-  ) : (
-    <span class={props.classTitle || "text-xl font-semibold"}>{domainTitle()}</span>
+  return (
+    <div class="flex items-center">
+      <Show when={src() && !imgBroken()} fallback={
+        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
+      }>
+        <img
+          src={src()}
+          alt={t("brand.logoAlt", { domain: domainTitle() })}
+          class={props.class || "h-8 w-auto"}
+          decoding="async"
+          loading="eager"
+          onError={() => setImgBroken(true)}
+        />
+      </Show>
+    </div>
   );
 }

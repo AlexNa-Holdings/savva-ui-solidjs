@@ -1,3 +1,4 @@
+// src/App.jsx
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -26,7 +27,12 @@ export default function App() {
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <Header onTogglePane={togglePane} />
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
-      <MainView />
+
+      {/* Simple hash-route switch */}
+      <Show when={route() === "/settings"} fallback={<MainView />}>
+        <Settings />
+      </Show>
+
       <Toaster />
     </div>
   );

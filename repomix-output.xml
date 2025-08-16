@@ -41,11 +41,12 @@ The content is organized as follows:
 
 <directory_structure>
 assets/
+  chain_logos/
+    ethereum.svg
+    puilsechain-test-v4.svg
+    pulsechain.svg
   icons/
     arrow-back.svg
-  ethereum.svg
-  puilsechain-test--v4.svg
-  pulsechain.svg
 public/
   domain_default/
     favicon/
@@ -93,7 +94,11 @@ src/
     chains.js
     wallet.js
   components/
+    main/
+      MainView.jsx
+      TabsBar.jsx
     settings/
+      Assets.jsx
       DeveloperSection.jsx
       LocalIpfsSection.jsx
     ui/
@@ -118,6 +123,10 @@ src/
     Settings.jsx
   routing/
     hashRouter.js
+  utils/
+    assetLoader.js
+    assetsDiagnostics.js
+    net.js
   ux/
     toast.js
   App.jsx
@@ -138,34 +147,7 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/ui/BrandLogo.jsx">
-// src/components/BrandLogo.jsx
-import { useI18n } from "@solid-primitives/i18n";
-
-export default function BrandLogo() {
-  const [t, { locale }] = useI18n();  // <-- get current locale
-
-  return (
-    <div class="flex items-center">
-      <img
-        src={`/assets/logo-${locale()}.svg`} // example use of locale
-        alt={t("brand.name")}
-        class="h-8 w-auto"
-      />
-      <span class="ml-2 font-bold">{t("brand.name")}</span>
-    </div>
-  );
-}
-</file>
-
-<file path="assets/icons/arrow-back.svg">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-  <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h14"/>
-</svg>
-</file>
-
-<file path="assets/ethereum.svg">
+<file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 540 879.4">
   <path d="m269.9 325.2-269.9 122.7 269.9 159.6 270-159.6z" opacity=".6"/>
@@ -176,7 +158,7 @@ export default function BrandLogo() {
 </svg>
 </file>
 
-<file path="assets/puilsechain-test--v4.svg">
+<file path="assets/chain_logos/puilsechain-test-v4.svg">
 <svg width="433" height="402" viewBox="0 0 433 402" xmlns="http://www.w3.org/2000/svg">
   <title>PulseChain Logo · Testnet (monochrome)</title>
   <g fill="#000000" fill-rule="evenodd" transform="translate(-133, -149)">
@@ -185,7 +167,7 @@ export default function BrandLogo() {
 </svg>
 </file>
 
-<file path="assets/pulsechain.svg">
+<file path="assets/chain_logos/pulsechain.svg">
 <svg width="433px" height="402px" viewBox="0 0 433 402" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
     <title>PulseChain Logo Shape</title>
     <defs>
@@ -202,6 +184,404 @@ export default function BrandLogo() {
             <path d="M565.598765,372.951028 C565.598765,375.002407 565.123895,376.952504 564.22332,378.644848 L471.558363,539.145156 C467.628442,545.95198 460.365648,550.145156 452.505805,550.145156 L246.592961,550.145156 C238.733118,550.145156 231.470323,545.95198 227.540402,539.145156 L134.86679,378.629552 C133.968844,376.940022 133.5,374.999302 133.5,372.951028 C133.5,366.307901 138.885318,360.922583 145.528445,360.922583 L247.199342,360.922583 L272.965382,404.687949 L273.123755,404.949452 C276.56213,410.470142 283.796681,412.269462 289.433324,408.951035 L289.433324,408.951035 L289.725027,408.773687 C292.323961,407.142692 294.205446,404.576775 294.976025,401.597905 L294.976025,401.597905 L327.807505,274.677705 L355.998349,479.011885 L356.041062,479.296747 C357.082331,485.72482 363.072426,490.1783 369.557845,489.283548 L369.557845,489.283548 L369.85245,489.239203 C374.548041,488.473143 378.362876,485.004494 379.559058,480.380352 L379.559058,480.380352 L419.133013,327.39653 L435.381735,354.996566 L435.543066,355.262694 C437.735954,358.77701 441.59028,360.922583 445.747249,360.922583 L445.747249,360.922583 L553.57032,360.922583 L553.57032,360.922583 C560.213447,360.922583 565.598765,366.307901 565.598765,372.951028 Z M452.505805,149.493649 C460.365648,149.493649 467.628442,153.686825 471.558363,160.493649 L564.229106,321.001259 C565.125282,322.691832 565.598765,324.640838 565.598765,326.687777 C565.598765,333.330904 560.213447,338.716222 553.57032,338.716222 L451.566328,338.716222 L425.800288,294.950856 L425.62294,294.659153 C423.991945,292.060218 421.426028,290.178734 418.447158,289.408155 L418.447158,289.408155 L418.167463,289.339295 C411.826545,287.85703 405.429227,291.702682 403.789645,298.040901 L403.789645,298.040901 L370.95724,424.960175 L342.767321,220.62692 L342.722976,220.332314 C341.956916,215.636723 338.488267,211.821889 333.864125,210.625707 C327.432698,208.962014 320.870306,212.827026 319.206612,219.258453 L319.206612,219.258453 L279.631731,372.24135 L263.383935,344.64224 L263.222604,344.376112 C261.029716,340.861796 257.17539,338.716222 253.018421,338.716222 L253.018421,338.716222 L145.528445,338.716222 L145.528445,338.716222 C138.885318,338.716222 133.5,333.330904 133.5,326.687777 C133.5,324.65653 133.956256,322.735416 134.837658,321.056157 L227.540402,160.493649 C231.470323,153.686825 238.733118,149.493649 246.592961,149.493649 L452.505805,149.493649 Z" id="PulseChain-Logo-Shape"></path>
         </g>
     </g>
+</svg>
+</file>
+
+<file path="src/components/settings/Assets.jsx">
+// src/components/settings/Assets.jsx
+import { createSignal, createMemo, Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { assessAssets } from "../../utils/assetsDiagnostics";
+
+export default function Assets() {
+  const app = useApp();
+  const { t } = app;
+
+  // env switching (prod/test)
+  const env = createMemo(() => app.assetsEnv?.() || "prod");
+  const [busySwitch, setBusySwitch] = createSignal(false);
+
+  async function switchEnv(next) {
+    if (next === env()) return;
+    try {
+      setBusySwitch(true);
+      if (typeof app.setAssetsEnv === "function") {
+        app.setAssetsEnv(next);
+        // if the context exposes a refresh helper, call it
+        if (typeof app.refreshDomainAssets === "function") {
+          await app.refreshDomainAssets();
+        }
+      } else {
+        // Fallback: soft reload to let the app pick env on boot
+        // (only used if setAssetsEnv isn't available)
+        location.reload();
+      }
+    } finally {
+      setBusySwitch(false);
+    }
+  }
+
+  // diagnostics
+  const [busyDiag, setBusyDiag] = createSignal(false);
+  const [report, setReport] = createSignal(null);
+  const [err, setErr] = createSignal(null);
+
+  async function runDiagnostics() {
+    setBusyDiag(true);
+    setErr(null);
+    try {
+      const r = await assessAssets({
+        env: app.assetsEnv?.(),
+        assetsBaseUrl: app.assetsBaseUrl?.(),
+        selectedDomainName: (() => {
+          const d = app.selectedDomain?.();
+          return typeof d === "string" ? d : (d?.name || "");
+        })(),
+        domainAssetsPrefixActive: app.domainAssetsPrefix?.(),
+        domainAssetsConfig: app.domainAssetsConfig?.(),
+        domainAssetsSource: app.domainAssetsSource?.(),
+      });
+      setReport(r);
+    } catch (e) {
+      setErr(e);
+    } finally {
+      setBusyDiag(false);
+    }
+  }
+
+  const Row = (props) => (
+    <div class="grid grid-cols-[180px_1fr] gap-2 py-1">
+      <div class="text-sm text-gray-500">{props.label}</div>
+      <div class="text-sm break-all">{props.children}</div>
+    </div>
+  );
+
+  return (
+    <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-4">
+      {/* Header + Env switch */}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h3 class="text-lg font-medium">
+          {t("settings.dev.assets.title") /* "Assets" */}
+        </h3>
+
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">
+            {t("settings.dev.assets.env") /* "Environment" */}
+          </span>
+          <div class="inline-flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
+            <button
+              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "bg-transparent text-gray-700 dark:text-gray-200"}`}
+              disabled={busySwitch()}
+              onClick={() => switchEnv("prod")}
+            >
+              {t("settings.dev.assets.env.prod") /* "Prod" */}
+            </button>
+            <button
+              class={`px-3 py-1.5 text-sm border-l border-gray-300 dark:border-gray-600 ${env() === "test" ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "bg-transparent text-gray-700 dark:text-gray-200"}`}
+              disabled={busySwitch()}
+              onClick={() => switchEnv("test")}
+            >
+              {t("settings.dev.assets.env.test") /* "Test" */}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick facts */}
+      <div class="rounded-md bg-gray-50 dark:bg-gray-900 p-3 space-y-1">
+        <Row label={t("settings.dev.assets.env")}>{env()}</Row>
+        <Row label={t("settings.dev.assets.baseUrl")}>{app.assetsBaseUrl?.() || "—"}</Row>
+        <Row label={t("settings.dev.assets.prefix.active")}>{app.domainAssetsPrefix?.() || "—"}</Row>
+        <Row label={t("settings.dev.assets.source")}>{app.domainAssetsSource?.() || "—"}</Row>
+      </div>
+
+      {/* Diagnostics block */}
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">{t("settings.dev.assets.diagnostics.title")}</div>
+        <button
+          class="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+          onClick={runDiagnostics}
+          disabled={busyDiag()}
+        >
+          {busyDiag() ? t("common.loading") : t("settings.dev.assets.diagnostics.run")}
+        </button>
+      </div>
+
+      {err() && (
+        <div class="text-sm text-red-400">
+          {t("settings.dev.assets.diagnostics.error")}: {String(err())}
+        </div>
+      )}
+
+      <Show when={report()}>
+        <div class="space-y-2">
+          <Row label={t("settings.dev.assets.domain")}>{report().domain || "—"}</Row>
+          <Row label={t("settings.dev.assets.prefix.computed")}>{report().computedDomainPrefix || "—"}</Row>
+          <Row label={t("settings.dev.assets.configUrl")}>{report().appConfigUrl || "—"}</Row>
+
+          <div class="pt-2">
+            <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.configChecks")}</div>
+            <div class="mt-1 text-xs">
+              <div>• {t("settings.dev.assets.diagnostics.primary")}: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
+              <div>• {t("settings.dev.assets.diagnostics.default")}: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.configSummary")}</div>
+            <div class="mt-1 text-xs">
+              <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
+              <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
+              <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
+              <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
+              <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
+            </div>
+          </div>
+
+          <Show when={report().resolvedSamples?.length}>
+            <div class="pt-2">
+              <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.sampleFetches")}</div>
+              <ul class="mt-1 space-y-1 text-xs">
+                {report().resolvedSamples.map((s) => (
+                  <li>
+                    {s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </section>
+  );
+}
+</file>
+
+<file path="src/utils/assetLoader.js">
+// src/utils/assetLoader.js
+import { parse } from "yaml";
+import { fetchWithTimeout } from "./net";
+
+/**
+ * Load a resource from the active domain assets (or domain_default fallback).
+ * @param {object} app useApp() context
+ * @param {string} relPath relative path inside the asset pack (e.g. "tabs.yaml")
+ * @param {object} opts { type: "yaml"|"json"|"text", timeoutMs?: number }
+ */
+export async function loadAssetResource(app, relPath, opts = {}) {
+  const url = app.assetUrl(relPath);
+  const timeoutMs = opts.timeoutMs || 8000;
+  const res = await fetchWithTimeout(url, { timeoutMs });
+
+  if (!res.ok) {
+    throw new Error(`Asset fetch failed: ${url} (${res.status})`);
+  }
+
+  const text = await res.text();
+
+  switch (opts.type) {
+    case "yaml":
+      return parse(text) || null;
+    case "json":
+      return JSON.parse(text);
+    case "text":
+    default:
+      return text;
+  }
+}
+</file>
+
+<file path="src/utils/assetsDiagnostics.js">
+// src/utils/assetsDiagnostics.js
+// Utility to assess domain asset resources and common pitfalls.
+// Pure JS (no Solid imports). You pass values from useApp().
+
+import { fetchWithTimeout } from "./net";
+
+// Normalize join with a trailing slash on base and no leading slash on rel
+function join(base, rel) {
+  const b = base.endsWith("/") ? base : base + "/";
+  const r = String(rel || "").replace(/^\/+/, "");
+  return b + r;
+}
+
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function summarizeLogos(cfg) {
+  if (!cfg) return { has: false, fields: [], pickable: [] };
+  const raw = cfg.logos ?? cfg.logo ?? null;
+  if (!raw) return { has: false, fields: [], pickable: [] };
+  if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
+
+  const l = {
+    dark_mobile: raw.dark_mobile ?? raw.mobile_dark ?? null,
+    light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+    mobile: raw.mobile ?? null,
+    dark: raw.dark ?? null,
+    light: raw.light ?? null,
+    default: raw.default ?? raw.fallback ?? null,
+  };
+  const fields = Object.entries(l).filter(([,v]) => !!v).map(([k]) => k);
+  return {
+    has: fields.length > 0,
+    fields,
+    pickable: fields, // actual keys present
+  };
+}
+
+/**
+ * assessAssets
+ * @param {object} p
+ * @param {string} p.env 'prod' | 'test'
+ * @param {string} p.assetsBaseUrl from /info (based on env)
+ * @param {string} p.selectedDomainName current domain string
+ * @param {string} p.domainAssetsPrefixActive active prefix in useApp (domain or /domain_default/)
+ * @param {object|null} p.domainAssetsConfig parsed config.yaml (or null when default pack)
+ * @param {'remote'|'default'|null} p.domainAssetsSource where config came from
+ * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher] custom fetch (defaults to fetchWithTimeout)
+ */
+export async function assessAssets(p) {
+  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts||{}) }));
+  const now = new Date();
+
+  const base = String(p.assetsBaseUrl || "");
+  const domain = String(p.selectedDomainName || "");
+  const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
+  const activePrefix = String(p.domainAssetsPrefixActive || "");
+  const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
+  const defaultConfigUrl = "/domain_default/config.yaml";
+
+  // HEAD first; if server blocks HEAD, fall back to GET (no-store)
+  async function check(url) {
+    if (!url) return { url, ok: false, status: 0, exists: false, text: null };
+    let res;
+    try {
+      res = await fetcher(url, { method: "HEAD", cache: "no-store" });
+      if (!res.ok && res.status !== 404) {
+        // Try GET to get more clues
+        res = await fetcher(url, { method: "GET", cache: "no-store" });
+      }
+      const exists = res.status !== 404 && res.ok;
+      let text = null;
+      if (exists && /\/config\.yaml$/i.test(url) && res.method !== "HEAD") {
+        text = await res.text().catch(() => null);
+      }
+      return { url, ok: res.ok, status: res.status, exists, text };
+    } catch (e) {
+      return { url, ok: false, status: -1, exists: false, error: String(e) };
+    }
+  }
+
+  const primary = primaryConfigUrl ? await check(primaryConfigUrl) : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
+  const fallback = await check(defaultConfigUrl);
+
+  // Figure out which one the app thinks it's using, based on activePrefix/source
+  const appConfigUrl = join(activePrefix, "config.yaml");
+
+  // Extract key bits from parsed config available to the app
+  const cfg = p.domainAssetsConfig || null;
+  const logos = summarizeLogos(cfg);
+  const hasLocales = !!(cfg && (cfg.locales || cfg.i18n));
+  const hasTabs = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
+  const hasCategories = !!(cfg && (cfg.categories || cfg.ui?.categories));
+
+  // Sample resolution checks for a couple of typical files, using the ACTIVE prefix
+  const sampleFiles = [];
+  if (logos.has) {
+    // pick any first logo key
+    const firstLogoKey = logos.pickable[0];
+    const relPath = (typeof (cfg?.logos ?? cfg?.logo) === "string")
+      ? (cfg?.logos ?? cfg?.logo)
+      : (cfg?.logos?.[firstLogoKey] ?? cfg?.logo?.[firstLogoKey]);
+    if (relPath) {
+      sampleFiles.push({ kind: "logo", relPath });
+    }
+  }
+  if (cfg?.locales?.length) {
+    // pick first locale file path if present (structure may vary by project)
+    const fr = cfg.locales.find(x => x?.path) || cfg.locales[0];
+    if (fr?.path) sampleFiles.push({ kind: "locale", relPath: fr.path });
+  }
+  if (cfg?.tabs?.path) {
+    sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
+  }
+
+  const resolvedSamples = await Promise.all(sampleFiles.map(async sf => {
+    const url = join(activePrefix, sf.relPath);
+    const r = await check(url);
+    return { ...sf, url, ok: r.ok, status: r.status, exists: r.exists };
+  }));
+
+  // Assemble report
+  return {
+    timestamp: now.toISOString(),
+    env: p.env || "prod",
+    domain,
+    assetsBaseUrl: base,
+    computedDomainPrefix,
+    activePrefix,
+    appSource: p.domainAssetsSource || null,      // "remote" or "default"
+    appConfigUrl,                                  // what the app would fetch given activePrefix
+    primaryConfig: {
+      url: primary.url,
+      exists: !!primary.exists,
+      status: primary.status,
+      note: "ASSETS_BASE/DOMAIN/config.yaml",
+    },
+    defaultConfig: {
+      url: fallback.url,
+      exists: !!fallback.exists,
+      status: fallback.status,
+      note: "/domain_default/config.yaml",
+    },
+    appParsedConfigPresence: {
+      hasConfigObject: !!cfg,
+      hasLogos: !!logos.has,
+      logoFields: logos.fields,
+      hasLocales,
+      hasTabs,
+      hasCategories,
+    },
+    resolvedSamples,
+  };
+}
+</file>
+
+<file path="src/utils/net.js">
+// src/utils/net.js
+// ^^^ one single source of truth
+export async function fetchWithTimeout(
+  url,
+  { timeoutMs = 7000, method = "GET", headers, signal, body } = {}
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("Timeout", "TimeoutError")),
+    timeoutMs
+  );
+  if (signal) {
+    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+  try {
+    return await fetch(url, {
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+      cache: "no-store",
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+</file>
+
+<file path="assets/icons/arrow-back.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+  <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h14"/>
 </svg>
 </file>
 
@@ -3503,9 +3883,9 @@ function writeLang(filePath, obj) {
 <file path="src/blockchain/chainLogos.js">
 // src/blockchain/chainLogos.js
 export const CHAIN_LOGOS = {
-  1: "/assets/ethereum.svg", // Ethereum Mainnet
-  943: "/assets/pulsechain-test-v4.svg", // PulseChain Testnet
-  369: "/assets/pulsechain.svg", // PulseChain Mainnet
+  1: "/assets/chain_logos/ethereum.svg", // Ethereum Mainnet
+  943: "/assets/chain_logos/puilsechain-test-v4.svg", // PulseChain Testnet
+  369: "/assets/chain_logos/pulsechain.svg", // PulseChain Mainnet
   // Add more as you need
 };
 
@@ -3519,34 +3899,336 @@ export function getChainLogo(chainId) {
 export const CHAINS = {
   943: {
     id: 943,
+    chainId: 943, // required by wallet.js
     name: "PulseChain Testnet v4",
     rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
-    nativeCurrency: { name: "tPLS", symbol: "tPLS", decimals: 18 },
-    blockExplorers: [{ name: "Scan", url: "https://scan.v4.testnet.pulsechain.com" }],
+    nativeCurrency: { name: "Test Pulse", symbol: "tPLS", decimals: 18 },
+    // wallet_addEthereumChain expects an array of URLs, not objects
+    blockExplorers: ["https://scan.v4.testnet.pulsechain.com"],
   },
   369: {
     id: 369,
+    chainId: 369, // required by wallet.js
     name: "PulseChain",
-    rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
-    nativeCurrency: { name: "tPLS", symbol: "tPLS", decimals: 18 },
-    blockExplorers: [{ name: "Scan", url: "https://scan.v4.testnet.pulsechain.com" }],
+    rpcUrls: ["https://rpc.pulsechain.com"],
+    nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
+    blockExplorers: ["https://scan.pulsechain.com"],
   },
   // Add more chains as needed
 };
 
+/**
+ * Return chain meta in the shape expected by switchOrAddChain():
+ * {
+ *   chainId: number, name: string, nativeCurrency, rpcUrls: string[],
+ *   blockExplorers: string[]
+ * }
+ */
 export function getChainMeta(chainId) {
-  return CHAINS[chainId] || null;
+  const raw = CHAINS[chainId];
+  if (!raw) return null;
+
+  // normalize shapes to be resilient to older entries
+  const chainIdNum = raw.chainId ?? raw.id ?? Number(chainId);
+  const rpcUrls = Array.isArray(raw.rpcUrls)
+    ? raw.rpcUrls
+    : raw.rpcUrls ? [raw.rpcUrls] : [];
+
+  let explorers = [];
+  if (Array.isArray(raw.blockExplorers)) {
+    explorers = raw.blockExplorers
+      .map((x) => (typeof x === "string" ? x : x?.url))
+      .filter(Boolean);
+  } else if (Array.isArray(raw.blockExplorerUrls)) {
+    explorers = raw.blockExplorerUrls.filter(Boolean);
+  }
+
+  return {
+    chainId: chainIdNum,
+    name: raw.name,
+    nativeCurrency: raw.nativeCurrency,
+    rpcUrls,
+    blockExplorers: explorers,
+  };
+}
+</file>
+
+<file path="src/components/main/MainView.jsx">
+// src/components/main/MainView.jsx
+import { createMemo, Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import TabsBar from "./TabsBar";
+
+export default function MainView() {
+  const { t, selectedDomain, domainAssetsConfig } = useApp();
+
+  // reactive domain name
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
+  });
+
+  // keep a localized title ready (even if not shown yet)
+  const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
+
+  // revision flips when domain or asset pack (prod/test) changes
+  const revision = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const tabs = cfg?.modules?.tabs || "";
+    return `${domainName()}|${cid}|${tabs}`;
+  });
+
+  return (
+    <div class="w-full">
+      {/* Remount children when revision changes so everything re-reads configs */}
+      <Show when={revision()} keyed>
+        {() => <TabsBar />}
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/main/TabsBar.jsx">
+// src/components/main/TabsBar.jsx
+import { createResource, For, Show, createMemo, createSignal, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { useI18n } from "../../i18n/useI18n";
+import { loadAssetResource } from "../../utils/assetLoader";
+
+export default function TabsBar() {
+  const app = useApp();
+  const { t, domainAssetsConfig, selectedDomain } = app;
+  const { lang } = useI18n();
+
+  // Current domain name (for per-domain titles in tabs.yaml)
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
+  });
+
+  // Locate the tabs manifest relative path:
+  // - Prefer domain config: config.modules.tabs
+  // - Fallback to the default pack's conventional path: "modules/tabs.yaml"
+  const tabsPath = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    return cfg?.modules?.tabs || "modules/tabs.yaml";
+  });
+
+  // Fetch & parse using the new asset loader (auto domain/default prefix)
+  const [tabsRaw] = createResource(
+    () => tabsPath(),
+    async (relPath) => {
+      if (!relPath) return [];
+      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
+      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
+      return list.map((x, i) => ({
+        id: x?.id ?? `tab_${i}`,
+        title: x?.title, // string | { locale -> string|{domain->string} }
+        _raw: x,
+      }));
+    }
+  );
+
+  // ── locale normalization ─────────────────────────────────────────────────────
+  function pickByLocale(obj, langCode) {
+    if (!obj || typeof obj !== "object") return undefined;
+    const lc = (langCode || "en").toString();
+    if (obj[lc] !== undefined) return obj[lc];
+    const base = lc.toLowerCase().split(/[-_]/)[0];
+    if (obj[base] !== undefined) return obj[base];
+    return obj["*"];
+  }
+
+  function resolveTitle(title, langCode, domain) {
+    if (!title) return "";
+    if (typeof title === "string") return title;
+
+    const byLocale = pickByLocale(title, langCode);
+    if (byLocale) {
+      if (typeof byLocale === "string") return byLocale;
+      if (typeof byLocale === "object") {
+        const byDomain = byLocale[domain] ?? byLocale["*"];
+        if (typeof byDomain === "string") return byDomain;
+        const anyStr = Object.values(byLocale).find((v) => typeof v === "string");
+        if (anyStr) return anyStr;
+      }
+    }
+
+    const topStr = Object.values(title).find((v) => typeof v === "string");
+    if (topStr) return topStr;
+
+    for (const v of Object.values(title)) {
+      if (v && typeof v === "object") {
+        const byDomain = v[domain] ?? v["*"];
+        if (typeof byDomain === "string") return byDomain;
+        const anyStr = Object.values(v).find((x) => typeof x === "string");
+        if (anyStr) return anyStr;
+      }
+    }
+    return "";
+  }
+
+  // ── selection state ──────────────────────────────────────────────────────────
+  const [selectedId, setSelectedId] = createSignal("");
+
+  // When tabs load or change (domain/pack switch), auto-select the first one
+  createEffect(() => {
+    const list = tabsRaw() || [];
+    if (!list.length) {
+      setSelectedId("");
+      return;
+    }
+    // if current selectedId is not present in new list, pick the first
+    if (!list.some((t) => t.id === selectedId())) {
+      setSelectedId(list[0].id);
+    }
+  });
+
+  // ── render ───────────────────────────────────────────────────────────────────
+  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
+
+  return (
+    <nav class="w-full overflow-x-auto border-b border-neutral-200/60 dark:border-neutral-800/60">
+      <div class="max-w-6xl mx-auto px-4">
+        <div class="flex gap-3 sm:gap-4 py-2">
+          <Show
+            when={!tabsRaw.loading}
+            fallback={
+              <span class="text-sm text-neutral-500 dark:text-neutral-400">
+                {t("main.tabs.loading")}
+              </span>
+            }
+          >
+            <For each={tabsRaw() || []}>
+              {(tab) => {
+                const active = () => tab.id === selectedId();
+                const label =
+                  resolveTitle(tab.title, langCode(), domainName()) ||
+                  t("main.tabs.untitled");
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(tab.id)}
+                    aria-selected={active()}
+                    class={`px-3 py-1.5 text-sm transition ${
+                      active()
+                        ? "bg-neutral-200 dark:bg-neutral-700 font-medium"
+                        : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              }}
+            </For>
+          </Show>
+        </div>
+      </div>
+    </nav>
+  );
+}
+</file>
+
+<file path="src/components/ui/BrandLogo.jsx">
+// src/components/ui/BrandLogo.jsx
+import { createMemo, createSignal, onMount, onCleanup, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function BrandLogo(props) {
+  const app = useApp();
+  const { t, domainAssetsConfig, assetUrl } = app;
+
+  // Single source of truth for the domain name (falls back to i18n brand name)
+  const domainTitle = createMemo(() => {
+    const fromCfg = app.config?.()?.domain?.trim();
+    const fallback = t("brand.name");
+    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
+  });
+
+  // Theme + mobile detection
+  const [isDark, setIsDark] = createSignal(false);
+  const [isMobile, setIsMobile] = createSignal(false);
+  onMount(() => {
+    const el = document.documentElement;
+    const updateDark = () => setIsDark(el.classList.contains("dark"));
+    updateDark();
+    const mo = new MutationObserver(updateDark);
+    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onMQ = (e) => setIsMobile(!!e.matches);
+    onMQ(mql);
+    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
+
+    onCleanup(() => {
+      mo.disconnect();
+      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
+    });
+  });
+
+  // logos from active domain assets config
+  const logos = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const raw = cfg?.logos ?? cfg?.logo ?? null;
+    if (!raw) return null;
+    if (typeof raw === "string") return { default: raw };
+    return {
+      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+      mobile:       raw.mobile       ?? null,
+      dark:         raw.dark         ?? null,
+      light:        raw.light        ?? null,
+      default:      raw.default      ?? raw.fallback     ?? null,
+    };
+  });
+
+  const relPath = createMemo(() => {
+    const l = logos();
+    if (!l) return "";
+    const dark = isDark();
+    const mobile = isMobile();
+    const order = dark
+      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
+      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
+    return order.find(Boolean) || "";
+  });
+
+  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
+
+  const [imgBroken, setImgBroken] = createSignal(false);
+  // reset broken flag whenever src changes
+  createMemo(() => { src(); setImgBroken(false); });
+
+  return (
+    <div class="flex items-center">
+      <Show when={src() && !imgBroken()} fallback={
+        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
+      }>
+        <img
+          src={src()}
+          alt={t("brand.logoAlt", { domain: domainTitle() })}
+          class={props.class || "h-8 w-auto"}
+          decoding="async"
+          loading="eager"
+          onError={() => setImgBroken(true)}
+        />
+      </Show>
+    </div>
+  );
 }
 </file>
 
 <file path="src/components/SwitchConnectDialog.jsx">
-import { createSignal, createEffect, Show, createMemo } from "solid-js";
-import { useI18n } from "../i18n/useI18n";
+// src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
 
-function ensureSlash(s) {
-  if (!s) return "";
-  return s.endsWith("/") ? s : s + "/";
-}
+function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
 
 async function fetchInfoJSON(baseUrl, { signal } = {}) {
   const url = ensureSlash(baseUrl) + "info";
@@ -3556,45 +4238,44 @@ async function fetchInfoJSON(baseUrl, { signal } = {}) {
 }
 
 export default function SwitchConnectDialog(props) {
-  const { t } = useI18n();
+  const app = useApp();
+  const { t } = app;
 
-  // Form state
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? "");
-  const [domain, setDomain] = createSignal(props.domain ?? "");
-  const [domains, setDomains] = createSignal([]); // array of { name, ... }
-  const [fetching, setFetching] = createSignal(false);
+  // ── form state ───────────────────────────────────────────────────────────────
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain]       = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains]     = createSignal([]); // array of { name, ... }
+  const [fetching, setFetching]   = createSignal(false);
+  const [applying, setApplying]   = createSignal(false);
   const [localError, setLocalError] = createSignal("");
 
-  // Helper: current domain object
-  const selectedDomainObj = createMemo(() =>
-    (domains() || []).find((d) => d?.name === domain()) || null
-  );
+  let aborter;
 
-  // On open: fetch /info and populate domains (from info.domains[].name)
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => dn(d).trim().toLowerCase() === cur) || null;
+  });
+
+  // Initialize when dialog opens (use *app config* as the source of truth)
   createEffect(async () => {
     if (!props.open) return;
 
     setLocalError("");
-    setBackendUrl(props.backendLink ?? "");
-    setDomain(props.domain ?? "");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
     setDomains([]);
 
-    // Validate URL; if invalid, show a tip and skip autopopulate
-    try {
-      const u = new URL(ensureSlash(backendUrl()));
-      if (!/^https?:$/.test(u.protocol)) throw new Error("bad protocol");
-    } catch {
-      setLocalError(t("rightPane.switch.validation.protocol"));
-      return;
-    }
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
 
-    const controller = new AbortController();
     setFetching(true);
     try {
-      const info = await fetchInfoJSON(backendUrl(), { signal: controller.signal });
-      const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
 
-      // Expect objects with a .name string; fallback to []
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
       const normalized = list
         .map((d) => (typeof d === "string" ? { name: d } : d))
         .filter((d) => d && typeof d.name === "string" && d.name.trim().length > 0);
@@ -3602,11 +4283,10 @@ export default function SwitchConnectDialog(props) {
       setDomains(normalized);
 
       if (normalized.length > 0) {
-        if (props.domain && normalized.some((d) => d.name === props.domain)) {
-          setDomain(props.domain);
-        } else {
-          setDomain(normalized[0].name);
-        }
+        const desired = dn(props.domain) || (app.config?.()?.domain || "");
+        const foundByDesired = normalized.find((d) => eq(d.name, desired));
+        const foundByCurrent = normalized.find((d) => eq(d.name, domain()));
+        setDomain(foundByDesired?.name || foundByCurrent?.name || normalized[0].name);
       } else {
         setLocalError(t("rightPane.switch.noDomains"));
       }
@@ -3615,14 +4295,15 @@ export default function SwitchConnectDialog(props) {
     } finally {
       setFetching(false);
     }
-
-    return () => controller.abort();
   });
 
+  onCleanup(() => aborter?.abort());
+
+  // Manual reload (user clicks the button)
   async function handleReload() {
     setLocalError("");
     try {
-      const u = new URL(ensureSlash(backendUrl()));
+      const u = new URL((backendUrl() || "").trim());
       if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
     } catch (e) {
       setLocalError(e.message || t("rightPane.switch.validation.protocol"));
@@ -3630,8 +4311,11 @@ export default function SwitchConnectDialog(props) {
     }
 
     setFetching(true);
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+
     try {
-      const info = await fetchInfoJSON(backendUrl());
+      const info = await fetchInfoJSON((backendUrl() || "").trim(), { signal: aborter.signal });
       const list = Array.isArray(info?.domains) ? info.domains.filter(Boolean) : [];
       const normalized = list
         .map((d) => (typeof d === "string" ? { name: d } : d))
@@ -3639,10 +4323,12 @@ export default function SwitchConnectDialog(props) {
 
       setDomains(normalized);
 
-      if (normalized.length > 0 && !normalized.some((d) => d.name === domain())) {
-        setDomain(normalized[0].name);
+      if (normalized.length > 0) {
+        const keep = normalized.find((d) => eq(d.name, domain()));
+        setDomain(keep?.name || normalized[0].name);
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
       }
-      if (normalized.length === 0) setLocalError(t("rightPane.switch.noDomains"));
     } catch (e) {
       setLocalError(e.message || String(e));
     } finally {
@@ -3650,21 +4336,36 @@ export default function SwitchConnectDialog(props) {
     }
   }
 
+  // Apply: ALWAYS write to AppContext so the whole app uses the same domain
   async function onApply() {
     setLocalError("");
+    setApplying(true);
     try {
-      const u = new URL(ensureSlash(backendUrl()));
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+      const url = (backendUrl() || "").trim();
       const chosen = (domain() || "").trim();
+
+      // validate URL but don’t require trailing slash (added only for /info)
+      const u = new URL(url);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
       if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
 
-      await props.onApply({
-        backendLink: ensureSlash(backendUrl().trim()),
-        domain: chosen,
-      });
+      // If parent provided a hook, call it (no harm if it’s a no-op)
+      if (typeof props.onApply === "function") {
+        await props.onApply({ backendLink: url, domain: chosen });
+      }
+
+      // Enforce change in the global app context (single source of truth)
+      await app.updateConnect?.({ backendLink: url }); // re-apply even if unchanged (safe)
+      await app.setDomain?.(chosen);
+      await app.refreshDomainAssets?.();
     } catch (e) {
       setLocalError(e.message || String(e));
+      setApplying(false);
+      return; // keep dialog open
     }
+
+    setApplying(false);
+    props.onClose?.();
   }
 
   return (
@@ -3677,7 +4378,7 @@ export default function SwitchConnectDialog(props) {
             {t("rightPane.switch.title")}
           </h3>
 
-          {/* Backend URL first */}
+          {/* Backend URL */}
           <label class="block mb-3">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.backend.label")}</span>
             <div class="mt-1 flex gap-2">
@@ -3685,7 +4386,7 @@ export default function SwitchConnectDialog(props) {
                 class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 value={backendUrl()}
                 onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder="https://ui.savva.app/api/"
+                placeholder={t("rightPane.switch.backend.placeholder")}
                 spellcheck={false}
               />
               <button
@@ -3700,7 +4401,7 @@ export default function SwitchConnectDialog(props) {
             <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
           </label>
 
-          {/* Domain depends on backend /info */}
+          {/* Domain select */}
           <label class="block mb-1">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
           </label>
@@ -3711,11 +4412,11 @@ export default function SwitchConnectDialog(props) {
             disabled={fetching() || domains().length === 0}
           >
             {domains().map((d) => (
-              <option value={d.name}>{d.name}</option>
+              <option value={dn(d)}>{dn(d)}</option>
             ))}
           </select>
 
-          {/* Small details for selected domain (optional, helpful) */}
+          {/* Domain details (optional) */}
           <Show when={selectedDomainObj()}>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
               <Show when={selectedDomainObj().website}>
@@ -3726,7 +4427,6 @@ export default function SwitchConnectDialog(props) {
                   </a>
                 </div>
               </Show>
-
             </div>
           </Show>
 
@@ -3755,9 +4455,9 @@ export default function SwitchConnectDialog(props) {
             <button
               class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
               onClick={onApply}
-              disabled={props.loading || fetching()}
+              disabled={props.loading || fetching() || applying()}
             >
-              {props.loading || fetching() ? t("common.applying") : t("common.apply")}
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
             </button>
           </div>
         </div>
@@ -4653,24 +5353,95 @@ export function useTheme() {
 <file path="src/i18n/ru.js">
 // Auto-generated by i18n-sync.mjs. Do not edit by hand.
 export default {
-  "app.title": "SAVVA · SolidJS",
-  "card.tailwindWorks": "Tailwind работает?",
-  "debug.rightOpen": "???",
-  "debug.theme": "???",
-  "greeting.hello": "Привет, Алекс 👋",
+  "brand.logoAlt": "???",
+  "brand.name": "???",
+  "common.apply": "???",
+  "common.applying": "???",
+  "common.cancel": "???",
+  "common.checking": "???",
+  "common.error": "???",
+  "common.exists": "???",
+  "common.fail": "???",
+  "common.loading": "???",
+  "common.notFound": "???",
+  "common.ok": "???",
+  "main.tabs.loading": "???",
+  "main.tabs.untitled": "???",
+  "menu.open": "???",
+  "rightPane.close": "???",
   "rightPane.language": "Язык",
-  "rightPane.option1": "Опция 1",
-  "rightPane.option2": "Опция 2",
-  "rightPane.option3": "Опция 3",
-  "rightPane.showKeys": "Показывать ключи",
+  "rightPane.settings": "???",
+  "rightPane.switch.backend.help": "???",
+  "rightPane.switch.backend.label": "???",
+  "rightPane.switch.backend.placeholder": "???",
+  "rightPane.switch.domain.label": "???",
+  "rightPane.switch.domain.website": "???",
+  "rightPane.switch.noDomains": "???",
+  "rightPane.switch.open": "???",
+  "rightPane.switch.reload": "???",
+  "rightPane.switch.reload.title": "???",
+  "rightPane.switch.reset": "???",
+  "rightPane.switch.reset.title": "???",
+  "rightPane.switch.title": "???",
+  "rightPane.switch.validation.domain": "???",
+  "rightPane.switch.validation.protocol": "???",
+  "settings.back": "???",
+  "settings.debug.gateways.title": "???",
+  "settings.dev.assets.baseUrl": "???",
+  "settings.dev.assets.configUrl": "???",
+  "settings.dev.assets.diagnostics.configChecks": "???",
+  "settings.dev.assets.diagnostics.configSummary": "???",
+  "settings.dev.assets.diagnostics.default": "???",
+  "settings.dev.assets.diagnostics.error": "???",
+  "settings.dev.assets.diagnostics.hasCategories": "???",
+  "settings.dev.assets.diagnostics.hasConfig": "???",
+  "settings.dev.assets.diagnostics.hasLocales": "???",
+  "settings.dev.assets.diagnostics.hasLogos": "???",
+  "settings.dev.assets.diagnostics.hasTabs": "???",
+  "settings.dev.assets.diagnostics.primary": "???",
+  "settings.dev.assets.diagnostics.run": "???",
+  "settings.dev.assets.diagnostics.sampleFetches": "???",
+  "settings.dev.assets.diagnostics.title": "???",
+  "settings.dev.assets.domain": "???",
+  "settings.dev.assets.env": "???",
+  "settings.dev.assets.env.prod": "???",
+  "settings.dev.assets.env.test": "???",
+  "settings.dev.assets.prefix.active": "???",
+  "settings.dev.assets.prefix.computed": "???",
+  "settings.dev.assets.source": "???",
+  "settings.dev.assets.title": "???",
+  "settings.developer.showKeys": "???",
+  "settings.developer.title": "???",
+  "settings.ipfs.localDisabled": "???",
+  "settings.localIpfs.apiUrl.help": "???",
+  "settings.localIpfs.apiUrl.label": "???",
+  "settings.localIpfs.disable": "???",
+  "settings.localIpfs.enableCheckbox": "???",
+  "settings.localIpfs.gateway.label": "???",
+  "settings.localIpfs.help.api.tip": "???",
+  "settings.localIpfs.help.api.title": "???",
+  "settings.localIpfs.help.gateway.note": "???",
+  "settings.localIpfs.help.gateway.title": "???",
+  "settings.localIpfs.help.intro": "???",
+  "settings.localIpfs.help.proxy.note": "???",
+  "settings.localIpfs.help.proxy.text": "???",
+  "settings.localIpfs.help.proxy.title": "???",
+  "settings.localIpfs.help.restart.title": "???",
+  "settings.localIpfs.help.toggle.hide": "???",
+  "settings.localIpfs.help.toggle.show": "???",
+  "settings.localIpfs.help.verify.note": "???",
+  "settings.localIpfs.help.verify.title": "???",
+  "settings.localIpfs.status.label": "???",
+  "settings.localIpfs.testEnable": "???",
+  "settings.localIpfs.title": "???",
+  "settings.title": "Настройки",
   "ui.mode.dark": "Тёмная тема",
   "ui.mode.light": "Светлая тема",
-  "settings.title": "Настройки",
-  "settings.close": "Закрыть",
-  "settings.debug.title": "Отладка",
-  "settings.debug.showKeys.label": "Показывать ключи переводов",
-  "settings.debug.showKeys.help":
-    "Если включено, каждая строка добавит в конец свой ключ в квадратных скобках.",
+  "wallet.changeChain": "???",
+  "wallet.connect": "???",
+  "wallet.copied": "???",
+  "wallet.copyAddress": "???",
+  "wallet.onRequiredNetwork": "???"
 };
 </file>
 
@@ -4895,6 +5666,143 @@ export default {
 };
 </file>
 
+<file path="src/i18n/en.js">
+// Auto-generated by i18n-sync.mjs. Do not edit by hand.
+export default {
+  "brand.logoAlt": "Logo of {domain}",
+  "brand.name": "SAVVA",
+  "common.apply": "Apply",
+  "common.applying": "Applying…",
+  "common.cancel": "Cancel",
+  "common.checking": "Checking…",
+  "common.error": "Error",
+  "common.exists": "Exists",
+  "common.fail": "Fail",
+  "common.loading": "Loading…",
+  "common.notFound": "Not found",
+  "common.ok": "OK",
+  "main.tabs.loading": "Loading tabs…",
+  "main.tabs.untitled": "Untitled",
+  "menu.open": "Open menu",
+  "rightPane.close": "Close menu",
+  "rightPane.language": "Language",
+  "rightPane.settings": "Settings",
+  "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.backend.label": "Backend URL",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Domain",
+  "rightPane.switch.domain.website": "Website",
+  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.open": "Switch backend / domain",
+  "rightPane.switch.reload": "Load domains",
+  "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
+  "rightPane.switch.reset": "Reset to defaults",
+  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
+  "rightPane.switch.title": "Switch backend / domain",
+  "rightPane.switch.validation.domain": "Domain cannot be empty.",
+  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
+  "settings.back": "Back",
+  "settings.debug.gateways.title": "IPFS Gateways (active order)",
+  "settings.dev.assets.baseUrl": "Assets base URL",
+  "settings.dev.assets.configUrl": "Config URL",
+  "settings.dev.assets.diagnostics.configChecks": "Config checks",
+  "settings.dev.assets.diagnostics.configSummary": "Config summary",
+  "settings.dev.assets.diagnostics.default": "Default config",
+  "settings.dev.assets.diagnostics.error": "Diagnostics error",
+  "settings.dev.assets.diagnostics.hasCategories": "Has categories",
+  "settings.dev.assets.diagnostics.hasConfig": "Has config",
+  "settings.dev.assets.diagnostics.hasLocales": "Has locales",
+  "settings.dev.assets.diagnostics.hasLogos": "Has logos",
+  "settings.dev.assets.diagnostics.hasTabs": "Has tabs",
+  "settings.dev.assets.diagnostics.primary": "Primary config",
+  "settings.dev.assets.diagnostics.run": "Run diagnostics",
+  "settings.dev.assets.diagnostics.sampleFetches": "Sample fetches",
+  "settings.dev.assets.diagnostics.title": "Asset diagnostics",
+  "settings.dev.assets.domain": "Domain",
+  "settings.dev.assets.env": "Environment",
+  "settings.dev.assets.env.prod": "Production",
+  "settings.dev.assets.env.test": "Test",
+  "settings.dev.assets.prefix.active": "Active prefix",
+  "settings.dev.assets.prefix.computed": "Computed prefix",
+  "settings.dev.assets.source": "Source",
+  "settings.dev.assets.title": "Assets",
+  "settings.developer.showKeys": "Show translation keys",
+  "settings.developer.title": "Developer",
+  "settings.ipfs.localDisabled": "Local IPFS disabled",
+  "settings.localIpfs.apiUrl.help": "We will call",
+  "settings.localIpfs.apiUrl.label": "Local IPFS API URL",
+  "settings.localIpfs.disable": "Disable",
+  "settings.localIpfs.enableCheckbox": "Use local IPFS node",
+  "settings.localIpfs.gateway.label": "Gateway",
+  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
+  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
+  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
+  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
+  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
+  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
+  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
+  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
+  "settings.localIpfs.help.restart.title": "3) Restart the daemon",
+  "settings.localIpfs.help.toggle.hide": "Hide help",
+  "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
+  "settings.localIpfs.help.verify.note": "The gateway is usually",
+  "settings.localIpfs.help.verify.title": "4) Verify",
+  "settings.localIpfs.status.label": "Status",
+  "settings.localIpfs.testEnable": "Test & enable",
+  "settings.localIpfs.title": "Local IPFS",
+  "settings.title": "Settings",
+  "ui.mode.dark": "Dark mode",
+  "ui.mode.light": "Light mode",
+  "wallet.changeChain": "Change network",
+  "wallet.connect": "Connect wallet",
+  "wallet.copied": "Copied",
+  "wallet.copyAddress": "Copy address",
+  "wallet.onRequiredNetwork": "On required network"
+};
+</file>
+
+<file path="src/pages/Settings.jsx">
+// src/pages/Settings.jsx
+import { useApp } from "../context/AppContext.jsx";
+import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
+import BackIconButton from "../components/ui/BackIconButton.jsx";
+import Assets from "../components/settings/Assets.jsx";  
+
+export default function Settings() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
+        <BackIconButton title={t("settings.back")} />
+      </div>
+
+      {/* Local IPFS (separate component) */}
+      <LocalIpfsSection />
+
+      <Assets/>
+
+      {/* Developer */}
+      <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+        <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
+
+        <label class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={app.showKeys()}
+            onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
+          />
+          <span>{t("settings.developer.showKeys")}</span>
+        </label>
+
+      </section>
+    </main>
+  );
+}
+</file>
+
 <file path="src/components/Header.jsx">
 // File: src/components/Header.jsx
 import { Show, createSignal, onMount } from "solid-js";
@@ -5046,205 +5954,6 @@ export default function Header({ onTogglePane }) {
         </button>
       </div>
     </header>
-  );
-}
-</file>
-
-<file path="src/i18n/en.js">
-// Auto-generated by i18n-sync.mjs. Do not edit by hand.
-export default {
-  "app.title": "SAVVA · SolidJS",
-  "card.tailwindWorks": "Tailwind works?",
-  "debug.rightOpen": "???",
-  "debug.theme": "???",
-  "greeting.hello": "Hello, Alex 👋",
-  "rightPane.language": "Language",
-  "rightPane.option1": "Option 1",
-  "rightPane.option2": "Option 2",
-  "rightPane.option3": "Option 3",
-  "rightPane.showKeys": "Show translation keys",
-  "ui.mode.dark": "Dark mode",
-  "ui.mode.light": "Light mode",
-  "settings.title": "Settings",
-  "settings.close": "Close",
-  "settings.debug.title": "Debug",
-  "settings.debug.showKeys.label": "Show translation keys",
-  "settings.debug.showKeys.help":
-    "When enabled, every translated string will append its key in square brackets.",
-      "rightPane.close": "Close menu",
-  "rightPane.settings": "Settings",
-  "rightPane.switch.open": "Switch backend / domain",
-  "rightPane.switch.title": "Switch backend / domain",
-  "rightPane.switch.domain.label": "Domain",
-  "rightPane.switch.backend.label": "Backend URL (ends with /)",
-  "rightPane.switch.reset": "Reset to defaults",
-  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
-
-  "init.title": "SAVVA · Init",
-  "init.loading": "Loading configuration…",
-
-  "common.cancel": "Cancel",
-  "common.apply": "Apply",
-  "common.applying": "Applying…",
-  "common.error": "Error",
-  "common.retry": "Retry",
-    "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
-  "rightPane.switch.reload": "Load domains",
-  "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
-
-  "rightPane.switch.domain.help": "Choose the domain from the backend reporting supported list.",
-  "rightPane.switch.domain.empty": "No domains available. Check backend URL and try loading again.",
-  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
-  "rightPane.switch.validation.domain": "Domain cannot be empty.",
-  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
-  "rightPane.switch.domain.website": "Website",
-
-  "settings.title": "Settings",
-
-  "settings.localIpfs.title": "Local IPFS",
-  "settings.localIpfs.enableCheckbox": "Use local IPFS node",
-  "settings.localIpfs.apiUrl.label": "Local IPFS API URL",
-  "settings.localIpfs.apiUrl.help": "We will call",
-  "settings.localIpfs.testEnable": "Test & enable",
-  "settings.localIpfs.disable": "Disable",
-  "settings.localIpfs.status.label": "Status",
-  "settings.localIpfs.gateway.label": "Gateway",
-
-  "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
-  "settings.localIpfs.help.toggle.hide": "Hide help",
-  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
-  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
-  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
-  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
-  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
-  "settings.localIpfs.help.restart.title": "3) Restart the daemon",
-  "settings.localIpfs.help.verify.title": "4) Verify",
-  "settings.localIpfs.help.verify.note": "The gateway is usually",
-  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
-  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
-  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
-
-  "settings.developer.title": "Developer",
-  "settings.developer.preview": "Preview:",
-
-  "settings.debug.gateways.title": "IPFS Gateways (active order)",
-
-  "common.checking": "Checking…",
-
-  "common.loading": "Loading…",
-    "settings.developer.title": "Developer",
-  "settings.developer.showKeys": "Show translation keys", 
-  "settings.debug.gateways.title": "IPFS Gateways (active order)",  
-
-}
-</file>
-
-<file path="src/pages/Settings.jsx">
-// src/pages/Settings.jsx
-import { For } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
-import BackButton from "../components/ui/BackIconButton.jsx";
-import BackIconButton from "../components/ui/BackIconButton.jsx";
-
-
-export default function Settings() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto space-y-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
-        <BackIconButton title={t("settings.back")} />
-      </div>
-
-      {/* Local IPFS (separate component) */}
-      < LocalIpfsSection />
-
-      {/* Developer */}
-      < section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
-        <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
-
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={app.showKeys()}
-            onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
-          />
-          <span>{t("settings.developer.showKeys")}</span>
-        </label>
-
-        <DeveloperAssetsSection />
-
-      </section>
-    </main >
-  );
-}
-
-function DeveloperAssetsSection() {
-  const {
-    assetsEnv,
-    setAssetsEnv,
-    assetsBaseUrl,
-    domainAssetsPrefix,
-    domainAssetsConfig,
-    selectedDomain,
-  } = useApp();
-
-  const onInput = (e) => setAssetsEnv(e.currentTarget.value);
-
-  const domainName = () => {
-    const d = selectedDomain();
-    if (!d) return "";
-    return typeof d === "string" ? d : (d.name || "");
-  };
-
-  return (
-    <section class="space-y-3">
-      <h4 class="text-base font-semibold">Domain assets</h4>
-
-      <div class="flex items-center gap-4">
-        <label class="inline-flex items-center gap-2">
-          <input
-            type="radio"
-            name="assets-env"
-            value="prod"
-            checked={assetsEnv() === "prod"}
-            onInput={onInput}
-          />
-          <span>prod</span>
-        </label>
-        <label class="inline-flex items-center gap-2">
-          <input
-            type="radio"
-            name="assets-env"
-            value="test"
-            checked={assetsEnv() === "test"}
-            onInput={onInput}
-          />
-          <span>test</span>
-        </label>
-      </div>
-
-      <dl class="text-sm grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
-        <dt class="font-medium">Domain:</dt>
-        <dd>{domainName() || "—"}</dd>
-
-        <dt class="font-medium">Base URL:</dt>
-        <dd>{assetsBaseUrl() || "—"}</dd>
-
-        <dt class="font-medium">Prefix:</dt>
-        <dd>{domainAssetsPrefix() || "—"}</dd>
-
-        <dt class="font-medium">Config:</dt>
-        <dd>
-          <Show when={domainAssetsConfig()} fallback={<span>none</span>}>
-            <span>loaded</span>
-          </Show>
-        </dd>
-      </dl>
-    </section>
   );
 }
 </file>
@@ -5428,29 +6137,20 @@ export default function RightPane({ isOpen, onClose }) {
 </file>
 
 <file path="src/context/AppContext.jsx">
+// src/context/AppContext.jsx
 import { createContext, useContext, createSignal, onMount, createMemo, onCleanup, createEffect } from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain } from "../blockchain/wallet";
-import { pushToast, pushErrorToast, errorDetails } from "../ux/toast";
+import { pushToast, pushErrorToast } from "../ux/toast";
 import { useI18n } from "../i18n/useI18n";
+import { fetchWithTimeout } from "../utils/net.js";
 
-
-
-// ---------- helpers ----------
+// ───────────────────────────────────────────────────────────────────────────────
+// small string utils (local)
+// ───────────────────────────────────────────────────────────────────────────────
 function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
-function trimSlash(s) { return (s || "").replace(/\/+$/g, ""); }
-async function fetchWithTimeout(url, { timeoutMs = 7000, method = "GET", headers, signal, body } = {}) {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
-  if (signal) signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  try {
-    const res = await fetch(url, { method, headers, body, signal: controller.signal, cache: "no-store" });
-    return res;
-  } finally {
-    clearTimeout(tid);
-  }
-}
+function trimSlash(s) { if (!s) return ""; return s.endsWith("/") ? s.slice(0, -1) : s; }
 
 // ---------- context ----------
 const AppContext = createContext();
@@ -5460,7 +6160,7 @@ const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
 const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway_v1";
 const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
 
-// NEW: domain assets env persistence key
+// domain assets env persistence key
 const ASSETS_ENV_KEY = "domain_assets_env_v1"; // "prod" | "test"
 
 function pickPersistable(cfg) {
@@ -5472,10 +6172,19 @@ function pickPersistable(cfg) {
 }
 
 function loadOverride() {
-  try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; }
+  try {
+    const raw = localStorage.getItem(OVERRIDE_KEY);
+    if (!raw) return null;
+    return pickPersistable(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 function saveOverride(obj) {
-  try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { }
+  try {
+    if (!obj) localStorage.removeItem(OVERRIDE_KEY);
+    else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj)));
+  } catch {}
 }
 
 export function AppProvider(props) {
@@ -5493,7 +6202,7 @@ export function AppProvider(props) {
   const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;
 
-  // NEW: domain assets env (prod/test)
+  // domain assets env (prod/test)
   const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
   function setAssetsEnv(next) {
     const v = next === "test" ? "test" : "prod";
@@ -5588,7 +6297,9 @@ export function AppProvider(props) {
   const supportedDomains = createMemo(() => {
     const data = info();
     const list = Array.isArray(data?.domains) ? data.domains : [];
-    return list.map((d) => (typeof d === "string" ? d : d?.name)).filter((name) => typeof name === "string" && name.trim().length > 0);
+    return list
+      .map((d) => (typeof d === "string" ? d : d?.name))
+      .filter((name) => typeof name === "string" && name.trim().length > 0);
   });
 
   const selectedDomain = createMemo(() => {
@@ -5596,11 +6307,19 @@ export function AppProvider(props) {
     const cur = config();
     if (!data || !cur) return null;
     const list = Array.isArray(data.domains) ? data.domains : [];
-    return list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) || null;
+    return (
+      list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) ||
+      null
+    );
   });
 
-  const desiredChainId = createMemo(() => (typeof info()?.blockchain_id === "number" ? info().blockchain_id : null));
-  const desiredChain = createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
+  const desiredChainId = createMemo(() =>
+    typeof info()?.blockchain_id === "number" ? info().blockchain_id : null
+  );
+  const desiredChain = createMemo(() => {
+    const id = desiredChainId();
+    return id ? getChainMeta(id) : null;
+  });
   async function ensureWalletOnDesiredChain() {
     const meta = desiredChain();
     if (!meta) throw new Error("Unknown target chain");
@@ -5609,7 +6328,12 @@ export function AppProvider(props) {
 
   const remoteIpfsGateways = createMemo(() => {
     const arr = info()?.ipfs_gateways;
-    return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
+    return Array.isArray(arr)
+      ? arr
+          .filter(Boolean)
+          .map((s) => ensureSlash(s.trim()))
+          .filter(Boolean)
+      : [];
   });
 
   const activeIpfsGateways = createMemo(() => {
@@ -5635,7 +6359,7 @@ export function AppProvider(props) {
   const selectedDomainName = createMemo(() => {
     const d = selectedDomain();
     if (!d) return "";
-    return typeof d === "string" ? d : (d?.name || "");
+    return typeof d === "string" ? d : d?.name || "";
   });
 
   // Prefix like <assetsBase>/<domain>/
@@ -5646,53 +6370,103 @@ export function AppProvider(props) {
     return ensureSlash(base) + dom.replace(/^\//, "") + "/";
   });
 
-  // State for parsed config.yaml
+  // State for parsed config.yaml (+source/prefix so consumers know what we use)
   const [domainAssetsState, setDomainAssetsState] = createSignal({
     config: null,
     loadedAt: null,
     error: null,
+    source: null, // "remote" | "default"
+    prefix: DEFAULT_DOMAIN_ASSETS_PREFIX, // active base for assetUrl()
   });
 
+  // Helper: load & parse the default pack config so components (BrandLogo, etc.)
+  // can still read logos/locales when there is no per-domain config.
+  async function loadDefaultAssetsConfig(fallbackError) {
+    try {
+      const res = await fetchWithTimeout(`${DEFAULT_DOMAIN_ASSETS_PREFIX}config.yaml`, { timeoutMs: 8000 });
+      let parsed = null;
+      if (res.ok) {
+        const text = await res.text();
+        try { parsed = parse(text) || null; } catch { parsed = null; }
+      }
+      setDomainAssetsState({
+        config: parsed,                     // <— critical: expose default config
+        loadedAt: new Date(),
+        error: null,
+        source: "default",
+        prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
+      });
+    } catch (e) {
+      setDomainAssetsState({
+        config: null,
+        loadedAt: new Date(),
+        error: fallbackError || e,
+        source: "default",
+        prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
+      });
+    }
+  }
+
+  // Loader for per-domain config with fallback to domain_default (parsed!)
   async function refreshDomainAssets() {
     const prefix = domainAssetsPrefix();
-    if (!prefix) {
-      setDomainAssetsState({ config: null, loadedAt: new Date(), error: null });
-      return;
-    }
-    const url = prefix + "config.yaml";
+    const url = `${prefix}config.yaml`;
+
     try {
       const res = await fetchWithTimeout(url, { timeoutMs: 8000 });
+
       if (res.status === 404) {
-        setDomainAssetsState({ config: null, loadedAt: new Date(), error: null });
+        // no domain config -> use parsed /domain_default/config.yaml
+        await loadDefaultAssetsConfig();
         return;
       }
-      if (!res.ok) throw new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`);
+
+      if (!res.ok) {
+        // other HTTP errors; fall back to parsed default
+        await loadDefaultAssetsConfig(new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`));
+        return;
+      }
+
       const text = await res.text();
       let parsed = null;
       try {
         parsed = parse(text) || null;
       } catch (e) {
-        setDomainAssetsState({ config: null, loadedAt: new Date(), error: e });
+        // parsing failed -> parsed default pack
+        await loadDefaultAssetsConfig(e);
         return;
       }
-      setDomainAssetsState({ config: parsed, loadedAt: new Date(), error: null });
+
+      // success → remote (per-domain) assets
+      setDomainAssetsState({
+        config: parsed,
+        loadedAt: new Date(),
+        error: null,
+        source: "remote",
+        prefix, // ASSETS_BASE/<domain>/
+      });
     } catch (e) {
-      setDomainAssetsState({ config: null, loadedAt: new Date(), error: e });
+      // network/timeout → parsed default pack
+      await loadDefaultAssetsConfig(e);
     }
   }
 
+  // Resolve an asset path using the *active* prefix (domain or default)
   function assetUrl(relPath) {
     if (!relPath) return "";
     if (/^(https?:)?\/\//i.test(relPath) || /^data:/.test(relPath)) return relPath;
-    const prefix = domainAssetsPrefix();
-    if (!prefix) return relPath;
+    const prefix = domainAssetsState().prefix || DEFAULT_DOMAIN_ASSETS_PREFIX;
     return prefix + String(relPath).replace(/^\//, "");
   }
 
   // Auto-refresh when env, info, or domain changes
   createEffect(() => {
-    const _ = [assetsEnv(), assetsBaseUrl(), selectedDomainName()];
-    refreshDomainAssets();
+    // track dependencies
+    void assetsEnv();
+    void assetsBaseUrl();
+    void selectedDomainName();
+    // fire loader
+    void refreshDomainAssets();
   });
 
   const domainAssetsConfig = createMemo(() => domainAssetsState().config);
@@ -5702,40 +6476,6 @@ export function AppProvider(props) {
   );
 
   // ----- Local IPFS: probe + monitor -----
-  async function probeLocalIpfs(apiUrl) {
-    const base = trimSlash(apiUrl || "");
-    if (!base) throw new Error("Local IPFS API URL is empty");
-    // CORS note: browser needs CORS on local node
-    const url = `${base}/api/v0/config/show`;
-    const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
-    if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
-    const cfg = await res.json();
-    let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
-    if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
-    return ensureSlash(gw);
-  }
-
-  async function enableLocalIpfs(apiUrl) {
-    try {
-      const gw = await probeLocalIpfs(apiUrl);  // already normalized to http://.../
-      setLocalIpfsEnabled(true);
-      setLocalIpfsApiUrl(apiUrl);
-      setLocalIpfsGateway(gw);
-      localStorage.setItem(IPFS_LOCAL_KEY, "1");
-      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
-      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-      setLocalIpfsStatus("ok");
-      pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
-      startLocalIpfsMonitor();
-      return gw;
-    } catch (e) {
-      setLocalIpfsEnabled(false);
-      setLocalIpfsStatus("down");
-      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
-      throw e;
-    }
-  }
-
   function multiaddrToHttp(ma) {
     if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
     const parts = ma.split("/").filter(Boolean);
@@ -5755,20 +6495,32 @@ export function AppProvider(props) {
     return ensureSlash(base);
   }
 
-
   async function probeLocalIpfs(apiUrl) {
     const base = trimSlash(apiUrl || "");
     if (!base) throw new Error("Local IPFS API URL is empty");
+    // CORS note: browser needs CORS on local node
     const url = `${base}/api/v0/config/show`;
     const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
     if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
     const cfg = await res.json();
     let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
     if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
-    const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // <-- normalize
+    const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // normalize
     return ensureSlash(httpGw);
   }
 
+  function startLocalIpfsMonitor() {
+    stopLocalIpfsMonitor();
+    // first immediate ping (don’t spam toasts on the very first success)
+    void pingLocalIpfs();
+    ipfsMonitorTid = setInterval(pingLocalIpfs, 20000);
+  }
+  function stopLocalIpfsMonitor() {
+    if (ipfsMonitorTid) {
+      clearInterval(ipfsMonitorTid);
+      ipfsMonitorTid = null;
+    }
+  }
   function disableLocalIpfs() {
     stopLocalIpfsMonitor();
     setLocalIpfsEnabled(false);
@@ -5776,9 +6528,8 @@ export function AppProvider(props) {
     setLocalIpfsStatus("unknown");
     localStorage.setItem(IPFS_LOCAL_KEY, "0");
     localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
-    pushToast({ type: "info", message: "Local IPFS disabled" });
+    pushToast({ type: "info", message: i18n.t("settings.ipfs.localDisabled") });
   }
-
   async function pingLocalIpfs() {
     try {
       const base = trimSlash(localIpfsApiUrl());
@@ -5787,21 +6538,11 @@ export function AppProvider(props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setLocalIpfsStatus("ok");
       return true;
-    } catch (e) {                      // <-- add (e)
+    } catch (e) {
       setLocalIpfsStatus("down");
       pushErrorToast(e, { op: "pingLocalIpfs", apiUrl: localIpfsApiUrl() });
       return false;
     }
-  }
-
-  function startLocalIpfsMonitor() {
-    stopLocalIpfsMonitor();
-    // first immediate ping (don’t spam toasts on the very first success)
-    pingLocalIpfs();
-    ipfsMonitorTid = setInterval(pingLocalIpfs, 20000);
-  }
-  function stopLocalIpfsMonitor() {
-    if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
   }
 
   const value = {
@@ -5827,6 +6568,8 @@ export function AppProvider(props) {
     setAssetsEnv,
     assetsBaseUrl,
     domainAssetsConfig,
+    domainAssetsSource,
+    domainAssetsPrefix: domainAssetsPrefixActive,
     refreshDomainAssets,
     assetUrl,
 
@@ -5838,7 +6581,21 @@ export function AppProvider(props) {
     ensureWalletOnDesiredChain,
 
     // local IPFS actions
-    enableLocalIpfs,
+    enableLocalIpfs: async (apiUrl) => {
+      try {
+        const gw = await probeLocalIpfs(apiUrl);
+        setLocalIpfsApiUrl(apiUrl);
+        setLocalIpfsGateway(gw);
+        setLocalIpfsEnabled(true);
+        localStorage.setItem(IPFS_LOCAL_KEY, "1");
+        localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+        localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+        startLocalIpfsMonitor();
+      } catch (e) {
+        pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+        throw e;
+      }
+    },
     disableLocalIpfs,
     setLocalIpfsApiUrl, // so Settings can update the URL field live
 
@@ -5849,7 +6606,6 @@ export function AppProvider(props) {
     showKeys: i18n.showKeys,
     setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,
-    domainAssetsPrefix: domainAssetsPrefixActive,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
@@ -5863,6 +6619,7 @@ export function useApp() {
 </file>
 
 <file path="src/App.jsx">
+// src/App.jsx
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -5871,6 +6628,7 @@ import { useHashRouter } from "./routing/hashRouter";
 import { useApp } from "./context/AppContext.jsx";
 import { useI18n } from "./i18n/useI18n";
 import Toaster from "./components/Toaster";
+import MainView from "./components/main/MainView";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -5891,40 +6649,11 @@ export default function App() {
       <Header onTogglePane={togglePane} />
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
 
-      <Show when={route() === "/settings"} fallback={
-        <main class="p-4 max-w-7xl mx-auto">
-          <h2 class="text-xl">{t("init.title")}</h2>
-
-          <Show when={app.loading()}>
-            <p>{t("init.loading")}</p>
-          </Show>
-
-          <Show when={app.error()}>
-            <div class="text-red-500">
-              {t("common.error")}: {app.error().message}
-              <button
-                class="ml-3 px-2 py-1 rounded bg-blue-500 text-white"
-                onClick={app.reload}
-              >
-                {t("common.retry")}
-              </button>
-            </div>
-          </Show>
-
-          <Show when={!app.loading() && !app.error()}>
-            <div class="space-y-2 text-sm">
-              <div><span class="opacity-60">domain:</span> {app.config()?.domain}</div>
-              <div><span class="opacity-60">backend:</span> {app.config()?.backendLink}</div>
-            </div>
-
-            <pre class="mt-3 text-xs bg-black/10 p-3 rounded overflow-auto">
-              {JSON.stringify(app.info(), null, 2)}
-            </pre>
-          </Show>
-        </main>
-      }>
+      {/* Simple hash-route switch */}
+      <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
+
       <Toaster />
     </div>
   );

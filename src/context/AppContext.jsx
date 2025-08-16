@@ -1,26 +1,17 @@
+// src/context/AppContext.jsx
 import { createContext, useContext, createSignal, onMount, createMemo, onCleanup, createEffect } from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain } from "../blockchain/wallet";
-import { pushToast, pushErrorToast, errorDetails } from "../ux/toast";
+import { pushToast, pushErrorToast } from "../ux/toast";
 import { useI18n } from "../i18n/useI18n";
+import { fetchWithTimeout } from "../utils/net.js";
 
-
-
-// ---------- helpers ----------
+// ───────────────────────────────────────────────────────────────────────────────
+// small string utils (local)
+// ───────────────────────────────────────────────────────────────────────────────
 function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
-function trimSlash(s) { return (s || "").replace(/\/+$/g, ""); }
-async function fetchWithTimeout(url, { timeoutMs = 7000, method = "GET", headers, signal, body } = {}) {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
-  if (signal) signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  try {
-    const res = await fetch(url, { method, headers, body, signal: controller.signal, cache: "no-store" });
-    return res;
-  } finally {
-    clearTimeout(tid);
-  }
-}
+function trimSlash(s) { if (!s) return ""; return s.endsWith("/") ? s.slice(0, -1) : s; }
 
 // ---------- context ----------
 const AppContext = createContext();
@@ -30,7 +21,7 @@ const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
 const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway_v1";
 const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
 
-// NEW: domain assets env persistence key
+// domain assets env persistence key
 const ASSETS_ENV_KEY = "domain_assets_env_v1"; // "prod" | "test"
 
 function pickPersistable(cfg) {
@@ -42,10 +33,19 @@ function pickPersistable(cfg) {
 }
 
 function loadOverride() {
-  try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; }
+  try {
+    const raw = localStorage.getItem(OVERRIDE_KEY);
+    if (!raw) return null;
+    return pickPersistable(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 function saveOverride(obj) {
-  try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { }
+  try {
+    if (!obj) localStorage.removeItem(OVERRIDE_KEY);
+    else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj)));
+  } catch {}
 }
 
 export function AppProvider(props) {
@@ -63,7 +63,7 @@ export function AppProvider(props) {
   const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;
 
-  // NEW: domain assets env (prod/test)
+  // domain assets env (prod/test)
   const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
   function setAssetsEnv(next) {
     const v = next === "test" ? "test" : "prod";
@@ -158,7 +158,9 @@ export function AppProvider(props) {
   const supportedDomains = createMemo(() => {
     const data = info();
     const list = Array.isArray(data?.domains) ? data.domains : [];
-    return list.map((d) => (typeof d === "string" ? d : d?.name)).filter((name) => typeof name === "string" && name.trim().length > 0);
+    return list
+      .map((d) => (typeof d === "string" ? d : d?.name))
+      .filter((name) => typeof name === "string" && name.trim().length > 0);
   });
 
   const selectedDomain = createMemo(() => {
@@ -166,11 +168,19 @@ export function AppProvider(props) {
     const cur = config();
     if (!data || !cur) return null;
     const list = Array.isArray(data.domains) ? data.domains : [];
-    return list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) || null;
+    return (
+      list.find((d) => (typeof d === "string" ? d === cur.domain : d?.name === cur.domain)) ||
+      null
+    );
   });
 
-  const desiredChainId = createMemo(() => (typeof info()?.blockchain_id === "number" ? info().blockchain_id : null));
-  const desiredChain = createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
+  const desiredChainId = createMemo(() =>
+    typeof info()?.blockchain_id === "number" ? info().blockchain_id : null
+  );
+  const desiredChain = createMemo(() => {
+    const id = desiredChainId();
+    return id ? getChainMeta(id) : null;
+  });
   async function ensureWalletOnDesiredChain() {
     const meta = desiredChain();
     if (!meta) throw new Error("Unknown target chain");
@@ -179,7 +189,12 @@ export function AppProvider(props) {
 
   const remoteIpfsGateways = createMemo(() => {
     const arr = info()?.ipfs_gateways;
-    return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
+    return Array.isArray(arr)
+      ? arr
+          .filter(Boolean)
+          .map((s) => ensureSlash(s.trim()))
+          .filter(Boolean)
+      : [];
   });
 
   const activeIpfsGateways = createMemo(() => {
@@ -205,7 +220,7 @@ export function AppProvider(props) {
   const selectedDomainName = createMemo(() => {
     const d = selectedDomain();
     if (!d) return "";
-    return typeof d === "string" ? d : (d?.name || "");
+    return typeof d === "string" ? d : d?.name || "";
   });
 
   // Prefix like <assetsBase>/<domain>/
@@ -216,53 +231,103 @@ export function AppProvider(props) {
     return ensureSlash(base) + dom.replace(/^\//, "") + "/";
   });
 
-  // State for parsed config.yaml
+  // State for parsed config.yaml (+source/prefix so consumers know what we use)
   const [domainAssetsState, setDomainAssetsState] = createSignal({
     config: null,
     loadedAt: null,
     error: null,
+    source: null, // "remote" | "default"
+    prefix: DEFAULT_DOMAIN_ASSETS_PREFIX, // active base for assetUrl()
   });
 
+  // Helper: load & parse the default pack config so components (BrandLogo, etc.)
+  // can still read logos/locales when there is no per-domain config.
+  async function loadDefaultAssetsConfig(fallbackError) {
+    try {
+      const res = await fetchWithTimeout(`${DEFAULT_DOMAIN_ASSETS_PREFIX}config.yaml`, { timeoutMs: 8000 });
+      let parsed = null;
+      if (res.ok) {
+        const text = await res.text();
+        try { parsed = parse(text) || null; } catch { parsed = null; }
+      }
+      setDomainAssetsState({
+        config: parsed,                     // <— critical: expose default config
+        loadedAt: new Date(),
+        error: null,
+        source: "default",
+        prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
+      });
+    } catch (e) {
+      setDomainAssetsState({
+        config: null,
+        loadedAt: new Date(),
+        error: fallbackError || e,
+        source: "default",
+        prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
+      });
+    }
+  }
+
+  // Loader for per-domain config with fallback to domain_default (parsed!)
   async function refreshDomainAssets() {
     const prefix = domainAssetsPrefix();
-    if (!prefix) {
-      setDomainAssetsState({ config: null, loadedAt: new Date(), error: null });
-      return;
-    }
-    const url = prefix + "config.yaml";
+    const url = `${prefix}config.yaml`;
+
     try {
       const res = await fetchWithTimeout(url, { timeoutMs: 8000 });
+
       if (res.status === 404) {
-        setDomainAssetsState({ config: null, loadedAt: new Date(), error: null });
+        // no domain config -> use parsed /domain_default/config.yaml
+        await loadDefaultAssetsConfig();
         return;
       }
-      if (!res.ok) throw new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`);
+
+      if (!res.ok) {
+        // other HTTP errors; fall back to parsed default
+        await loadDefaultAssetsConfig(new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`));
+        return;
+      }
+
       const text = await res.text();
       let parsed = null;
       try {
         parsed = parse(text) || null;
       } catch (e) {
-        setDomainAssetsState({ config: null, loadedAt: new Date(), error: e });
+        // parsing failed -> parsed default pack
+        await loadDefaultAssetsConfig(e);
         return;
       }
-      setDomainAssetsState({ config: parsed, loadedAt: new Date(), error: null });
+
+      // success → remote (per-domain) assets
+      setDomainAssetsState({
+        config: parsed,
+        loadedAt: new Date(),
+        error: null,
+        source: "remote",
+        prefix, // ASSETS_BASE/<domain>/
+      });
     } catch (e) {
-      setDomainAssetsState({ config: null, loadedAt: new Date(), error: e });
+      // network/timeout → parsed default pack
+      await loadDefaultAssetsConfig(e);
     }
   }
 
+  // Resolve an asset path using the *active* prefix (domain or default)
   function assetUrl(relPath) {
     if (!relPath) return "";
     if (/^(https?:)?\/\//i.test(relPath) || /^data:/.test(relPath)) return relPath;
-    const prefix = domainAssetsPrefix();
-    if (!prefix) return relPath;
+    const prefix = domainAssetsState().prefix || DEFAULT_DOMAIN_ASSETS_PREFIX;
     return prefix + String(relPath).replace(/^\//, "");
   }
 
   // Auto-refresh when env, info, or domain changes
   createEffect(() => {
-    const _ = [assetsEnv(), assetsBaseUrl(), selectedDomainName()];
-    refreshDomainAssets();
+    // track dependencies
+    void assetsEnv();
+    void assetsBaseUrl();
+    void selectedDomainName();
+    // fire loader
+    void refreshDomainAssets();
   });
 
   const domainAssetsConfig = createMemo(() => domainAssetsState().config);
@@ -272,40 +337,6 @@ export function AppProvider(props) {
   );
 
   // ----- Local IPFS: probe + monitor -----
-  async function probeLocalIpfs(apiUrl) {
-    const base = trimSlash(apiUrl || "");
-    if (!base) throw new Error("Local IPFS API URL is empty");
-    // CORS note: browser needs CORS on local node
-    const url = `${base}/api/v0/config/show`;
-    const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
-    if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
-    const cfg = await res.json();
-    let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
-    if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
-    return ensureSlash(gw);
-  }
-
-  async function enableLocalIpfs(apiUrl) {
-    try {
-      const gw = await probeLocalIpfs(apiUrl);  // already normalized to http://.../
-      setLocalIpfsEnabled(true);
-      setLocalIpfsApiUrl(apiUrl);
-      setLocalIpfsGateway(gw);
-      localStorage.setItem(IPFS_LOCAL_KEY, "1");
-      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
-      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-      setLocalIpfsStatus("ok");
-      pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
-      startLocalIpfsMonitor();
-      return gw;
-    } catch (e) {
-      setLocalIpfsEnabled(false);
-      setLocalIpfsStatus("down");
-      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
-      throw e;
-    }
-  }
-
   function multiaddrToHttp(ma) {
     if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
     const parts = ma.split("/").filter(Boolean);
@@ -325,20 +356,32 @@ export function AppProvider(props) {
     return ensureSlash(base);
   }
 
-
   async function probeLocalIpfs(apiUrl) {
     const base = trimSlash(apiUrl || "");
     if (!base) throw new Error("Local IPFS API URL is empty");
+    // CORS note: browser needs CORS on local node
     const url = `${base}/api/v0/config/show`;
     const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
     if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
     const cfg = await res.json();
     let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
     if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
-    const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // <-- normalize
+    const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // normalize
     return ensureSlash(httpGw);
   }
 
+  function startLocalIpfsMonitor() {
+    stopLocalIpfsMonitor();
+    // first immediate ping (don’t spam toasts on the very first success)
+    void pingLocalIpfs();
+    ipfsMonitorTid = setInterval(pingLocalIpfs, 20000);
+  }
+  function stopLocalIpfsMonitor() {
+    if (ipfsMonitorTid) {
+      clearInterval(ipfsMonitorTid);
+      ipfsMonitorTid = null;
+    }
+  }
   function disableLocalIpfs() {
     stopLocalIpfsMonitor();
     setLocalIpfsEnabled(false);
@@ -346,9 +389,8 @@ export function AppProvider(props) {
     setLocalIpfsStatus("unknown");
     localStorage.setItem(IPFS_LOCAL_KEY, "0");
     localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
-    pushToast({ type: "info", message: "Local IPFS disabled" });
+    pushToast({ type: "info", message: i18n.t("settings.ipfs.localDisabled") });
   }
-
   async function pingLocalIpfs() {
     try {
       const base = trimSlash(localIpfsApiUrl());
@@ -357,21 +399,11 @@ export function AppProvider(props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setLocalIpfsStatus("ok");
       return true;
-    } catch (e) {                      // <-- add (e)
+    } catch (e) {
       setLocalIpfsStatus("down");
       pushErrorToast(e, { op: "pingLocalIpfs", apiUrl: localIpfsApiUrl() });
       return false;
     }
-  }
-
-  function startLocalIpfsMonitor() {
-    stopLocalIpfsMonitor();
-    // first immediate ping (don’t spam toasts on the very first success)
-    pingLocalIpfs();
-    ipfsMonitorTid = setInterval(pingLocalIpfs, 20000);
-  }
-  function stopLocalIpfsMonitor() {
-    if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
   }
 
   const value = {
@@ -397,6 +429,8 @@ export function AppProvider(props) {
     setAssetsEnv,
     assetsBaseUrl,
     domainAssetsConfig,
+    domainAssetsSource,
+    domainAssetsPrefix: domainAssetsPrefixActive,
     refreshDomainAssets,
     assetUrl,
 
@@ -408,7 +442,21 @@ export function AppProvider(props) {
     ensureWalletOnDesiredChain,
 
     // local IPFS actions
-    enableLocalIpfs,
+    enableLocalIpfs: async (apiUrl) => {
+      try {
+        const gw = await probeLocalIpfs(apiUrl);
+        setLocalIpfsApiUrl(apiUrl);
+        setLocalIpfsGateway(gw);
+        setLocalIpfsEnabled(true);
+        localStorage.setItem(IPFS_LOCAL_KEY, "1");
+        localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+        localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+        startLocalIpfsMonitor();
+      } catch (e) {
+        pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+        throw e;
+      }
+    },
     disableLocalIpfs,
     setLocalIpfsApiUrl, // so Settings can update the URL field live
 
@@ -419,7 +467,6 @@ export function AppProvider(props) {
     showKeys: i18n.showKeys,
     setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,
-    domainAssetsPrefix: domainAssetsPrefixActive,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
