@@ -41,6 +41,8 @@ The content is organized as follows:
 
 <directory_structure>
 assets/
+  icons/
+    arrow-back.svg
   ethereum.svg
   puilsechain-test--v4.svg
   pulsechain.svg
@@ -57,6 +59,10 @@ src/
     chains.js
     wallet.js
   components/
+    settings/
+      LocalIpfsSection.jsx
+    ui/
+      BackIconButton.jsx
     Header.jsx
     RightPane.jsx
     SwitchConnectDialog.jsx
@@ -96,269 +102,11 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/Toaster.jsx">
-import { For, Show } from "solid-js";
-import { toasts, dismissToast, toggleToast } from "../ux/toast";
-
-const typeStyles = {
-  info:    "bg-blue-600",
-  success: "bg-emerald-600",
-  warning: "bg-amber-600",
-  error:   "bg-red-600",
-};
-
-function pretty(obj) {
-  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
-}
-
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); } catch {}
-}
-
-export default function Toaster() {
-  return (
-    // bottom-right placement
-    <div class="fixed bottom-3 right-3 z-[1000] space-y-2 max-w-[92vw] sm:max-w-[28rem]">
-      <For each={toasts()}>
-        {(t) => (
-          <div
-            class={`text-white rounded shadow overflow-hidden`}
-            role="status"
-          >
-            {/* Header bar */}
-            <div class={`flex items-center justify-between px-3 py-2 ${typeStyles[t.type] || typeStyles.info}`}>
-              <span class="text-sm font-medium">{t.message}</span>
-              <div class="flex items-center gap-1">
-                <Show when={t.details}>
-                  <button
-                    class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                    onClick={() => toggleToast(t.id)}
-                    aria-expanded={t.expanded}
-                    title={t.expanded ? "Hide details" : "Show details"}
-                  >
-                    {t.expanded ? "Hide" : "Details"}
-                  </button>
-                </Show>
-                <button
-                  class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
-                  onClick={() => dismissToast(t.id)}
-                  aria-label="Close notification"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Details panel */}
-            <Show when={t.expanded && t.details}>
-              <div class="bg-gray-900 text-gray-100 px-3 py-2">
-                <pre class="whitespace-pre-wrap break-words text-[11px] leading-tight">
-{pretty(t.details)}
-                </pre>
-                <div class="mt-2 flex justify-end">
-                  <button
-                    class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
-                    onClick={() => copy(pretty(t.details))}
-                    title="Copy details to clipboard"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-            </Show>
-          </div>
-        )}
-      </For>
-    </div>
-  );
-}
-</file>
-
-<file path="src/ipfs/index.js">
-// Minimal IPFS client with gateway fallback.
-// Usage:
-//   import { ipfs } from "../ipfs";
-//   const res = await ipfs.fetch("Qm.../file.json", { gateways: myGateways });
-//   const json = await ipfs.getJSON("ipfs://Qm.../file.json", { gateways: myGateways });
-
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
-
-function normalizeInput(input) {
-  // Accepts: "ipfs://CID/path", "/ipfs/CID/path", "CID[/path]"
-  let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
-  return s; // "CID[/path]"
-}
-
-function buildUrl(baseGateway, cidPath) {
-  // baseGateway may be ".../ipfs/" or a raw origin.
-  const g = baseGateway.replace(/\/+$/g, ""); // remove trailing slashes
-  const hasIpfs = /\/ipfs$/i.test(g);
-  const prefix = hasIpfs ? g + "/" : g + "/ipfs/";
-  return prefix + cidPath.replace(/^\/+/g, "");
-}
-
-async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
-  const compositeSignal = signal
-    ? new AbortController()
-    : null;
-
-  // If a signal was provided, abort our controller when it aborts.
-  if (signal && compositeSignal) {
-    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  }
-
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(tid);
-  }
-}
-
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) return { res, url, gateway: gw };
-      // Treat non-2xx as failure and continue
-      errors.push(new Error(`Gateway ${gw} -> HTTP ${res.status}`));
-    } catch (e) {
-      errors.push(new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`));
-    }
-  }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  throw err;
-}
-
-async function fetchIpfs(input, opts = {}) {
-  const {
-    gateways = [],
-    timeoutMs = 8000,
-    signal,
-    cache = "default",
-    headers,
-    method = "GET",
-  } = opts;
-
-  if (!gateways || gateways.length === 0) {
-    throw new Error("ipfs.fetch: no gateways provided");
-  }
-  const cidPath = normalizeInput(input);
-  const { res, url, gateway } = await tryGateways(cidPath, gateways, {
-    timeoutMs,
-    init: { method, headers, cache, signal }
-  });
-  return { response: res, url, gateway };
-}
-
-async function getJSON(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
-  return { data: await response.json(), url, gateway };
-}
-
-async function getText(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.text(), url, gateway };
-}
-
-async function getBlob(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.blob(), url, gateway };
-}
-
-async function getArrayBuffer(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.arrayBuffer(), url, gateway };
-}
-
-export const ipfs = {
-  fetch: fetchIpfs,
-  getJSON,
-  getText,
-  getBlob,
-  getArrayBuffer,
-  // Utils you may want in other places:
-  normalizeInput,
-  buildUrl,
-};
-</file>
-
-<file path="src/ux/toast.js">
-import { createSignal } from "solid-js";
-
-export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
-
-let counter = 0;
-
-export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
-  const id = ++counter;
-  const item = { id, type, message: String(message || ""), details, expanded: false };
-  setToasts((curr) => [...curr, item]);
-  if (autohideMs > 0 && type !== "error") {
-    setTimeout(() => dismissToast(id), autohideMs);
-  }
-  return id;
-}
-
-export function dismissToast(id) {
-  setToasts((curr) => curr.filter((t) => t.id !== id));
-}
-
-export function toggleToast(id) {
-  setToasts((curr) =>
-    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
-  );
-}
-
-/** Convenience: turn any Error (or unknown) into a compact, useful details object */
-export function errorDetails(err, extra = {}) {
-  if (!err) return extra || {};
-  const base = {
-    name: err.name,
-    message: err.message,
-    code: err.code,
-    type: err.type,
-    status: err.status,
-    stack: err.stack,
-    cause: err.cause && typeof err.cause === "object" ? {
-      name: err.cause.name,
-      message: err.cause.message,
-      code: err.cause.code,
-      status: err.cause.status,
-    } : undefined,
-  };
-  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
-  if (Array.isArray(err.causes)) {
-    base.causes = err.causes.map((e) => ({
-      name: e?.name,
-      message: e?.message,
-      code: e?.code,
-      status: e?.status,
-    }));
-  }
-  // Merge caller-provided context (like URL, gateway, endpoint)
-  return { ...base, ...extra };
-}
-
-/** push an error toast with extracted details */
-export function pushErrorToast(err, context = {}) {
-  return pushToast({
-    type: "error",
-    message: err?.message || "Unexpected error",
-    details: errorDetails(err, context),
-    autohideMs: 0, // errors stay until closed
-  });
-}
+<file path="assets/icons/arrow-back.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+  <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h14"/>
+</svg>
 </file>
 
 <file path="assets/ethereum.svg">
@@ -610,81 +358,206 @@ export function getChainMeta(chainId) {
 }
 </file>
 
-<file path="src/blockchain/wallet.js">
-// src/blockchain/wallet.js
-import { createSignal } from "solid-js";
+<file path="src/components/settings/LocalIpfsSection.jsx">
+// src/components/settings/LocalIpfsSection.jsx
+import { createSignal, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
 
-export const [walletAccount, setWalletAccount] = createSignal(null);
-export const [walletChainId, setWalletChainId] = createSignal(null);
-export const [walletReady, setWalletReady] = createSignal(false);
+export default function LocalIpfsSection() {
+  const app = useApp(); // exposes t, local IPFS signals, actions
+  const { t } = app;
 
-function hasProvider() {
-  return typeof window !== "undefined" && window.ethereum;
-}
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
+  const [showIpfsHelp, setShowIpfsHelp] = createSignal(false);
 
-function onAccountsChanged(accs) {
-  setWalletAccount(Array.isArray(accs) && accs.length ? accs[0] : null);
-}
-
-function onChainChanged(chainHex) {
-  const id = typeof chainHex === "string" ? parseInt(chainHex, 16) : Number(chainHex);
-  setWalletChainId(id || null);
-}
-
-export async function connectWallet() {
-  if (!hasProvider()) throw new Error("No EVM wallet found");
-  const eth = window.ethereum;
-
-  const accounts = await eth.request({ method: "eth_requestAccounts" });
-  setWalletAccount(accounts?.[0] || null);
-
-  const chainHex = await eth.request({ method: "eth_chainId" });
-  setWalletChainId(parseInt(chainHex, 16));
-  setWalletReady(true);
-
-  eth.removeListener?.("accountsChanged", onAccountsChanged);
-  eth.removeListener?.("chainChanged", onChainChanged);
-  eth.on?.("accountsChanged", onAccountsChanged);
-  eth.on?.("chainChanged", onChainChanged);
-}
-
-export function isWalletAvailable() {
-  return hasProvider();
-}
-
-export async function switchOrAddChain(chainMeta) {
-  if (!hasProvider()) throw new Error("No EVM wallet found");
-  if (!chainMeta) throw new Error("Unknown chain");
-
-  const eth = window.ethereum;
-  const chainIdHex = "0x" + Number(chainMeta.id).toString(16);
-
-  try {
-    await eth.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: chainIdHex }],
-    });
-  } catch (err) {
-    if (err?.code === 4902 || /unrecognized chain/i.test(err?.message || "")) {
-      await eth.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: chainIdHex,
-          chainName: chainMeta.name,
-          nativeCurrency: chainMeta.nativeCurrency,
-          rpcUrls: chainMeta.rpcUrls,
-          blockExplorerUrls: (chainMeta.blockExplorers || []).map(b => b.url),
-        }],
-      });
-      await eth.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: chainIdHex }],
-      });
-    } else {
-      throw err;
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      await app.enableLocalIpfs(apiUrl().trim());
+    } finally {
+      setTesting(false);
     }
   }
+
+  return (
+    <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
+
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.localIpfsEnabled()}
+          onInput={(e) => {
+            const checked = e.currentTarget.checked;
+            if (!checked) app.disableLocalIpfs();
+          }}
+        />
+        <span>{t("settings.localIpfs.enableCheckbox")}</span>
+      </label>
+
+      {/* Input + button row (aligned bottoms); hint on its own row */}
+      <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
+        {/* Left: label + input */}
+        <label class="block">
+          <span class="text-sm text-gray-700 dark:text-gray-300">
+            {t("settings.localIpfs.apiUrl.label")}
+          </span>
+          <input
+            class="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            value={apiUrl()}
+            onInput={(e) => {
+              const val = e.currentTarget.value;
+              setApiUrl(val);
+              app.setLocalIpfsApiUrl?.(val);
+            }}
+            placeholder="http://localhost:5001"
+            spellcheck={false}
+          />
+        </label>
+
+        {/* Right: action button, bottom-aligned to the input */}
+        <div class="flex md:self-end">
+          <Show
+            when={!app.localIpfsEnabled()}
+            fallback={
+              <button
+                class="h-10 px-3 rounded bg-red-600 text-white hover:bg-red-700"
+                onClick={() => app.disableLocalIpfs()}
+              >
+                {t("settings.localIpfs.disable")}
+              </button>
+            }
+          >
+            <button
+              class="h-10 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              onClick={onEnableLocal}
+              disabled={testing()}
+              title={t("settings.localIpfs.testEnable")}
+            >
+              {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
+            </button>
+          </Show>
+        </div>
+
+        {/* Hint line */}
+        <p class="text-xs text-gray-500 mt-1 md:col-span-2">
+          {t("settings.localIpfs.apiUrl.help")} <code>/api/v0/config/show</code>.
+        </p>
+      </div>
+
+      {/* Status */}
+      <div class="text-sm text-gray-600 dark:text-gray-300">
+        {t("settings.localIpfs.status.label")}:{" "}
+        <span
+          class={
+            app.localIpfsStatus() === "ok"
+              ? "text-emerald-600"
+              : app.localIpfsStatus() === "down"
+              ? "text-red-500"
+              : "opacity-70"
+          }
+        >
+          {app.localIpfsStatus()}
+        </span>
+        <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+          <span class="ml-2 opacity-70">
+            • {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}
+          </span>
+        </Show>
+      </div>
+
+      {/* Help toggle */}
+      <div class="pt-2">
+        <button
+          class="text-sm underline text-blue-600 dark:text-blue-400 hover:opacity-80"
+          onClick={() => setShowIpfsHelp(!showIpfsHelp())}
+        >
+          {showIpfsHelp()
+            ? t("settings.localIpfs.help.toggle.hide")
+            : t("settings.localIpfs.help.toggle.show")}
+        </button>
+      </div>
+
+      {/* Collapsible help content */}
+      <Show when={showIpfsHelp()}>
+        <div class="mt-3 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 space-y-3 text-sm">
+          <p class="opacity-90">
+            {t("settings.localIpfs.help.intro")} <code>/api/v0/*</code>
+          </p>
+
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.api.title")}</p>
+            <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["GET","POST","PUT","OPTIONS"]'
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Content-Type","Authorization"]'`}</pre>
+            <p class="opacity-75 mt-1">{t("settings.localIpfs.help.api.tip")}</p>
+          </div>
+
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.gateway.title")}</p>
+            <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Methods '["GET","HEAD","OPTIONS"]'`}</pre>
+            <p class="opacity-75 mt-1">{t("settings.localIpfs.help.gateway.note")}</p>
+          </div>
+
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.restart.title")}</p>
+            <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`ipfs shutdown 2>/dev/null || true
+ipfs daemon`}</pre>
+          </div>
+
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.verify.title")}</p>
+            <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`curl -X POST http://localhost:5001/api/v0/id
+curl -X POST http://localhost:5001/api/v0/config/show | jq -r '.Addresses.Gateway'`}</pre>
+            <p class="opacity-75 mt-1">
+              {t("settings.localIpfs.help.verify.note")} <code>/ip4/127.0.0.1/tcp/8080</code>.
+            </p>
+          </div>
+
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.proxy.title")}</p>
+            <p class="opacity-90">{t("settings.localIpfs.help.proxy.text")}</p>
+            <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`// vite.config.js
+export default {
+  server: {
+    proxy: {
+      "/ipfs-api": {
+        target: "http://localhost:5001",
+        changeOrigin: true,
+        rewrite: p => p.replace(/^\\/ipfs-api/, "")
+      }
+    }
+  }
+};`}</pre>
+            <p class="opacity-75 mt-1">
+              {t("settings.localIpfs.help.proxy.note")} <code>http://localhost:5173/ipfs-api</code>.
+            </p>
+          </div>
+        </div>
+      </Show>
+    </section>
+  );
 }
+</file>
+
+<file path="src/components/ui/BackIconButton.jsx">
+<button
+  class="p-2 h-9 w-9 flex items-center justify-center rounded 
+         hover:bg-gray-200 dark:hover:bg-gray-700 
+         text-gray-900 dark:text-gray-100
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+  /* ... */
+>
+  <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
+    <path
+      d="M9 15L3 9m0 0l6-6M3 9h11a4 4 0 014 4v7"
+      fill="none" stroke="currentColor" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round"
+    />
+  </svg>
+</button>
 </file>
 
 <file path="src/components/SwitchConnectDialog.jsx">
@@ -1031,122 +904,6 @@ export function useI18n() {
 }
 </file>
 
-<file path="src/pages/Settings.jsx">
-import { createSignal, Show } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-
-export default function Settings() {
-  const app = useApp();
-  const [testing, setTesting] = createSignal(false);
-  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
-
-  async function onEnableLocal() {
-    setTesting(true);
-    try {
-      await app.enableLocalIpfs(apiUrl().trim());
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto space-y-6">
-      <h2 class="text-2xl font-semibold">Settings</h2>
-
-      {/* Local IPFS */}
-      <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
-        <h3 class="text-lg font-medium">Local IPFS</h3>
-
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={app.localIpfsEnabled()}
-            onInput={(e) => {
-              const checked = e.currentTarget.checked;
-              if (!checked) {
-                app.disableLocalIpfs();
-              }
-            }}
-          />
-          <span>Use local IPFS node</span>
-        </label>
-
-        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-end">
-          <label class="block">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Local IPFS API URL</span>
-            <input
-              class="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-              value={apiUrl()}
-              onInput={(e) => setApiUrl(e.currentTarget.value)}
-              placeholder="http://localhost:5001"
-              spellcheck={false}
-            />
-            <p class="text-xs text-gray-500 mt-1">
-              We will call <code>/api/v0/config/show</code> to discover your local Gateway URL.
-            </p>
-          </label>
-
-          <Show when={!app.localIpfsEnabled()} fallback={
-            <button
-              class="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700"
-              onClick={() => app.disableLocalIpfs()}
-            >
-              Disable
-            </button>
-          }>
-            <button
-              class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-              onClick={onEnableLocal}
-              disabled={testing()}
-              title="Probe local IPFS and enable"
-            >
-              {testing() ? "Checking…" : "Test & enable"}
-            </button>
-          </Show>
-        </div>
-
-        <div class="text-sm text-gray-600 dark:text-gray-300">
-          Status:{" "}
-          <span class={
-            app.localIpfsStatus() === "ok" ? "text-emerald-600" :
-              app.localIpfsStatus() === "down" ? "text-red-500" : "opacity-70"
-          }>
-            {app.localIpfsStatus()}
-          </span>
-          <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
-            <span class="ml-2 opacity-70">• Gateway: {app.localIpfsGateway()}</span>
-          </Show>
-        </div>
-      </section>
-
-      <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
-        <h3 class="text-lg font-medium">Developer</h3>
-
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={showKeys()}
-            onInput={(e) => setShowKeys(e.currentTarget.checked)}
-          />
-          <span>Show i18n keys instead of translations</span>
-        </label>
-
-        <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-          <p class="mb-1 opacity-80">Preview:</p>
-          <ul class="list-disc pl-6">
-            <li>{t("rightPane.switch.title")}</li>
-            <li>{t("rightPane.switch.backend.label")}</li>
-            <li>{t("rightPane.switch.domain.label")}</li>
-            <li>{t("common.apply")}</li>
-            <li>{t("common.cancel")}</li>
-          </ul>
-        </div>
-      </section>
-    </main>
-  );
-}
-</file>
-
 <file path="src/routing/hashRouter.js">
 import { createSignal, onCleanup, onMount } from "solid-js";
 
@@ -1175,6 +932,74 @@ export function useHashRouter() {
     window.removeEventListener("hashchange", setFromHash);
   });
   return { route, navigate };
+}
+</file>
+
+<file path="src/ux/toast.js">
+import { createSignal } from "solid-js";
+
+export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
+
+let counter = 0;
+
+export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
+  const id = ++counter;
+  const item = { id, type, message: String(message || ""), details, expanded: false };
+  setToasts((curr) => [...curr, item]);
+  if (autohideMs > 0 && type !== "error") {
+    setTimeout(() => dismissToast(id), autohideMs);
+  }
+  return id;
+}
+
+export function dismissToast(id) {
+  setToasts((curr) => curr.filter((t) => t.id !== id));
+}
+
+export function toggleToast(id) {
+  setToasts((curr) =>
+    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
+  );
+}
+
+/** Convenience: turn any Error (or unknown) into a compact, useful details object */
+export function errorDetails(err, extra = {}) {
+  if (!err) return extra || {};
+  const base = {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    type: err.type,
+    status: err.status,
+    stack: err.stack,
+    cause: err.cause && typeof err.cause === "object" ? {
+      name: err.cause.name,
+      message: err.cause.message,
+      code: err.cause.code,
+      status: err.cause.status,
+    } : undefined,
+  };
+  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
+  if (Array.isArray(err.causes)) {
+    base.causes = err.causes.map((e) => ({
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+    }));
+  }
+  // Merge caller-provided context (like URL, gateway, endpoint)
+  return { ...base, ...extra };
+}
+
+/** push an error toast with extracted details */
+export function pushErrorToast(err, context = {}) {
+  return pushToast({
+    type: "error",
+    message: err?.message || "Unexpected error",
+    details: errorDetails(err, context),
+    autohideMs: 0, // errors stay until closed
+  });
 }
 </file>
 
@@ -1296,6 +1121,695 @@ Learn more about deploying your application with the [documentations](https://vi
     "noUncheckedSideEffectImports": true
   },
   "include": ["vite.config.js"]
+}
+</file>
+
+<file path="src/blockchain/wallet.js">
+// src/blockchain/wallet.js
+import { createSignal } from "solid-js";
+
+const [walletAccount, setWalletAccount] = createSignal(null);
+const [walletChainId, setWalletChainId] = createSignal(null);
+
+export function isWalletAvailable() {
+  return typeof window !== "undefined" && !!window.ethereum;
+}
+
+function hexChainId(n) {
+  const id = Number(n);
+  if (!Number.isFinite(id)) throw new Error(`Invalid chain id: ${n}`);
+  return "0x" + id.toString(16);
+}
+
+let listenersReady = false;
+function setupListeners() {
+  const eth = window.ethereum;
+  if (!eth || listenersReady) return;
+  eth.on?.("accountsChanged", (accs) => {
+    setWalletAccount(accs?.[0] || null);
+  });
+  eth.on?.("chainChanged", (id) => {
+    const n = typeof id === "string" ? parseInt(id, 16) : +id;
+    setWalletChainId(Number.isFinite(n) ? n : null);
+  });
+  listenersReady = true;
+}
+
+export async function eagerConnect() {
+  const eth = window.ethereum;
+  if (!eth) return false;
+  setupListeners();
+  try {
+    const [accounts, chainIdHex] = await Promise.all([
+      eth.request({ method: "eth_accounts" }),
+      eth.request({ method: "eth_chainId" }).catch(() => null),
+    ]);
+    if (chainIdHex) {
+      const n = parseInt(chainIdHex, 16);
+      setWalletChainId(Number.isFinite(n) ? n : null);
+    }
+    if (accounts && accounts[0]) {
+      setWalletAccount(accounts[0]);
+      return true;
+    }
+    setWalletAccount(null);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function connectWallet() {
+  const eth = window.ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found");
+  setupListeners();
+  const accounts = await eth.request({ method: "eth_requestAccounts" });
+  const chainIdHex = await eth.request({ method: "eth_chainId" }).catch(() => null);
+  if (chainIdHex) {
+    const n = parseInt(chainIdHex, 16);
+    setWalletChainId(Number.isFinite(n) ? n : null);
+  }
+  setWalletAccount(accounts?.[0] || null);
+}
+
+/**
+ * Switch to a chain; if the wallet doesn't know it, try to add it.
+ * meta = {
+ *   chainId: number,
+ *   name: string,
+ *   nativeCurrency: { name, symbol, decimals },
+ *   rpcUrls: string[],
+ *   blockExplorers?: string[]
+ * }
+ */
+export async function switchOrAddChain(meta) {
+  const eth = window.ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found");
+  if (!meta || !meta.chainId) throw new Error("Missing chain metadata");
+
+  const chainIdHexVal = hexChainId(meta.chainId);
+  try {
+    await eth.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: chainIdHexVal }],
+    });
+  } catch (e) {
+    // 4902 = Unrecognized chain
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4902) {
+      await eth.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: chainIdHexVal,
+            chainName: meta.name || `Chain ${meta.chainId}`,
+            nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
+            rpcUrls: meta.rpcUrls || [],
+            blockExplorerUrls: meta.blockExplorers || [],
+          },
+        ],
+      });
+    } else {
+      throw e;
+    }
+  }
+
+  // update signal with the (new) chain id
+  try {
+    const cid = await eth.request({ method: "eth_chainId" });
+    if (cid) {
+      const n = parseInt(cid, 16);
+      setWalletChainId(Number.isFinite(n) ? n : null);
+    }
+  } catch { /* ignore */ }
+}
+
+export { walletAccount, walletChainId };
+</file>
+
+<file path="src/components/Toaster.jsx">
+// src/components/Toaster.jsx
+import { For, Show } from "solid-js";
+import { toasts, dismissToast, toggleToast } from "../ux/toast";
+
+const typeStyles = {
+  info:    "bg-blue-600",
+  success: "bg-emerald-600",
+  warning: "bg-amber-600",
+  error:   "bg-red-600",
+};
+
+function pretty(obj) {
+  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); } catch {}
+}
+
+export default function Toaster() {
+  return (
+    // Full-width bottom bar container; toasts align right when compact.
+    // We disable pointer events on the container so it doesn't block the page,
+    // and re-enable them on each toast.
+    <div class="fixed inset-x-0 bottom-0 z-[1000] p-3 pointer-events-none">
+      <div class="flex flex-col gap-2 items-end">
+        <For each={toasts()}>
+          {(t) => {
+            const headerColor = typeStyles[t.type] || typeStyles.info;
+            return (
+              // When expanded: stretch to full width; when compact: hug right (max ~28rem)
+              <div
+                class={`pointer-events-auto w-full ${
+                  t.expanded ? "" : "sm:w-[28rem] max-w-[92vw]"
+                }`}
+              >
+                <div class="text-white rounded shadow overflow-hidden">
+                  {/* Header bar */}
+                  <div class={`flex items-center justify-between px-3 py-2 ${headerColor}`}>
+                    <span class="text-sm font-medium">{t.message}</span>
+                    <div class="flex items-center gap-1">
+                      <Show when={t.details}>
+                        <button
+                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
+                          onClick={() => toggleToast(t.id)}
+                          aria-expanded={t.expanded}
+                          title={t.expanded ? "Hide details" : "Show details"}
+                        >
+                          {t.expanded ? "Hide" : "Details"}
+                        </button>
+                      </Show>
+                      <button
+                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
+                        onClick={() => dismissToast(t.id)}
+                        aria-label="Close notification"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Details panel — takes full width, tall & scrollable */}
+                  <Show when={t.expanded && t.details}>
+                    <div class="bg-gray-900 text-gray-100 px-4 py-3 max-h-[60vh] overflow-auto">
+                      <pre class="whitespace-pre-wrap break-words text-[12px] leading-tight">
+{pretty(t.details)}
+                      </pre>
+                      <div class="mt-2 flex justify-end">
+                        <button
+                          class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
+                          onClick={() => copy(pretty(t.details))}
+                          title="Copy details to clipboard"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/hooks/useTheme.js">
+// src/hooks/useTheme.js
+import { createSignal, onMount } from "solid-js";
+
+export function useTheme() {
+  const [theme, setTheme] = createSignal("light");
+
+  onMount(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    setTheme(savedTheme);
+    document.documentElement.classList.toggle("dark", savedTheme === "dark");
+    console.log("Initial theme:", savedTheme, "dark class:", document.documentElement.classList.contains("dark")); // Debug
+  });
+
+  const toggleTheme = () => {
+    const next = theme() === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try { localStorage.setItem("theme", next); } catch {}
+    console.log("Toggled to:", next, "dark class:", document.documentElement.classList.contains("dark")); // Debug
+  };
+
+  // Expose theme signal for external use
+  useTheme.theme = theme;
+
+  return [theme, toggleTheme];
+}
+</file>
+
+<file path="src/i18n/ru.js">
+// Auto-generated by i18n-sync.mjs. Do not edit by hand.
+export default {
+  "app.title": "SAVVA · SolidJS",
+  "card.tailwindWorks": "Tailwind работает?",
+  "debug.rightOpen": "???",
+  "debug.theme": "???",
+  "greeting.hello": "Привет, Алекс 👋",
+  "rightPane.language": "Язык",
+  "rightPane.option1": "Опция 1",
+  "rightPane.option2": "Опция 2",
+  "rightPane.option3": "Опция 3",
+  "rightPane.showKeys": "Показывать ключи",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "settings.title": "Настройки",
+  "settings.close": "Закрыть",
+  "settings.debug.title": "Отладка",
+  "settings.debug.showKeys.label": "Показывать ключи переводов",
+  "settings.debug.showKeys.help":
+    "Если включено, каждая строка добавит в конец свой ключ в квадратных скобках.",
+};
+</file>
+
+<file path="src/ipfs/index.js">
+// Minimal IPFS client with gateway fallback.
+// Usage:
+//   import { ipfs } from "../ipfs";
+//   const res = await ipfs.fetch("Qm.../file.json", { gateways: myGateways });
+//   const json = await ipfs.getJSON("ipfs://Qm.../file.json", { gateways: myGateways });
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+
+function normalizeInput(input) {
+  // Accepts: "ipfs://CID/path", "/ipfs/CID/path", "CID[/path]"
+  let s = String(input || "").trim();
+  if (!s) throw new Error("ipfs: empty input");
+  s = stripPrefix(s, "ipfs://");
+  s = stripPrefix(s, "/ipfs/");
+  s = stripPrefix(s, "ipfs/");
+  return s; // "CID[/path]"
+}
+
+function buildUrl(baseGateway, cidPath) {
+  const base = normalizeGatewayBase(baseGateway).replace(/\/+$/g, "");
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? base + "/" : base + "/ipfs/";
+  return prefix + cidPath.replace(/^\/+/g, "");
+}
+
+
+async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
+  const compositeSignal = signal
+    ? new AbortController()
+    : null;
+
+  // If a signal was provided, abort our controller when it aborts.
+  if (signal && compositeSignal) {
+    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) return { res, url, gateway: gw };
+      // Treat non-2xx as failure and continue
+      errors.push(new Error(`Gateway ${gw} -> HTTP ${res.status}`));
+    } catch (e) {
+      errors.push(new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`));
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  throw err;
+}
+
+async function fetchIpfs(input, opts = {}) {
+  const {
+    gateways = [],
+    timeoutMs = 8000,
+    signal,
+    cache = "default",
+    headers,
+    method = "GET",
+  } = opts;
+
+  if (!gateways || gateways.length === 0) {
+    throw new Error("ipfs.fetch: no gateways provided");
+  }
+  const cidPath = normalizeInput(input);
+  const { res, url, gateway } = await tryGateways(cidPath, gateways, {
+    timeoutMs,
+    init: { method, headers, cache, signal }
+  });
+  return { response: res, url, gateway };
+}
+
+async function getJSON(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
+  return { data: await response.json(), url, gateway };
+}
+
+async function getText(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.text(), url, gateway };
+}
+
+async function getBlob(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.blob(), url, gateway };
+}
+
+async function getArrayBuffer(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.arrayBuffer(), url, gateway };
+}
+
+export const ipfs = {
+  fetch: fetchIpfs,
+  getJSON,
+  getText,
+  getBlob,
+  getArrayBuffer,
+  // Utils you may want in other places:
+  normalizeInput,
+  buildUrl,
+};
+</file>
+
+<file path="src/index.jsx">
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./context/AppContext.jsx";
+
+const root = document.getElementById("root");
+
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVVA · SolidJS</title>
+
+  <!-- Preload theme to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      } catch { }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form: /#/settings
+      if (!location.hash && location.pathname !== "/") {
+        var newHash = "#" + location.pathname + location.search + location.hash;
+        history.replaceState(null, "", "/" + newHash);
+      }
+    })();
+  </script>
+
+
+  <!-- Load app after theme class is set -->
+  <script type="module" src="/src/index.jsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
+</file>
+
+<file path="postcss.config.js">
+// postcss.config.js
+export default {
+  plugins: {
+    '@tailwindcss/postcss': { config: './tailwind.config.js' },
+    autoprefixer: {},
+  },
+};
+</file>
+
+<file path="vite.config.js">
+// vite.config.js
+import { defineConfig } from 'vite';
+import solid from 'vite-plugin-solid';
+
+export default defineConfig({
+  plugins: [solid()],
+  server: {
+    port: 5173,
+  },
+  build: {
+    target: 'esnext',
+  },
+});
+</file>
+
+<file path="src/pages/Settings.jsx">
+// src/pages/Settings.jsx
+import { For } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
+import BackButton from "../components/ui/BackIconButton.jsx";
+import BackIconButton from "../components/ui/BackIconButton.jsx";
+
+export default function Settings() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto space-y-6">
+  {/* Title left, back icon right */}
+  <div class="flex items-center justify-between">
+    <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
+    <BackIconButton title={t("settings.back")} />
+  </div>
+
+      {/* Local IPFS (separate component) */}
+      < LocalIpfsSection />
+
+      {/* Developer */}
+      < section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+        <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
+
+        <label class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={app.showKeys()}
+            onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
+          />
+          <span>{t("settings.developer.showKeys")}</span>
+        </label>
+
+        <div class="bg-white/60 dark:bg-black/30 rounded p-3">
+          <h4 class="font-medium mb-2">{t("settings.debug.gateways.title")}</h4>
+          <ul class="list-disc pl-6 text-sm">
+            <For each={app.activeIpfsGateways()}>
+              {(g) => <li>{g}</li>}
+            </For>
+          </ul>
+        </div>
+      </section>
+    </main >
+  );
+}
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+</file>
+
+<file path="tailwind.config.js">
+// tailwind.config.js
+export default {
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
+};
+</file>
+
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal, onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import {
+  connectWallet,
+  walletAccount,
+  walletChainId,
+  isWalletAvailable,
+  eagerConnect,             // ← NEW
+} from "../blockchain/wallet";
+import { getChainLogo } from "../blockchain/chainLogos";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const [copyState, setCopyState] = createSignal("");
+  const [eagerDone, setEagerDone] = createSignal(false);   // ← NEW
+
+  const desiredId = () => app.desiredChainId();
+  const mismatched = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  onMount(async () => {
+    if (isWalletAvailable()) {
+      // Try rehydrate silently (no prompt)
+      await eagerConnect();
+      // (Do NOT auto-switch network on eager connect; we only hint via UI.)
+    }
+    setEagerDone(true);
+  });
+
+  async function onConnect() {
+    try {
+      await connectWallet();
+      // After manual connect, we can try switching to backend’s chain
+      if (desiredId()) {
+        try { await app.ensureWalletOnDesiredChain(); } catch {}
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+      setCopyState("copied");
+      setTimeout(() => setCopyState(""), 1200);
+    } catch {}
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  const chainLogoSrc = () => {
+    const id = desiredId();
+    return id ? getChainLogo(id) : null;
+  };
+
+  return (
+    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
+      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
+        {app.config()?.domain || "…"}
+      </h1>
+
+      <div class="flex items-center gap-2 mr-2">
+        {/* Wallet area */}
+        <Show
+          when={walletAccount()}
+          fallback={
+            // Only show Connect after we *tried* eager connect; hide if no wallet installed
+            <Show when={eagerDone() && isWalletAvailable()}>
+              <button
+                class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600"
+                onClick={onConnect}
+                title="Connect your wallet"
+              >
+                Connect wallet
+              </button>
+            </Show>
+          }
+        >
+          <div class="flex items-center gap-2">
+            {/* Address pill */}
+            <button
+              class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+              onClick={copyAddress}
+              title="Click to copy address"
+            >
+              {shortAddr(walletAccount())}
+            </button>
+
+            {/* If chain is correct → logo only; if wrong → red Change chain button */}
+            <Show
+              when={!mismatched()}
+              fallback={
+                <button
+                  class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                  onClick={onSwitchChain}
+                  title="Switch to the required network"
+                >
+                  Change chain
+                </button>
+              }
+            >
+              <Show when={chainLogoSrc()}>
+                <img
+                  src={chainLogoSrc()}
+                  alt="chain"
+                  class="w-5 h-5"
+                  title="Connected to the required network"
+                />
+              </Show>
+            </Show>
+
+            {/* tiny copied hint */}
+            <Show when={copyState() === "copied"}>
+              <span class="text-xs text-emerald-600">Copied</span>
+            </Show>
+          </div>
+        </Show>
+
+        {/* Right menu toggle */}
+        <button
+          class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
+          onClick={onTogglePane}
+          aria-label="Open menu"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </header>
+  );
 }
 </file>
 
@@ -1472,12 +1986,15 @@ export function AppProvider(props) {
     return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
   });
 
-  const activeIpfsGateways = createMemo(() => {
-    if (localIpfsEnabled() && localIpfsGateway()) {
-      return [ensureSlash(localIpfsGateway()), ...remoteIpfsGateways()];
-    }
-    return remoteIpfsGateways();
-  });
+const activeIpfsGateways = createMemo(() => {
+  // STRICT MODE: if local IPFS is enabled, use ONLY the local gateway
+  if (localIpfsEnabled() && localIpfsGateway()) {
+    return [ensureSlash(localIpfsGateway())];
+  }
+  // otherwise use the remote list from /info
+  return remoteIpfsGateways();
+});
+
 
   // ----- Local IPFS: probe + monitor -----
   async function probeLocalIpfs(apiUrl) {
@@ -1493,26 +2010,59 @@ export function AppProvider(props) {
     return ensureSlash(gw);
   }
 
-  async function enableLocalIpfs(apiUrl) {
-    try {
-      const gw = await probeLocalIpfs(apiUrl);
-      setLocalIpfsEnabled(true);
-      setLocalIpfsApiUrl(apiUrl);
-      setLocalIpfsGateway(gw);
-      localStorage.setItem(IPFS_LOCAL_KEY, "1");
-      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
-      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-      setLocalIpfsStatus("ok");
-      pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
-      startLocalIpfsMonitor();
-      return gw;
-    } catch (e) {
-      setLocalIpfsEnabled(false);
-      setLocalIpfsStatus("down");
-      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
-      throw e;
-    }
+async function enableLocalIpfs(apiUrl) {
+  try {
+    const gw = await probeLocalIpfs(apiUrl);  // already normalized to http://.../
+    setLocalIpfsEnabled(true);
+    setLocalIpfsApiUrl(apiUrl);
+    setLocalIpfsGateway(gw);
+    localStorage.setItem(IPFS_LOCAL_KEY, "1");
+    localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+    localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+    setLocalIpfsStatus("ok");
+    pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
+    startLocalIpfsMonitor();
+    return gw;
+  } catch (e) {
+    setLocalIpfsEnabled(false);
+    setLocalIpfsStatus("down");
+    pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+    throw e;
   }
+}
+
+function multiaddrToHttp(ma) {
+  if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
+  const parts = ma.split("/").filter(Boolean);
+  let host = null, port = null;
+  for (let i = 0; i < parts.length; i += 2) {
+    const k = parts[i], v = parts[i+1];
+    if (k === "ip4" || k === "dns4" || k === "dns6") host = v;
+    else if (k === "ip6") host = v && v.includes(":") ? `[${v}]` : v;
+    else if (k === "tcp") port = v;
+  }
+  if (!host || !port) return ma;
+  return `http://${host}:${port}/`;
+}
+
+function normalizeGatewayBase(g) {
+  const base = g.startsWith("/") ? multiaddrToHttp(g) : g;
+  return ensureSlash(base);
+}
+
+
+  async function probeLocalIpfs(apiUrl) {
+  const base = trimSlash(apiUrl || "");
+  if (!base) throw new Error("Local IPFS API URL is empty");
+  const url = `${base}/api/v0/config/show`;
+  const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
+  if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
+  const cfg = await res.json();
+  let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
+  if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
+  const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // <-- normalize
+  return ensureSlash(httpGw);
+}
 
   function disableLocalIpfs() {
     stopLocalIpfsMonitor();
@@ -1598,285 +2148,6 @@ export function useApp() {
 }
 </file>
 
-<file path="src/hooks/useTheme.js">
-// src/hooks/useTheme.js
-import { createSignal, onMount } from "solid-js";
-
-export function useTheme() {
-  const [theme, setTheme] = createSignal("light");
-
-  onMount(() => {
-    const savedTheme = localStorage.getItem("theme") || "light";
-    setTheme(savedTheme);
-    document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    console.log("Initial theme:", savedTheme, "dark class:", document.documentElement.classList.contains("dark")); // Debug
-  });
-
-  const toggleTheme = () => {
-    const next = theme() === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-    try { localStorage.setItem("theme", next); } catch {}
-    console.log("Toggled to:", next, "dark class:", document.documentElement.classList.contains("dark")); // Debug
-  };
-
-  // Expose theme signal for external use
-  useTheme.theme = theme;
-
-  return [theme, toggleTheme];
-}
-</file>
-
-<file path="src/i18n/ru.js">
-// Auto-generated by i18n-sync.mjs. Do not edit by hand.
-export default {
-  "app.title": "SAVVA · SolidJS",
-  "card.tailwindWorks": "Tailwind работает?",
-  "debug.rightOpen": "???",
-  "debug.theme": "???",
-  "greeting.hello": "Привет, Алекс 👋",
-  "rightPane.language": "Язык",
-  "rightPane.option1": "Опция 1",
-  "rightPane.option2": "Опция 2",
-  "rightPane.option3": "Опция 3",
-  "rightPane.showKeys": "Показывать ключи",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "settings.title": "Настройки",
-  "settings.close": "Закрыть",
-  "settings.debug.title": "Отладка",
-  "settings.debug.showKeys.label": "Показывать ключи переводов",
-  "settings.debug.showKeys.help":
-    "Если включено, каждая строка добавит в конец свой ключ в квадратных скобках.",
-};
-</file>
-
-<file path="src/index.jsx">
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./App";
-import { AppProvider } from "./context/AppContext.jsx";
-
-const root = document.getElementById("root");
-
-render(() => (
-  <AppProvider>
-    <App />
-  </AppProvider>
-), root);
-</file>
-
-<file path="index.html">
-<!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAVVA · SolidJS</title>
-
-  <!-- Preload theme to avoid flash -->
-  <script>
-    (function () {
-      try {
-        const saved = localStorage.getItem("theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved || (systemDark ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", theme === "dark");
-      } catch { }
-    })();
-  </script>
-
-  <script>
-    (function () {
-      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form: /#/settings
-      if (!location.hash && location.pathname !== "/") {
-        var newHash = "#" + location.pathname + location.search + location.hash;
-        history.replaceState(null, "", "/" + newHash);
-      }
-    })();
-  </script>
-
-
-  <!-- Load app after theme class is set -->
-  <script type="module" src="/src/index.jsx"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-</body>
-
-</html>
-</file>
-
-<file path="postcss.config.js">
-// postcss.config.js
-export default {
-  plugins: {
-    '@tailwindcss/postcss': { config: './tailwind.config.js' },
-    autoprefixer: {},
-  },
-};
-</file>
-
-<file path="vite.config.js">
-// vite.config.js
-import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
-
-export default defineConfig({
-  plugins: [solid()],
-  server: {
-    port: 5173,
-  },
-  build: {
-    target: 'esnext',
-  },
-});
-</file>
-
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-import { Show, createSignal } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import {
-  connectWallet,
-  walletAccount,
-  walletChainId,
-  isWalletAvailable,
-} from "../blockchain/wallet";
-import { getChainLogo } from "../blockchain/chainLogos";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const [copyState, setCopyState] = createSignal(""); // "", "copied"
-
-  const desiredId = () => app.desiredChainId();   // number | null
-  const mismatched = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) {
-        try { await app.ensureWalletOnDesiredChain(); } catch {}
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(walletAccount());
-      setCopyState("copied");
-      setTimeout(() => setCopyState(""), 1200);
-    } catch {}
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  const chainLogoSrc = () => {
-    const id = desiredId();
-    return id ? getChainLogo(id) : null;
-  };
-
-  return (
-    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
-      <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100 ml-2">
-        {app.config()?.domain || "…"}
-      </h1>
-
-      <div class="flex items-center gap-2 mr-2">
-        {/* Wallet area */}
-        <Show
-          when={walletAccount()}
-          fallback={
-            <button
-              class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60"
-              onClick={onConnect}
-              disabled={!isWalletAvailable()}
-              title={isWalletAvailable() ? "Connect your wallet" : "No wallet detected"}
-            >
-              Connect wallet
-            </button>
-          }
-        >
-          <div class="flex items-center gap-2">
-            {/* Address pill */}
-            <button
-              class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
-              onClick={copyAddress}
-              title="Click to copy address"
-            >
-              {shortAddr(walletAccount())}
-            </button>
-
-            {/* If chain is correct → logo only; if wrong → red Change chain button */}
-            <Show when={!mismatched()} fallback={
-              <button
-                class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
-                onClick={onSwitchChain}
-                title="Switch to the required network"
-              >
-                Change chain
-              </button>
-            }>
-              <Show when={chainLogoSrc()}>
-                <img
-                  src={chainLogoSrc()}
-                  alt="chain"
-                  class="w-5 h-5"
-                  title="Connected to the required network"
-                />
-              </Show>
-            </Show>
-
-            {/* tiny copied hint */}
-            <Show when={copyState() === "copied"}>
-              <span class="text-xs text-emerald-600">Copied</span>
-            </Show>
-          </div>
-        </Show>
-
-        {/* Right menu toggle */}
-        <button
-          class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
-          onClick={onTogglePane}
-          aria-label="Open menu"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-      </div>
-    </header>
-  );
-}
-</file>
-
 <file path="src/i18n/en.js">
 // Auto-generated by i18n-sync.mjs. Do not edit by hand.
 export default {
@@ -1926,25 +2197,44 @@ export default {
   "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
   "rightPane.switch.domain.website": "Website",
 
+  "settings.title": "Settings",
+
+  "settings.localIpfs.title": "Local IPFS",
+  "settings.localIpfs.enableCheckbox": "Use local IPFS node",
+  "settings.localIpfs.apiUrl.label": "Local IPFS API URL",
+  "settings.localIpfs.apiUrl.help": "We will call",
+  "settings.localIpfs.testEnable": "Test & enable",
+  "settings.localIpfs.disable": "Disable",
+  "settings.localIpfs.status.label": "Status",
+  "settings.localIpfs.gateway.label": "Gateway",
+
+  "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
+  "settings.localIpfs.help.toggle.hide": "Hide help",
+  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
+  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
+  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
+  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
+  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
+  "settings.localIpfs.help.restart.title": "3) Restart the daemon",
+  "settings.localIpfs.help.verify.title": "4) Verify",
+  "settings.localIpfs.help.verify.note": "The gateway is usually",
+  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
+  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
+  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
+
+  "settings.developer.title": "Developer",
+  "settings.developer.preview": "Preview:",
+
+  "settings.debug.gateways.title": "IPFS Gateways (active order)",
+
+  "common.checking": "Checking…",
+
   "common.loading": "Loading…",
-};
-</file>
+    "settings.developer.title": "Developer",
+  "settings.developer.showKeys": "Show translation keys", 
+  "settings.debug.gateways.title": "IPFS Gateways (active order)",  
 
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-
-@custom-variant dark (&:where(.dark, .dark *));
-</file>
-
-<file path="tailwind.config.js">
-// tailwind.config.js
-export default {
-  darkMode: "class",
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-  theme: { extend: {} },
-  plugins: [],
-};
+}
 </file>
 
 <file path="package.json">

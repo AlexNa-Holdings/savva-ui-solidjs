@@ -1,4 +1,4 @@
-import { createContext, useContext, createSignal, onMount, createMemo, onCleanup } from "solid-js";
+import { createContext, useContext, createSignal, onMount, createMemo, onCleanup, createEffect } from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain } from "../blockchain/wallet";
@@ -29,6 +29,9 @@ const IPFS_LOCAL_KEY = "ipfs_local_enabled_v1";
 const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
 const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway_v1";
 
+// NEW: domain assets env persistence key
+const ASSETS_ENV_KEY = "domain_assets_env_v1"; // "prod" | "test"
+
 function pickPersistable(cfg) {
   if (!cfg) return null;
   return {
@@ -58,6 +61,14 @@ export function AppProvider(props) {
   const [localIpfsGateway, setLocalIpfsGateway] = createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
   const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;
+
+  // NEW: domain assets env (prod/test)
+  const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
+  function setAssetsEnv(next) {
+    const v = next === "test" ? "test" : "prod";
+    localStorage.setItem(ASSETS_ENV_KEY, v);
+    setAssetsEnvState(v);
+  }
 
   async function fetchInfo(cfg) {
     const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
@@ -170,15 +181,90 @@ export function AppProvider(props) {
     return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
   });
 
-const activeIpfsGateways = createMemo(() => {
-  // STRICT MODE: if local IPFS is enabled, use ONLY the local gateway
-  if (localIpfsEnabled() && localIpfsGateway()) {
-    return [ensureSlash(localIpfsGateway())];
-  }
-  // otherwise use the remote list from /info
-  return remoteIpfsGateways();
-});
+  const activeIpfsGateways = createMemo(() => {
+    // STRICT MODE: if local IPFS is enabled, use ONLY the local gateway
+    if (localIpfsEnabled() && localIpfsGateway()) {
+      return [ensureSlash(localIpfsGateway())];
+    }
+    // otherwise use the remote list from /info
+    return remoteIpfsGateways();
+  });
 
+  // ----- Domain assets (prod/test) -----
+
+  // Base assets URL from /info based on selected env
+  const assetsBaseUrl = createMemo(() => {
+    const i = info();
+    if (!i) return "";
+    const raw = assetsEnv() === "test" ? i?.temp_assets_url : i?.assets_url;
+    return ensureSlash(raw || "");
+  });
+
+  // Current domain name string
+  const selectedDomainName = createMemo(() => {
+    const d = selectedDomain();
+    if (!d) return "";
+    return typeof d === "string" ? d : (d?.name || "");
+  });
+
+  // Prefix like <assetsBase>/<domain>/
+  const domainAssetsPrefix = createMemo(() => {
+    const base = assetsBaseUrl();
+    const dom = selectedDomainName();
+    if (!base || !dom) return "";
+    return ensureSlash(base) + dom.replace(/^\//, "") + "/";
+  });
+
+  // State for parsed config.yaml
+  const [domainAssetsState, setDomainAssetsState] = createSignal({
+    config: null,
+    loadedAt: null,
+    error: null,
+  });
+
+  async function refreshDomainAssets() {
+    const prefix = domainAssetsPrefix();
+    if (!prefix) {
+      setDomainAssetsState({ config: null, loadedAt: new Date(), error: null });
+      return;
+    }
+    const url = prefix + "config.yaml";
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs: 8000 });
+      if (res.status === 404) {
+        setDomainAssetsState({ config: null, loadedAt: new Date(), error: null });
+        return;
+      }
+      if (!res.ok) throw new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`);
+      const text = await res.text();
+      let parsed = null;
+      try {
+        parsed = parse(text) || null;
+      } catch (e) {
+        setDomainAssetsState({ config: null, loadedAt: new Date(), error: e });
+        return;
+      }
+      setDomainAssetsState({ config: parsed, loadedAt: new Date(), error: null });
+    } catch (e) {
+      setDomainAssetsState({ config: null, loadedAt: new Date(), error: e });
+    }
+  }
+
+  function assetUrl(relPath) {
+    if (!relPath) return "";
+    if (/^(https?:)?\/\//i.test(relPath) || /^data:/.test(relPath)) return relPath;
+    const prefix = domainAssetsPrefix();
+    if (!prefix) return relPath;
+    return prefix + String(relPath).replace(/^\//, "");
+  }
+
+  // Auto-refresh when env, info, or domain changes
+  createEffect(() => {
+    const _ = [assetsEnv(), assetsBaseUrl(), selectedDomainName()];
+    refreshDomainAssets();
+  });
+
+  const domainAssetsConfig = createMemo(() => domainAssetsState().config);
 
   // ----- Local IPFS: probe + monitor -----
   async function probeLocalIpfs(apiUrl) {
@@ -194,59 +280,59 @@ const activeIpfsGateways = createMemo(() => {
     return ensureSlash(gw);
   }
 
-async function enableLocalIpfs(apiUrl) {
-  try {
-    const gw = await probeLocalIpfs(apiUrl);  // already normalized to http://.../
-    setLocalIpfsEnabled(true);
-    setLocalIpfsApiUrl(apiUrl);
-    setLocalIpfsGateway(gw);
-    localStorage.setItem(IPFS_LOCAL_KEY, "1");
-    localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
-    localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-    setLocalIpfsStatus("ok");
-    pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
-    startLocalIpfsMonitor();
-    return gw;
-  } catch (e) {
-    setLocalIpfsEnabled(false);
-    setLocalIpfsStatus("down");
-    pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
-    throw e;
+  async function enableLocalIpfs(apiUrl) {
+    try {
+      const gw = await probeLocalIpfs(apiUrl);  // already normalized to http://.../
+      setLocalIpfsEnabled(true);
+      setLocalIpfsApiUrl(apiUrl);
+      setLocalIpfsGateway(gw);
+      localStorage.setItem(IPFS_LOCAL_KEY, "1");
+      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+      setLocalIpfsStatus("ok");
+      pushToast({ type: "success", message: `Local IPFS enabled. Gateway: ${gw}` });
+      startLocalIpfsMonitor();
+      return gw;
+    } catch (e) {
+      setLocalIpfsEnabled(false);
+      setLocalIpfsStatus("down");
+      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+      throw e;
+    }
   }
-}
 
-function multiaddrToHttp(ma) {
-  if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
-  const parts = ma.split("/").filter(Boolean);
-  let host = null, port = null;
-  for (let i = 0; i < parts.length; i += 2) {
-    const k = parts[i], v = parts[i+1];
-    if (k === "ip4" || k === "dns4" || k === "dns6") host = v;
-    else if (k === "ip6") host = v && v.includes(":") ? `[${v}]` : v;
-    else if (k === "tcp") port = v;
+  function multiaddrToHttp(ma) {
+    if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
+    const parts = ma.split("/").filter(Boolean);
+    let host = null, port = null;
+    for (let i = 0; i < parts.length; i += 2) {
+      const k = parts[i], v = parts[i+1];
+      if (k === "ip4" || k === "dns4" || k === "dns6") host = v;
+      else if (k === "ip6") host = v && v.includes(":") ? `[${v}]` : v;
+      else if (k === "tcp") port = v;
+    }
+    if (!host || !port) return ma;
+    return `http://${host}:${port}/`;
   }
-  if (!host || !port) return ma;
-  return `http://${host}:${port}/`;
-}
 
-function normalizeGatewayBase(g) {
-  const base = g.startsWith("/") ? multiaddrToHttp(g) : g;
-  return ensureSlash(base);
-}
+  function normalizeGatewayBase(g) {
+    const base = g.startsWith("/") ? multiaddrToHttp(g) : g;
+    return ensureSlash(base);
+  }
 
 
   async function probeLocalIpfs(apiUrl) {
-  const base = trimSlash(apiUrl || "");
-  if (!base) throw new Error("Local IPFS API URL is empty");
-  const url = `${base}/api/v0/config/show`;
-  const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
-  if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
-  const cfg = await res.json();
-  let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
-  if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
-  const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // <-- normalize
-  return ensureSlash(httpGw);
-}
+    const base = trimSlash(apiUrl || "");
+    if (!base) throw new Error("Local IPFS API URL is empty");
+    const url = `${base}/api/v0/config/show`;
+    const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
+    if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
+    const cfg = await res.json();
+    let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
+    if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
+    const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // <-- normalize
+    return ensureSlash(httpGw);
+  }
 
   function disableLocalIpfs() {
     stopLocalIpfsMonitor();
@@ -300,6 +386,15 @@ function normalizeGatewayBase(g) {
     desiredChain,
     remoteIpfsGateways,
     activeIpfsGateways,
+
+    // domain assets
+    assetsEnv,
+    setAssetsEnv,
+    assetsBaseUrl,
+    domainAssetsPrefix,
+    domainAssetsConfig,
+    refreshDomainAssets,
+    assetUrl,
 
     // actions
     reload: init,
