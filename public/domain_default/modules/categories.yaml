@@ -1,0 +1,18 @@
+required: false
+locales:
+  ru:
+    - SAVVA Платформа
+    - SAVVA Документация
+    - Вопросы и ответы
+  en:
+    - SAVVA Talk
+    - SAVVA Documentation
+    - Q&A
+  fr:
+    - Plateforme SAVVA
+    - Documentation SAVVA
+    - Questions et Réponses
+  ua:
+    - Платформа SAVVA
+    - Документація SAVVA
+    - Запитання та Відповіді

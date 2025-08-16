@@ -1,0 +1,132 @@
+staker_levels:
+  levels:
+  - min: 0
+    icon:
+    name: 
+      - locale: en
+        text: "Guest"
+      - locale: ru
+        text: "Гость"
+      - locale: fr
+        text: "Invité"
+      - locale: ua
+        text: "Гість"
+      - locale: de
+        text: "Gast"
+  - min: 5000
+    icon: /images/icons8-clam-50.svg
+    name: 
+      - locale: en
+        text: "Clam"
+      - locale: ru
+        text: "Моллюск"
+      - locale: fr
+        text: "Palourde"
+      - locale: ua
+        text: "Молюск"
+      - locale: de
+        text: "Muschel"
+  - min: 10000
+    icon: /images/icons8-shrimp-50.svg
+    name: 
+      - locale: en
+        text: "Shrimp"
+      - locale: ru
+        text: "Креветка"
+      - locale: fr
+        text: "Crevette"
+      - locale: ua
+        text: "Креветка"
+      - locale: de
+        text: "Garnele"
+  - min: 20000
+    icon: /images/icons8-seahorse-50.svg
+    name: 
+      - locale: en
+        text: "Seahorse"
+      - locale: ru
+        text: "Морской конек"
+      - locale: fr
+        text: "Hippocampe"
+      - locale: ua
+        text: "Морський коник"
+      - locale: de
+        text: "Seepferdchen"
+  - min: 50000
+    icon: /images/icons8-top-view-fish-50.svg
+    name: 
+      - locale: en
+        text: "Fish"
+      - locale: ru
+        text: "Рыба"
+      - locale: fr
+        text: "Poisson"
+      - locale: ua
+        text: "Риба"
+      - locale: de
+        text: "Fisch"
+  - min: 100000
+    icon: /images/icons8-dolphin-50.svg
+    name: 
+      - locale: en
+        text: "Dolphin"
+      - locale: ru
+        text: "Дельфин"
+      - locale: fr
+        text: "Dauphin"
+      - locale: ua
+        text: "Дельфін"
+      - locale: de
+        text: "Delfin"
+  - min: 200000 
+    icon: /images/icons8-shark-50.svg
+    name: 
+      - locale: en
+        text: "Shark"
+      - locale: ru
+        text: "Акула"
+      - locale: fr
+        text: "Requin"
+      - locale: ua
+        text: "Акула"
+      - locale: de
+        text: "Hai"
+  - min: 500000
+    icon: /images/icons8-stingray.svg
+    name: 
+      - locale: en
+        text: "Stingray"
+      - locale: ru
+        text: "Скат"
+      - locale: fr
+        text: "Raie"
+      - locale: ua
+        text: "Скат"
+      - locale: de
+        text: "Stachelrochen"
+  - min: 1000000
+    icon: /images/icons8-orca-50.svg
+    name: 
+      - locale: en
+        text: "Orca"
+      - locale: ru
+        text: "Косатка"
+      - locale: fr
+        text: "Orque"
+      - locale: ua
+        text: "Косатка"
+      - locale: de
+        text: "Orca"
+  - min: 10000000
+    icon: /images/icons8-whale-50.svg
+    name: 
+      - locale: en
+        text: "Whale"
+      - locale: ru
+        text: "Кит"
+      - locale: fr
+        text: "Baleine"
+      - locale: ua
+        text: "Кит"
+      - locale: de
+        text: "Wal"

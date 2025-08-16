@@ -1,0 +1,45 @@
+logo:
+  light: images/logo_light.png
+  dark: images/logo_dark.png
+  light_mobile: images/logo_light.png
+  dark_mobile: images/logo_dark.png
+favicon:
+  apple-touch-icon: favicon/apple-touch-icon.png
+  16: favicon/favicon-16x16.png
+  32: favicon/favicon-32x32.png
+  manifest: favicon/site.webmanifest
+  mask-icon:
+    href: favicon/safari-pinned-tab.svg
+    color: '#5bbad5'
+  base: favicon/favicon.ico
+  meta:
+    - name: msapplication-TileColor
+      content: '#da532c'
+    - name: theme-color
+      content: '#ffffff'
+GA_tag: G-XDSTY1ND4P
+modules:
+  staker_levels: modules/staker_levels.yaml
+  content_lists: modules/content_lists.yaml
+  bun_reasons: modules/bun_reasons.yaml
+  categories: modules/categories.yaml
+  tabs: modules/tabs.yaml
+default_locale: en
+locales:
+  - code: en
+    name: English
+    title: 'SAVVA.APP - Beyond Likes Social'
+    dictionary: i18n/en.yaml
+  - code: ru
+    name: Русский
+    title: 'SAVVA.APP - За пределами лайков'
+    dictionary: i18n/ru.yaml
+  - code: fr
+    name: Français
+    title: 'SAVVA.APP - Au-delà des likes'
+    dictionary: i18n/fr.yaml
+  - code: ua
+    name: Українська
+    title: 'SAVVA.APP - Поза межами вподобань'
+    dictionary: i18n/ua.yaml
+

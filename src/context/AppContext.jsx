@@ -28,6 +28,7 @@ const OVERRIDE_KEY = "connect_override_v1";
 const IPFS_LOCAL_KEY = "ipfs_local_enabled_v1";
 const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
 const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway_v1";
+const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
 
 // NEW: domain assets env persistence key
 const ASSETS_ENV_KEY = "domain_assets_env_v1"; // "prod" | "test"
@@ -265,6 +266,10 @@ export function AppProvider(props) {
   });
 
   const domainAssetsConfig = createMemo(() => domainAssetsState().config);
+  const domainAssetsSource = createMemo(() => domainAssetsState().source || null);
+  const domainAssetsPrefixActive = createMemo(
+    () => domainAssetsState().prefix || DEFAULT_DOMAIN_ASSETS_PREFIX
+  );
 
   // ----- Local IPFS: probe + monitor -----
   async function probeLocalIpfs(apiUrl) {
@@ -306,7 +311,7 @@ export function AppProvider(props) {
     const parts = ma.split("/").filter(Boolean);
     let host = null, port = null;
     for (let i = 0; i < parts.length; i += 2) {
-      const k = parts[i], v = parts[i+1];
+      const k = parts[i], v = parts[i + 1];
       if (k === "ip4" || k === "dns4" || k === "dns6") host = v;
       else if (k === "ip6") host = v && v.includes(":") ? `[${v}]` : v;
       else if (k === "tcp") port = v;
@@ -391,7 +396,6 @@ export function AppProvider(props) {
     assetsEnv,
     setAssetsEnv,
     assetsBaseUrl,
-    domainAssetsPrefix,
     domainAssetsConfig,
     refreshDomainAssets,
     assetUrl,
@@ -415,6 +419,7 @@ export function AppProvider(props) {
     showKeys: i18n.showKeys,
     setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,
+    domainAssetsPrefix: domainAssetsPrefixActive,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

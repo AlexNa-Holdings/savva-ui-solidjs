@@ -1,0 +1,16 @@
+market_contract: ''
+list:
+  main:
+    title:
+      ru: 'Анонсы'
+      en: 'Announcements'
+      ua: 'Анонси'
+      fr: 'Annonces'
+    on_market: true
+  new:
+    title:
+      ru: 'Новые анонсы'
+      en: 'New announces'
+      ua: 'Новi анонсы'
+      fr: 'new annonces'
+    on_market: true
