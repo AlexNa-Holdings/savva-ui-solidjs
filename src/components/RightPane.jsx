@@ -34,8 +34,9 @@ export default function RightPane({ isOpen, onClose }) {
         data-testid="right-pane"
       >
         <div class="p-4 space-y-3">
+          {/* Close */}
           <button
-            class="p-2 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            class="p-0 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
             onClick={onClose}
             aria-label={t("rightPane.close")}
           >
@@ -44,56 +45,59 @@ export default function RightPane({ isOpen, onClose }) {
             </svg>
           </button>
 
-          <button
-            onClick={() => { toggleTheme(); console.log("Theme toggled:", theme()); }}
-            class="w-full text-left px-4 py-2 bg-blue-500 dark:bg-blue-700 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-800 transition"
-          >
-            {theme() === "dark" ? t("ui.mode.dark") : t("ui.mode.light")}
-            <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
-          </button>
-
-          <div class="pt-1">
-            <label class="block text-gray-900 dark:text-gray-100 mb-1">{t("rightPane.language")}</label>
-            <select
-              class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
-              value={app.lang()}
-              onInput={(e) => app.setLang(e.currentTarget.value)}
-            >
-              {app.i18nAvailable.map((code) => {
-                const info = LANG_INFO[code] || { code: code.toUpperCase(), name: code };
-                return (
-                  <option value={code}>
-                    [{info.code}] {info.name}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* Menu list */}
+          {/* Menu list (includes Theme + Language as items) */}
           <nav class="pt-2">
             <ul class="space-y-1">
+              {/* Theme item */}
               <li>
                 <div
-                  class="px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
-                  role="button"
+                  class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100 flex items-center justify-between"
+                  role="switch"
+                  aria-checked={theme() === "dark"}
                   tabIndex={0}
-                  onClick={() => { navigate("/settings"); onClose(); }}
+                  onClick={() => { toggleTheme(); console.log("Theme toggled:", theme()); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      navigate("/settings"); onClose();
+                      toggleTheme();
                     }
                   }}
                 >
-                  {t("rightPane.settings")}
+                  <span>{theme() === "dark" ? t("ui.mode.dark") : t("ui.mode.light")}</span>
+                  <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
                 </div>
               </li>
 
+              {/* Language item (label left, fixed-width select right) */}
+              <li>
+                <div
+                  class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 flex items-center justify-between"
+                >
+                  <span>{t("rightPane.language")}</span>
+                  <select
+                    id="rp-lang"
+                    class="ml-2 px-2 py-1 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 w-28 shrink-0"
+                    aria-label={t("rightPane.language")}
+                    value={app.lang()}
+                    onInput={(e) => app.setLang(e.currentTarget.value)}
+                  >
+                    {app.i18nAvailable.map((code) => {
+                      const info = LANG_INFO[code] || { code: code.toLowerCase(), name: code };
+                      return (
+                        <option value={code}>
+                          {info.name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </li>
+
+              {/* Switch backend / domain (conditional) */}
               <Show when={app.config()?.gear}>
                 <li>
                   <div
-                    class="px-4 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
                     role="button"
                     tabIndex={0}
                     onClick={() => setShowSwitch(true)}
@@ -105,6 +109,24 @@ export default function RightPane({ isOpen, onClose }) {
                     }}
                   >
                     {t("rightPane.switch.open")}
+                  </div>
+                </li>
+
+                {/* Settings */}
+                <li>
+                  <div
+                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { navigate("/settings"); onClose(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate("/settings"); onClose();
+                      }
+                    }}
+                  >
+                    {t("rightPane.settings")}
                   </div>
                 </li>
               </Show>

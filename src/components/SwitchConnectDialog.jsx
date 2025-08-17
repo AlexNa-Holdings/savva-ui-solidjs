@@ -1,11 +1,25 @@
 // src/components/SwitchConnectDialog.jsx
-import { createSignal, createEffect, Show, createMemo, onCleanup, For } from "solid-js";
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
 
+// ───────────────────────────────────────────────────────────────────────────────
+// small utils
+// ───────────────────────────────────────────────────────────────────────────────
 function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
-const defer = (fn) => (typeof queueMicrotask === "function" ? queueMicrotask(fn) : setTimeout(fn, 0));
+
+// Treat fetch aborts as non-errors (dialog closed / URL changed quickly)
+function isAbortError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  // Chrome / spec
+  if (e?.name === "AbortError") return true;
+  // Firefox / historical DOMException
+  if (e?.code === 20) return true;
+  // Message variants we’ve seen in browsers / fetch polyfills
+  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
+  return false;
+}
 
 async function fetchInfoJSON(baseUrl, { signal } = {}) {
   const url = ensureSlash(baseUrl) + "info";
@@ -13,6 +27,8 @@ async function fetchInfoJSON(baseUrl, { signal } = {}) {
   if (!res.ok) throw new Error(`/info failed: ${res.status}`);
   return await res.json();
 }
+
+// ───────────────────────────────────────────────────────────────────────────────
 
 export default function SwitchConnectDialog(props) {
   const app = useApp();
@@ -34,7 +50,8 @@ export default function SwitchConnectDialog(props) {
     return (domains() || []).find((d) => eq(dn(d), cur)) || null;
   });
 
-  // When dialog opens: hydrate fields from AppContext, fetch /info, preselect current domain
+  // When dialog opens: hydrate fields from AppContext (single source of truth),
+  // fetch /info, and preselect the current domain if present.
   createEffect(async () => {
     if (!props.open) return;
 
@@ -66,14 +83,12 @@ export default function SwitchConnectDialog(props) {
           normalized.find((d) => eq(d.name, wanted)) ||
           normalized.find((d) => eq(d.name, domain())) ||
           normalized[0];
-
-        // ensure options exist first, then apply the value
-        defer(() => setDomain(resolved.name));
+        setDomain(resolved.name);
       } else {
         setLocalError(t("rightPane.switch.noDomains"));
       }
     } catch (e) {
-      setLocalError(e.message || String(e));
+      if (!isAbortError(e)) setLocalError(e.message || String(e)); // ← suppress aborts
     } finally {
       setFetching(false);
     }
@@ -102,22 +117,20 @@ export default function SwitchConnectDialog(props) {
         .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
 
       setDomains(normalized);
-
       if (normalized.length > 0) {
-        const keep = normalized.find((d) => eq(d.name, domain())) || normalized[0];
-        // again: defer to after options mount/update
-        defer(() => setDomain(keep.name));
+        const keep = normalized.find((d) => eq(d.name, domain()));
+        setDomain(keep?.name || normalized[0].name);
       } else {
         setLocalError(t("rightPane.switch.noDomains"));
       }
     } catch (e) {
-      setLocalError(e.message || String(e));
+      if (!isAbortError(e)) setLocalError(e.message || String(e)); // ← suppress aborts
     } finally {
       setFetching(false);
     }
   }
 
-  // Apply: write to AppContext (single source of truth)
+  // Apply ALWAYS writes to AppContext so the whole app shares the same state.
   async function onApply() {
     setLocalError("");
     setApplying(true);
@@ -136,17 +149,16 @@ export default function SwitchConnectDialog(props) {
       await app.setDomain?.(chosen);
       await app.refreshDomainAssets?.();
     } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
+      if (!isAbortError(e)) setLocalError(e.message || String(e)); // ← suppress aborts here too (paranoid)
       setApplying(false);
-      return;
+      return; // keep dialog open on error
     }
 
     setApplying(false);
-    props.onClose?.();
-  }
 
-  function isAbortError(e) {
-    return e?.name === "AbortError" || /aborted/i.test(e?.message || "");
+    // proactively cancel any in-flight /info load before closing
+    try { aborter?.abort(); } catch {}
+    props.onClose?.();
   }
 
   return (
@@ -187,19 +199,14 @@ export default function SwitchConnectDialog(props) {
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
           </label>
           <select
-            id="switch-domain"
             class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 disabled:opacity-60"
             value={domain()}
             onChange={(e) => setDomain(e.currentTarget.value)}
             disabled={fetching() || domains().length === 0}
           >
-            <For each={domains()}>
-              {(d) => (
-                <option value={d.name} selected={eq(domain(), d.name)}>
-                  {d.name}
-                </option>
-              )}
-            </For>
+            {domains().map((d) => (
+              <option value={d.name}>{d.name}</option>
+            ))}
           </select>
 
           {/* Optional details */}
@@ -216,7 +223,7 @@ export default function SwitchConnectDialog(props) {
             </div>
           </Show>
 
-          {/* Errors (toast now also shows, but keep inline for clarity) */}
+          {/* Errors (aborts are suppressed) */}
           <Show when={localError() || props.error}>
             <p class="mt-2 text-sm text-red-500">
               {t("common.error")}: {localError() || props.error?.message}
