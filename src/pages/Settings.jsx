@@ -18,8 +18,6 @@ export default function Settings() {
 
       <LocalIpfsSection />
       <Assets />
-
-      {/* Developer (modular) */}
       <DeveloperSection />
     </main>
   );

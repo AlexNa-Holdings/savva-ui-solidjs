@@ -1,41 +1,18 @@
 // src/components/settings/DeveloperSection.jsx
+/* src/components/settings/DeveloperSection.jsx */
+import { Show, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug";
-import { Show } from "solid-js";
 
 export default function DeveloperSection() {
   const app = useApp();
   const { t } = app;
+  const [copied, setCopied] = createSignal(false);
 
-  function dumpAppState() {
-    const d = app.selectedDomain?.();
-    const domainName = typeof d === "string" ? d : d?.name || "";
-
-    const cfg = app.domainAssetsConfig?.();
-    const raw = cfg?.logos ?? cfg?.logo ?? null;
-    const logos = !raw
-      ? null
-      : (typeof raw === "string"
-          ? { default: raw }
-          : {
-              dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
-              light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-              mobile:       raw.mobile       ?? null,
-              dark:         raw.dark         ?? null,
-              light:        raw.light        ?? null,
-              default:      raw.default      ?? raw.fallback     ?? null,
-            });
-
-    const ns = dbg.ns("Settings/Developer");
-    ns.group("App state");
-    ns.info("domain:", domainName);
-    ns.info("assetsEnv:", app.assetsEnv?.());
-    ns.info("assetsBaseUrl:", app.assetsBaseUrl?.());
-    ns.info("domainAssetsSource:", app.domainAssetsSource?.()); // "remote" | "default" | null
-    ns.info("domainAssetsPrefix:", app.domainAssetsPrefix?.());
-    ns.info("domainAssetsConfig present:", !!cfg);
-    ns.info("logos object:", logos);
-    ns.groupEnd();
+  async function copyLog() {
+    const ok = await dbg.copy();
+    setCopied(ok);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   return (
@@ -52,27 +29,28 @@ export default function DeveloperSection() {
         <span>{t("settings.developer.showKeys")}</span>
       </label>
 
-      {/* Enable/disable console debug logs */}
+      {/* Enable debug logging */}
       <label class="flex items-center gap-2">
         <input
           type="checkbox"
           checked={dbg.enabled()}
-          onInput={(e) => dbg.setEnabled(e.currentTarget.checked)}
+          onInput={(e) => dbg.enable(e.currentTarget.checked)}
         />
-        <span>{t("settings.developer.debugLogs")}</span>
+        <span>{t("settings.developer.debug.enable")}</span>
       </label>
 
-      {/* Handy one-click dump into the console */}
-      <div>
-        <button
-          type="button"
-          class="px-3 py-1.5 text-sm rounded bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 transition"
-          onClick={dumpAppState}
-          title={t("settings.developer.debugLogs")}
-        >
-          {t("settings.developer.dumpState")}
+      <div class="flex gap-2">
+        <button class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700" onClick={copyLog}>
+          {t("settings.developer.debug.copy")}
+        </button>
+        <button class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700" onClick={() => dbg.clear()}>
+          {t("settings.developer.debug.clear")}
         </button>
       </div>
+
+      <Show when={copied()}>
+        <div class="text-xs opacity-70">{t("settings.developer.debug.copied")}</div>
+      </Show>
     </section>
   );
 }

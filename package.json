@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",
+    "dotenv": "^17.2.1",
     "js-yaml": "^4.1.0",
+    "openai": "^5.12.2",
     "solid-js": "^1.9.8",
     "viem": "^2.33.3",
     "yaml": "^2.8.1"
