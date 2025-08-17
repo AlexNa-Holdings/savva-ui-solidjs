@@ -17,21 +17,25 @@ export default {
   "rightPane.close": "Close menu",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
-  "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.backend.help":
+    "The app will fetch /info from this URL to list supported domains.",
   "rightPane.switch.backend.label": "Backend URL",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.help": "Need help switching domains?",
   "rightPane.switch.domain.label": "Domain",
   "rightPane.switch.domain.website": "Website",
-  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.noDomains":
+    "Backend returned no domains. You can still apply, but the domain will be empty.",
   "rightPane.switch.open": "Switch backend / domain",
   "rightPane.switch.reload": "Load domains",
   "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
   "rightPane.switch.reset": "Reset to defaults",
-  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
+  "rightPane.switch.reset.title":
+    "Clear local override and reload defaults from default_connect.yaml",
   "rightPane.switch.title": "Switch backend / domain",
   "rightPane.switch.validation.domain": "Domain cannot be empty.",
-  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
+  "rightPane.switch.validation.protocol":
+    "Backend URL must start with http:// or https://",
   "rightPane.switch.domain.notListed": "not in /info",
   "settings.back": "Back",
   "settings.debug.gateways.title": "IPFS Gateways (active order)",
@@ -64,7 +68,8 @@ export default {
   "settings.developer.debug.copy": "Copy log",
   "settings.developer.debug.copyFail": "Failed to copy log",
   "settings.developer.debug.enable": "Enable debug logging",
-  "settings.developer.debug.hint": "Turn this on to start capturing logs into a buffer you can copy.",
+  "settings.developer.debug.hint":
+    "Turn this on to start capturing logs into a buffer you can copy.",
   "settings.developer.debug.lines": "lines",
   "settings.developer.dumpState": "Dump Current State",
   "settings.developer.showKeys": "Show API Keys",
@@ -75,14 +80,22 @@ export default {
   "settings.localIpfs.disable": "Disable",
   "settings.localIpfs.enableCheckbox": "Use local IPFS node",
   "settings.localIpfs.gateway.label": "Gateway",
-  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
-  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
-  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
-  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
-  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
-  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
-  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
-  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
+  "settings.localIpfs.help.api.tip":
+    'Tip: keep this strict in dev; avoid "*" for production setups.',
+  "settings.localIpfs.help.api.title":
+    "1) Allow your app origin on the API (required)",
+  "settings.localIpfs.help.gateway.note":
+    "Only needed if the app loads files straight from the local gateway origin.",
+  "settings.localIpfs.help.gateway.title":
+    "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
+  "settings.localIpfs.help.intro":
+    "Your browser must be allowed to call the local IPFS API endpoints",
+  "settings.localIpfs.help.proxy.note":
+    "Then set “Local IPFS API URL” to and click “Test & enable”.",
+  "settings.localIpfs.help.proxy.text":
+    "Proxy the API through Vite so it’s same-origin:",
+  "settings.localIpfs.help.proxy.title":
+    "Alternative for dev (no IPFS config changes)",
   "settings.localIpfs.help.restart.title": "3) Restart the daemon",
   "settings.localIpfs.help.toggle.hide": "Hide help",
   "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
@@ -98,5 +111,9 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+  "tabs.aria": "Section tabs",
+  "main.tabs.loading": "Loading tabs…",
+  "main.tabs.untitled": "Untitled",
+  "main.tabs.empty": "This tab is empty for now.",
 };
