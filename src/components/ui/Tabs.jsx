@@ -1,86 +1,139 @@
 // src/components/ui/Tabs.jsx
 /* src/components/ui/Tabs.jsx */
-import { For, createMemo, createSignal, onMount, onCleanup } from "solid-js";
+import { For, createSignal, onMount, onCleanup, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
 export default function Tabs(props) {
+  // props.items: [{ id, label, icon?, disabled? }]
+  // props.value: selected id
+  // props.onChange(nextId)
+  // props.class?: wrapper classnames
+
   const app = useApp();
   const { t } = app;
 
-  const isControlled = () => props.value != null;
-  const [internal, setInternal] = createSignal(props.defaultValue ?? props.items?.[0]?.id ?? "");
-  const current = createMemo(() => (isControlled() ? props.value : internal()));
+  const items = () => props.items || [];
+  const value = () => props.value;
 
-  const setValue = (id) => {
-    if (!isControlled()) setInternal(id);
-    props.onChange?.(id);
-  };
+  // --- responsive compact handling ---
+  let listEl;
+  const [compact, setCompact] = createSignal(false);
 
-  // simple keyboard nav
-  const onKey = (e, idx) => {
-    const items = props.items || [];
-    let next = idx;
-    if (e.key === "ArrowRight") next = (idx + 1) % items.length;
-    else if (e.key === "ArrowLeft") next = (idx - 1 + items.length) % items.length;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = items.length - 1;
-    else return;
-    e.preventDefault();
-    const it = items[next];
-    if (!it || it.disabled) return;
-    setValue(it.id);
-    document.getElementById(`tab-${it.id}`)?.focus();
-  };
+  function hasWrapped() {
+    if (!listEl) return false;
+    const lis = listEl.querySelectorAll(":scope > li");
+    if (!lis.length) return false;
+    const firstTop = lis[0].offsetTop;
+    for (let i = 1; i < lis.length; i++) {
+      if (lis[i].offsetTop > firstTop) return true; // a second row appeared
+    }
+    return false;
+  }
 
-  // edge mask for overflow (optional)
-  let scroller;
-  const update = () => {
-    if (!scroller) return;
-    scroller.dataset.atStart = scroller.scrollLeft <= 0 ? "1" : "0";
-    scroller.dataset.atEnd =
-      Math.ceil(scroller.scrollLeft + scroller.clientWidth) >= scroller.scrollWidth ? "1" : "0";
-  };
+  let rafId;
+  function measure() {
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      if (!listEl) return;
+
+      // Test full mode first
+      listEl.dataset.compact = "0";
+      setCompact(false);
+
+      if (hasWrapped()) {
+        // Switch to compact (icons only)
+        listEl.dataset.compact = "1";
+        setCompact(true);
+
+        // If it *still* wraps when compact, mark (optional)
+        listEl.dataset.overflow = hasWrapped() ? "1" : "0";
+      } else {
+        listEl.dataset.overflow = "0";
+      }
+    });
+  }
+
   onMount(() => {
-    update();
-    scroller?.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update, { passive: true });
+    measure();
+
+    // Re‑measure on size changes of the list itself
+    const ro = new ResizeObserver(measure);
+    if (listEl) ro.observe(listEl);
+
+    // And on viewport changes
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+
+    onCleanup(() => {
+      ro.disconnect?.();
+      window.removeEventListener("resize", onResize);
+      cancelAnimationFrame(rafId);
+    });
   });
-  onCleanup(() => {
-    scroller?.removeEventListener("scroll", update);
-    window.removeEventListener("resize", update);
+
+  // Re‑measure when the tabs list changes
+  createEffect(() => {
+    items(); // track items
+    measure();
   });
 
   return (
-    <div class={`rotabs ${props.class || ""}`}>
-      <div class="rotabs__bar">
-        <div ref={scroller} role="tablist" aria-label={t("tabs.aria")} class="rotabs__list">
-          <For each={props.items || []}>
-            {(it, i) => {
-              const active = createMemo(() => current() === it.id);
-              return (
-                <button
-                  id={`tab-${it.id}`}
-                  data-tab={it.id}
-                  role="tab"
-                  aria-selected={active()}
-                  aria-controls={`panel-${it.id}`}
-                  aria-disabled={!!it.disabled}
-                  tabindex={active() ? "0" : "-1"}
-                  class="rotabs__tab"
-                  data-active={active() ? "true" : "false"}
-                  onClick={() => !it.disabled && setValue(it.id)}
-                  onKeyDown={(e) => onKey(e, i())}
-                  title={typeof it.label === "string" ? it.label : undefined}
-                >
-                  {it.icon ? <span class="rotabs__chip">{it.icon}</span> : null}
-                  <span class="truncate">{it.label}</span>
-                </button>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-      {/* Panels: pass children or render outside; TabsBar renders its own panels. */}
-    </div>
+    <ul
+      ref={(el) => (listEl = el)}
+      class={`tabs ${props.class || ""}`}
+      role="tablist"
+      aria-label={t("tabs.aria")}
+      data-compact={compact() ? "1" : "0"}
+    >
+      <For each={items()}>
+        {(it) => {
+          const active = () => it.id === value();
+          const disabled = !!it.disabled;
+          const tabId = `tab-${it.id}`;
+
+          const onClick = (e) => {
+            e.preventDefault();
+            if (disabled || active()) return;
+            props.onChange?.(it.id);
+          };
+
+          const onKeyDown = (e) => {
+            if (disabled) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (!active()) props.onChange?.(it.id);
+            }
+          };
+
+          return (
+            <li
+              classList={{ active: active() }}
+              role="presentation"
+              aria-selected={active()}
+            >
+              <a
+                id={tabId}
+                href="#"
+                role="tab"
+                aria-selected={active() ? "true" : "false"}
+                aria-disabled={disabled ? "true" : "false"}
+                // Keep accessible name even when the label is visually hidden
+                aria-label={it.label}
+                title={compact() ? it.label : undefined}
+                tabIndex={disabled ? -1 : 0}
+                onClick={onClick}
+                onKeyDown={onKeyDown}
+              >
+                {/* icon then text label */}
+                {it.icon ? (
+                  <span class="tab__icon" aria-hidden="true">{it.icon}</span>
+                ) : null}
+                <span class="tab__label">{it.label}</span>
+              </a>
+            </li>
+          );
+        }}
+      </For>
+    </ul>
   );
 }

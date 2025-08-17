@@ -1,10 +1,100 @@
-// src/components/main/TabsBar.jsx
 /* src/components/main/TabsBar.jsx */
 import { createResource, For, Show, createMemo, createSignal, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { useI18n } from "../../i18n/useI18n";
 import { loadAssetResource } from "../../utils/assetLoader";
 import Tabs from "../ui/Tabs.jsx";
+
+/* small, consistent SVG wrapper */
+function SvgIcon(props) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      class={props.class || "w-4 h-4"}
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.75"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      {props.children}
+    </svg>
+  );
+}
+
+/* default icons by tab type */
+function TrophyIcon() {
+  return (
+    <SvgIcon>
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="M7 4h10" />
+      <path d="M7 8a5 5 0 0010 0" />
+      <path d="M7 4a4 4 0 01-4 4" />
+      <path d="M17 4a4 4 0 004 4" />
+    </SvgIcon>
+  );
+}
+function BoltIcon() {
+  return (
+    <SvgIcon>
+      <path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z" />
+    </SvgIcon>
+  );
+}
+function CommentIcon() {
+  return (
+    <SvgIcon>
+      <path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z" />
+    </SvgIcon>
+  );
+}
+function SparklesIcon() {
+  return (
+    <SvgIcon>
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
+      <path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z" />
+    </SvgIcon>
+  );
+}
+function HeartIcon() {
+  return (
+    <SvgIcon>
+      <path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z" />
+    </SvgIcon>
+  );
+}
+function FallbackIcon() {
+  return (
+    <SvgIcon>
+      <path d="M4 6h16v12H4z" />
+      <path d="M8 10h8M8 14h5" />
+    </SvgIcon>
+  );
+}
+
+/* map the known types to icons */
+function iconForType(type) {
+  const k = String(type || "").toLowerCase();
+  if (k === "leaders") return <TrophyIcon />;
+  if (k === "actual") return <BoltIcon />;
+  if (k === "comments") return <CommentIcon />;
+  if (k === "new") return <SparklesIcon />;
+  if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  return <FallbackIcon />;
+}
+
+/* allow YAML to override icons later, e.g., icon: "emoji:🔥" */
+function iconFromSpec(spec) {
+  if (!spec) return null;
+  if (typeof spec === "string" && spec.startsWith("emoji:")) {
+    const ch = spec.slice("emoji:".length);
+    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
+  }
+  // otherwise ignore untrusted/unknown formats
+  return null;
+}
 
 export default function TabsBar() {
   const app = useApp();
@@ -28,15 +118,15 @@ export default function TabsBar() {
       const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
       const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
       return list.map((x, i) => ({
-        id: x?.id ?? `tab_${i}`,
+        id: x?.id ?? x?.type ?? `tab_${i}`,
+        type: x?.type ?? x?.id ?? `tab_${i}`,
         title: x?.title,
-        icon: x?.icon, // optional
+        icon: x?.icon || null,
         _raw: x,
       }));
     }
   );
 
-  // locale helpers
   function pickByLocale(obj, langCode) {
     if (!obj || typeof obj !== "object") return undefined;
     const lc = (langCode || "en").toString();
@@ -45,6 +135,7 @@ export default function TabsBar() {
     if (obj[base] !== undefined) return obj[base];
     return obj["*"];
   }
+
   function resolveTitle(title, langCode, domain) {
     if (!title) return "";
     if (typeof title === "string") return title;
@@ -71,7 +162,6 @@ export default function TabsBar() {
     return "";
   }
 
-  // selection
   const [selectedId, setSelectedId] = createSignal("");
 
   createEffect(() => {
@@ -83,11 +173,16 @@ export default function TabsBar() {
   const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
 
   const items = createMemo(() =>
-    (tabsRaw() || []).map((tab) => ({
-      id: tab.id,
-      label: resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled"),
-      icon: tab.icon ? <span>{tab.icon}</span> : null,
-    }))
+    (tabsRaw() || []).map((tab) => {
+      const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
+      const explicit = iconFromSpec(tab.icon);
+      const auto = iconForType(tab.type || tab.id);
+      return {
+        id: tab.id,
+        label,
+        icon: explicit || auto,
+      };
+    })
   );
 
   const labelById = createMemo(() => {
@@ -98,18 +193,14 @@ export default function TabsBar() {
 
   return (
     <section class="w-full">
-      <div class="max-w-6xl mx-auto px-4">
-        {/* Round‑out tabs bar */}
+      <div class="max-w-6xl mx-auto px-0">
         <Show
           when={!tabsRaw.loading}
           fallback={<span class="text-sm text-neutral-500 dark:text-neutral-400">{t("main.tabs.loading")}</span>}
         >
-          {/* You can override the rail color per place if needed:
-              <Tabs class="!my-0" /> and set it via inline style: style={{ "--rt-rail": "#1f2937" }} */}
           <Tabs items={items()} value={selectedId()} onChange={setSelectedId} />
         </Show>
 
-        {/* Content panel (empty for now) */}
         <div class="mt-2 rotabs__panel">
           <For each={tabsRaw() || []}>
             {(tab) => (
@@ -121,7 +212,6 @@ export default function TabsBar() {
                   <p class="text-sm text-neutral-600 dark:text-neutral-400">
                     {t("main.tabs.empty")}
                   </p>
-                  {/* TODO: replace with real tab content */}
                 </section>
               </Show>
             )}

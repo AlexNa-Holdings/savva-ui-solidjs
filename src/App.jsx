@@ -27,18 +27,19 @@ export default function App() {
 
   return (
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-      {/* Passive logger; renders nothing */}
-      <AssetDebugTap />
+
 
       <Header onTogglePane={togglePane} />
-      <RightPane isOpen={isPaneOpen} onClose={togglePane} />
-
       {/* Simple hash-route switch */}
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
 
+      <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
+
+      {/* Passive logger; renders nothing */}
+      <AssetDebugTap />
     </div>
   );
 }
