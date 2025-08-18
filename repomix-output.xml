@@ -130,6 +130,8 @@ src/
     hashRouter.js
   styles/
     tabs.css
+  theme/
+    DomainCssLoader.jsx
   utils/
     assetLoader.js
     assetsDiagnostics.js
@@ -154,6 +156,65 @@ vite.config.js
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/theme/DomainCssLoader.jsx">
+// src/theme/DomainCssLoader.jsx
+import { createEffect, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const LINK_ID = "savva-domain-css";
+
+export default function DomainCssLoader() {
+  const app = useApp();
+
+  function ensureLink() {
+    let el = document.getElementById(LINK_ID);
+    if (!el) {
+      el = document.createElement("link");
+      el.id = LINK_ID;
+      el.rel = "stylesheet";
+      el.media = "all";
+      (document.head || document.getElementsByTagName("head")[0]).appendChild(el);
+    }
+    return el;
+  }
+
+  createEffect(() => {
+    const prefix = app.domainAssetsPrefix?.() || "";
+    const cfg = app.domainAssetsConfig?.();
+    const rev = `${prefix}|${cfg?.assets_cid || cfg?.cid || ""}`;
+    const href = app.assetUrl?.("domain.css");
+    const el = ensureLink();
+
+    dbg.log("assets", "DomainCssLoader: applying domain.css", { href, prefix, rev });
+
+    if (!href) {
+      el.parentNode && el.parentNode.removeChild(el);
+      return;
+    }
+
+    const nextHref = `${href}${href.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev)}`;
+    if (el.getAttribute("href") === nextHref) return;
+
+    el.setAttribute("href", nextHref);
+    el.addEventListener("error", () => {
+      dbg.warn("assets", "domain.css not found or failed", { href: nextHref, prefix });
+      // If it 404s, base tokens from src/index.css continue to apply.
+    }, { once: true });
+    el.addEventListener("load", () => {
+      dbg.log("assets", "domain.css applied", { href: nextHref, prefix });
+    }, { once: true });
+  });
+
+  onCleanup(() => {
+    const el = document.getElementById(LINK_ID);
+    if (el?.parentNode) el.parentNode.removeChild(el);
+  });
+
+  return null;
+}
+</file>
 
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
@@ -3248,75 +3309,6 @@ locales:
     dictionary: i18n/ua.yaml
 </file>
 
-<file path="public/domain_default/domain.css">
-:root {
-  --gradient: linear-gradient(to top left, #000c40, #607d8b);
-  --background: 243 100% 98.26%;
-  --foreground: 243 10% 0.52%;
-
-  --muted: 243 10% 91.3%;
-  --muted-foreground: 243 5% 41.3%;
-
-  --popover: 243 10% 91.3%;
-  --popover-foreground: 243 10% 0.65%;
-
-  --card: 243 10% 91.3%;
-  --card-foreground: 243 10% 0.65%;
-
-  --border: 243 15% 89.52%;
-  --input: 243 15% 89.52%;
-
-  --primary: 243 100% 13%;
-  --primary-foreground: 243 2% 91.3%;
-
-  --secondary: 243 5% 81.73%;
-  --secondary-foreground: 243 7% 11.3%;
-
-  --accent: 243 5% 95.65%;
-  --accent-foreground: 243 7% 11.3%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  --ring: 243 100% 13%;
-
-  --radius: 0.5rem;
-}
-
-.dark {
-  /* CSS: .bg-gradient { background: var(--gradient) } */
-  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
-
-  --background: 244 33.800000000000004% 6.32%;
-  --foreground: 244 5.2% 98.95%;
-
-  --muted: 244 26% 23.700000000000003%;
-  --muted-foreground: 244 5.2% 57.9%;
-
-  --popover: 244 54.6% 10.27%;
-  --popover-foreground: 244 5.2% 98.95%;
-
-  --card: 244 54.6% 10.27%;
-  --card-foreground: 244 5.2% 98.95%;
-
-  --border: 244 26% 23.700000000000003%;
-  --input: 244 26% 23.700000000000003%;
-
-  --primary: 244 52% 79%;
-  --primary-foreground: 244 5.2% 7.9%;
-
-  --secondary: 244 26% 23.700000000000003%;
-  --secondary-foreground: 244 5.2% 98.95%;
-
-  --accent: 244 26% 23.700000000000003%;
-  --accent-foreground: 244 5.2% 98.95%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 244 5.2% 98.95%;
-
-  --ring: 244 52% 79%;
-</file>
-
 <file path="public/default_connect.yaml">
 domain: savva.app
 backendLink: https://ui.savva.app/api/
@@ -4339,7 +4331,7 @@ export async function loadAssetResource(app, relPath, opts = {}) {
 </file>
 
 <file path="src/utils/assetsDiagnostics.js">
-// src/utils/assetsDiagnostics.js
+/* src/utils/assetsDiagnostics.js */
 // Utility to assess domain asset resources and common pitfalls.
 // Pure JS (no Solid imports). You pass values from useApp().
 
@@ -4363,34 +4355,30 @@ function summarizeLogos(cfg) {
   if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
 
   const l = {
-    dark_mobile: raw.dark_mobile ?? raw.mobile_dark ?? null,
+    dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
     light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-    mobile: raw.mobile ?? null,
-    dark: raw.dark ?? null,
-    light: raw.light ?? null,
-    default: raw.default ?? raw.fallback ?? null,
+    mobile:       raw.mobile ?? null,
+    dark:         raw.dark   ?? null,
+    light:        raw.light  ?? null,
+    default:      raw.default?? raw.fallback ?? null,
   };
   const fields = Object.entries(l).filter(([,v]) => !!v).map(([k]) => k);
-  return {
-    has: fields.length > 0,
-    fields,
-    pickable: fields, // actual keys present
-  };
+  return { has: fields.length > 0, fields, pickable: fields };
 }
 
 /**
  * assessAssets
  * @param {object} p
  * @param {string} p.env 'prod' | 'test'
- * @param {string} p.assetsBaseUrl from /info (based on env)
- * @param {string} p.selectedDomainName current domain string
- * @param {string} p.domainAssetsPrefixActive active prefix in useApp (domain or /domain_default/)
- * @param {object|null} p.domainAssetsConfig parsed config.yaml (or null when default pack)
- * @param {'remote'|'default'|null} p.domainAssetsSource where config came from
- * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher] custom fetch (defaults to fetchWithTimeout)
+ * @param {string} p.assetsBaseUrl
+ * @param {string} p.selectedDomainName
+ * @param {string} p.domainAssetsPrefixActive
+ * @param {object|null} p.domainAssetsConfig
+ * @param {'remote'|'default'|null} p.domainAssetsSource
+ * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher]
  */
 export async function assessAssets(p) {
-  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts||{}) }));
+  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
   const now = new Date();
 
   const base = String(p.assetsBaseUrl || "");
@@ -4400,60 +4388,70 @@ export async function assessAssets(p) {
   const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
   const defaultConfigUrl = "/domain_default/config.yaml";
 
-  // HEAD first; if server blocks HEAD, fall back to GET (no-store)
+  // Robust HEAD -> GET check that handles CORS/network failures
   async function check(url) {
     if (!url) return { url, ok: false, status: 0, exists: false, text: null };
-    let res;
+    let res, method = "HEAD";
+
+    // Try HEAD
     try {
       res = await fetcher(url, { method: "HEAD", cache: "no-store" });
-      if (!res.ok && res.status !== 404) {
-        // Try GET to get more clues
-        res = await fetcher(url, { method: "GET", cache: "no-store" });
+    } catch {
+      // HEAD failed (CORS/network) → try GET
+      try {
+        method = "GET";
+        res = await fetcher(url, { method, cache: "no-store" });
+      } catch (e2) {
+        return { url, ok: false, status: -1, exists: false, error: String(e2) };
       }
-      const exists = res.status !== 404 && res.ok;
-      let text = null;
-      if (exists && /\/config\.yaml$/i.test(url) && res.method !== "HEAD") {
-        text = await res.text().catch(() => null);
-      }
-      return { url, ok: res.ok, status: res.status, exists, text };
-    } catch (e) {
-      return { url, ok: false, status: -1, exists: false, error: String(e) };
     }
+
+    // If HEAD returned non‑OK and not 404, try GET too
+    if (method === "HEAD" && !res.ok && res.status !== 404) {
+      try {
+        method = "GET";
+        res = await fetcher(url, { method, cache: "no-store" });
+      } catch (e3) {
+        return { url, ok: false, status: -1, exists: false, error: String(e3) };
+      }
+    }
+
+    const exists = res.status !== 404 && res.ok;
+    let text = null;
+    if (exists && /\/config\.yaml$/i.test(url) && method === "GET") {
+      text = await res.text().catch(() => null);
+    }
+    return { url, ok: res.ok, status: res.status, exists, text };
   }
 
-  const primary = primaryConfigUrl ? await check(primaryConfigUrl) : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
+  const primary = primaryConfigUrl
+    ? await check(primaryConfigUrl)
+    : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
+
   const fallback = await check(defaultConfigUrl);
 
-  // Figure out which one the app thinks it's using, based on activePrefix/source
   const appConfigUrl = join(activePrefix, "config.yaml");
 
-  // Extract key bits from parsed config available to the app
   const cfg = p.domainAssetsConfig || null;
   const logos = summarizeLogos(cfg);
-  const hasLocales = !!(cfg && (cfg.locales || cfg.i18n));
-  const hasTabs = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
+  const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
+  const hasTabs       = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
   const hasCategories = !!(cfg && (cfg.categories || cfg.ui?.categories));
 
-  // Sample resolution checks for a couple of typical files, using the ACTIVE prefix
+  // Sample resolution checks using ACTIVE prefix
   const sampleFiles = [];
   if (logos.has) {
-    // pick any first logo key
     const firstLogoKey = logos.pickable[0];
     const relPath = (typeof (cfg?.logos ?? cfg?.logo) === "string")
       ? (cfg?.logos ?? cfg?.logo)
       : (cfg?.logos?.[firstLogoKey] ?? cfg?.logo?.[firstLogoKey]);
-    if (relPath) {
-      sampleFiles.push({ kind: "logo", relPath });
-    }
+    if (relPath) sampleFiles.push({ kind: "logo", relPath });
   }
   if (cfg?.locales?.length) {
-    // pick first locale file path if present (structure may vary by project)
     const fr = cfg.locales.find(x => x?.path) || cfg.locales[0];
     if (fr?.path) sampleFiles.push({ kind: "locale", relPath: fr.path });
   }
-  if (cfg?.tabs?.path) {
-    sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
-  }
+  if (cfg?.tabs?.path) sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
 
   const resolvedSamples = await Promise.all(sampleFiles.map(async sf => {
     const url = join(activePrefix, sf.relPath);
@@ -4461,7 +4459,6 @@ export async function assessAssets(p) {
     return { ...sf, url, ok: r.ok, status: r.status, exists: r.exists };
   }));
 
-  // Assemble report
   return {
     timestamp: now.toISOString(),
     env: p.env || "prod",
@@ -4469,8 +4466,8 @@ export async function assessAssets(p) {
     assetsBaseUrl: base,
     computedDomainPrefix,
     activePrefix,
-    appSource: p.domainAssetsSource || null,      // "remote" or "default"
-    appConfigUrl,                                  // what the app would fetch given activePrefix
+    appSource: p.domainAssetsSource || null,
+    appConfigUrl,
     primaryConfig: {
       url: primary.url,
       exists: !!primary.exists,
@@ -4684,6 +4681,76 @@ Learn more about deploying your application with the [documentations](https://vi
     "noUncheckedSideEffectImports": true
   },
   "include": ["vite.config.js"]
+}
+</file>
+
+<file path="public/domain_default/domain.css">
+:root {
+  --gradient: linear-gradient(to top left, #000c40, #607d8b);
+  --background: 243 100% 98.26%;
+  --foreground: 243 10% 0.52%;
+
+  --muted: 243 10% 91.3%;
+  --muted-foreground: 243 5% 41.3%;
+
+  --popover: 243 10% 91.3%;
+  --popover-foreground: 243 10% 0.65%;
+
+  --card: 243 10% 91.3%;
+  --card-foreground: 243 10% 0.65%;
+
+  --border: 243 15% 89.52%;
+  --input: 243 15% 89.52%;
+
+  --primary: 243 100% 13%;
+  --primary-foreground: 243 2% 91.3%;
+
+  --secondary: 243 5% 81.73%;
+  --secondary-foreground: 243 7% 11.3%;
+
+  --accent: 243 5% 95.65%;
+  --accent-foreground: 243 7% 11.3%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+
+  --ring: 243 100% 13%;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* CSS: .bg-gradient { background: var(--gradient) } */
+  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
+
+  --background: 244 33.800000000000004% 6.32%;
+  --foreground: 244 5.2% 98.95%;
+
+  --muted: 244 26% 23.700000000000003%;
+  --muted-foreground: 244 5.2% 57.9%;
+
+  --popover: 244 54.6% 10.27%;
+  --popover-foreground: 244 5.2% 98.95%;
+
+  --card: 244 54.6% 10.27%;
+  --card-foreground: 244 5.2% 98.95%;
+
+  --border: 244 26% 23.700000000000003%;
+  --input: 244 26% 23.700000000000003%;
+
+  --primary: 244 52% 79%;
+  --primary-foreground: 244 5.2% 7.9%;
+
+  --secondary: 244 26% 23.700000000000003%;
+  --secondary-foreground: 244 5.2% 98.95%;
+
+  --accent: 244 26% 23.700000000000003%;
+  --accent-foreground: 244 5.2% 98.95%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 244 5.2% 98.95%;
+
+  --ring: 244 52% 79%;
 }
 </file>
 
@@ -7041,8 +7108,8 @@ export default function Settings() {
 </file>
 
 <file path="src/context/AppContext.jsx">
-// src/context/AppContext.jsx
-import { createContext, useContext, createSignal, onMount, createMemo, onCleanup, createEffect } from "solid-js";
+/* src/context/AppContext.jsx */
+import * as Solid from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain } from "../blockchain/wallet";
@@ -7059,7 +7126,7 @@ const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 // ---------- context ----------
-const AppContext = createContext();
+const AppContext = Solid.createContext();
 const OVERRIDE_KEY = "connect_override_v1";
 const IPFS_LOCAL_KEY = "ipfs_local_enabled_v1";
 const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
@@ -7071,10 +7138,7 @@ const ASSETS_ENV_KEY = "domain_assets_env_v1"; // "prod" | "test"
 
 function pickPersistable(cfg) {
   if (!cfg) return null;
-  return {
-    domain: cfg.domain || "",
-    backendLink: ensureSlash(cfg.backendLink || "")
-  };
+  return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") };
 }
 
 function loadOverride() {
@@ -7095,21 +7159,23 @@ function saveOverride(obj) {
 
 export function AppProvider(props) {
   const i18n = useI18n();
-  const [config, setConfig] = createSignal(null);
-  const [info, setInfo] = createSignal(null);
-  const [error, setError] = createSignal(null);
-  const [loading, setLoading] = createSignal(true);
-  const [lastUpdatedAt, setLastUpdatedAt] = createSignal(null);
+
+  // top-level app state
+  const [config, setConfig]               = Solid.createSignal(null);
+  const [info, setInfo]                   = Solid.createSignal(null);
+  const [error, setError]                 = Solid.createSignal(null);
+  const [loading, setLoading]             = Solid.createSignal(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = Solid.createSignal(null);
 
   // Local IPFS prefs/state
-  const [localIpfsEnabled, setLocalIpfsEnabled] = createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
-  const [localIpfsApiUrl, setLocalIpfsApiUrl] = createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
-  const [localIpfsGateway, setLocalIpfsGateway] = createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
-  const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown"); // "unknown" | "ok" | "down"
+  const [localIpfsEnabled, setLocalIpfsEnabled] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
+  const [localIpfsApiUrl, setLocalIpfsApiUrl]   = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
+  const [localIpfsGateway, setLocalIpfsGateway] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
+  const [localIpfsStatus, setLocalIpfsStatus]   = Solid.createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;
 
   // domain assets env (prod/test)
-  const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
+  const [assetsEnv, setAssetsEnvState] = Solid.createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
   function setAssetsEnv(next) {
     const v = next === "test" ? "test" : "prod";
     localStorage.setItem(ASSETS_ENV_KEY, v);
@@ -7148,7 +7214,6 @@ export function AppProvider(props) {
       const merged = { ...baseCfg, ...(ovr ? { ...ovr } : {}) };
       await applyConfig(merged);
 
-      // kick off local IPFS monitor if enabled
       if (localIpfsEnabled() && localIpfsApiUrl()) startLocalIpfsMonitor();
     } catch (e) {
       setError(e);
@@ -7158,38 +7223,37 @@ export function AppProvider(props) {
   }
 
   // ----- Connect changes -----
-async function updateConnect(partial) {
-  try {
-    setLoading(true);
-    setError(null);
+  async function updateConnect(partial) {
+    try {
+      setLoading(true);
+      setError(null);
 
-    const cur = config() || {};
-    const next = {
-      ...cur,
-      ...partial,
-      backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink),
-    };
-    const backendChanged = next.backendLink !== cur.backendLink;
+      const cur = config() || {};
+      const next = {
+        ...cur,
+        ...partial,
+        backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink),
+      };
+      const backendChanged = next.backendLink !== cur.backendLink;
 
-    if (backendChanged) {
-      await applyConfig(next);
-    } else {
-      setConfig(next);
-      setLastUpdatedAt(Date.now());
+      if (backendChanged) {
+        await applyConfig(next);
+      } else {
+        setConfig(next);
+        setLastUpdatedAt(Date.now());
+      }
+      saveOverride(next);
+    } catch (e) {
+      setError(e);
+      pushErrorToast(e, {
+        op: "updateConnect",
+        backendLink: partial?.backendLink ?? cur?.backendLink,
+        domain: partial?.domain ?? cur?.domain,
+      });
+    } finally {
+      setLoading(false);
     }
-    saveOverride(next);
-  } catch (e) {
-    setError(e);
-    // 🔔 Make the error visible globally (dialog may close after Apply)
-    pushErrorToast(e, {
-      op: "updateConnect",
-      backendLink: partial?.backendLink ?? cur?.backendLink,
-      domain: partial?.domain ?? cur?.domain,
-    });
-  } finally {
-    setLoading(false);
   }
-}
 
   function setDomain(nextDomain) {
     const cur = config() || {};
@@ -7204,11 +7268,11 @@ async function updateConnect(partial) {
     await init();
   }
 
-  onMount(init);
-  onCleanup(() => stopLocalIpfsMonitor());
+  Solid.onMount(init);
+  Solid.onCleanup(() => stopLocalIpfsMonitor());
 
   // ----- Derived helpers from /info -----
-  const supportedDomains = createMemo(() => {
+  const supportedDomains = Solid.createMemo(() => {
     const data = info();
     const list = Array.isArray(data?.domains) ? data.domains : [];
     return list
@@ -7216,9 +7280,8 @@ async function updateConnect(partial) {
       .filter((name) => typeof name === "string" && name.trim().length > 0);
   });
 
-  // ✅ Single source of truth for domain:
-  // Prefer explicit config().domain, even if /info hasn't listed it yet.
-  const selectedDomain = createMemo(() => {
+  // Prefer explicit config().domain; if /info doesn't list it yet, still use it.
+  const selectedDomain = Solid.createMemo(() => {
     const curDomain = (config()?.domain || "").trim();
     const list = Array.isArray(info()?.domains) ? info().domains : [];
     if (curDomain) {
@@ -7228,13 +7291,12 @@ async function updateConnect(partial) {
     const first = list[0];
     return typeof first === "string" ? { name: first } : first || null;
   });
+  const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()) || "");
 
-  const selectedDomainName = createMemo(() => dn(selectedDomain()) || "");
-
-  const desiredChainId = createMemo(() =>
+  const desiredChainId = Solid.createMemo(() =>
     typeof info()?.blockchain_id === "number" ? info().blockchain_id : null
   );
-  const desiredChain = createMemo(() => {
+  const desiredChain = Solid.createMemo(() => {
     const id = desiredChainId();
     return id ? getChainMeta(id) : null;
   });
@@ -7244,7 +7306,7 @@ async function updateConnect(partial) {
     await switchOrAddChain(meta);
   }
 
-  const remoteIpfsGateways = createMemo(() => {
+  const remoteIpfsGateways = Solid.createMemo(() => {
     const arr = info()?.ipfs_gateways;
     return Array.isArray(arr)
       ? arr
@@ -7254,223 +7316,78 @@ async function updateConnect(partial) {
       : [];
   });
 
-  const activeIpfsGateways = createMemo(() => {
-    // STRICT MODE: if local IPFS is enabled, use ONLY the local gateway
+  const activeIpfsGateways = Solid.createMemo(() => {
     if (localIpfsEnabled() && localIpfsGateway()) {
       return [ensureSlash(localIpfsGateway())];
     }
-    // otherwise use the remote list from /info
     return remoteIpfsGateways();
   });
 
-  // ----- Domain assets (prod/test) -----
-
-  // Base assets URL from /info based on selected env
-  const assetsBaseUrl = createMemo(() => {
-    const i = info();
-    if (!i) return "";
-    const raw = assetsEnv() === "test" ? i?.temp_assets_url : i?.assets_url;
-    return ensureSlash(raw || "");
+  // ----- Domain assets (prod/test, prefix, config.yaml) -----
+  const assetsBaseUrl = Solid.createMemo(() => {
+    const baseProd = info()?.assets_url || "";
+    const baseTest = info()?.temp_assets_url || "";
+    const base = assetsEnv() === "test" ? baseTest : baseProd;
+    return ensureSlash(base || "");
   });
 
-  // Prefix like <assetsBase>/<domain>/
-  const domainAssetsPrefix = createMemo(() => {
-    const base = assetsBaseUrl();
-    const dom  = selectedDomainName();
-    if (!base || !dom) return "";
-    return ensureSlash(base) + dom.replace(/^\//, "") + "/";
-  });
+  const [domainAssetsConfig, setDomainAssetsConfig] = Solid.createSignal(null);
+  const [domainAssetsSource, setDomainAssetsSource] = Solid.createSignal(null); // "remote" | "default"
+  const [domainAssetsPrefix, setDomainAssetsPrefix] = Solid.createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
 
-  // State for parsed config.yaml (+source/prefix so consumers know what we use)
-  const [domainAssetsState, setDomainAssetsState] = createSignal({
-    config: null,
-    loadedAt: null,
-    error: null,
-    source: null, // "remote" | "default"
-    prefix: DEFAULT_DOMAIN_ASSETS_PREFIX, // active base for assetUrl()
-  });
+  const domainAssetsPrefixActive = Solid.createMemo(() => domainAssetsPrefix() || DEFAULT_DOMAIN_ASSETS_PREFIX);
 
-  // Helper: load & parse the default pack config so components (BrandLogo, etc.)
-  // can still read logos/locales when there is no per-domain config.
-  // Now stamp-aware and non-clobbering by default.
-  async function loadDefaultAssetsConfig(fallbackError, { stamp, force = false } = {}) {
-    try {
-      // If a newer refresh started, bail
-      if (stamp && stamp !== assetsLoadSeq) return;
-
-      // Unless explicitly forced (real failure/new domain), never clobber
-      // an already active remote pack with the default pack during transient states.
-      if (!force && domainAssetsState().source === "remote") return;
-
-      const res = await fetchWithTimeout(`${DEFAULT_DOMAIN_ASSETS_PREFIX}config.yaml`, { timeoutMs: 8000 });
-      let parsed = null;
-      if (res.ok) {
-        const text = await res.text();
-        try { parsed = parse(text) || null; } catch { parsed = null; }
-      }
-
-      // Recheck staleness again right before committing
-      if (stamp && stamp !== assetsLoadSeq) return;
-
-      setDomainAssetsState({
-        config: parsed,
-        loadedAt: new Date(),
-        error: null,
-        source: "default",
-        prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
-      });
-    } catch (e) {
-      if (stamp && stamp !== assetsLoadSeq) return;
-      setDomainAssetsState({
-        config: null,
-        loadedAt: new Date(),
-        error: fallbackError || e,
-        source: "default",
-        prefix: DEFAULT_DOMAIN_ASSETS_PREFIX,
-      });
-    }
-  }
-
-  // ✅ Prevent stale loads from clobbering current domain pack
-  let assetsLoadSeq = 0;
-
-  // Loader for per-domain config with fallback to domain_default (parsed!)
   async function refreshDomainAssets() {
-    const prefix = domainAssetsPrefix();
-    const stamp  = ++assetsLoadSeq;
+    const base = assetsBaseUrl();
+    const domain = selectedDomainName();
+    const computedPrefix = base && domain ? ensureSlash(base) + domain + "/" : "";
+    const primaryUrl = computedPrefix ? computedPrefix + "config.yaml" : "";
+    const fallbackUrl = DEFAULT_DOMAIN_ASSETS_PREFIX + "config.yaml";
 
-    // If we don't yet have a computed prefix (e.g., info/domain not resolved),
-    // DO NOT clobber a good remote pack with default. Seed default only if nothing loaded.
-    if (!prefix) {
-      if (!domainAssetsState().source) {
-        await loadDefaultAssetsConfig(undefined, { stamp, force: false });
+    // try remote first, then default pack
+    let res = null, used = null;
+    try {
+      if (primaryUrl) {
+        const r = await fetchWithTimeout(primaryUrl, { timeoutMs: 8000 });
+        if (r.ok) { res = r; used = "remote"; }
       }
+    } catch {}
+    if (!res) {
+      try {
+        const r = await fetchWithTimeout(fallbackUrl, { timeoutMs: 8000 });
+        if (r.ok) { res = r; used = "default"; }
+      } catch {}
+    }
+    if (!res) {
+      setDomainAssetsConfig(null);
+      setDomainAssetsSource(null);
+      setDomainAssetsPrefix(DEFAULT_DOMAIN_ASSETS_PREFIX);
       return;
     }
 
-    const url = `${prefix}config.yaml`;
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs: 8000 });
+    const text = await res.text();
+    let cfg = null;
+    try { cfg = parse(text) || null; } catch { cfg = null; }
 
-      // If this response is stale, ignore it
-      if (stamp !== assetsLoadSeq) return;
-
-      if (res.status === 404) {
-        await loadDefaultAssetsConfig(new Error("404"), { stamp, force: true });
-        return;
-      }
-      if (!res.ok) {
-        await loadDefaultAssetsConfig(
-          new Error(`Domain assets fetch failed: ${res.status} ${res.statusText}`),
-          { stamp, force: true }
-        );
-        return;
-      }
-
-      const text = await res.text();
-      let parsed = null;
-      try {
-        parsed = parse(text) || null;
-      } catch (e) {
-        await loadDefaultAssetsConfig(e, { stamp, force: true });
-        return;
-      }
-
-      // Still current? Commit it.
-      if (stamp !== assetsLoadSeq) return;
-      setDomainAssetsState({
-        config: parsed,
-        loadedAt: new Date(),
-        error: null,
-        source: "remote",
-        prefix, // ASSETS_BASE/<domain>/
-      });
-    } catch (e) {
-      if (stamp !== assetsLoadSeq) return;
-      await loadDefaultAssetsConfig(e, { stamp, force: true });
-    }
+    setDomainAssetsConfig(cfg);
+    setDomainAssetsSource(used);
+    setDomainAssetsPrefix(used === "remote" ? computedPrefix : DEFAULT_DOMAIN_ASSETS_PREFIX);
   }
 
-  
-  // Resolve an asset path using the *active* prefix (domain or default)
-  function assetUrl(relPath) {
-    if (!relPath) return "";
-    if (/^(https?:)?\/\//i.test(relPath) || /^data:/.test(relPath)) return relPath;
-    const prefix = domainAssetsState().prefix || DEFAULT_DOMAIN_ASSETS_PREFIX;
-    return prefix + String(relPath).replace(/^\//, "");
-  }
-
-  // Auto-refresh when env, info, or domain changes
-  createEffect(() => {
-    // track dependencies
-    void assetsEnv();
-    void assetsBaseUrl();
-    void selectedDomainName();
-    // fire loader
-    void refreshDomainAssets();
+  Solid.createEffect(() => {
+    // refresh when env or selected domain changes or when /info refreshes
+    assetsEnv(); selectedDomainName(); info();
+    refreshDomainAssets();
   });
 
-  const domainAssetsConfig = createMemo(() => domainAssetsState().config);
-  const domainAssetsSource = createMemo(() => domainAssetsState().source || null);
-  const domainAssetsPrefixActive = createMemo(
-    () => domainAssetsState().prefix || DEFAULT_DOMAIN_ASSETS_PREFIX
-  );
-
-  // ----- Local IPFS: probe + monitor -----
-  function multiaddrToHttp(ma) {
-    if (typeof ma !== "string" || !ma.startsWith("/")) return ma;
-    const parts = ma.split("/").filter(Boolean);
-    let host = null, port = null;
-    for (let i = 0; i < parts.length; i += 2) {
-      const k = parts[i], v = parts[i + 1];
-      if (k === "ip4" || k === "dns4" || k === "dns6") host = v;
-      else if (k === "ip6") host = v && v.includes(":") ? `[${v}]` : v;
-      else if (k === "tcp") port = v;
-    }
-    if (!host || !port) return ma;
-    return `http://${host}:${port}/`;
+  function assetUrl(relPath) {
+    const rel = String(relPath || "").replace(/^\/+/, "");
+    const prefix = domainAssetsPrefixActive();
+    if (!prefix) return "";
+    return ensureSlash(prefix) + rel;
   }
 
-  function normalizeGatewayBase(g) {
-    const base = g.startsWith("/") ? multiaddrToHttp(g) : g;
-    return ensureSlash(base);
-  }
-
-  async function probeLocalIpfs(apiUrl) {
-    const base = trimSlash(apiUrl || "");
-    if (!base) throw new Error("Local IPFS API URL is empty");
-    // CORS note: browser needs CORS on local node
-    const url = `${base}/api/v0/config/show`;
-    const res = await fetchWithTimeout(url, { method: "POST", timeoutMs: 7000 });
-    if (!res.ok) throw new Error(`IPFS RPC error: ${res.status}`);
-    const cfg = await res.json();
-    let gw = cfg?.Addresses?.Gateway || cfg?.Addresses?.["Gateway"];
-    if (!gw || typeof gw !== "string") throw new Error("Gateway not found in IPFS config");
-    const httpGw = gw.startsWith("/") ? multiaddrToHttp(gw) : gw; // normalize
-    return ensureSlash(httpGw);
-  }
-
-  function startLocalIpfsMonitor() {
-    stopLocalIpfsMonitor();
-    // first immediate ping (don’t spam toasts on the very first success)
-    void pingLocalIpfs();
-    ipfsMonitorTid = setInterval(pingLocalIpfs, 20000);
-  }
-  function stopLocalIpfsMonitor() {
-    if (ipfsMonitorTid) {
-      clearInterval(ipfsMonitorTid);
-      ipfsMonitorTid = null;
-    }
-  }
-  function disableLocalIpfs() {
-    stopLocalIpfsMonitor();
-    setLocalIpfsEnabled(false);
-    setLocalIpfsGateway("");
-    setLocalIpfsStatus("unknown");
-    localStorage.setItem(IPFS_LOCAL_KEY, "0");
-    localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
-    pushToast({ type: "info", message: i18n.t("settings.ipfs.localDisabled") });
-  }
+  // ----- Local IPFS helpers -----
   async function pingLocalIpfs() {
     try {
       const base = trimSlash(localIpfsApiUrl());
@@ -7486,6 +7403,32 @@ async function updateConnect(partial) {
     }
   }
 
+  async function probeLocalIpfs(apiUrl) {
+    const url = trimSlash(apiUrl || "");
+    if (!url) throw new Error("Empty IPFS API URL");
+    const res = await fetchWithTimeout(`${url}/api/v0/version`, { method: "POST", timeoutMs: 4000 });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const gw = url.replace(/:\d+$/, ":8080").replace(/\/api$/, "");
+    return gw.endsWith("/") ? gw : gw + "/";
+  }
+
+  function startLocalIpfsMonitor() {
+    stopLocalIpfsMonitor();
+    ipfsMonitorTid = setInterval(() => { pingLocalIpfs(); }, 10_000);
+    pingLocalIpfs();
+  }
+  function stopLocalIpfsMonitor() {
+    if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
+  }
+  async function disableLocalIpfs() {
+    stopLocalIpfsMonitor();
+    setLocalIpfsEnabled(false);
+    setLocalIpfsGateway("");
+    localStorage.setItem(IPFS_LOCAL_KEY, "0");
+    localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
+    pushToast({ type: "info", message: i18n.t("settings.ipfs.localDisabled") });
+  }
+
   const value = {
     // state
     config, info, error, loading, lastUpdatedAt,
@@ -7498,7 +7441,7 @@ async function updateConnect(partial) {
 
     // convenience
     supportedDomains,
-    selectedDomain,           // object with {name,...} (or null)
+    selectedDomain,           // object { name, ... } (or null)
     desiredChainId,
     desiredChain,
     remoteIpfsGateways,
@@ -7538,9 +7481,9 @@ async function updateConnect(partial) {
       }
     },
     disableLocalIpfs,
-    setLocalIpfsApiUrl, // so Settings can update the URL field live
+    setLocalIpfsApiUrl,
 
-    // i18n (now globally available through AppContext)
+    // i18n (global from context)
     t: i18n.t,
     lang: i18n.lang,
     setLang: i18n.setLang,
@@ -7553,7 +7496,7 @@ async function updateConnect(partial) {
 }
 
 export function useApp() {
-  const ctx = useContext(AppContext);
+  const ctx = Solid.useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
   return ctx;
 }
@@ -7571,7 +7514,8 @@ import { useApp } from "./context/AppContext.jsx";
 import { useI18n } from "./i18n/useI18n";
 import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
-import AssetDebugTap from "./dev/AssetDebugTap.jsx"; // ⬅️ debug tap (no UI)
+import AssetDebugTap from "./dev/AssetDebugTap.jsx";
+import DomainCssLoader from "./theme/DomainCssLoader.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -7589,18 +7533,15 @@ export default function App() {
 
   return (
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-
+      <DomainCssLoader />
 
       <Header onTogglePane={togglePane} />
-      {/* Simple hash-route switch */}
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
 
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
-
-      {/* Passive logger; renders nothing */}
       <AssetDebugTap />
     </div>
   );

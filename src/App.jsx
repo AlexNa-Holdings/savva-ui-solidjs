@@ -9,7 +9,8 @@ import { useApp } from "./context/AppContext.jsx";
 import { useI18n } from "./i18n/useI18n";
 import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
-import AssetDebugTap from "./dev/AssetDebugTap.jsx"; // ⬅️ debug tap (no UI)
+import AssetDebugTap from "./dev/AssetDebugTap.jsx";
+import DomainCssLoader from "./theme/DomainCssLoader.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -27,18 +28,15 @@ export default function App() {
 
   return (
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-
+      <DomainCssLoader />
 
       <Header onTogglePane={togglePane} />
-      {/* Simple hash-route switch */}
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
 
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
-
-      {/* Passive logger; renders nothing */}
       <AssetDebugTap />
     </div>
   );
