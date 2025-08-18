@@ -8,7 +8,6 @@ export function useTheme() {
     const savedTheme = localStorage.getItem("theme") || "light";
     setTheme(savedTheme);
     document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    console.log("Initial theme:", savedTheme, "dark class:", document.documentElement.classList.contains("dark")); // Debug
   });
 
   const toggleTheme = () => {
@@ -16,7 +15,6 @@ export function useTheme() {
     setTheme(next);
     document.documentElement.classList.toggle("dark", next === "dark");
     try { localStorage.setItem("theme", next); } catch {}
-    console.log("Toggled to:", next, "dark class:", document.documentElement.classList.contains("dark")); // Debug
   };
 
   // Expose theme signal for external use

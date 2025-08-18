@@ -12,7 +12,6 @@ export default function RightPane({ isOpen, onClose }) {
   const { t } = app;
 
   createEffect(() => {
-    console.log("RightPane: isOpen changed to:", isOpen());
   });
 
   const handlePanelClick = (e) => {
@@ -22,14 +21,13 @@ export default function RightPane({ isOpen, onClose }) {
   const [showSwitch, setShowSwitch] = createSignal(false);
 
   // Parent no longer writes config; dialog does it and then calls onClose
-  const noopApply = () => {};
+  const noopApply = () => { };
 
   return (
     <>
       <div
-        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${
-          isOpen() ? "right-0" : "right-[-256px]"
-        } transition-all duration-300`}
+        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"
+          } transition-all duration-300`}
         onClick={handlePanelClick}
         data-testid="right-pane"
       >
@@ -55,7 +53,7 @@ export default function RightPane({ isOpen, onClose }) {
                   role="switch"
                   aria-checked={theme() === "dark"}
                   tabIndex={0}
-                  onClick={() => { toggleTheme(); console.log("Theme toggled:", theme()); }}
+                  onClick={() => { toggleTheme(); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();

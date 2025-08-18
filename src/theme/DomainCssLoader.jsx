@@ -1,5 +1,5 @@
 // src/theme/DomainCssLoader.jsx
-import { createEffect, onCleanup } from "solid-js";
+import { createEffect, onCleanup, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { dbg } from "../utils/debug";
 
@@ -20,31 +20,38 @@ export default function DomainCssLoader() {
     return el;
   }
 
-  createEffect(() => {
-    const prefix = app.domainAssetsPrefix?.() || "";
+  // Flip when env/domain/pack changes; used only for cache busting
+  const rev = createMemo(() => {
     const cfg = app.domainAssetsConfig?.();
-    const rev = `${prefix}|${cfg?.assets_cid || cfg?.cid || ""}`;
-    const href = app.assetUrl?.("domain.css");
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const env = app.assetsEnv?.() || "prod";
+    const dom = (() => {
+      const d = app.selectedDomain?.();
+      return typeof d === "string" ? d : d?.name || "";
+    })();
+    return `${env}|${dom}|${cid}`;
+  });
+
+  createEffect(() => {
+    const hrefBase = app.assetUrl?.("domain.css"); // <- single source of truth
     const el = ensureLink();
 
-    dbg.log("assets", "DomainCssLoader: applying domain.css", { href, prefix, rev });
-
-    if (!href) {
+    if (!hrefBase) {
       el.parentNode && el.parentNode.removeChild(el);
       return;
     }
 
-    const nextHref = `${href}${href.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev)}`;
-    if (el.getAttribute("href") === nextHref) return;
+    const href = `${hrefBase}${hrefBase.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev())}`;
+    if (el.getAttribute("href") === href) return;
 
-    el.setAttribute("href", nextHref);
-    el.addEventListener("error", () => {
-      dbg.warn("assets", "domain.css not found or failed", { href: nextHref, prefix });
-      // If it 404s, base tokens from src/index.css continue to apply.
-    }, { once: true });
-    el.addEventListener("load", () => {
-      dbg.log("assets", "domain.css applied", { href: nextHref, prefix });
-    }, { once: true });
+    dbg.log("assets", "DomainCssLoader: applying domain.css", { hrefBase, href });
+
+    const onLoad = () => dbg.log("assets", "domain.css loaded", { href });
+    const onError = () => dbg.warn("assets", "domain.css failed to load", { href });
+
+    el.addEventListener("load", onLoad, { once: true });
+    el.addEventListener("error", onError, { once: true });
+    el.setAttribute("href", href);
   });
 
   onCleanup(() => {
