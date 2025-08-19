@@ -1,17 +1,18 @@
 // src/components/tabs/index.js
-import LeadersTab from "./LeadersTab";
-import ActualTab from "./ActualTab";
-import CommentsTab from "./CommentsTab";
-import NewTab from "./NewTab";
-import ForYouTab from "./ForYouTab";
+import NILTab from "./NILTab.jsx";
+import NewTab from "./NewTab.jsx";
 
+/**
+ * Registry of tab type -> component.
+ * Add more mappings as you implement new tab types.
+ */
 const REGISTRY = {
-  leaders: LeadersTab,
-  actual: ActualTab,
-  comments: CommentsTab,
+  nil: NILTab,
   new: NewTab,
-  "for-you": ForYouTab,
-  foryou: ForYouTab,
+  "for-you": null, // example: not implemented yet
+  leaders: null,
+  actual: null,
+  comments: null,
 };
 
 export function getTabComponent(type) {

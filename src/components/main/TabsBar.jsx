@@ -5,8 +5,10 @@ import { useI18n } from "../../i18n/useI18n";
 import { loadAssetResource } from "../../utils/assetLoader";
 import { useHashRouter, navigate } from "../../routing/hashRouter";
 import Tabs from "../ui/Tabs.jsx";
+import { getTabComponent } from "../tabs";
+import RightRailLayout from "../tabs/RightRailLayout.jsx";
 
-// ── route helpers (no /t prefix; use "/actual", "/leaders", etc.) ──────────────
+// route helpers (no /t prefix; use "/actual", "/leaders", etc.)
 const slug = (s) => String(s || "").trim().toLowerCase();
 const firstSeg = (path) => {
   const p = String(path || "/");
@@ -16,7 +18,7 @@ const firstSeg = (path) => {
 };
 const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
 
-// ── minimal icons ──────────────────────────────────────────────────────────────
+// icons
 function SvgIcon(props) {
   return (
     <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -78,7 +80,7 @@ export default function TabsBar() {
     }
   );
 
-  // ── i18n title resolver ─────────────────────────────────────────────────────
+  // i18n helpers
   function pickByLocale(obj, langCode) {
     if (!obj || typeof obj !== "object") return undefined;
     const lc = (langCode || "en").toString();
@@ -113,11 +115,10 @@ export default function TabsBar() {
     return "";
   }
 
-  // ── selection + URL sync ────────────────────────────────────────────────────
+  // selection + URL sync
   const [selectedId, setSelectedId] = createSignal("");
   const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
 
-  // Build items for <Tabs/>
   const items = createMemo(() =>
     (tabsRaw() || []).map((tab) => {
       const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
@@ -127,19 +128,18 @@ export default function TabsBar() {
     })
   );
 
-  // Label lookup for the panel header
   const labelById = createMemo(() => {
     const map = new Map();
     (items() || []).forEach((it) => map.set(it.id, it.label));
     return map;
   });
 
-  // 1) Initialize/fix selection when tabs change OR when URL points to a known key
+  // init/fix selection vs URL
   createEffect(() => {
     const list = tabsRaw() || [];
     if (!list.length) return setSelectedId("");
 
-    const key = firstSeg(route());               // "", "actual", "leaders", ...
+    const key = firstSeg(route());
     const hasKey = (k) => list.some((t) => slug(t.id) === k || slug(t.type) === k);
 
     if (key && hasKey(key)) {
@@ -149,13 +149,11 @@ export default function TabsBar() {
       const first = list[0];
       batch(() => {
         setSelectedId(first.id);
-        // Canonicalize URL to the first tab if URL has no/unknown key
         navigate(pathFor(first.type || first.id), { replace: true });
       });
     }
   });
 
-  // 2) When USER clicks a tab: update selection immediately and push URL.
   function handleTabChange(nextId) {
     const list = tabsRaw() || [];
     const entry = list.find((t) => t.id === nextId);
@@ -183,16 +181,38 @@ export default function TabsBar() {
 
         <div class="tabs_panel">
           <For each={tabsRaw() || []}>
-            {(tab) => (
-              <Show when={selectedId() === tab.id}>
-                <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">
-                  {labelById().get(tab.id) || t("main.tabs.untitled")}
-                </h3>
-                <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                  {t("main.tabs.empty")}
-                </p>
-              </Show>
-            )}
+            {(tab) => {
+              const active = () => selectedId() === tab.id;
+              const Comp = getTabComponent(tab.type);
+              const title = labelById().get(tab.id) || t("main.tabs.untitled");
+              const rightCfg = tab?._raw?.right_panel || { available: false };
+
+              return (
+                <Show when={active()}>
+                  {Comp ? (
+                    rightCfg?.available  ? (
+                      <RightRailLayout>
+                        <Comp title={title} tab={tab} />
+                      </RightRailLayout>
+                    ) : (
+                      <Comp title={title} tab={tab} />
+                    )
+                  ) : rightCfg?.available ? (
+                    <RightRailLayout>
+                      <>
+                        <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                      </>
+                    </RightRailLayout>
+                  ) : (
+                    <>
+                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                    </>
+                  )}
+                </Show>
+              );
+            }}
           </For>
         </div>
       </div>
