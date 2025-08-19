@@ -28,15 +28,13 @@ export default function App() {
   const togglePane = () => setIsPaneOpen(!isPaneOpen());
 
   return (
-    <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
       <DomainCssLoader />
       <GoogleAnalyticsLoader />
-
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
-
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
       <AssetDebugTap />

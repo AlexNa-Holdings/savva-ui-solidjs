@@ -106,7 +106,9 @@ src/
         TabIcons.jsx
       BackIconButton.jsx
       BrandLogo.jsx
+      LangSelector.jsx
       Tabs.jsx
+      ThemeToggle.jsx
     Header.jsx
     RightPane.jsx
     SwitchConnectDialog.jsx
@@ -130,8 +132,11 @@ src/
     hashRouter.js
   styles/
     tabs.css
+    themed-controls.css
   theme/
     DomainCssLoader.jsx
+    FaviconLoader.jsx
+    GoogleAnalyticsLoader.jsx
   utils/
     assetLoader.js
     assetsDiagnostics.js
@@ -156,65 +161,6 @@ vite.config.js
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="src/theme/DomainCssLoader.jsx">
-// src/theme/DomainCssLoader.jsx
-import { createEffect, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { dbg } from "../utils/debug";
-
-const LINK_ID = "savva-domain-css";
-
-export default function DomainCssLoader() {
-  const app = useApp();
-
-  function ensureLink() {
-    let el = document.getElementById(LINK_ID);
-    if (!el) {
-      el = document.createElement("link");
-      el.id = LINK_ID;
-      el.rel = "stylesheet";
-      el.media = "all";
-      (document.head || document.getElementsByTagName("head")[0]).appendChild(el);
-    }
-    return el;
-  }
-
-  createEffect(() => {
-    const prefix = app.domainAssetsPrefix?.() || "";
-    const cfg = app.domainAssetsConfig?.();
-    const rev = `${prefix}|${cfg?.assets_cid || cfg?.cid || ""}`;
-    const href = app.assetUrl?.("domain.css");
-    const el = ensureLink();
-
-    dbg.log("assets", "DomainCssLoader: applying domain.css", { href, prefix, rev });
-
-    if (!href) {
-      el.parentNode && el.parentNode.removeChild(el);
-      return;
-    }
-
-    const nextHref = `${href}${href.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev)}`;
-    if (el.getAttribute("href") === nextHref) return;
-
-    el.setAttribute("href", nextHref);
-    el.addEventListener("error", () => {
-      dbg.warn("assets", "domain.css not found or failed", { href: nextHref, prefix });
-      // If it 404s, base tokens from src/index.css continue to apply.
-    }, { once: true });
-    el.addEventListener("load", () => {
-      dbg.log("assets", "domain.css applied", { href: nextHref, prefix });
-    }, { once: true });
-  });
-
-  onCleanup(() => {
-    const el = document.getElementById(LINK_ID);
-    if (el?.parentNode) el.parentNode.removeChild(el);
-  });
-
-  return null;
-}
-</file>
 
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
@@ -3868,6 +3814,106 @@ export function tabIconFor(type) {
 }
 </file>
 
+<file path="src/components/ui/LangSelector.jsx">
+// src/components/ui/LangPillSelector.jsx
+import { createMemo, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { LANG_INFO } from "../../i18n/useI18n";
+
+export default function LangPillSelector(props) {
+  const app = useApp();
+
+  // options: explicit list → domain config locales → i18n available
+  const codes = createMemo(() => {
+    if (Array.isArray(props.options) && props.options.length) return props.options;
+    const fromDomain = (app.domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    if (fromDomain.length) return fromDomain;
+    return app.i18nAvailable || [];
+  });
+
+  const value = () => (props.value || app.lang?.() || "").toLowerCase();
+  const onChange = (code) => (props.onChange ? props.onChange(code) : app.setLang?.(code));
+
+  return (
+    <div class={`themed-segment ${props.class || ""}`} role="radiogroup" aria-label={app.t("rightPane.language")}>
+      <For each={codes()}>
+        {(code) => {
+          const c = String(code).toLowerCase();
+          const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
+          const active = () => value() === c;
+          return (
+            <button
+              type="button"
+              class={`themed-pill ${active() ? "is-active" : ""}`}
+              role="radio"
+              aria-checked={active()}
+              onClick={() => onChange(c)}
+              title={info.name}
+            >
+              {info.code}
+            </button>
+          );
+        }}
+      </For>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/ThemeToggle.jsx">
+// src/components/ui/ThemeIconToggle.jsx
+import { useTheme } from "../../hooks/useTheme";
+import { useApp } from "../../context/AppContext.jsx";
+
+function SunIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
+      <path d="M12 4V2M12 22v-2M4.93 4.93L3.51 3.51M20.49 20.49l-1.42-1.42M4 12H2M22 12h-2M4.93 19.07L3.51 20.49M20.49 3.51l-1.42 1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8" fill="none"/>
+    </svg>
+  );
+}
+function MoonIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" {...props}>
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+    </svg>
+  );
+}
+
+export default function ThemeIconToggle(props) {
+  const [theme, toggleTheme] = useTheme();
+  const app = useApp();
+
+  const isDark = () => theme() === "dark";
+
+  return (
+    <div class="themed-segment" role="group" aria-label={app.t("rightPane.theme")}>
+      <button
+        class={`themed-pill themed-pill--icon ${!isDark() ? "is-active" : ""}`}
+        aria-pressed={!isDark()}
+        aria-label={app.t("ui.mode.light")}
+        onClick={() => { if (isDark()) toggleTheme(); }}
+        title={app.t("ui.mode.light")}
+        type="button"
+      >
+        <SunIcon />
+      </button>
+      <button
+        class={`themed-pill themed-pill--icon ${isDark() ? "is-active" : ""}`}
+        aria-pressed={isDark()}
+        aria-label={app.t("ui.mode.dark")}
+        onClick={() => { if (!isDark()) toggleTheme(); }}
+        title={app.t("ui.mode.dark")}
+        type="button"
+      >
+        <MoonIcon />
+      </button>
+    </div>
+  );
+}
+</file>
+
 <file path="src/dev/AssetDebugTap.jsx">
 // src/dev/AssetDebugTap.jsx
 /* src/dev/AssetDebugTap.jsx */
@@ -4100,199 +4146,244 @@ export function useHashRouter() {
 }
 </file>
 
-<file path="src/styles/tabs.css">
-/* src/styles/tabs.css */
-
-
-
-.tabs {
---tabs-active-bg: hsl(var(--background));
---tabs-active-fg: hsl(var(--foreground));
---tabs-inactive-bg: hsl(var(--secondary));
---tabs-inactive-fg: hsl(var(--secondary-foreground));
---tabs-background: hsl(var(--card));
-
-  list-style: none;
-  margin: 0px auto 0;
-  background: var(--tabs-background);
-  background: var(--gradient);
-  display: flow-root;
-  padding-top: 8px;
-}
-
-.tabs li {
-  /* Makes a horizontal row */
-  float: left;
-
-  /* So the psueudo elements can be abs. positioned inside */
-  position: relative;
-}
-
-.tabs a {
-  /* Make them block level and only as wide as they need */
-  float: left;
-  padding: 10px 20px;
-  text-decoration: none;
-
-  /* Colors via design tokens */
-  color: var(--tabs-inactive-fg);
-  background: var(--tabs-inactive-bg);
-  
-  /* Only round the top corners */
-  -webkit-border-top-left-radius: 15px;
-  -webkit-border-top-right-radius: 15px;
-  -moz-border-radius-topleft: 15px;
-  -moz-border-radius-topright: 15px;
-  border-top-left-radius: 15px;
-  border-top-right-radius: 15px;
-}
-
-.tabs .active {
-  /* Highest, active tab is on top */
-  z-index: 3;
-}
-
-.tabs .active a {
-  /* Colors when tab is active */
-  color: var(--tabs-active-fg);
-  background: var(--tabs-active-bg);
-}
-
-.tabs li:before,
-.tabs li:after,
-.tabs li a:before,
-.tabs li a:after {
-  /* All pseudo elements are abs. positioned and on bottom */
-  position: absolute;
-  bottom: 0;
-}
-
-/* Only the first, last, and active tabs need pseudo elements at all */
-.tabs li:last-child:after,
-.tabs li:last-child a:after,
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs .active:after,
-.tabs .active:before,
-.tabs .active a:after,
-.tabs .active a:before {
-  content: "";
-}
-
-.tabs .active:before,
-.tabs .active:after {
-  background: var(--tabs-active-bg);
-  /* Squares below circles */
-  z-index: 1;
-}
-
-/* Squares */
-.tabs li:before,
-.tabs li:after {
-  background: var(--tabs-inactive-bg);
-  width: 10px;
-  height: 10px;
-}
-.tabs li:before {
-  
-  left: -10px;
-}
-.tabs li:after {
-  right: -10px;
-}
-
-/* Circles */
-.tabs li a:after,
-.tabs li a:before {
-  width: 20px;
-  height: 20px;
-
-  /* Circles are circular */
-  -webkit-border-radius: 10px;
-  -moz-border-radius: 10px;
-  border-radius: 10px;
-
-  /* Use theme foreground (dark in light mode, light in dark mode) */
-  background: var(--tabs-background);
-
-  /* Circles over squares */
-  z-index: 2;
-}
-
-.tabs .active a:after,
-.tabs .active a:before {
-  background: var(--tabs-inactive-bg);
-}
-
-/* First and last tabs have different outside color needs */
-.tabs li:first-child.active a:before,
-.tabs li:last-child.active a:after {
-  background: var(--tabs-background);
-}
-
-/* Circle positions */
-.tabs li a:before {
-  left: -20px;
-}
-.tabs li a:after {
-  right: -20px;
-}
-
-/* do not show neither square nor cirle before first and after last */
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs li:last-child:after,
-.tabs li:last-child a:after {
-  content: none;
-}
-
-/* Panel */
-.tabs_panel {
-  clear: both; /* the .tabs list uses floats */
-  position: relative;
-
-  /* Surface + text colors via tokens */
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-
-  padding: 1rem; /* 16px */
-}
-
-.dark .tabs_panel {
-  /* Dark theme surfaces from tokens */
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border-color: hsl(var(--border));
-  box-shadow: none; /* keep it subtle in dark mode */
-}
-
-/* Optional: vertical rhythm if multiple sections render inside */
-.tabs_panel > section + section {
-  margin-top: 0.75rem;
-}
-
-/* ——— Compact mode helpers (auto‑toggled via data-compact) ——— */
-.tabs a .tab__icon { 
+<file path="src/styles/themed-controls.css">
+/* src/styles/themed-controls.css */
+.themed-segment {
   display: inline-flex;
-  vertical-align: middle;
-  margin-right: 0.5rem;        /* breathing room before label */
-  line-height: 0;              /* tighter alignment for inline SVGs */
-}
-.tabs a .tab__icon svg { 
-  width: 18px; height: 18px;   /* keep icons crisp but modest */
-}
-
-/* When compact, hide labels and tighten horizontal padding */
-.tabs[data-compact="1"] a .tab__label { 
-  display: none; 
-}
-.tabs[data-compact="1"] a { 
-  padding: 10px 12px;          /* narrower pill for icons-only */
+  gap: 6px;
+  padding: 4px;
+  border-radius: 9999px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
 }
 
-/* Remove the right gap if label is hidden */
-.tabs[data-compact="1"] a .tab__icon { 
-  margin-right: 0; 
+.themed-pill {
+  appearance: none;
+  border: 0;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  line-height: 1;
+  font-weight: 600;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  outline: none;
+}
+.themed-pill:hover { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+.themed-pill.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.themed-pill:focus { outline: none; box-shadow: none; }
+
+.themed-pill--icon { padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; }
+.themed-pill--icon svg { display: block; }
+</file>
+
+<file path="src/theme/FaviconLoader.jsx">
+// src/theme/FaviconLoader.jsx
+import { createEffect, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const ID = {
+  apple:   "savva-fav-apple",
+  icon16:  "savva-fav-16",
+  icon32:  "savva-fav-32",
+  base:    "savva-fav-base",
+  manifest:"savva-fav-manifest",
+  mask:    "savva-fav-mask",
+};
+
+function ensureHeadEl(tag, id) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement(tag);
+    el.id = id;
+    el.setAttribute("data-savva", "1");
+    (document.head || document.getElementsByTagName("head")[0]).appendChild(el);
+  }
+  return el;
+}
+function removeEl(id) {
+  const el = document.getElementById(id);
+  if (el?.parentNode) el.parentNode.removeChild(el);
+}
+
+function setOrRemoveLink(id, rel, href, attrs = {}) {
+  if (!href) return removeEl(id);
+  const el = ensureHeadEl("link", id);
+  el.setAttribute("rel", rel);
+  el.setAttribute("href", href);
+  // clean attrs we may set
+  ["sizes", "type", "color", "crossorigin"].forEach((a) => el.removeAttribute(a));
+  Object.entries(attrs).forEach(([k, v]) => v != null && el.setAttribute(k, v));
+}
+
+function slugMetaId(name) {
+  return "savva-meta-" + String(name || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+}
+function setOrRemoveMeta(name, content) {
+  const id = slugMetaId(name);
+  if (!content) return removeEl(id);
+  const el = ensureHeadEl("meta", id);
+  el.setAttribute("name", name);
+  el.setAttribute("content", content);
+}
+
+export default function FaviconLoader() {
+  const app = useApp();
+
+  createEffect(() => {
+    const prefix = app.domainAssetsPrefix?.() || "";
+    const cfg    = app.domainAssetsConfig?.();
+    const fav    = cfg?.favicon || null;
+    const revKey = `${prefix}|${cfg?.assets_cid || cfg?.cid || ""}`;
+
+    const withRev = (relPath) => {
+      if (!relPath) return "";
+      const abs = app.assetUrl?.(relPath);
+      if (!abs) return "";
+      return `${abs}${abs.includes("?") ? "&" : "?"}rev=${encodeURIComponent(revKey)}`;
+    };
+
+    // Resolve all hrefs up front
+    const hrefs = {
+      apple:    fav?.["apple-touch-icon"] ? withRev(fav["apple-touch-icon"]) : "",
+      icon16:   fav?.["16"] ? withRev(fav["16"]) : "",
+      icon32:   fav?.["32"] ? withRev(fav["32"]) : "",
+      base:     fav?.base ? withRev(fav.base) : "",
+      manifest: fav?.manifest ? withRev(fav.manifest) : "",
+      mask:     fav?.["mask-icon"]?.href ? withRev(fav["mask-icon"].href) : "",
+    };
+
+    dbg.log("assets", "FaviconLoader → apply", {
+      prefix, revKey,
+      hasFavConfig: !!fav,
+      hrefs,
+    });
+
+    // Links
+    setOrRemoveLink(ID.apple, "apple-touch-icon", hrefs.apple);
+    setOrRemoveLink(ID.icon16, "icon", hrefs.icon16, { sizes: "16x16", type: "image/png" });
+    setOrRemoveLink(ID.icon32, "icon", hrefs.icon32, { sizes: "32x32", type: "image/png" });
+    setOrRemoveLink(ID.base,   "icon", hrefs.base,   { type: "image/x-icon" });
+    setOrRemoveLink(ID.manifest, "manifest", hrefs.manifest);
+    setOrRemoveLink(ID.mask, "mask-icon", hrefs.mask, { color: fav?.["mask-icon"]?.color || undefined });
+
+    // Meta (generic list; we only manage our own <meta> with data-savva/id)
+    const metaList = Array.isArray(fav?.meta) ? fav.meta : [];
+    const keepIds = new Set();
+    metaList.forEach((m) => {
+      if (m && m.name && m.content != null) {
+        setOrRemoveMeta(m.name, String(m.content));
+        keepIds.add(slugMetaId(m.name));
+      }
+    });
+    // Remove any previous managed meta not present anymore
+    const prevManaged = Array.from(document.querySelectorAll('meta[id^="savva-meta-"][data-savva="1"]'));
+    prevManaged.forEach((el) => { if (!keepIds.has(el.id)) el.parentNode?.removeChild(el); });
+
+    // If there’s no favicon section at all, drop our managed nodes and keep index.html default
+    if (!fav) {
+      Object.values(ID).forEach(removeEl);
+      prevManaged.forEach((el) => el.parentNode?.removeChild(el));
+    }
+  });
+
+  onCleanup(() => {
+    // Remove the nodes we manage (so a different shell can take over if unmounted)
+    Object.values(ID).forEach(removeEl);
+    const prevManaged = Array.from(document.querySelectorAll('meta[id^="savva-meta-"][data-savva="1"]'));
+    prevManaged.forEach((el) => el.parentNode?.removeChild(el));
+  });
+
+  return null;
+}
+</file>
+
+<file path="src/theme/GoogleAnalyticsLoader.jsx">
+// src/theme/GoogleAnalyticsLoader.jsx
+import { createEffect, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const SRC_ID  = "savva-ga-src";
+const INIT_ID = "savva-ga-init";
+
+function removeNode(id) {
+  const el = document.getElementById(id);
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
+export default function GoogleAnalyticsLoader() {
+  const app = useApp();
+
+  createEffect(() => {
+    const cfg = app.domainAssetsConfig?.(); // parsed per-domain config.yaml
+    const tag = String(cfg?.GA_tag || cfg?.ga_tag || "").trim();
+
+    const prevSrc  = document.getElementById(SRC_ID);
+    const prevInit = document.getElementById(INIT_ID);
+
+    // If tag is empty → remove our scripts (if any) and stop.
+    if (!tag) {
+      if (prevSrc || prevInit) {
+        removeNode(SRC_ID);
+        removeNode(INIT_ID);
+        dbg.log("analytics", "GA disabled (no tag in config)");
+      }
+      return;
+    }
+
+    // If already loaded for the same tag → nothing to do.
+    if (prevSrc?.getAttribute("data-ga-id") === tag && prevInit?.getAttribute("data-ga-id") === tag) {
+      return;
+    }
+
+    // Replace previous GA scripts if tag changed.
+    removeNode(SRC_ID);
+    removeNode(INIT_ID);
+
+    // Load gtag.js
+    const s1 = document.createElement("script");
+    s1.id = SRC_ID;
+    s1.async = true;
+    s1.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(tag)}`;
+    s1.setAttribute("data-ga-id", tag);
+    (document.head || document.documentElement).appendChild(s1);
+
+    // Init + first config
+    const s2 = document.createElement("script");
+    s2.id = INIT_ID;
+    s2.setAttribute("data-ga-id", tag);
+    s2.text =
+      `window.dataLayer = window.dataLayer || [];` +
+      `function gtag(){dataLayer.push(arguments);} ` +
+      `gtag('js', new Date()); ` +
+      `gtag('config', '${tag}', { 'anonymize_ip': true });`;
+    (document.head || document.documentElement).appendChild(s2);
+
+    // Simple SPA page_view on hash route changes
+    const onHash = () => {
+      try {
+        window.gtag && window.gtag('config', tag, { page_path: location.pathname + location.hash });
+      } catch {}
+    };
+    window.addEventListener("hashchange", onHash);
+
+    dbg.log("analytics", "GA enabled", { tag });
+
+    // Clean the event handler when the effect re-runs
+    onCleanup(() => {
+      window.removeEventListener("hashchange", onHash);
+    });
+  });
+
+  // Remove our scripts if component unmounts
+  onCleanup(() => {
+    removeNode(SRC_ID);
+    removeNode(INIT_ID);
+  });
+
+  return null;
 }
 </file>
 
@@ -4327,169 +4418,6 @@ export async function loadAssetResource(app, relPath, opts = {}) {
     default:
       return text;
   }
-}
-</file>
-
-<file path="src/utils/assetsDiagnostics.js">
-/* src/utils/assetsDiagnostics.js */
-// Utility to assess domain asset resources and common pitfalls.
-// Pure JS (no Solid imports). You pass values from useApp().
-
-import { fetchWithTimeout } from "./net";
-
-// Normalize join with a trailing slash on base and no leading slash on rel
-function join(base, rel) {
-  const b = base.endsWith("/") ? base : base + "/";
-  const r = String(rel || "").replace(/^\/+/, "");
-  return b + r;
-}
-
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
-}
-
-function summarizeLogos(cfg) {
-  if (!cfg) return { has: false, fields: [], pickable: [] };
-  const raw = cfg.logos ?? cfg.logo ?? null;
-  if (!raw) return { has: false, fields: [], pickable: [] };
-  if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
-
-  const l = {
-    dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
-    light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-    mobile:       raw.mobile ?? null,
-    dark:         raw.dark   ?? null,
-    light:        raw.light  ?? null,
-    default:      raw.default?? raw.fallback ?? null,
-  };
-  const fields = Object.entries(l).filter(([,v]) => !!v).map(([k]) => k);
-  return { has: fields.length > 0, fields, pickable: fields };
-}
-
-/**
- * assessAssets
- * @param {object} p
- * @param {string} p.env 'prod' | 'test'
- * @param {string} p.assetsBaseUrl
- * @param {string} p.selectedDomainName
- * @param {string} p.domainAssetsPrefixActive
- * @param {object|null} p.domainAssetsConfig
- * @param {'remote'|'default'|null} p.domainAssetsSource
- * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher]
- */
-export async function assessAssets(p) {
-  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
-  const now = new Date();
-
-  const base = String(p.assetsBaseUrl || "");
-  const domain = String(p.selectedDomainName || "");
-  const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
-  const activePrefix = String(p.domainAssetsPrefixActive || "");
-  const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
-  const defaultConfigUrl = "/domain_default/config.yaml";
-
-  // Robust HEAD -> GET check that handles CORS/network failures
-  async function check(url) {
-    if (!url) return { url, ok: false, status: 0, exists: false, text: null };
-    let res, method = "HEAD";
-
-    // Try HEAD
-    try {
-      res = await fetcher(url, { method: "HEAD", cache: "no-store" });
-    } catch {
-      // HEAD failed (CORS/network) → try GET
-      try {
-        method = "GET";
-        res = await fetcher(url, { method, cache: "no-store" });
-      } catch (e2) {
-        return { url, ok: false, status: -1, exists: false, error: String(e2) };
-      }
-    }
-
-    // If HEAD returned non‑OK and not 404, try GET too
-    if (method === "HEAD" && !res.ok && res.status !== 404) {
-      try {
-        method = "GET";
-        res = await fetcher(url, { method, cache: "no-store" });
-      } catch (e3) {
-        return { url, ok: false, status: -1, exists: false, error: String(e3) };
-      }
-    }
-
-    const exists = res.status !== 404 && res.ok;
-    let text = null;
-    if (exists && /\/config\.yaml$/i.test(url) && method === "GET") {
-      text = await res.text().catch(() => null);
-    }
-    return { url, ok: res.ok, status: res.status, exists, text };
-  }
-
-  const primary = primaryConfigUrl
-    ? await check(primaryConfigUrl)
-    : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
-
-  const fallback = await check(defaultConfigUrl);
-
-  const appConfigUrl = join(activePrefix, "config.yaml");
-
-  const cfg = p.domainAssetsConfig || null;
-  const logos = summarizeLogos(cfg);
-  const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
-  const hasTabs       = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
-  const hasCategories = !!(cfg && (cfg.categories || cfg.ui?.categories));
-
-  // Sample resolution checks using ACTIVE prefix
-  const sampleFiles = [];
-  if (logos.has) {
-    const firstLogoKey = logos.pickable[0];
-    const relPath = (typeof (cfg?.logos ?? cfg?.logo) === "string")
-      ? (cfg?.logos ?? cfg?.logo)
-      : (cfg?.logos?.[firstLogoKey] ?? cfg?.logo?.[firstLogoKey]);
-    if (relPath) sampleFiles.push({ kind: "logo", relPath });
-  }
-  if (cfg?.locales?.length) {
-    const fr = cfg.locales.find(x => x?.path) || cfg.locales[0];
-    if (fr?.path) sampleFiles.push({ kind: "locale", relPath: fr.path });
-  }
-  if (cfg?.tabs?.path) sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
-
-  const resolvedSamples = await Promise.all(sampleFiles.map(async sf => {
-    const url = join(activePrefix, sf.relPath);
-    const r = await check(url);
-    return { ...sf, url, ok: r.ok, status: r.status, exists: r.exists };
-  }));
-
-  return {
-    timestamp: now.toISOString(),
-    env: p.env || "prod",
-    domain,
-    assetsBaseUrl: base,
-    computedDomainPrefix,
-    activePrefix,
-    appSource: p.domainAssetsSource || null,
-    appConfigUrl,
-    primaryConfig: {
-      url: primary.url,
-      exists: !!primary.exists,
-      status: primary.status,
-      note: "ASSETS_BASE/DOMAIN/config.yaml",
-    },
-    defaultConfig: {
-      url: fallback.url,
-      exists: !!fallback.exists,
-      status: fallback.status,
-      note: "/domain_default/config.yaml",
-    },
-    appParsedConfigPresence: {
-      hasConfigObject: !!cfg,
-      hasLogos: !!logos.has,
-      logoFields: logos.fields,
-      hasLocales,
-      hasTabs,
-      hasCategories,
-    },
-    resolvedSamples,
-  };
 }
 </file>
 
@@ -4681,76 +4609,6 @@ Learn more about deploying your application with the [documentations](https://vi
     "noUncheckedSideEffectImports": true
   },
   "include": ["vite.config.js"]
-}
-</file>
-
-<file path="public/domain_default/domain.css">
-:root {
-  --gradient: linear-gradient(to top left, #000c40, #607d8b);
-  --background: 243 100% 98.26%;
-  --foreground: 243 10% 0.52%;
-
-  --muted: 243 10% 91.3%;
-  --muted-foreground: 243 5% 41.3%;
-
-  --popover: 243 10% 91.3%;
-  --popover-foreground: 243 10% 0.65%;
-
-  --card: 243 10% 91.3%;
-  --card-foreground: 243 10% 0.65%;
-
-  --border: 243 15% 89.52%;
-  --input: 243 15% 89.52%;
-
-  --primary: 243 100% 13%;
-  --primary-foreground: 243 2% 91.3%;
-
-  --secondary: 243 5% 81.73%;
-  --secondary-foreground: 243 7% 11.3%;
-
-  --accent: 243 5% 95.65%;
-  --accent-foreground: 243 7% 11.3%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  --ring: 243 100% 13%;
-
-  --radius: 0.5rem;
-}
-
-.dark {
-  /* CSS: .bg-gradient { background: var(--gradient) } */
-  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
-
-  --background: 244 33.800000000000004% 6.32%;
-  --foreground: 244 5.2% 98.95%;
-
-  --muted: 244 26% 23.700000000000003%;
-  --muted-foreground: 244 5.2% 57.9%;
-
-  --popover: 244 54.6% 10.27%;
-  --popover-foreground: 244 5.2% 98.95%;
-
-  --card: 244 54.6% 10.27%;
-  --card-foreground: 244 5.2% 98.95%;
-
-  --border: 244 26% 23.700000000000003%;
-  --input: 244 26% 23.700000000000003%;
-
-  --primary: 244 52% 79%;
-  --primary-foreground: 244 5.2% 7.9%;
-
-  --secondary: 244 26% 23.700000000000003%;
-  --secondary-foreground: 244 5.2% 98.95%;
-
-  --accent: 244 26% 23.700000000000003%;
-  --accent-foreground: 244 5.2% 98.95%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 244 5.2% 98.95%;
-
-  --ring: 244 52% 79%;
 }
 </file>
 
@@ -5410,35 +5268,6 @@ export default function Toaster() {
 }
 </file>
 
-<file path="src/hooks/useTheme.js">
-// src/hooks/useTheme.js
-import { createSignal, onMount } from "solid-js";
-
-export function useTheme() {
-  const [theme, setTheme] = createSignal("light");
-
-  onMount(() => {
-    const savedTheme = localStorage.getItem("theme") || "light";
-    setTheme(savedTheme);
-    document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    console.log("Initial theme:", savedTheme, "dark class:", document.documentElement.classList.contains("dark")); // Debug
-  });
-
-  const toggleTheme = () => {
-    const next = theme() === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-    try { localStorage.setItem("theme", next); } catch {}
-    console.log("Toggled to:", next, "dark class:", document.documentElement.classList.contains("dark")); // Debug
-  };
-
-  // Expose theme signal for external use
-  useTheme.theme = theme;
-
-  return [theme, toggleTheme];
-}
-</file>
-
 <file path="src/ipfs/index.js">
 // Minimal IPFS client with gateway fallback.
 // Usage:
@@ -5556,6 +5385,431 @@ export const ipfs = {
   normalizeInput,
   buildUrl,
 };
+</file>
+
+<file path="src/styles/tabs.css">
+/* src/styles/tabs.css */
+
+
+
+.tabs {
+--tabs-active-bg: hsl(var(--background));
+--tabs-active-fg: hsl(var(--foreground));
+--tabs-inactive-bg: hsl(var(--secondary));
+--tabs-inactive-fg: hsl(var(--secondary-foreground));
+--tabs-background: hsl(var(--card));
+
+  list-style: none;
+  margin: 0px auto 0;
+  background: var(--tabs-background);
+  background: var(--gradient);
+  display: flow-root;
+  padding-top: 5px;
+}
+
+.tabs li {
+  /* Makes a horizontal row */
+  float: left;
+
+  /* So the psueudo elements can be abs. positioned inside */
+  position: relative;
+}
+
+.tabs a {
+  /* Make them block level and only as wide as they need */
+  float: left;
+  padding: 7px 20px 7px 20px;
+  text-decoration: none;
+
+  /* Colors via design tokens */
+  color: var(--tabs-inactive-fg);
+  background: var(--tabs-inactive-bg);
+  
+  /* Only round the top corners */
+  -webkit-border-top-left-radius: 15px;
+  -webkit-border-top-right-radius: 15px;
+  -moz-border-radius-topleft: 15px;
+  -moz-border-radius-topright: 15px;
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
+}
+
+.tabs .active {
+  /* Highest, active tab is on top */
+  z-index: 3;
+}
+
+.tabs .active a {
+  /* Colors when tab is active */
+  color: var(--tabs-active-fg);
+  background: var(--tabs-active-bg);
+}
+
+.tabs li:before,
+.tabs li:after,
+.tabs li a:before,
+.tabs li a:after {
+  /* All pseudo elements are abs. positioned and on bottom */
+  position: absolute;
+  bottom: 0;
+}
+
+/* Only the first, last, and active tabs need pseudo elements at all */
+.tabs li:last-child:after,
+.tabs li:last-child a:after,
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs .active:after,
+.tabs .active:before,
+.tabs .active a:after,
+.tabs .active a:before {
+  content: "";
+}
+
+.tabs .active:before,
+.tabs .active:after {
+  background: var(--tabs-active-bg);
+  /* Squares below circles */
+  z-index: 1;
+}
+
+/* Squares */
+.tabs li:before,
+.tabs li:after {
+  background: var(--tabs-inactive-bg);
+  width: 10px;
+  height: 10px;
+}
+.tabs li:before {
+  
+  left: -10px;
+}
+.tabs li:after {
+  right: -10px;
+}
+
+/* Circles */
+.tabs li a:after,
+.tabs li a:before {
+  width: 20px;
+  height: 20px;
+
+  /* Circles are circular */
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+
+  /* Use theme foreground (dark in light mode, light in dark mode) */
+  background: var(--tabs-background);
+
+  /* Circles over squares */
+  z-index: 2;
+}
+
+.tabs .active a:after,
+.tabs .active a:before {
+  background: var(--tabs-inactive-bg);
+}
+
+/* First and last tabs have different outside color needs */
+.tabs li:first-child.active a:before,
+.tabs li:last-child.active a:after {
+  background: var(--tabs-background);
+}
+
+/* Circle positions */
+.tabs li a:before {
+  left: -20px;
+}
+.tabs li a:after {
+  right: -20px;
+}
+
+/* do not show neither square nor cirle before first and after last */
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs li:last-child:after,
+.tabs li:last-child a:after {
+  content: none;
+}
+
+/* Panel */
+.tabs_panel {
+  clear: both; /* the .tabs list uses floats */
+  position: relative;
+
+  /* Surface + text colors via tokens */
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+
+  padding: 1rem; /* 16px */
+}
+
+.dark .tabs_panel {
+  /* Dark theme surfaces from tokens */
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+  box-shadow: none; /* keep it subtle in dark mode */
+}
+
+/* Optional: vertical rhythm if multiple sections render inside */
+.tabs_panel > section + section {
+  margin-top: 0.75rem;
+}
+
+/* ——— Compact mode helpers (auto‑toggled via data-compact) ——— */
+.tabs a .tab__icon { 
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 0.5rem;        /* breathing room before label */
+  line-height: 0;              /* tighter alignment for inline SVGs */
+}
+.tabs a .tab__icon svg { 
+  width: 18px; height: 18px;   /* keep icons crisp but modest */
+}
+
+/* When compact, hide labels and tighten horizontal padding */
+.tabs[data-compact="1"] a .tab__label { 
+  display: none; 
+}
+.tabs[data-compact="1"] a { 
+  padding: 10px 12px;          /* narrower pill for icons-only */
+}
+
+/* Remove the right gap if label is hidden */
+.tabs[data-compact="1"] a .tab__icon { 
+  margin-right: 0; 
+}
+</file>
+
+<file path="src/theme/DomainCssLoader.jsx">
+// src/theme/DomainCssLoader.jsx
+import { createEffect, onCleanup, createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const LINK_ID = "savva-domain-css";
+
+export default function DomainCssLoader() {
+  const app = useApp();
+
+  function ensureLink() {
+    let el = document.getElementById(LINK_ID);
+    if (!el) {
+      el = document.createElement("link");
+      el.id = LINK_ID;
+      el.rel = "stylesheet";
+      el.media = "all";
+      (document.head || document.getElementsByTagName("head")[0]).appendChild(el);
+    }
+    return el;
+  }
+
+  // Flip when env/domain/pack changes; used only for cache busting
+  const rev = createMemo(() => {
+    const cfg = app.domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const env = app.assetsEnv?.() || "prod";
+    const dom = (() => {
+      const d = app.selectedDomain?.();
+      return typeof d === "string" ? d : d?.name || "";
+    })();
+    return `${env}|${dom}|${cid}`;
+  });
+
+  createEffect(() => {
+    const hrefBase = app.assetUrl?.("domain.css"); // <- single source of truth
+    const el = ensureLink();
+
+    if (!hrefBase) {
+      el.parentNode && el.parentNode.removeChild(el);
+      return;
+    }
+
+    const href = `${hrefBase}${hrefBase.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev())}`;
+    if (el.getAttribute("href") === href) return;
+
+    dbg.log("assets", "DomainCssLoader: applying domain.css", { hrefBase, href });
+
+    const onLoad = () => dbg.log("assets", "domain.css loaded", { href });
+    const onError = () => dbg.warn("assets", "domain.css failed to load", { href });
+
+    el.addEventListener("load", onLoad, { once: true });
+    el.addEventListener("error", onError, { once: true });
+    el.setAttribute("href", href);
+  });
+
+  onCleanup(() => {
+    const el = document.getElementById(LINK_ID);
+    if (el?.parentNode) el.parentNode.removeChild(el);
+  });
+
+  return null;
+}
+</file>
+
+<file path="src/utils/assetsDiagnostics.js">
+/* src/utils/assetsDiagnostics.js */
+// Utility to assess domain asset resources and common pitfalls.
+// Pure JS (no Solid imports). You pass values from useApp().
+
+import { fetchWithTimeout } from "./net";
+
+// Normalize join with a trailing slash on base and no leading slash on rel
+function join(base, rel) {
+  const b = base.endsWith("/") ? base : base + "/";
+  const r = String(rel || "").replace(/^\/+/, "");
+  return b + r;
+}
+
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function summarizeLogos(cfg) {
+  if (!cfg) return { has: false, fields: [], pickable: [] };
+  const raw = cfg.logos ?? cfg.logo ?? null;
+  if (!raw) return { has: false, fields: [], pickable: [] };
+  if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
+
+  const l = {
+    dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+    light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+    mobile:       raw.mobile ?? null,
+    dark:         raw.dark   ?? null,
+    light:        raw.light  ?? null,
+    default:      raw.default?? raw.fallback ?? null,
+  };
+  const fields = Object.entries(l).filter(([,v]) => !!v).map(([k]) => k);
+  return { has: fields.length > 0, fields, pickable: fields };
+}
+
+/**
+ * assessAssets
+ * @param {object} p
+ * @param {string} p.env 'prod' | 'test'
+ * @param {string} p.assetsBaseUrl
+ * @param {string} p.selectedDomainName
+ * @param {string} p.domainAssetsPrefixActive
+ * @param {object|null} p.domainAssetsConfig
+ * @param {'remote'|'default'|null} p.domainAssetsSource
+ * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher]
+ */
+export async function assessAssets(p) {
+  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
+  const now = new Date();
+
+  const base = String(p.assetsBaseUrl || "");
+  const domain = String(p.selectedDomainName || "");
+  const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
+  const activePrefix = String(p.domainAssetsPrefixActive || "");
+  const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
+  const defaultConfigUrl = "/domain_default/config.yaml";
+
+  // Robust HEAD -> GET check that handles CORS/network failures
+  async function check(url) {
+    if (!url) return { url, ok: false, status: 0, exists: false, text: null };
+    let res, method = "HEAD";
+
+    // Try HEAD
+    try {
+      res = await fetcher(url, { method: "HEAD", cache: "no-store" });
+    } catch {
+      // HEAD failed (CORS/network) → try GET
+      try {
+        method = "GET";
+        res = await fetcher(url, { method, cache: "no-store" });
+      } catch (e2) {
+        return { url, ok: false, status: -1, exists: false, error: String(e2) };
+      }
+    }
+
+    // If HEAD returned non‑OK and not 404, try GET too
+    if (method === "HEAD" && !res.ok && res.status !== 404) {
+      try {
+        method = "GET";
+        res = await fetcher(url, { method, cache: "no-store" });
+      } catch (e3) {
+        return { url, ok: false, status: -1, exists: false, error: String(e3) };
+      }
+    }
+
+    const exists = res.status !== 404 && res.ok;
+    let text = null;
+    if (exists && /\/config\.yaml$/i.test(url) && method === "GET") {
+      text = await res.text().catch(() => null);
+    }
+    return { url, ok: res.ok, status: res.status, exists, text };
+  }
+
+  const primary = primaryConfigUrl
+    ? await check(primaryConfigUrl)
+    : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
+
+  const fallback = await check(defaultConfigUrl);
+
+  const appConfigUrl = join(activePrefix, "config.yaml");
+
+  const cfg = p.domainAssetsConfig || null;
+  const logos = summarizeLogos(cfg);
+  const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
+  const hasTabs       = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
+  const hasCategories = !!(cfg && (cfg.categories || cfg.ui?.categories));
+
+  // Sample resolution checks using ACTIVE prefix
+  const sampleFiles = [];
+  if (logos.has) {
+    const firstLogoKey = logos.pickable[0];
+    const relPath = (typeof (cfg?.logos ?? cfg?.logo) === "string")
+      ? (cfg?.logos ?? cfg?.logo)
+      : (cfg?.logos?.[firstLogoKey] ?? cfg?.logo?.[firstLogoKey]);
+    if (relPath) sampleFiles.push({ kind: "logo", relPath });
+  }
+  if (cfg?.locales?.length) {
+    const fr = cfg.locales.find(x => x?.path) || cfg.locales[0];
+    if (fr?.path) sampleFiles.push({ kind: "locale", relPath: fr.path });
+  }
+  if (cfg?.tabs?.path) sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
+
+  const resolvedSamples = await Promise.all(sampleFiles.map(async sf => {
+    const url = join(activePrefix, sf.relPath);
+    const r = await check(url);
+    return { ...sf, url, ok: r.ok, status: r.status, exists: r.exists };
+  }));
+
+  return {
+    timestamp: now.toISOString(),
+    env: p.env || "prod",
+    domain,
+    assetsBaseUrl: base,
+    computedDomainPrefix,
+    activePrefix,
+    appSource: p.domainAssetsSource || null,
+    appConfigUrl,
+    primaryConfig: {
+      url: primary.url,
+      exists: !!primary.exists,
+      status: primary.status,
+      note: "ASSETS_BASE/DOMAIN/config.yaml",
+    },
+    defaultConfig: {
+      url: fallback.url,
+      exists: !!fallback.exists,
+      status: fallback.status,
+      note: "/domain_default/config.yaml",
+    },
+    appParsedConfigPresence: {
+      hasConfigObject: !!cfg,
+      hasLogos: !!logos.has,
+      logoFields: logos.fields,
+      hasLocales,
+      hasTabs,
+      hasCategories,
+    },
+    resolvedSamples,
+  };
+}
 </file>
 
 <file path="src/utils/debug.js">
@@ -5758,6 +6012,76 @@ export default defineConfig({
 });
 </file>
 
+<file path="public/domain_default/domain.css">
+:root {
+  --gradient: linear-gradient(to top left, #000c40, #607d8b);
+  --background: 243 100% 98.26%;
+  --foreground: 243 10% 0.52%;
+
+  --muted: 243 10% 91.3%;
+  --muted-foreground: 243 5% 41.3%;
+
+  --popover: 243 10% 91.3%;
+  --popover-foreground: 243 10% 0.65%;
+
+  --card: 243 10% 91.3%;
+  --card-foreground: 243 10% 0.65%;
+
+  --border: 243 15% 89.52%;
+  --input: 243 15% 89.52%;
+
+  --primary: 243 100% 13%;
+  --primary-foreground: 243 2% 91.3%;
+
+  --secondary: 243 5% 81.73%;
+  --secondary-foreground: 243 7% 11.3%;
+
+  --accent: 243 5% 95.65%;
+  --accent-foreground: 243 7% 11.3%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+
+  --ring: 243 100% 13%;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* CSS: .bg-gradient { background: var(--gradient) } */
+  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
+
+  --background: 244 33.800000000000004% 6.32%;
+  --foreground: 244 5.2% 98.95%;
+
+  --muted: 244 26% 23.700000000000003%;
+  --muted-foreground: 244 5.2% 57.9%;
+
+  --popover: 244 54.6% 10.27%;
+  --popover-foreground: 244 5.2% 98.95%;
+
+  --card: 244 54.6% 10.27%;
+  --card-foreground: 244 5.2% 98.95%;
+
+  --border: 244 26% 23.700000000000003%;
+  --input: 244 26% 23.700000000000003%;
+
+  --primary: 244 52% 79%;
+  --primary-foreground: 244 5.2% 7.9%;
+
+  --secondary: 244 26% 23.700000000000003%;
+  --secondary-foreground: 244 5.2% 98.95%;
+
+  --accent: 244 26% 23.700000000000003%;
+  --accent-foreground: 244 5.2% 98.95%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 244 5.2% 98.95%;
+
+  --ring: 244 52% 79%;
+}
+</file>
+
 <file path="src/components/ui/BrandLogo.jsx">
 // src/components/ui/BrandLogo.jsx
 /* src/components/ui/BrandLogo.jsx */
@@ -5864,6 +6188,33 @@ export default function BrandLogo(props) {
       </Show>
     </div>
   );
+}
+</file>
+
+<file path="src/hooks/useTheme.js">
+// src/hooks/useTheme.js
+import { createSignal, onMount } from "solid-js";
+
+export function useTheme() {
+  const [theme, setTheme] = createSignal("light");
+
+  onMount(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    setTheme(savedTheme);
+    document.documentElement.classList.toggle("dark", savedTheme === "dark");
+  });
+
+  const toggleTheme = () => {
+    const next = theme() === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try { localStorage.setItem("theme", next); } catch {}
+  };
+
+  // Expose theme signal for external use
+  useTheme.theme = theme;
+
+  return [theme, toggleTheme];
 }
 </file>
 
@@ -6278,7 +6629,7 @@ import {
   eagerConnect,
 } from "../blockchain/wallet";
 import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx"; // NEW import
+import BrandLogo from "./ui/BrandLogo.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -6338,10 +6689,17 @@ export default function Header({ onTogglePane }) {
   };
 
   return (
-    <header class="bg-white dark:bg-gray-800 shadow flex items-center justify-between p-2 sticky top-0 z-10 h-12">
+    <header
+      class="
+        sticky top-0 z-10 h-12
+        flex items-center justify-between p-2
+        bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]
+        border-b border-[hsl(var(--border))] shadow-sm
+      "
+    >
       {/* Left: brand logo or title */}
       <div class="ml-2 flex items-center">
-        <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-gray-900 dark:text-gray-100" />
+        <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
       </div>
 
       {/* Right: wallet + menu */}
@@ -6352,7 +6710,11 @@ export default function Header({ onTogglePane }) {
           fallback={
             <Show when={eagerDone() && isWalletAvailable()}>
               <button
-                class="px-3 py-1 rounded bg-emerald-500 text-white hover:bg-emerald-600"
+                class="
+                  px-3 py-1 rounded
+                  bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
+                  hover:opacity-90
+                "
                 onClick={onConnect}
                 title={app.t("wallet.connect")}
                 aria-label={app.t("wallet.connect")}
@@ -6365,7 +6727,11 @@ export default function Header({ onTogglePane }) {
           <div class="flex items-center gap-2">
             {/* Address pill */}
             <button
-              class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+              class="
+                px-2 py-1 rounded
+                bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
+                hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
+              "
               onClick={copyAddress}
               title={app.t("wallet.copyAddress")}
               aria-label={app.t("wallet.copyAddress")}
@@ -6373,12 +6739,16 @@ export default function Header({ onTogglePane }) {
               {shortAddr(walletAccount())}
             </button>
 
-            {/* If chain is correct → logo only; if wrong → red Change chain button */}
+            {/* If chain is correct → logo only; if wrong → destructive button */}
             <Show
               when={!mismatched()}
               fallback={
                 <button
-                  class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                  class="
+                    px-2 py-1 rounded
+                    bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
+                    hover:opacity-90
+                  "
                   onClick={onSwitchChain}
                   title={app.t("wallet.changeChain")}
                   aria-label={app.t("wallet.changeChain")}
@@ -6399,19 +6769,23 @@ export default function Header({ onTogglePane }) {
 
             {/* tiny copied hint */}
             <Show when={copyState() === "copied"}>
-              <span class="text-xs text-emerald-600">{app.t("wallet.copied")}</span>
+              <span class="text-xs text-[hsl(var(--primary))]">{app.t("wallet.copied")}</span>
             </Show>
           </div>
         </Show>
 
         {/* Right menu toggle */}
         <button
-          class="p-1 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition"
+          class="
+            p-1 rounded transition
+            text-[hsl(var(--muted-foreground))]
+            hover:bg-[hsl(var(--muted))]
+          "
           onClick={onTogglePane}
           aria-label={app.t("menu.open")}
           title={app.t("menu.open")}
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -6426,21 +6800,14 @@ export default function Header({ onTogglePane }) {
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
 
-// ───────────────────────────────────────────────────────────────────────────────
-// small utils
-// ───────────────────────────────────────────────────────────────────────────────
 function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
 
-// Treat fetch aborts as non-errors (dialog closed / URL changed quickly)
 function isAbortError(e) {
   const msg = String(e?.message || e || "").toLowerCase();
-  // Chrome / spec
   if (e?.name === "AbortError") return true;
-  // Firefox / historical DOMException
   if (e?.code === 20) return true;
-  // Message variants we’ve seen in browsers / fetch polyfills
   if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
   return false;
 }
@@ -6452,13 +6819,10 @@ async function fetchInfoJSON(baseUrl, { signal } = {}) {
   return await res.json();
 }
 
-// ───────────────────────────────────────────────────────────────────────────────
-
 export default function SwitchConnectDialog(props) {
   const app = useApp();
   const { t } = app;
 
-  // form state
   const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
   const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
   const [domains, setDomains] = createSignal([]); // [{ name }]
@@ -6468,14 +6832,11 @@ export default function SwitchConnectDialog(props) {
 
   let aborter;
 
-  // selected domain object (from fetched /info)
   const selectedDomainObj = createMemo(() => {
     const cur = (domain() || "").trim().toLowerCase();
     return (domains() || []).find((d) => eq(dn(d), cur)) || null;
   });
 
-  // When dialog opens: hydrate fields from AppContext (single source of truth),
-  // fetch /info, and preselect the current domain if present.
   createEffect(async () => {
     if (!props.open) return;
 
@@ -6499,6 +6860,7 @@ export default function SwitchConnectDialog(props) {
         .map((d) => (typeof d === "string" ? { name: d } : d))
         .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
 
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
       setDomains(normalized);
 
       if (normalized.length > 0) {
@@ -6507,12 +6869,16 @@ export default function SwitchConnectDialog(props) {
           normalized.find((d) => eq(d.name, wanted)) ||
           normalized.find((d) => eq(d.name, domain())) ||
           normalized[0];
-        setDomain(resolved.name);
+
+        // Apply after options exist to avoid browser defaulting to index 0
+        const name = resolved.name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
       } else {
         setLocalError(t("rightPane.switch.noDomains"));
       }
     } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e)); // ← suppress aborts
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
     } finally {
       setFetching(false);
     }
@@ -6541,20 +6907,27 @@ export default function SwitchConnectDialog(props) {
         .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
 
       setDomains(normalized);
+
       if (normalized.length > 0) {
-        const keep = normalized.find((d) => eq(d.name, domain()));
-        setDomain(keep?.name || normalized[0].name);
+        const prefer =
+          dn(props.domain) ||
+          (app.config?.()?.domain || "") ||
+          domain();
+
+        const keep = normalized.find((d) => eq(d.name, prefer)) || normalized.find((d) => eq(d.name, domain()));
+        const name = (keep?.name || normalized[0].name);
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
       } else {
         setLocalError(t("rightPane.switch.noDomains"));
       }
     } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e)); // ← suppress aborts
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
     } finally {
       setFetching(false);
     }
   }
 
-  // Apply ALWAYS writes to AppContext so the whole app shares the same state.
   async function onApply() {
     setLocalError("");
     setApplying(true);
@@ -6573,15 +6946,13 @@ export default function SwitchConnectDialog(props) {
       await app.setDomain?.(chosen);
       await app.refreshDomainAssets?.();
     } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e)); // ← suppress aborts here too (paranoid)
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
       setApplying(false);
-      return; // keep dialog open on error
+      return;
     }
 
     setApplying(false);
-
-    // proactively cancel any in-flight /info load before closing
-    try { aborter?.abort(); } catch {}
+    try { aborter?.abort(); } catch { }
     props.onClose?.();
   }
 
@@ -6595,7 +6966,6 @@ export default function SwitchConnectDialog(props) {
             {t("rightPane.switch.title")}
           </h3>
 
-          {/* Backend URL */}
           <label class="block mb-3">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.backend.label")}</span>
             <div class="mt-1 flex gap-2">
@@ -6618,7 +6988,6 @@ export default function SwitchConnectDialog(props) {
             <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
           </label>
 
-          {/* Domain select */}
           <label class="block mb-1">
             <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
           </label>
@@ -6629,11 +6998,12 @@ export default function SwitchConnectDialog(props) {
             disabled={fetching() || domains().length === 0}
           >
             {domains().map((d) => (
-              <option value={d.name}>{d.name}</option>
+              <option value={d.name} selected={eq(d.name, domain())}>
+                {d.name}
+              </option>
             ))}
           </select>
 
-          {/* Optional details */}
           <Show when={selectedDomainObj()}>
             <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
               <Show when={selectedDomainObj().website}>
@@ -6647,14 +7017,12 @@ export default function SwitchConnectDialog(props) {
             </div>
           </Show>
 
-          {/* Errors (aborts are suppressed) */}
           <Show when={localError() || props.error}>
             <p class="mt-2 text-sm text-red-500">
               {t("common.error")}: {localError() || props.error?.message}
             </p>
           </Show>
 
-          {/* Actions */}
           <div class="mt-4 flex gap-2 justify-end">
             <button
               class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100"
@@ -6681,82 +7049,6 @@ export default function SwitchConnectDialog(props) {
       </div>
     </Show>
   );
-}
-</file>
-
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-@import "./styles/tabs.css";
-
-@custom-variant dark (&:where(.dark, .dark *));
-
-:root {
-  --gradient: linear-gradient(to top left, #000c40, #607d8b);
-  --background: 243 100% 98.26%;
-  --foreground: 243 10% 0.52%;
-
-  --muted: 243 10% 91.3%;
-  --muted-foreground: 243 5% 41.3%;
-
-  --popover: 243 10% 91.3%;
-  --popover-foreground: 243 10% 0.65%;
-
-  --card: 243 10% 91.3%;
-  --card-foreground: 243 10% 0.65%;
-
-  --border: 243 15% 89.52%;
-  --input: 243 15% 89.52%;
-
-  --primary: 243 100% 13%;
-  --primary-foreground: 243 2% 91.3%;
-
-  --secondary: 243 5% 81.73%;
-  --secondary-foreground: 243 7% 11.3%;
-
-  --accent: 243 5% 95.65%;
-  --accent-foreground: 243 7% 11.3%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  --ring: 243 100% 13%;
-
-  --radius: 0.5rem;
-}
-
-.dark {
-  /* CSS: .bg-gradient { background: var(--gradient) } */
-  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
-
-  --background: 244 33.800000000000004% 6.32%;
-  --foreground: 244 5.2% 98.95%;
-
-  --muted: 244 26% 23.700000000000003%;
-  --muted-foreground: 244 5.2% 57.9%;
-
-  --popover: 244 54.6% 10.27%;
-  --popover-foreground: 244 5.2% 98.95%;
-
-  --card: 244 54.6% 10.27%;
-  --card-foreground: 244 5.2% 98.95%;
-
-  --border: 244 26% 23.700000000000003%;
-  --input: 244 26% 23.700000000000003%;
-
-  --primary: 244 52% 79%;
-  --primary-foreground: 244 5.2% 7.9%;
-
-  --secondary: 244 26% 23.700000000000003%;
-  --secondary-foreground: 244 5.2% 98.95%;
-
-  --accent: 244 26% 23.700000000000003%;
-  --accent-foreground: 244 5.2% 98.95%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 244 5.2% 98.95%;
-
-  --ring: 244 52% 79%;
 }
 </file>
 
@@ -6788,173 +7080,6 @@ export default function SwitchConnectDialog(props) {
     "vite": "^7.1.2",
     "vite-plugin-solid": "^2.11.8"
   }
-}
-</file>
-
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createEffect, createSignal, Show } from "solid-js";
-import { useTheme } from "../hooks/useTheme";
-import { LANG_INFO } from "../i18n/useI18n";
-import { navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
-
-export default function RightPane({ isOpen, onClose }) {
-  const [theme, toggleTheme] = useTheme();
-  const app = useApp();
-  const { t } = app;
-
-  createEffect(() => {
-    console.log("RightPane: isOpen changed to:", isOpen());
-  });
-
-  const handlePanelClick = (e) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
-  const [showSwitch, setShowSwitch] = createSignal(false);
-
-  // Parent no longer writes config; dialog does it and then calls onClose
-  const noopApply = () => {};
-
-  return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${
-          isOpen() ? "right-0" : "right-[-256px]"
-        } transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-      >
-        <div class="p-4 space-y-3">
-          {/* Close */}
-          <button
-            class="p-0 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-            onClick={onClose}
-            aria-label={t("rightPane.close")}
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Menu list (includes Theme + Language as items) */}
-          <nav class="pt-2">
-            <ul class="space-y-1">
-              {/* Theme item */}
-              <li>
-                <div
-                  class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100 flex items-center justify-between"
-                  role="switch"
-                  aria-checked={theme() === "dark"}
-                  tabIndex={0}
-                  onClick={() => { toggleTheme(); console.log("Theme toggled:", theme()); }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      toggleTheme();
-                    }
-                  }}
-                >
-                  <span>{theme() === "dark" ? t("ui.mode.dark") : t("ui.mode.light")}</span>
-                  <span class="ml-2">{theme() === "dark" ? "🌙" : "☀️"}</span>
-                </div>
-              </li>
-
-              {/* Language item (label left, fixed-width select right) */}
-              <li>
-                <div
-                  class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 flex items-center justify-between"
-                >
-                  <span>{t("rightPane.language")}</span>
-                  <select
-                    id="rp-lang"
-                    class="ml-2 px-2 py-1 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 w-28 shrink-0"
-                    aria-label={t("rightPane.language")}
-                    value={app.lang()}
-                    onInput={(e) => app.setLang(e.currentTarget.value)}
-                  >
-                    {app.i18nAvailable.map((code) => {
-                      const info = LANG_INFO[code] || { code: code.toLowerCase(), name: code };
-                      return (
-                        <option value={code}>
-                          {info.name}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              </li>
-
-              {/* Switch backend / domain (conditional) */}
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setShowSwitch(true);
-                      }
-                    }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
-
-                {/* Settings */}
-                <li>
-                  <div
-                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => { navigate("/settings"); onClose(); }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        navigate("/settings"); onClose();
-                      }
-                    }}
-                  >
-                    {t("rightPane.settings")}
-                  </div>
-                </li>
-              </Show>
-            </ul>
-          </nav>
-        </div>
-      </div>
-
-      {isOpen() && (
-        <div
-          class="fixed inset-0 bg-black opacity-20 z-20"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
-          data-testid="overlay"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Mount/unmount the dialog so it always re-seeds from AppContext */}
-      <Show when={showSwitch()} keyed>
-        {() => (
-          <SwitchConnectDialog
-            open={true}
-            domain={app.config()?.domain}
-            backendLink={app.config()?.backendLink}
-            loading={app.loading()}
-            error={app.error()}
-            onApply={noopApply}
-            onReset={app.clearConnectOverride}
-            onClose={() => setShowSwitch(false)}
-          />
-        )}
-      </Show>
-    </>
-  );
 }
 </file>
 
@@ -7103,6 +7228,178 @@ export default function Settings() {
       <Assets />
       <DeveloperSection />
     </main>
+  );
+}
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+@import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --gradient: linear-gradient(to top left, #000c40, #607d8b);
+  --background: 243 100% 98.26%;
+  --foreground: 243 10% 0.52%;
+
+  --muted: 243 10% 91.3%;
+  --muted-foreground: 243 5% 41.3%;
+
+  --popover: 243 10% 91.3%;
+  --popover-foreground: 243 10% 0.65%;
+
+  --card: 243 10% 91.3%;
+  --card-foreground: 243 10% 0.65%;
+
+  --border: 243 15% 89.52%;
+  --input: 243 15% 89.52%;
+
+  --primary: 243 100% 13%;
+  --primary-foreground: 243 2% 91.3%;
+
+  --secondary: 243 5% 81.73%;
+  --secondary-foreground: 243 7% 11.3%;
+
+  --accent: 243 5% 95.65%;
+  --accent-foreground: 243 7% 11.3%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+
+  --ring: 243 100% 13%;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* CSS: .bg-gradient { background: var(--gradient) } */
+  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
+
+  --background: 244 33.800000000000004% 6.32%;
+  --foreground: 244 5.2% 98.95%;
+
+  --muted: 244 26% 23.700000000000003%;
+  --muted-foreground: 244 5.2% 57.9%;
+
+  --popover: 244 54.6% 10.27%;
+  --popover-foreground: 244 5.2% 98.95%;
+
+  --card: 244 54.6% 10.27%;
+  --card-foreground: 244 5.2% 98.95%;
+
+  --border: 244 26% 23.700000000000003%;
+  --input: 244 26% 23.700000000000003%;
+
+  --primary: 244 52% 79%;
+  --primary-foreground: 244 5.2% 7.9%;
+
+  --secondary: 244 26% 23.700000000000003%;
+  --secondary-foreground: 244 5.2% 98.95%;
+
+  --accent: 244 26% 23.700000000000003%;
+  --accent-foreground: 244 5.2% 98.95%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 244 5.2% 98.95%;
+
+  --ring: 244 52% 79%;
+}
+</file>
+
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createEffect, createSignal, Show } from "solid-js";
+import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import ThemeToggle from "./ui/ThemeToggle.jsx";
+import LangSelector from "./ui/LangSelector.jsx";
+
+export default function RightPane({ isOpen, onClose }) {
+  const app = useApp();
+  const { t } = app;
+
+  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+  const [showSwitch, setShowSwitch] = createSignal(false);
+  const noopApply = () => {};
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+      >
+        <div class="p-4 space-y-3">
+          {/* Close */}
+          <button
+            class="p-0 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+            onClick={onClose}
+            aria-label={t("rightPane.close")}
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Theme + Language */}
+          <nav class="pt-2">
+            <ul class="space-y-3">
+              <li><ThemeToggle /></li>
+              <li><LangSelector /></li>
+
+              {/* Switch backend / domain (conditional) */}
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+
+                <li>
+                  <div
+                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { navigate("/settings"); onClose(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
+                  >
+                    {t("rightPane.settings")}
+                  </div>
+                </li>
+              </Show>
+            </ul>
+          </nav>
+        </div>
+      </div>
+
+      {isOpen() && <div class="fixed inset-0 bg-black opacity-20 z-20" style={{ "background-color": "rgba(0, 0, 0, 0.2)" }} data-testid="overlay" onClick={onClose} />}
+
+      {/* Re-seed from AppContext on open */}
+      <Show when={showSwitch()} keyed>
+        {() => (
+          <SwitchConnectDialog
+            open={true}
+            domain={app.config()?.domain}
+            backendLink={app.config()?.backendLink}
+            loading={app.loading()}
+            error={app.error()}
+            onApply={noopApply}
+            onReset={app.clearConnectOverride}
+            onClose={() => setShowSwitch(false)}
+          />
+        )}
+      </Show>
+    </>
   );
 }
 </file>
@@ -7516,6 +7813,7 @@ import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import DomainCssLoader from "./theme/DomainCssLoader.jsx";
+import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -7534,6 +7832,7 @@ export default function App() {
   return (
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <DomainCssLoader />
+      <GoogleAnalyticsLoader />
 
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>
