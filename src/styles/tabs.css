@@ -14,7 +14,7 @@
   background: var(--tabs-background);
   background: var(--gradient);
   display: flow-root;
-  padding-top: 8px;
+  padding-top: 5px;
 }
 
 .tabs li {
@@ -28,7 +28,7 @@
 .tabs a {
   /* Make them block level and only as wide as they need */
   float: left;
-  padding: 10px 20px;
+  padding: 7px 20px 7px 20px;
   text-decoration: none;
 
   /* Colors via design tokens */

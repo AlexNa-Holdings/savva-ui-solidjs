@@ -1,6 +1,7 @@
 /* src/index.css */
 @import "tailwindcss";
 @import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
