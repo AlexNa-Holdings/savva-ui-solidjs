@@ -1,8 +1,27 @@
 // src/components/ui/BackIconButton.jsx
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+
 export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
+  const { route } = useHashRouter();
+
   function goBack() {
-    try { if (window.history.length > 1) return window.history.back(); } catch {}
-    window.location.href = fallbackHref;
+    let before = route();
+    try {
+      if (window.history.length > 1) {
+        window.history.back();
+        // Дадим hashchange шанс сработать; если остались на /settings — уводим вручную
+        setTimeout(() => {
+          const now = route();
+          if (now === before || now === "/settings") {
+            navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
+          }
+        }, 60);
+        return;
+      }
+    } catch { /* ignore */ }
+
+    // Нет истории — уводим сразу через роутер
+    navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
   }
 
   return (
@@ -11,6 +30,7 @@ export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
       onClick={goBack}
       aria-label={title}
       title={title}
+      type="button"
     >
       <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
         <path
