@@ -1,5 +1,4 @@
 // src/App.jsx
-/* src/App.jsx */
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -11,6 +10,7 @@ import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import DomainCssLoader from "./theme/DomainCssLoader.jsx";
+import FaviconLoader from "./theme/FaviconLoader.jsx";
 import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
 
 export default function App() {
@@ -30,11 +30,14 @@ export default function App() {
   return (
     <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
       <DomainCssLoader />
+      <FaviconLoader />
       <GoogleAnalyticsLoader />
+
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
+
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
       <AssetDebugTap />

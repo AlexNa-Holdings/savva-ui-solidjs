@@ -1,18 +1,12 @@
-/* src/utils/assetsDiagnostics.js */
+// src/utils/assetsDiagnostics.js
 // Utility to assess domain asset resources and common pitfalls.
-// Pure JS (no Solid imports). You pass values from useApp().
 
 import { fetchWithTimeout } from "./net";
 
-// Normalize join with a trailing slash on base and no leading slash on rel
 function join(base, rel) {
-  const b = base.endsWith("/") ? base : base + "/";
+  const b = base?.endsWith("/") ? base : (base || "") + "/";
   const r = String(rel || "").replace(/^\/+/, "");
   return b + r;
-}
-
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
 }
 
 function summarizeLogos(cfg) {
@@ -20,7 +14,6 @@ function summarizeLogos(cfg) {
   const raw = cfg.logos ?? cfg.logo ?? null;
   if (!raw) return { has: false, fields: [], pickable: [] };
   if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
-
   const l = {
     dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
     light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
@@ -33,21 +26,8 @@ function summarizeLogos(cfg) {
   return { has: fields.length > 0, fields, pickable: fields };
 }
 
-/**
- * assessAssets
- * @param {object} p
- * @param {string} p.env 'prod' | 'test'
- * @param {string} p.assetsBaseUrl
- * @param {string} p.selectedDomainName
- * @param {string} p.domainAssetsPrefixActive
- * @param {object|null} p.domainAssetsConfig
- * @param {'remote'|'default'|null} p.domainAssetsSource
- * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher]
- */
 export async function assessAssets(p) {
   const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
-  const now = new Date();
-
   const base = String(p.assetsBaseUrl || "");
   const domain = String(p.selectedDomainName || "");
   const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
@@ -55,46 +35,24 @@ export async function assessAssets(p) {
   const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
   const defaultConfigUrl = "/domain_default/config.yaml";
 
-  // Robust HEAD -> GET check that handles CORS/network failures
   async function check(url) {
-    if (!url) return { url, ok: false, status: 0, exists: false, text: null };
+    if (!url) return { url, ok: false, status: 0, exists: false, error: null };
     let res, method = "HEAD";
-
-    // Try HEAD
     try {
-      res = await fetcher(url, { method: "HEAD", cache: "no-store" });
-    } catch {
-      // HEAD failed (CORS/network) → try GET
-      try {
-        method = "GET";
-        res = await fetcher(url, { method, cache: "no-store" });
-      } catch (e2) {
-        return { url, ok: false, status: -1, exists: false, error: String(e2) };
-      }
+      res = await fetcher(url, { method, cache: "no-store" });
+    } catch (e) {
+      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
+      catch (e2) { return { url, ok: false, status: -1, exists: false, error: String(e2) }; }
     }
-
-    // If HEAD returned non‑OK and not 404, try GET too
     if (method === "HEAD" && !res.ok && res.status !== 404) {
-      try {
-        method = "GET";
-        res = await fetcher(url, { method, cache: "no-store" });
-      } catch (e3) {
-        return { url, ok: false, status: -1, exists: false, error: String(e3) };
-      }
+      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
+      catch (e3) { return { url, ok: false, status: -1, exists: false, error: String(e3) }; }
     }
-
-    const exists = res.status !== 404 && res.ok;
-    let text = null;
-    if (exists && /\/config\.yaml$/i.test(url) && method === "GET") {
-      text = await res.text().catch(() => null);
-    }
-    return { url, ok: res.ok, status: res.status, exists, text };
+    const exists = res.ok && res.status !== 404;
+    return { url, ok: res.ok, status: res.status, exists, error: null };
   }
 
-  const primary = primaryConfigUrl
-    ? await check(primaryConfigUrl)
-    : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
-
+  const primary = primaryConfigUrl ? await check(primaryConfigUrl) : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
   const fallback = await check(defaultConfigUrl);
 
   const appConfigUrl = join(activePrefix, "config.yaml");
@@ -102,58 +60,54 @@ export async function assessAssets(p) {
   const cfg = p.domainAssetsConfig || null;
   const logos = summarizeLogos(cfg);
   const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
-  const hasTabs       = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
-  const hasCategories = !!(cfg && (cfg.categories || cfg.ui?.categories));
+  const hasTabs       = !!(cfg && (cfg.modules?.tabs || cfg.tabs || cfg.ui?.tabs));            // fixed
+  const hasCategories = !!(cfg && (cfg.modules?.categories || cfg.categories || cfg.ui?.categories)); // fixed
 
-  // Sample resolution checks using ACTIVE prefix
+  const fav = cfg?.favicon || null;
+  const hasFavicon = !!(fav && (fav.base || fav["16"] || fav["32"] || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href));
+
   const sampleFiles = [];
   if (logos.has) {
-    const firstLogoKey = logos.pickable[0];
-    const relPath = (typeof (cfg?.logos ?? cfg?.logo) === "string")
+    const key = logos.pickable[0];
+    const rel = (typeof (cfg?.logos ?? cfg?.logo) === "string")
       ? (cfg?.logos ?? cfg?.logo)
-      : (cfg?.logos?.[firstLogoKey] ?? cfg?.logo?.[firstLogoKey]);
-    if (relPath) sampleFiles.push({ kind: "logo", relPath });
+      : (cfg?.logos?.[key] ?? cfg?.logo?.[key]);
+    if (rel) sampleFiles.push({ kind: "logo", relPath: rel });
   }
   if (cfg?.locales?.length) {
-    const fr = cfg.locales.find(x => x?.path) || cfg.locales[0];
-    if (fr?.path) sampleFiles.push({ kind: "locale", relPath: fr.path });
+    const fr = cfg.locales.find(x => x?.path || x?.dictionary) || cfg.locales[0];
+    const rel = fr?.path || fr?.dictionary;
+    if (rel) sampleFiles.push({ kind: "locale", relPath: rel });
   }
-  if (cfg?.tabs?.path) sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
+  if (cfg?.modules?.tabs || cfg?.tabs?.path) {
+    const rel = cfg?.modules?.tabs || cfg?.tabs?.path;
+    sampleFiles.push({ kind: "tabs", relPath: rel });
+  }
+  if (hasFavicon) {
+    const favRel = fav["32"] || fav["16"] || fav.base || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href;
+    if (favRel) sampleFiles.push({ kind: "favicon", relPath: favRel });
+  }
 
-  const resolvedSamples = await Promise.all(sampleFiles.map(async sf => {
+  const resolvedSamples = await Promise.all(sampleFiles.map(async (sf) => {
     const url = join(activePrefix, sf.relPath);
     const r = await check(url);
-    return { ...sf, url, ok: r.ok, status: r.status, exists: r.exists };
+    return { ...sf, url, exists: r.exists, status: r.status };
   }));
 
   return {
-    timestamp: now.toISOString(),
     env: p.env || "prod",
     domain,
     assetsBaseUrl: base,
     computedDomainPrefix,
     activePrefix,
     appSource: p.domainAssetsSource || null,
-    appConfigUrl,
-    primaryConfig: {
-      url: primary.url,
-      exists: !!primary.exists,
-      status: primary.status,
-      note: "ASSETS_BASE/DOMAIN/config.yaml",
-    },
-    defaultConfig: {
-      url: fallback.url,
-      exists: !!fallback.exists,
-      status: fallback.status,
-      note: "/domain_default/config.yaml",
-    },
+    appConfigUrl,                   // active pack’s config (may be /domain_default/)
+    primaryConfig: { url: primary.url, exists: !!primary.exists, status: primary.status, error: primary.error },
+    defaultConfig: { url: fallback.url, exists: !!fallback.exists, status: fallback.status },
     appParsedConfigPresence: {
       hasConfigObject: !!cfg,
-      hasLogos: !!logos.has,
-      logoFields: logos.fields,
-      hasLocales,
-      hasTabs,
-      hasCategories,
+      hasLogos: !!logos.has, logoFields: logos.fields,
+      hasLocales, hasTabs, hasCategories, hasFavicon
     },
     resolvedSamples,
   };

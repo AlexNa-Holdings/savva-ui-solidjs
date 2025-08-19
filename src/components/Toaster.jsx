@@ -1,6 +1,6 @@
 // src/components/Toaster.jsx
 import { For, Show } from "solid-js";
-import { toasts, dismissToast, toggleToast } from "../ux/toast";
+import { toasts, dismissToast, toggleToast } from "./ui/toast";
 
 const typeStyles = {
   info:    "bg-blue-600",

@@ -3,7 +3,7 @@ import * as Solid from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain } from "../blockchain/wallet";
-import { pushToast, pushErrorToast } from "../ux/toast";
+import { pushToast, pushErrorToast } from "../components/ui/toast.js";
 import { useI18n } from "../i18n/useI18n";
 import { fetchWithTimeout } from "../utils/net.js";
 

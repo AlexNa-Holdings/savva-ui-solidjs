@@ -26,3 +26,9 @@
 
 .themed-pill--icon { padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; }
 .themed-pill--icon svg { display: block; }
+
+/* 1px theme border for dialogs/panels */
+.themed-dialog {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem; /* keeps rounded look if element didn't set one */
+}

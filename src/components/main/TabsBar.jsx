@@ -201,18 +201,18 @@ export default function TabsBar() {
           <Tabs items={items()} value={selectedId()} onChange={setSelectedId} />
         </Show>
 
-        <div class="mt-2 rotabs__panel">
+        <div class="tabs_panel">
           <For each={tabsRaw() || []}>
             {(tab) => (
               <Show when={selectedId() === tab.id}>
-                <section id={`panel-${tab.id}`} aria-labelledby={`tab-${tab.id}`}>
+
+                Test
                   <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
                     {labelById().get(tab.id) || t("main.tabs.untitled")}
                   </h3>
                   <p class="text-sm text-neutral-600 dark:text-neutral-400">
                     {t("main.tabs.empty")}
                   </p>
-                </section>
               </Show>
             )}
           </For>

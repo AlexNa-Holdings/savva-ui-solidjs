@@ -155,18 +155,12 @@
   padding: 1rem; /* 16px */
 }
 
-.dark .tabs_panel {
-  /* Dark theme surfaces from tokens */
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border-color: hsl(var(--border));
-  box-shadow: none; /* keep it subtle in dark mode */
-}
+
 
 /* Optional: vertical rhythm if multiple sections render inside */
-.tabs_panel > section + section {
+/* .tabs_panel > section + section {
   margin-top: 0.75rem;
-}
+} */
 
 /* ——— Compact mode helpers (auto‑toggled via data-compact) ——— */
 .tabs a .tab__icon { 

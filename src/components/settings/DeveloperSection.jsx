@@ -16,7 +16,7 @@ export default function DeveloperSection() {
   }
 
   return (
-    <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
       <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
 
       {/* Show translation keys */}
@@ -40,16 +40,22 @@ export default function DeveloperSection() {
       </label>
 
       <div class="flex gap-2">
-        <button class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700" onClick={copyLog}>
+        <button
+          class="px-3 py-1 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+          onClick={copyLog}
+        >
           {t("settings.developer.debug.copy")}
         </button>
-        <button class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700" onClick={() => dbg.clear()}>
+        <button
+          class="px-3 py-1 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+          onClick={() => dbg.clear()}
+        >
           {t("settings.developer.debug.clear")}
         </button>
       </div>
 
       <Show when={copied()}>
-        <div class="text-xs opacity-70">{t("settings.developer.debug.copied")}</div>
+        <div class="text-xs text-[hsl(var(--primary))]">{t("settings.developer.debug.copied")}</div>
       </Show>
     </section>
   );

@@ -73,8 +73,8 @@ export default function Header({ onTogglePane }) {
       class="
         sticky top-0 z-10 h-12
         flex items-center justify-between p-2
-        bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]
-        border-b border-[hsl(var(--border))] shadow-sm
+        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
+        border-b  shadow-sm
       "
     >
       {/* Left: brand logo or title */}

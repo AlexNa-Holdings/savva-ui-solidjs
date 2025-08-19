@@ -3581,116 +3581,84 @@ export default function MainView() {
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
-import { useApp } from "../../context/AppContext";
+import { useApp } from "../../context/AppContext.jsx";
 import { assessAssets } from "../../utils/assetsDiagnostics";
 
 export default function Assets() {
   const app = useApp();
   const { t } = app;
 
-  // env switching (prod/test)
   const env = createMemo(() => app.assetsEnv?.() || "prod");
   const [busySwitch, setBusySwitch] = createSignal(false);
-
   async function switchEnv(next) {
     if (next === env()) return;
     try {
       setBusySwitch(true);
-      if (typeof app.setAssetsEnv === "function") {
-        app.setAssetsEnv(next);
-        // if the context exposes a refresh helper, call it
-        if (typeof app.refreshDomainAssets === "function") {
-          await app.refreshDomainAssets();
-        }
-      } else {
-        // Fallback: soft reload to let the app pick env on boot
-        // (only used if setAssetsEnv isn't available)
-        location.reload();
-      }
-    } finally {
-      setBusySwitch(false);
-    }
+      app.setAssetsEnv?.(next);
+      await app.refreshDomainAssets?.();
+    } finally { setBusySwitch(false); }
   }
 
-  // diagnostics
   const [busyDiag, setBusyDiag] = createSignal(false);
   const [report, setReport] = createSignal(null);
   const [err, setErr] = createSignal(null);
 
   async function runDiagnostics() {
-    setBusyDiag(true);
-    setErr(null);
+    setBusyDiag(true); setErr(null);
     try {
       const r = await assessAssets({
         env: app.assetsEnv?.(),
         assetsBaseUrl: app.assetsBaseUrl?.(),
-        selectedDomainName: (() => {
-          const d = app.selectedDomain?.();
-          return typeof d === "string" ? d : (d?.name || "");
-        })(),
+        selectedDomainName: (() => { const d = app.selectedDomain?.(); return typeof d === "string" ? d : (d?.name || ""); })(),
         domainAssetsPrefixActive: app.domainAssetsPrefix?.(),
         domainAssetsConfig: app.domainAssetsConfig?.(),
         domainAssetsSource: app.domainAssetsSource?.(),
       });
       setReport(r);
-    } catch (e) {
-      setErr(e);
-    } finally {
-      setBusyDiag(false);
-    }
+    } catch (e) { setErr(e); } finally { setBusyDiag(false); }
   }
 
   const Row = (props) => (
-    <div class="grid grid-cols-[180px_1fr] gap-2 py-1">
-      <div class="text-sm text-gray-500">{props.label}</div>
+    <div class="grid grid-cols-[160px_1fr] gap-2 py-1">
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">{props.label}</div>
       <div class="text-sm break-all">{props.children}</div>
     </div>
   );
 
   return (
-    <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-4">
-      {/* Header + Env switch */}
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h3 class="text-lg font-medium">
-          {t("settings.dev.assets.title") /* "Assets" */}
-        </h3>
-
+        <h3 class="text-lg font-medium">{t("settings.dev.assets.title")}</h3>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-500">
-            {t("settings.dev.assets.env") /* "Environment" */}
-          </span>
-          <div class="inline-flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.env")}</span>
+          <div class="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
             <button
-              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "bg-transparent text-gray-700 dark:text-gray-200"}`}
-              disabled={busySwitch()}
-              onClick={() => switchEnv("prod")}
+              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
+              disabled={busySwitch()} onClick={() => switchEnv("prod")}
             >
-              {t("settings.dev.assets.env.prod") /* "Prod" */}
+              {t("settings.dev.assets.env.prod")}
             </button>
             <button
-              class={`px-3 py-1.5 text-sm border-l border-gray-300 dark:border-gray-600 ${env() === "test" ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900" : "bg-transparent text-gray-700 dark:text-gray-200"}`}
-              disabled={busySwitch()}
-              onClick={() => switchEnv("test")}
+              class={`px-3 py-1.5 text-sm border-l border-[hsl(var(--border))] ${env() === "test" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
+              disabled={busySwitch()} onClick={() => switchEnv("test")}
             >
-              {t("settings.dev.assets.env.test") /* "Test" */}
+              {t("settings.dev.assets.env.test")}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Quick facts */}
-      <div class="rounded-md bg-gray-50 dark:bg-gray-900 p-3 space-y-1">
+      <div class="rounded-md bg-[hsl(var(--muted))] p-3 space-y-1">
         <Row label={t("settings.dev.assets.env")}>{env()}</Row>
         <Row label={t("settings.dev.assets.baseUrl")}>{app.assetsBaseUrl?.() || "—"}</Row>
         <Row label={t("settings.dev.assets.prefix.active")}>{app.domainAssetsPrefix?.() || "—"}</Row>
         <Row label={t("settings.dev.assets.source")}>{app.domainAssetsSource?.() || "—"}</Row>
       </div>
 
-      {/* Diagnostics block */}
       <div class="flex items-center justify-between">
         <div class="text-sm font-medium">{t("settings.dev.assets.diagnostics.title")}</div>
         <button
-          class="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+          class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
           onClick={runDiagnostics}
           disabled={busyDiag()}
         >
@@ -3698,45 +3666,63 @@ export default function Assets() {
         </button>
       </div>
 
-      {err() && (
-        <div class="text-sm text-red-400">
-          {t("settings.dev.assets.diagnostics.error")}: {String(err())}
-        </div>
-      )}
+      {err() && <div class="text-sm text-[hsl(var(--destructive))]">
+        {t("settings.dev.assets.diagnostics.error")}: {String(err())}
+      </div>}
 
       <Show when={report()}>
         <div class="space-y-2">
           <Row label={t("settings.dev.assets.domain")}>{report().domain || "—"}</Row>
           <Row label={t("settings.dev.assets.prefix.computed")}>{report().computedDomainPrefix || "—"}</Row>
-          <Row label={t("settings.dev.assets.configUrl")}>{report().appConfigUrl || "—"}</Row>
 
-          <div class="pt-2">
-            <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.configChecks")}</div>
-            <div class="mt-1 text-xs">
-              <div>• {t("settings.dev.assets.diagnostics.primary")}: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
-              <div>• {t("settings.dev.assets.diagnostics.default")}: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
-            </div>
+          {/* Active config (what the app is really using) */}
+          <Row label={t("settings.dev.assets.configUrl")}>
+            <Show when={report().appConfigUrl} fallback={"—"}>
+              <span class="inline-flex items-center gap-2">
+                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="underline">{report().appConfigUrl}</a>
+                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
+              </span>
+            </Show>
+          </Row>
+
+          {/* Also show the env+domain computed config */}
+          <Row label={t("settings.dev.assets.configUrl.computed")}>
+            <Show when={report().computedDomainPrefix} fallback={"—"}>
+              <span class="inline-flex items-center gap-2">
+                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="underline">
+                  {report().computedDomainPrefix + "config.yaml"}
+                </a>
+                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
+              </span>
+            </Show>
+          </Row>
+
+          {/* Checks */}
+          <div class="pt-2 text-xs space-y-1">
+            <div><b>{t("settings.dev.assets.diagnostics.primary")}</b>: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
+            <Show when={report().primaryConfig.status === -1 && report().primaryConfig.error}>
+              <div class="text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.diagnostics.noteNetwork")} {report().primaryConfig.error}</div>
+            </Show>
+            <div><b>{t("settings.dev.assets.diagnostics.default")}</b>: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
           </div>
 
-          <div class="pt-2">
-            <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.configSummary")}</div>
-            <div class="mt-1 text-xs">
-              <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
-              <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
-              <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
-              <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
-              <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
-            </div>
+          {/* Summary */}
+          <div class="pt-2 text-xs space-y-1">
+            <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasFavicon")}: {String(report().appParsedConfigPresence.hasFavicon)}</div>
           </div>
 
+          {/* Sample fetches */}
           <Show when={report().resolvedSamples?.length}>
             <div class="pt-2">
               <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.sampleFetches")}</div>
               <ul class="mt-1 space-y-1 text-xs">
                 {report().resolvedSamples.map((s) => (
-                  <li>
-                    {s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})
-                  </li>
+                  <li>{s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})</li>
                 ))}
               </ul>
             </div>
@@ -4814,169 +4800,171 @@ import { createSignal, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
 export default function LocalIpfsSection() {
-    const app = useApp(); // exposes t, local IPFS signals, actions
-    const { t } = app;
+  const app = useApp(); // exposes t, local IPFS signals, actions
+  const { t } = app;
 
-    const [testing, setTesting] = createSignal(false);
-    const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
-    const [showIpfsHelp, setShowIpfsHelp] = createSignal(false);
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
+  const [showIpfsHelp, setShowIpfsHelp] = createSignal(false);
 
-    async function onEnableLocal() {
-        setTesting(true);
-        try {
-            await app.enableLocalIpfs(apiUrl().trim());
-        } finally {
-            setTesting(false);
-        }
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      await app.enableLocalIpfs(apiUrl().trim());
+    } finally {
+      setTesting(false);
     }
+  }
 
-    return (
-        <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
-            <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
 
-            <label class="flex items-center gap-2">
-                <input
-                    type="checkbox"
-                    checked={app.localIpfsEnabled()}
-                    onInput={(e) => {
-                        const checked = e.currentTarget.checked;
-                        if (!checked) app.disableLocalIpfs();
-                    }}
-                />
-                <span>{t("settings.localIpfs.enableCheckbox")}</span>
-            </label>
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.localIpfsEnabled()}
+          onInput={(e) => {
+            const checked = e.currentTarget.checked;
+            if (!checked) app.disableLocalIpfs();
+          }}
+        />
+        <span>{t("settings.localIpfs.enableCheckbox")}</span>
+      </label>
 
-            {/* Input + button row (aligned bottoms); hint on its own row */}
-            <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
-                {/* Left: label + input */}
-                <label class="block">
-                    <span class="text-sm text-gray-700 dark:text-gray-300">
-                        {t("settings.localIpfs.apiUrl.label")}
-                    </span>
-                    <input
-                        class="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                        value={apiUrl()}
-                        onInput={(e) => {
-                            const val = e.currentTarget.value;
-                            setApiUrl(val);
-                            app.setLocalIpfsApiUrl?.(val);
-                        }}
-                        placeholder="http://localhost:5001"
-                        spellcheck={false}
-                    />
-                </label>
+      {/* Input + button row (aligned bottoms); hint on its own row */}
+      <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
+        {/* Left: label + input */}
+        <label class="block">
+          <span class="text-sm text-[hsl(var(--muted-foreground))]">
+            {t("settings.localIpfs.apiUrl.label")}
+          </span>
+          <input
+            class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={apiUrl()}
+            onInput={(e) => {
+              const val = e.currentTarget.value;
+              setApiUrl(val);
+              app.setLocalIpfsApiUrl?.(val);
+            }}
+            placeholder="http://localhost:5001"
+            spellcheck={false}
+          />
+        </label>
 
-                {/* Right: action button, bottom-aligned to the input */}
-                <div class="flex md:self-end">
-                    <Show
-                        when={!app.localIpfsEnabled()}
-                        fallback={
-                            <button
-                                class="h-10 px-3 rounded bg-red-600 text-white hover:bg-red-700"
-                                onClick={() => app.disableLocalIpfs()}
-                            >
-                                {t("settings.localIpfs.disable")}
-                            </button>
-                        }
-                    >
-                        <button
-                            class="h-10 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                            onClick={onEnableLocal}
-                            disabled={testing()}
-                            title={t("settings.localIpfs.testEnable")}
-                        >
-                            {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
-                        </button>
-                    </Show>
-                </div>
+        {/* Right: action button, bottom-aligned to the input */}
+        <div class="flex md:self-end">
+          <Show
+            when={!app.localIpfsEnabled()}
+            fallback={
+              <button
+                class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+                onClick={() => app.disableLocalIpfs()}
+              >
+                {t("settings.localIpfs.disable")}
+              </button>
+            }
+          >
+            <button
+              class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onEnableLocal}
+              disabled={testing()}
+              title={t("settings.localIpfs.testEnable")}
+            >
+              {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
+            </button>
+          </Show>
+        </div>
 
-                {/* Hint line */}
-                <p class="text-xs text-gray-500 mt-1 md:col-span-2">
-                    {t("settings.localIpfs.apiUrl.help")} <code>/api/v0/config/show</code>.
-                </p>
-            </div>
+        {/* Hint line */}
+        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 md:col-span-2">
+          {t("settings.localIpfs.apiUrl.help")} <code>/api/v0/config/show</code>.
+        </p>
+      </div>
 
-            {/* Status */}
-            <div class="text-sm text-gray-600 dark:text-gray-300">
-                {t("settings.localIpfs.status.label")}:{" "}
-                <span
-                    class={
-                        app.localIpfsStatus() === "ok"
-                            ? "text-emerald-600"
-                            : app.localIpfsStatus() === "down"
-                                ? "text-red-500"
-                                : "opacity-70"
-                    }
-                >
-                    {app.localIpfsStatus()}
-                </span>
-                <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
-                    <span class="ml-2 opacity-70">
-                        • {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}
-                    </span>
-                </Show>
-            </div>
+      {/* Status */}
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">
+        {t("settings.localIpfs.status.label")}:{" "}
+        <span
+          class={
+            app.localIpfsStatus() === "ok"
+              ? "text-[hsl(var(--primary))]"
+              : app.localIpfsStatus() === "down"
+              ? "text-[hsl(var(--destructive))]"
+              : "opacity-70"
+          }
+        >
+          {app.localIpfsStatus()}
+        </span>
+        <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+          <span class="ml-2 opacity-70">
+            • {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}
+          </span>
+        </Show>
+      </div>
 
-            {/* Help toggle */}
-            <div class="pt-2">
-                <button
-                    class="text-sm underline text-blue-600 dark:text-blue-400 hover:opacity-80"
-                    onClick={() => setShowIpfsHelp(!showIpfsHelp())}
-                >
-                    {showIpfsHelp()
-                        ? t("settings.localIpfs.help.toggle.hide")
-                        : t("settings.localIpfs.help.toggle.show")}
-                </button>
-            </div>
-            <div class="bg-white/60 dark:bg-black/30 rounded p-3">
-                <h4 class="font-medium mb-2">{t("settings.debug.gateways.title")}</h4>
-                <ul class="list-disc pl-6 text-sm">
-                    <For each={app.activeIpfsGateways()}>
-                        {(g) => <li>{g}</li>}
-                    </For>
-                </ul>
-            </div>
-            {/* Collapsible help content */}
-            <Show when={showIpfsHelp()}>
-                <div class="mt-3 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 space-y-3 text-sm">
-                    <p class="opacity-90">
-                        {t("settings.localIpfs.help.intro")} <code>/api/v0/*</code>
-                    </p>
+      {/* Help toggle */}
+      <div class="pt-2">
+        <button
+          class="text-sm underline text-[hsl(var(--primary))] hover:opacity-80"
+          onClick={() => setShowIpfsHelp(!showIpfsHelp())}
+        >
+          {showIpfsHelp()
+            ? t("settings.localIpfs.help.toggle.hide")
+            : t("settings.localIpfs.help.toggle.show")}
+        </button>
+      </div>
 
-                    <div>
-                        <p class="font-medium mb-1">{t("settings.localIpfs.help.api.title")}</p>
-                        <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
+      <div class="bg-[hsl(var(--muted))] rounded p-3">
+        <h4 class="font-medium mb-2">{t("settings.debug.gateways.title")}</h4>
+        <ul class="list-disc pl-6 text-sm">
+          <For each={app.activeIpfsGateways()}>
+            {(g) => <li>{g}</li>}
+          </For>
+        </ul>
+      </div>
+
+      {/* Collapsible help content */}
+      <Show when={showIpfsHelp()}>
+        <div class="mt-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-3 space-y-3 text-sm">
+          <p class="opacity-90">
+            {t("settings.localIpfs.help.intro")} <code>/api/v0/*</code>
+          </p>
+
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.api.title")}</p>
+            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
 ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["GET","POST","PUT","OPTIONS"]'
 ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Content-Type","Authorization"]'`}</pre>
-                        <p class="opacity-75 mt-1">{t("settings.localIpfs.help.api.tip")}</p>
-                    </div>
+            <p class="opacity-75 mt-1">{t("settings.localIpfs.help.api.tip")}</p>
+          </div>
 
-                    <div>
-                        <p class="font-medium mb-1">{t("settings.localIpfs.help.gateway.title")}</p>
-                        <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.gateway.title")}</p>
+            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
 ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Methods '["GET","HEAD","OPTIONS"]'`}</pre>
-                        <p class="opacity-75 mt-1">{t("settings.localIpfs.help.gateway.note")}</p>
-                    </div>
+            <p class="opacity-75 mt-1">{t("settings.localIpfs.help.gateway.note")}</p>
+          </div>
 
-                    <div>
-                        <p class="font-medium mb-1">{t("settings.localIpfs.help.restart.title")}</p>
-                        <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`ipfs shutdown 2>/dev/null || true
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.restart.title")}</p>
+            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`ipfs shutdown 2>/dev/null || true
 ipfs daemon`}</pre>
-                    </div>
+          </div>
 
-                    <div>
-                        <p class="font-medium mb-1">{t("settings.localIpfs.help.verify.title")}</p>
-                        <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`curl -X POST http://localhost:5001/api/v0/id
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.verify.title")}</p>
+            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`curl -X POST http://localhost:5001/api/v0/id
 curl -X POST http://localhost:5001/api/v0/config/show | jq -r '.Addresses.Gateway'`}</pre>
-                        <p class="opacity-75 mt-1">
-                            {t("settings.localIpfs.help.verify.note")} <code>/ip4/127.0.0.1/tcp/8080</code>.
-                        </p>
-                    </div>
+            <p class="opacity-75 mt-1">
+              {t("settings.localIpfs.help.verify.note")} <code>/ip4/127.0.0.1/tcp/8080</code>.
+            </p>
+          </div>
 
-                    <div>
-                        <p class="font-medium mb-1">{t("settings.localIpfs.help.proxy.title")}</p>
-                        <p class="opacity-90">{t("settings.localIpfs.help.proxy.text")}</p>
-                        <pre class="bg-black/70 text-white p-2 rounded overflow-x-auto text-xs">{`// vite.config.js
+          <div>
+            <p class="font-medium mb-1">{t("settings.localIpfs.help.proxy.title")}</p>
+            <p class="opacity-90">{t("settings.localIpfs.help.proxy.text")}</p>
+            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`// vite.config.js
 export default {
   server: {
     proxy: {
@@ -4988,50 +4976,13 @@ export default {
     }
   }
 };`}</pre>
-                        <p class="opacity-75 mt-1">
-                            {t("settings.localIpfs.help.proxy.note")} <code>http://localhost:5173/ipfs-api</code>.
-                        </p>
-                    </div>
-                </div>
-
-
-
-            </Show>
-        </section>
-    );
-}
-</file>
-
-<file path="src/components/ui/BackIconButton.jsx">
-// src/components/ui/BackIconButton.jsx
-export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
-  function goBack() {
-    try {
-      if (window.history.length > 1) return window.history.back();
-    } catch {}
-    window.location.href = fallbackHref;
-  }
-
-  return (
-    <button
-      class="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
-      onClick={goBack}
-      aria-label={title}
-      title={title}
-    >
-      {/* U-turn left (arrow-back) */}
-      <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
-        <path
-          d="M9 15L3 9m0 0l6-6M3 9h11a4 4 0 014 4v7"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-      <span class="sr-only">{title}</span>
-    </button>
+            <p class="opacity-75 mt-1">
+              {t("settings.localIpfs.help.proxy.note")} <code>http://localhost:5173/ipfs-api</code>.
+            </p>
+          </div>
+        </div>
+      </Show>
+    </section>
   );
 }
 </file>
@@ -5650,21 +5601,15 @@ export default function DomainCssLoader() {
 </file>
 
 <file path="src/utils/assetsDiagnostics.js">
-/* src/utils/assetsDiagnostics.js */
+// src/utils/assetsDiagnostics.js
 // Utility to assess domain asset resources and common pitfalls.
-// Pure JS (no Solid imports). You pass values from useApp().
 
 import { fetchWithTimeout } from "./net";
 
-// Normalize join with a trailing slash on base and no leading slash on rel
 function join(base, rel) {
-  const b = base.endsWith("/") ? base : base + "/";
+  const b = base?.endsWith("/") ? base : (base || "") + "/";
   const r = String(rel || "").replace(/^\/+/, "");
   return b + r;
-}
-
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
 }
 
 function summarizeLogos(cfg) {
@@ -5672,7 +5617,6 @@ function summarizeLogos(cfg) {
   const raw = cfg.logos ?? cfg.logo ?? null;
   if (!raw) return { has: false, fields: [], pickable: [] };
   if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
-
   const l = {
     dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
     light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
@@ -5685,21 +5629,8 @@ function summarizeLogos(cfg) {
   return { has: fields.length > 0, fields, pickable: fields };
 }
 
-/**
- * assessAssets
- * @param {object} p
- * @param {string} p.env 'prod' | 'test'
- * @param {string} p.assetsBaseUrl
- * @param {string} p.selectedDomainName
- * @param {string} p.domainAssetsPrefixActive
- * @param {object|null} p.domainAssetsConfig
- * @param {'remote'|'default'|null} p.domainAssetsSource
- * @param {(url: string, opts?: any) => Promise<Response>} [p.fetcher]
- */
 export async function assessAssets(p) {
   const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
-  const now = new Date();
-
   const base = String(p.assetsBaseUrl || "");
   const domain = String(p.selectedDomainName || "");
   const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
@@ -5707,46 +5638,24 @@ export async function assessAssets(p) {
   const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
   const defaultConfigUrl = "/domain_default/config.yaml";
 
-  // Robust HEAD -> GET check that handles CORS/network failures
   async function check(url) {
-    if (!url) return { url, ok: false, status: 0, exists: false, text: null };
+    if (!url) return { url, ok: false, status: 0, exists: false, error: null };
     let res, method = "HEAD";
-
-    // Try HEAD
     try {
-      res = await fetcher(url, { method: "HEAD", cache: "no-store" });
-    } catch {
-      // HEAD failed (CORS/network) → try GET
-      try {
-        method = "GET";
-        res = await fetcher(url, { method, cache: "no-store" });
-      } catch (e2) {
-        return { url, ok: false, status: -1, exists: false, error: String(e2) };
-      }
+      res = await fetcher(url, { method, cache: "no-store" });
+    } catch (e) {
+      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
+      catch (e2) { return { url, ok: false, status: -1, exists: false, error: String(e2) }; }
     }
-
-    // If HEAD returned non‑OK and not 404, try GET too
     if (method === "HEAD" && !res.ok && res.status !== 404) {
-      try {
-        method = "GET";
-        res = await fetcher(url, { method, cache: "no-store" });
-      } catch (e3) {
-        return { url, ok: false, status: -1, exists: false, error: String(e3) };
-      }
+      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
+      catch (e3) { return { url, ok: false, status: -1, exists: false, error: String(e3) }; }
     }
-
-    const exists = res.status !== 404 && res.ok;
-    let text = null;
-    if (exists && /\/config\.yaml$/i.test(url) && method === "GET") {
-      text = await res.text().catch(() => null);
-    }
-    return { url, ok: res.ok, status: res.status, exists, text };
+    const exists = res.ok && res.status !== 404;
+    return { url, ok: res.ok, status: res.status, exists, error: null };
   }
 
-  const primary = primaryConfigUrl
-    ? await check(primaryConfigUrl)
-    : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
-
+  const primary = primaryConfigUrl ? await check(primaryConfigUrl) : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
   const fallback = await check(defaultConfigUrl);
 
   const appConfigUrl = join(activePrefix, "config.yaml");
@@ -5754,58 +5663,54 @@ export async function assessAssets(p) {
   const cfg = p.domainAssetsConfig || null;
   const logos = summarizeLogos(cfg);
   const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
-  const hasTabs       = !!(cfg && (cfg.tabs || cfg.ui?.tabs));
-  const hasCategories = !!(cfg && (cfg.categories || cfg.ui?.categories));
+  const hasTabs       = !!(cfg && (cfg.modules?.tabs || cfg.tabs || cfg.ui?.tabs));            // fixed
+  const hasCategories = !!(cfg && (cfg.modules?.categories || cfg.categories || cfg.ui?.categories)); // fixed
 
-  // Sample resolution checks using ACTIVE prefix
+  const fav = cfg?.favicon || null;
+  const hasFavicon = !!(fav && (fav.base || fav["16"] || fav["32"] || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href));
+
   const sampleFiles = [];
   if (logos.has) {
-    const firstLogoKey = logos.pickable[0];
-    const relPath = (typeof (cfg?.logos ?? cfg?.logo) === "string")
+    const key = logos.pickable[0];
+    const rel = (typeof (cfg?.logos ?? cfg?.logo) === "string")
       ? (cfg?.logos ?? cfg?.logo)
-      : (cfg?.logos?.[firstLogoKey] ?? cfg?.logo?.[firstLogoKey]);
-    if (relPath) sampleFiles.push({ kind: "logo", relPath });
+      : (cfg?.logos?.[key] ?? cfg?.logo?.[key]);
+    if (rel) sampleFiles.push({ kind: "logo", relPath: rel });
   }
   if (cfg?.locales?.length) {
-    const fr = cfg.locales.find(x => x?.path) || cfg.locales[0];
-    if (fr?.path) sampleFiles.push({ kind: "locale", relPath: fr.path });
+    const fr = cfg.locales.find(x => x?.path || x?.dictionary) || cfg.locales[0];
+    const rel = fr?.path || fr?.dictionary;
+    if (rel) sampleFiles.push({ kind: "locale", relPath: rel });
   }
-  if (cfg?.tabs?.path) sampleFiles.push({ kind: "tabs", relPath: cfg.tabs.path });
+  if (cfg?.modules?.tabs || cfg?.tabs?.path) {
+    const rel = cfg?.modules?.tabs || cfg?.tabs?.path;
+    sampleFiles.push({ kind: "tabs", relPath: rel });
+  }
+  if (hasFavicon) {
+    const favRel = fav["32"] || fav["16"] || fav.base || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href;
+    if (favRel) sampleFiles.push({ kind: "favicon", relPath: favRel });
+  }
 
-  const resolvedSamples = await Promise.all(sampleFiles.map(async sf => {
+  const resolvedSamples = await Promise.all(sampleFiles.map(async (sf) => {
     const url = join(activePrefix, sf.relPath);
     const r = await check(url);
-    return { ...sf, url, ok: r.ok, status: r.status, exists: r.exists };
+    return { ...sf, url, exists: r.exists, status: r.status };
   }));
 
   return {
-    timestamp: now.toISOString(),
     env: p.env || "prod",
     domain,
     assetsBaseUrl: base,
     computedDomainPrefix,
     activePrefix,
     appSource: p.domainAssetsSource || null,
-    appConfigUrl,
-    primaryConfig: {
-      url: primary.url,
-      exists: !!primary.exists,
-      status: primary.status,
-      note: "ASSETS_BASE/DOMAIN/config.yaml",
-    },
-    defaultConfig: {
-      url: fallback.url,
-      exists: !!fallback.exists,
-      status: fallback.status,
-      note: "/domain_default/config.yaml",
-    },
+    appConfigUrl,                   // active pack’s config (may be /domain_default/)
+    primaryConfig: { url: primary.url, exists: !!primary.exists, status: primary.status, error: primary.error },
+    defaultConfig: { url: fallback.url, exists: !!fallback.exists, status: fallback.status },
     appParsedConfigPresence: {
       hasConfigObject: !!cfg,
-      hasLogos: !!logos.has,
-      logoFields: logos.fields,
-      hasLocales,
-      hasTabs,
-      hasCategories,
+      hasLogos: !!logos.has, logoFields: logos.fields,
+      hasLocales, hasTabs, hasCategories, hasFavicon
     },
     resolvedSamples,
   };
@@ -6079,6 +5984,37 @@ export default defineConfig({
   --destructive-foreground: 244 5.2% 98.95%;
 
   --ring: 244 52% 79%;
+}
+</file>
+
+<file path="src/components/ui/BackIconButton.jsx">
+// src/components/ui/BackIconButton.jsx
+export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
+  function goBack() {
+    try { if (window.history.length > 1) return window.history.back(); } catch {}
+    window.location.href = fallbackHref;
+  }
+
+  return (
+    <button
+      class="p-2 rounded text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]"
+      onClick={goBack}
+      aria-label={title}
+      title={title}
+    >
+      <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
+        <path
+          d="M9 15L3 9m0 0l6-6M3 9h11a4 4 0 014 4v7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="sr-only">{title}</span>
+    </button>
+  );
 }
 </file>
 
@@ -6473,7 +6409,7 @@ export default function DeveloperSection() {
   }
 
   return (
-    <section class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
       <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
 
       {/* Show translation keys */}
@@ -6497,16 +6433,22 @@ export default function DeveloperSection() {
       </label>
 
       <div class="flex gap-2">
-        <button class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700" onClick={copyLog}>
+        <button
+          class="px-3 py-1 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+          onClick={copyLog}
+        >
           {t("settings.developer.debug.copy")}
         </button>
-        <button class="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700" onClick={() => dbg.clear()}>
+        <button
+          class="px-3 py-1 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+          onClick={() => dbg.clear()}
+        >
           {t("settings.developer.debug.clear")}
         </button>
       </div>
 
       <Show when={copied()}>
-        <div class="text-xs opacity-70">{t("settings.developer.debug.copied")}</div>
+        <div class="text-xs text-[hsl(var(--primary))]">{t("settings.developer.debug.copied")}</div>
       </Show>
     </section>
   );
@@ -6527,6 +6469,7 @@ export default {
   "common.loading": "Загрузка…",
   "common.notFound": "Не найдено",
   "common.ok": "ОК",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
   "main.tabs.loading": "Загрузка вкладок…",
   "main.tabs.untitled": "Без названия",
   "menu.open": "Открыть меню",
@@ -6536,7 +6479,6 @@ export default {
   "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
   "rightPane.switch.backend.label": "URL бэкенда",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.help": "Нужна помощь с переключением доменов?",
   "rightPane.switch.domain.label": "Домен",
   "rightPane.switch.domain.website": "Вебсайт",
   "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
@@ -6548,19 +6490,22 @@ export default {
   "rightPane.switch.title": "Сменить бэкенд / домен",
   "rightPane.switch.validation.domain": "Домен не может быть пустым.",
   "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
   "settings.back": "Назад",
   "settings.debug.gateways.title": "Шлюзы IPFS (активный порядок)",
   "settings.dev.assets.baseUrl": "Базовый URL активов",
   "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.diagnostics.configChecks": "Проверки конфигурации",
-  "settings.dev.assets.diagnostics.configSummary": "Сводка конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
   "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
   "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
   "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
   "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
   "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
   "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
   "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
   "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
   "settings.dev.assets.diagnostics.run": "Запустить диагностику",
   "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
@@ -6574,14 +6519,9 @@ export default {
   "settings.dev.assets.source": "Источник",
   "settings.dev.assets.title": "Активы",
   "settings.developer.debug.clear": "Очистить лог",
-  "settings.developer.debug.cleared": "Лог очищен",
   "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
   "settings.developer.debug.copy": "Скопировать лог",
-  "settings.developer.debug.copyFail": "Не удалось скопировать лог",
   "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.debug.hint": "Включите это, чтобы начать захват логов в буфер, который можно скопировать.",
-  "settings.developer.debug.lines": "строк",
-  "settings.developer.dumpState": "Сбросить текущее состояние",
   "settings.developer.showKeys": "Показать ключи перевода",
   "settings.developer.title": "Разработчик",
   "settings.ipfs.localDisabled": "Локальный IPFS отключен",
@@ -6607,6 +6547,7 @@ export default {
   "settings.localIpfs.testEnable": "Тестировать и включить",
   "settings.localIpfs.title": "Локальный IPFS",
   "settings.title": "Настройки",
+  "tabs.aria": "Вкладки раздела",
   "ui.mode.dark": "Тёмная тема",
   "ui.mode.light": "Светлая тема",
   "wallet.changeChain": "Сменить сеть",
@@ -7097,45 +7038,43 @@ export default {
   "common.loading": "Loading…",
   "common.notFound": "Not found",
   "common.ok": "OK",
+  "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",
   "menu.open": "Open menu",
   "rightPane.close": "Close menu",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
-  "rightPane.switch.backend.help":
-    "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
   "rightPane.switch.backend.label": "Backend URL",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.help": "Need help switching domains?",
   "rightPane.switch.domain.label": "Domain",
   "rightPane.switch.domain.website": "Website",
-  "rightPane.switch.noDomains":
-    "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
   "rightPane.switch.open": "Switch backend / domain",
   "rightPane.switch.reload": "Load domains",
   "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
   "rightPane.switch.reset": "Reset to defaults",
-  "rightPane.switch.reset.title":
-    "Clear local override and reload defaults from default_connect.yaml",
+  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
   "rightPane.switch.title": "Switch backend / domain",
   "rightPane.switch.validation.domain": "Domain cannot be empty.",
-  "rightPane.switch.validation.protocol":
-    "Backend URL must start with http:// or https://",
-  "rightPane.switch.domain.notListed": "not in /info",
+  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
+  "rightPane.theme": "Theme",
   "settings.back": "Back",
   "settings.debug.gateways.title": "IPFS Gateways (active order)",
   "settings.dev.assets.baseUrl": "Assets base URL",
   "settings.dev.assets.configUrl": "Config URL",
-  "settings.dev.assets.diagnostics.configChecks": "Config checks",
-  "settings.dev.assets.diagnostics.configSummary": "Config summary",
+  "settings.dev.assets.configUrl.computed": "Computed URL",
+  "settings.dev.assets.configUrl.open": "Open Config URL",
   "settings.dev.assets.diagnostics.default": "Default config",
   "settings.dev.assets.diagnostics.error": "Diagnostics error",
   "settings.dev.assets.diagnostics.hasCategories": "Has categories",
   "settings.dev.assets.diagnostics.hasConfig": "Has config",
+  "settings.dev.assets.diagnostics.hasFavicon": "Favicon detected",
   "settings.dev.assets.diagnostics.hasLocales": "Has locales",
   "settings.dev.assets.diagnostics.hasLogos": "Has logos",
   "settings.dev.assets.diagnostics.hasTabs": "Has tabs",
+  "settings.dev.assets.diagnostics.noteNetwork": "Check your network connection.",
   "settings.dev.assets.diagnostics.primary": "Primary config",
   "settings.dev.assets.diagnostics.run": "Run diagnostics",
   "settings.dev.assets.diagnostics.sampleFetches": "Sample fetches",
@@ -7149,15 +7088,9 @@ export default {
   "settings.dev.assets.source": "Source",
   "settings.dev.assets.title": "Assets",
   "settings.developer.debug.clear": "Clear log",
-  "settings.developer.debug.cleared": "Log cleared",
   "settings.developer.debug.copied": "Copied log to clipboard",
   "settings.developer.debug.copy": "Copy log",
-  "settings.developer.debug.copyFail": "Failed to copy log",
   "settings.developer.debug.enable": "Enable debug logging",
-  "settings.developer.debug.hint":
-    "Turn this on to start capturing logs into a buffer you can copy.",
-  "settings.developer.debug.lines": "lines",
-  "settings.developer.dumpState": "Dump Current State",
   "settings.developer.showKeys": "Show API Keys",
   "settings.developer.title": "Developer Settings",
   "settings.ipfs.localDisabled": "Local IPFS disabled",
@@ -7166,22 +7099,14 @@ export default {
   "settings.localIpfs.disable": "Disable",
   "settings.localIpfs.enableCheckbox": "Use local IPFS node",
   "settings.localIpfs.gateway.label": "Gateway",
-  "settings.localIpfs.help.api.tip":
-    'Tip: keep this strict in dev; avoid "*" for production setups.',
-  "settings.localIpfs.help.api.title":
-    "1) Allow your app origin on the API (required)",
-  "settings.localIpfs.help.gateway.note":
-    "Only needed if the app loads files straight from the local gateway origin.",
-  "settings.localIpfs.help.gateway.title":
-    "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
-  "settings.localIpfs.help.intro":
-    "Your browser must be allowed to call the local IPFS API endpoints",
-  "settings.localIpfs.help.proxy.note":
-    "Then set “Local IPFS API URL” to and click “Test & enable”.",
-  "settings.localIpfs.help.proxy.text":
-    "Proxy the API through Vite so it’s same-origin:",
-  "settings.localIpfs.help.proxy.title":
-    "Alternative for dev (no IPFS config changes)",
+  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
+  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
+  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
+  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
+  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
+  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
+  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
+  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
   "settings.localIpfs.help.restart.title": "3) Restart the daemon",
   "settings.localIpfs.help.toggle.hide": "Hide help",
   "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
@@ -7191,17 +7116,14 @@ export default {
   "settings.localIpfs.testEnable": "Test & enable",
   "settings.localIpfs.title": "Local IPFS",
   "settings.title": "Settings",
+  "tabs.aria": "Section tabs",
   "ui.mode.dark": "Dark mode",
   "ui.mode.light": "Light mode",
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network",
-  "tabs.aria": "Section tabs",
-  "main.tabs.loading": "Loading tabs…",
-  "main.tabs.untitled": "Untitled",
-  "main.tabs.empty": "This tab is empty for now.",
+  "wallet.onRequiredNetwork": "On required network"
 };
 </file>
 
@@ -7306,101 +7228,6 @@ export default function Settings() {
   --destructive-foreground: 244 5.2% 98.95%;
 
   --ring: 244 52% 79%;
-}
-</file>
-
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createEffect, createSignal, Show } from "solid-js";
-import { navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
-import ThemeToggle from "./ui/ThemeToggle.jsx";
-import LangSelector from "./ui/LangSelector.jsx";
-
-export default function RightPane({ isOpen, onClose }) {
-  const app = useApp();
-  const { t } = app;
-
-  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
-  const [showSwitch, setShowSwitch] = createSignal(false);
-  const noopApply = () => {};
-
-  return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-white dark:bg-gray-800 shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-      >
-        <div class="p-4 space-y-3">
-          {/* Close */}
-          <button
-            class="p-0 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-            onClick={onClose}
-            aria-label={t("rightPane.close")}
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Theme + Language */}
-          <nav class="pt-2">
-            <ul class="space-y-3">
-              <li><ThemeToggle /></li>
-              <li><LangSelector /></li>
-
-              {/* Switch backend / domain (conditional) */}
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
-
-                <li>
-                  <div
-                    class="px-2 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => { navigate("/settings"); onClose(); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
-                  >
-                    {t("rightPane.settings")}
-                  </div>
-                </li>
-              </Show>
-            </ul>
-          </nav>
-        </div>
-      </div>
-
-      {isOpen() && <div class="fixed inset-0 bg-black opacity-20 z-20" style={{ "background-color": "rgba(0, 0, 0, 0.2)" }} data-testid="overlay" onClick={onClose} />}
-
-      {/* Re-seed from AppContext on open */}
-      <Show when={showSwitch()} keyed>
-        {() => (
-          <SwitchConnectDialog
-            open={true}
-            domain={app.config()?.domain}
-            backendLink={app.config()?.backendLink}
-            loading={app.loading()}
-            error={app.error()}
-            onApply={noopApply}
-            onReset={app.clearConnectOverride}
-            onClose={() => setShowSwitch(false)}
-          />
-        )}
-      </Show>
-    </>
-  );
 }
 </file>
 
@@ -7799,6 +7626,100 @@ export function useApp() {
 }
 </file>
 
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createSignal, Show } from "solid-js";
+import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import ThemeToggle from "./ui/ThemeToggle.jsx";
+import LangSelector from "./ui/LangSelector.jsx";
+
+export default function RightPane({ isOpen, onClose }) {
+  const app = useApp();
+  const { t } = app;
+  const [showSwitch, setShowSwitch] = createSignal(false);
+  const noopApply = () => {};
+  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+      >
+        <div class="p-4 space-y-3">
+          <button
+            class="p-0 rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+            onClick={onClose}
+            aria-label={t("rightPane.close")}
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <nav class="pt-2">
+            <ul class="space-y-3">
+              <li><ThemeToggle /></li>
+              <li><LangSelector /></li>
+
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent))]"
+                    role="button" tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+                <li>
+                  <div
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent))]"
+                    role="button" tabIndex={0}
+                    onClick={() => { navigate("/settings"); onClose(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
+                  >
+                    {t("rightPane.settings")}
+                  </div>
+                </li>
+              </Show>
+            </ul>
+          </nav>
+        </div>
+      </div>
+
+      {isOpen() && (
+        <div
+          class="fixed inset-0 z-20"
+          style={{ "background-color": "rgba(0,0,0,0.2)" }}
+          data-testid="overlay"
+          onClick={onClose}
+        />
+      )}
+
+      <Show when={showSwitch()} keyed>
+        {() => (
+          <SwitchConnectDialog
+            open={true}
+            domain={app.config()?.domain}
+            backendLink={app.config()?.backendLink}
+            loading={app.loading()}
+            error={app.error()}
+            onApply={noopApply}
+            onReset={app.clearConnectOverride}
+            onClose={() => setShowSwitch(false)}
+          />
+        )}
+      </Show>
+    </>
+  );
+}
+</file>
+
 <file path="src/App.jsx">
 // src/App.jsx
 /* src/App.jsx */
@@ -7830,15 +7751,13 @@ export default function App() {
   const togglePane = () => setIsPaneOpen(!isPaneOpen());
 
   return (
-    <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
       <DomainCssLoader />
       <GoogleAnalyticsLoader />
-
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
-
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
       <AssetDebugTap />

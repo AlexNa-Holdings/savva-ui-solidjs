@@ -19,17 +19,10 @@ export default function RightPane({ isOpen, onClose }) {
         class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
         onClick={handlePanelClick}
         data-testid="right-pane"
+        style="border-left: 1px solid hsl(var(--border));"
       >
         <div class="p-4 space-y-3">
-          <button
-            class="p-0 rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
-            onClick={onClose}
-            aria-label={t("rightPane.close")}
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+
 
           <nav class="pt-2">
             <ul class="space-y-3">

@@ -72,7 +72,6 @@ export default function SwitchConnectDialog(props) {
           normalized.find((d) => eq(d.name, domain())) ||
           normalized[0];
 
-        // Apply after options exist to avoid browser defaulting to index 0
         const name = resolved.name;
         setDomain(name);
         queueMicrotask(() => setDomain(name));
@@ -111,13 +110,9 @@ export default function SwitchConnectDialog(props) {
       setDomains(normalized);
 
       if (normalized.length > 0) {
-        const prefer =
-          dn(props.domain) ||
-          (app.config?.()?.domain || "") ||
-          domain();
-
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
         const keep = normalized.find((d) => eq(d.name, prefer)) || normalized.find((d) => eq(d.name, domain()));
-        const name = (keep?.name || normalized[0].name);
+        const name = keep?.name || normalized[0].name;
         setDomain(name);
         queueMicrotask(() => setDomain(name));
       } else {
@@ -154,7 +149,7 @@ export default function SwitchConnectDialog(props) {
     }
 
     setApplying(false);
-    try { aborter?.abort(); } catch { }
+    try { aborter?.abort(); } catch {}
     props.onClose?.();
   }
 
@@ -163,23 +158,23 @@ export default function SwitchConnectDialog(props) {
       <div class="fixed inset-0 z-40 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
 
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
             {t("rightPane.switch.title")}
           </h3>
 
           <label class="block mb-3">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.backend.label")}</span>
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
             <div class="mt-1 flex gap-2">
               <input
-                class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
                 value={backendUrl()}
                 onInput={(e) => setBackendUrl(e.currentTarget.value)}
                 placeholder={t("rightPane.switch.backend.placeholder")}
                 spellcheck={false}
               />
               <button
-                class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
                 onClick={handleReload}
                 disabled={fetching()}
                 title={t("rightPane.switch.reload.title")}
@@ -187,14 +182,14 @@ export default function SwitchConnectDialog(props) {
                 {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
               </button>
             </div>
-            <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
           </label>
 
           <label class="block mb-1">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
           </label>
           <select
-            class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
             value={domain()}
             onChange={(e) => setDomain(e.currentTarget.value)}
             disabled={fetching() || domains().length === 0}
@@ -207,7 +202,7 @@ export default function SwitchConnectDialog(props) {
           </select>
 
           <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
               <Show when={selectedDomainObj().website}>
                 <div>
                   {t("rightPane.switch.domain.website")}:{" "}
@@ -220,27 +215,27 @@ export default function SwitchConnectDialog(props) {
           </Show>
 
           <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-red-500">
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
               {t("common.error")}: {localError() || props.error?.message}
             </p>
           </Show>
 
           <div class="mt-4 flex gap-2 justify-end">
             <button
-              class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100"
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
               onClick={props.onClose}
             >
               {t("common.cancel")}
             </button>
             <button
-              class="px-3 py-2 rounded bg-red-500 text-white hover:bg-red-600"
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
               onClick={props.onReset}
               title={t("rightPane.switch.reset.title")}
             >
               {t("rightPane.switch.reset")}
             </button>
             <button
-              class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
               onClick={onApply}
               disabled={props.loading || fetching() || applying()}
             >
