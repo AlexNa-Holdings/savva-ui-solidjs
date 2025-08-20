@@ -10,7 +10,7 @@
 .sv-container {
   max-width: var(--sv-container-max);
   margin-inline: auto;
-  padding-inline: var(--sv-container-gutter);
+  /* padding-inline: var(--sv-container-gutter); */
 }
 
 /* Content grid: main column + sidebar */

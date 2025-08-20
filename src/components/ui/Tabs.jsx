@@ -1,14 +1,8 @@
 // src/components/ui/Tabs.jsx
-/* src/components/ui/Tabs.jsx */
 import { For, createSignal, onMount, onCleanup, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
 export default function Tabs(props) {
-  // props.items: [{ id, label, icon?, disabled? }]
-  // props.value: selected id
-  // props.onChange(nextId)
-  // props.class?: wrapper classnames
-
   const app = useApp();
   const { t } = app;
 
@@ -19,67 +13,45 @@ export default function Tabs(props) {
   let listEl;
   const [compact, setCompact] = createSignal(false);
 
-  function hasWrapped() {
-    if (!listEl) return false;
-    const lis = listEl.querySelectorAll(":scope > li");
-    if (!lis.length) return false;
-    const firstTop = lis[0].offsetTop;
-    for (let i = 1; i < lis.length; i++) {
-      if (lis[i].offsetTop > firstTop) return true; // a second row appeared
-    }
-    return false;
-  }
-
   let rafId;
   function measure() {
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
       if (!listEl) return;
 
-      // Test full mode first
+      // To get an accurate measurement, we first temporarily force full-text mode.
       listEl.dataset.compact = "0";
-      setCompact(false);
 
-      if (hasWrapped()) {
-        // Switch to compact (icons only)
-        listEl.dataset.compact = "1";
-        setCompact(true);
+      // NEW LOGIC: Check if the full width of the content is greater than the visible width.
+      const isOverflowing = listEl.scrollWidth > listEl.clientWidth;
 
-        // If it *still* wraps when compact, mark (optional)
-        listEl.dataset.overflow = hasWrapped() ? "1" : "0";
-      } else {
-        listEl.dataset.overflow = "0";
-      }
+      // Now, set the final state. The JSX binding will apply the correct attribute.
+      setCompact(isOverflowing);
     });
   }
 
   onMount(() => {
-    measure();
-
-    // Re‑measure on size changes of the list itself
+    // The ResizeObserver is sufficient and will handle all size changes.
     const ro = new ResizeObserver(measure);
     if (listEl) ro.observe(listEl);
 
-    // And on viewport changes
-    const onResize = () => measure();
-    window.addEventListener("resize", onResize);
-
     onCleanup(() => {
-      ro.disconnect?.();
-      window.removeEventListener("resize", onResize);
+      ro.disconnect();
       cancelAnimationFrame(rafId);
     });
   });
 
-  // Re‑measure when the tabs list changes
+  // Re-measure when the list of items changes.
   createEffect(() => {
-    items(); // track items
-    measure();
+    items(); // track items so the effect re-runs
+    if (listEl) { // Check if element is mounted before measuring
+      measure();
+    }
   });
 
   return (
     <ul
-      ref={(el) => (listEl = el)}
+      ref={listEl}
       class={`tabs ${props.class || ""}`}
       role="tablist"
       aria-label={t("tabs.aria")}
@@ -117,14 +89,12 @@ export default function Tabs(props) {
                 role="tab"
                 aria-selected={active() ? "true" : "false"}
                 aria-disabled={disabled ? "true" : "false"}
-                // Keep accessible name even when the label is visually hidden
                 aria-label={it.label}
                 title={compact() ? it.label : undefined}
                 tabIndex={disabled ? -1 : 0}
                 onClick={onClick}
                 onKeyDown={onKeyDown}
               >
-                {/* icon then text label */}
                 {it.icon ? (
                   <span class="tab__icon" aria-hidden="true">{it.icon}</span>
                 ) : null}

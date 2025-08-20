@@ -30,6 +30,8 @@
   --ring: 243 100% 13%;
 
   --radius: 0.5rem;
+
+  --tabs-justify: center;
 }
 
 .dark {

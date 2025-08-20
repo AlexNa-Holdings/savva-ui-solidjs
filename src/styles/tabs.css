@@ -1,56 +1,51 @@
 /* src/styles/tabs.css */
 
-
-
 .tabs {
---tabs-active-bg: hsl(var(--background));
---tabs-active-fg: hsl(var(--foreground));
---tabs-inactive-bg: hsl(var(--secondary));
---tabs-inactive-fg: hsl(var(--secondary-foreground));
---tabs-background: hsl(var(--card));
+  --tabs-active-bg: hsl(var(--background));
+  --tabs-active-fg: hsl(var(--foreground));
+  --tabs-inactive-bg: hsl(var(--secondary));
+  --tabs-inactive-fg: hsl(var(--secondary-foreground));
+  --tabs-background: hsl(var(--card));
 
   list-style: none;
-  margin: 0px auto 0;
+  margin: 0;
+  padding-top: 5px;
+  
+  /* This is a standard fallback pattern. If --gradient is not defined, --tabs-background will be used. */
   background: var(--tabs-background);
   background: var(--gradient);
-  display: flow-root;
-  padding-top: 5px;
+
+  display: flex;
+  justify-content: center;
+  overflow-x: auto; /* Allows scrolling on very small screens if needed */
+  /* container-type was removed as it's no longer needed */
 }
 
 .tabs li {
-  /* Makes a horizontal row */
-  float: left;
-
-  /* So the psueudo elements can be abs. positioned inside */
   position: relative;
+  flex-shrink: 0; /* Prevents tabs from shrinking themselves */
 }
 
 .tabs a {
-  /* Make them block level and only as wide as they need */
-  float: left;
-  padding: 7px 20px 7px 20px;
+  display: block;
   text-decoration: none;
 
-  /* Colors via design tokens */
+  padding: 7px clamp(5px, 5vw, 80px);
+  white-space: nowrap; /* Keep icon and label on one line */
+
   color: var(--tabs-inactive-fg);
   background: var(--tabs-inactive-bg);
-  
-  /* Only round the top corners */
-  -webkit-border-top-left-radius: 15px;
-  -webkit-border-top-right-radius: 15px;
-  -moz-border-radius-topleft: 15px;
-  -moz-border-radius-topright: 15px;
+
+  /* Obsolete -moz- and -webkit- prefixes for border-radius were removed */
   border-top-left-radius: 15px;
   border-top-right-radius: 15px;
 }
 
 .tabs .active {
-  /* Highest, active tab is on top */
   z-index: 3;
 }
 
 .tabs .active a {
-  /* Colors when tab is active */
   color: var(--tabs-active-fg);
   background: var(--tabs-active-bg);
 }
@@ -59,12 +54,10 @@
 .tabs li:after,
 .tabs li a:before,
 .tabs li a:after {
-  /* All pseudo elements are abs. positioned and on bottom */
   position: absolute;
   bottom: 0;
 }
 
-/* Only the first, last, and active tabs need pseudo elements at all */
 .tabs li:last-child:after,
 .tabs li:last-child a:after,
 .tabs li:first-child:before,
@@ -79,11 +72,9 @@
 .tabs .active:before,
 .tabs .active:after {
   background: var(--tabs-active-bg);
-  /* Squares below circles */
   z-index: 1;
 }
 
-/* Squares */
 .tabs li:before,
 .tabs li:after {
   background: var(--tabs-inactive-bg);
@@ -91,28 +82,18 @@
   height: 10px;
 }
 .tabs li:before {
-  
   left: -10px;
 }
 .tabs li:after {
   right: -10px;
 }
 
-/* Circles */
 .tabs li a:after,
 .tabs li a:before {
   width: 20px;
   height: 20px;
-
-  /* Circles are circular */
-  -webkit-border-radius: 10px;
-  -moz-border-radius: 10px;
   border-radius: 10px;
-
-  /* Use theme foreground (dark in light mode, light in dark mode) */
   background: var(--tabs-background);
-
-  /* Circles over squares */
   z-index: 2;
 }
 
@@ -121,13 +102,11 @@
   background: var(--tabs-inactive-bg);
 }
 
-/* First and last tabs have different outside color needs */
 .tabs li:first-child.active a:before,
 .tabs li:last-child.active a:after {
   background: var(--tabs-background);
 }
 
-/* Circle positions */
 .tabs li a:before {
   left: -20px;
 }
@@ -135,7 +114,6 @@
   right: -20px;
 }
 
-/* do not show neither square nor cirle before first and after last */
 .tabs li:first-child:before,
 .tabs li:first-child a:before,
 .tabs li:last-child:after,
@@ -143,45 +121,34 @@
   content: none;
 }
 
-/* Panel */
 .tabs_panel {
-  clear: both; /* the .tabs list uses floats */
+  /* clear: both; was removed as it's not needed for flexbox */
   position: relative;
-
-  /* Surface + text colors via tokens */
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-
-  padding: 1rem; /* 16px */
+  padding: 1rem;
 }
 
-
-
-/* Optional: vertical rhythm if multiple sections render inside */
-/* .tabs_panel > section + section {
-  margin-top: 0.75rem;
-} */
-
-/* ——— Compact mode helpers (auto‑toggled via data-compact) ——— */
-.tabs a .tab__icon { 
+.tabs a .tab__icon {
   display: inline-flex;
   vertical-align: middle;
-  margin-right: 0.5rem;        /* breathing room before label */
-  line-height: 0;              /* tighter alignment for inline SVGs */
+  margin-right: 0.5rem;
+  line-height: 0;
 }
-.tabs a .tab__icon svg { 
-  width: 18px; height: 18px;   /* keep icons crisp but modest */
-}
-
-/* When compact, hide labels and tighten horizontal padding */
-.tabs[data-compact="1"] a .tab__label { 
-  display: none; 
-}
-.tabs[data-compact="1"] a { 
-  padding: 10px 12px;          /* narrower pill for icons-only */
+.tabs a .tab__icon svg {
+  width: 18px;
+  height: 18px;
 }
 
-/* Remove the right gap if label is hidden */
-.tabs[data-compact="1"] a .tab__icon { 
-  margin-right: 0; 
+/* When the tabs list has data-compact="true", apply icon-only styles */
+.tabs[data-compact="true"] a .tab__label {
+  display: none;
+}
+
+.tabs[data-compact="true"] a .tab__icon {
+  margin-right: 0;
+}
+
+.tabs[data-compact="true"] a {
+  padding: 7px 15px;
 }
