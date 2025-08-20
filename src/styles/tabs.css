@@ -10,41 +10,32 @@
   list-style: none;
   margin: 0;
   padding-top: 5px;
-  
-  /* This is a standard fallback pattern. If --gradient is not defined, --tabs-background will be used. */
+
   background: var(--tabs-background);
   background: var(--gradient);
 
   display: flex;
   justify-content: center;
-  overflow-x: auto; /* Allows scrolling on very small screens if needed */
-  /* container-type was removed as it's no longer needed */
+  overflow-x: auto;
 }
 
 .tabs li {
   position: relative;
-  flex-shrink: 0; /* Prevents tabs from shrinking themselves */
+  flex-shrink: 0;
 }
 
 .tabs a {
   display: block;
   text-decoration: none;
-
   padding: 7px clamp(5px, 5vw, 80px);
-  white-space: nowrap; /* Keep icon and label on one line */
-
+  white-space: nowrap;
   color: var(--tabs-inactive-fg);
   background: var(--tabs-inactive-bg);
-
-  /* Obsolete -moz- and -webkit- prefixes for border-radius were removed */
   border-top-left-radius: 15px;
   border-top-right-radius: 15px;
 }
 
-.tabs .active {
-  z-index: 3;
-}
-
+.tabs .active { z-index: 3; }
 .tabs .active a {
   color: var(--tabs-active-fg);
   background: var(--tabs-active-bg);
@@ -81,15 +72,11 @@
   width: 10px;
   height: 10px;
 }
-.tabs li:before {
-  left: -10px;
-}
-.tabs li:after {
-  right: -10px;
-}
+.tabs li:before { left: -10px; }
+.tabs li:after  { right: -10px; }
 
-.tabs li a:after,
-.tabs li a:before {
+.tabs li a:before,
+.tabs li a:after {
   width: 20px;
   height: 20px;
   border-radius: 10px;
@@ -107,12 +94,8 @@
   background: var(--tabs-background);
 }
 
-.tabs li a:before {
-  left: -20px;
-}
-.tabs li a:after {
-  right: -20px;
-}
+.tabs li a:before { left: -20px; }
+.tabs li a:after  { right: -20px; }
 
 .tabs li:first-child:before,
 .tabs li:first-child a:before,
@@ -122,7 +105,6 @@
 }
 
 .tabs_panel {
-  /* clear: both; was removed as it's not needed for flexbox */
   position: relative;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -135,20 +117,24 @@
   margin-right: 0.5rem;
   line-height: 0;
 }
-.tabs a .tab__icon svg {
-  width: 18px;
-  height: 18px;
-}
+.tabs a .tab__icon svg { width: 18px; height: 18px; }
 
-/* When the tabs list has data-compact="true", apply icon-only styles */
-.tabs[data-compact="true"] a .tab__label {
-  display: none;
-}
-
+/* --- compact mode --- */
 .tabs[data-compact="true"] a .tab__icon {
   margin-right: 0;
 }
-
 .tabs[data-compact="true"] a {
   padding: 7px 15px;
+}
+.tabs[data-compact="true"] a .tab__label {
+  /* Visually hide but keep in accessibility tree */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

@@ -83,9 +83,9 @@ public/
     config.yaml
     domain.css
   default_connect.yaml
-  vite.svg
 scripts/
   i18n.mjs
+  release.mjs
 src/
   assets/
     solid.svg
@@ -94,6 +94,11 @@ src/
     chains.js
     wallet.js
   components/
+    feed/
+      ContentFeed.jsx
+    layout/
+      Container.jsx
+      TwoColumn.jsx
     main/
       MainView.jsx
       TabsBar.jsx
@@ -101,14 +106,27 @@ src/
       Assets.jsx
       DeveloperSection.jsx
       LocalIpfsSection.jsx
+    tabs/
+      ActualTab.jsx
+      CommentsTab.jsx
+      ForYouTab.jsx
+      index.js
+      LeadersTab.jsx
+      NewTab.jsx
+      NILRightPanel.jsx
+      NILTab.jsx
+      RightRailLayout.jsx
+      TabPanelScaffold.jsx
     ui/
       icons/
         TabIcons.jsx
       BackIconButton.jsx
       BrandLogo.jsx
       LangSelector.jsx
+      RightPaneFooter.jsx
       Tabs.jsx
       ThemeToggle.jsx
+      toast.js
     Header.jsx
     RightPane.jsx
     SwitchConnectDialog.jsx
@@ -130,7 +148,9 @@ src/
     Settings.jsx
   routing/
     hashRouter.js
+    tabRoutes.js
   styles/
+    layout.css
     tabs.css
     themed-controls.css
   theme/
@@ -142,11 +162,10 @@ src/
     assetsDiagnostics.js
     debug.js
     net.js
-  ux/
-    toast.js
   App.jsx
   index.css
   index.jsx
+  version.js
   vite-env.d.js
 .gitignore
 index.html
@@ -3261,276 +3280,83 @@ backendLink: https://ui.savva.app/api/
 gear: true
 </file>
 
-<file path="public/vite.svg">
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
-</file>
-
-<file path="scripts/i18n.mjs">
+<file path="scripts/release.mjs">
+// scripts/release.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { execSync } from "node:child_process";
 import dotenv from "dotenv";
-import OpenAI from "openai";
 
-// ---------- Config ----------
 const ROOT = process.cwd();
 dotenv.config({ path: path.join(ROOT, ".env") });
 
-const SRC_DIR = path.join(ROOT, "src");
-const I18N_DIR = path.join(SRC_DIR, "i18n");
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const BATCH_SIZE = 60; // how many keys to ask the model about per request
+const VERSION_FILE = path.join(ROOT, "src", "version.js");
+const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
+const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
 
-// ---------- Collect used keys (scan t("key") calls) ----------
-const exts = [".js", ".jsx", ".ts", ".tsx"];
-const usedKeys = new Set();
+const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
+const DEPLOY_USER = process.env.DEPLOY_USER || "";
+const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
+const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
+const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
 
-/**
- * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
- * (If you build keys dynamically, they won’t be picked up by any static scan.)
- */
-const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+function sh(cmd, opts = {}) {
+  console.log(`$ ${cmd}`);
+  return execSync(cmd, { stdio: "inherit", ...opts });
+}
 
-function walk(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === "dist") continue;
-      walk(p);
-    } else if (exts.includes(path.extname(entry.name))) {
-      const text = fs.readFileSync(p, "utf8");
-      let m;
-      while ((m = T_CALL.exec(text))) {
-        usedKeys.add(m[2]);
-      }
-    }
+function readVersion() {
+  const text = fs.readFileSync(VERSION_FILE, "utf8");
+  const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
+  if (!m) throw new Error("Could not parse APP_VERSION in src/version.js");
+  return { major: Number(m[1]), minor: Number(m[2]), text };
+}
+
+function writeVersion(major, minor, prevText) {
+  const next = `${major}.${minor}`;
+  const out = prevText.replace(/APP_VERSION\s*=\s*["'`](\d+\.\d+)["'`]/, `APP_VERSION = "${next}"`);
+  fs.writeFileSync(VERSION_FILE, out, "utf8");
+  return next;
+}
+
+function build() {
+  sh("npm run build");
+}
+
+function gitCommitAndPush(version) {
+  try { sh("git add -A"); } catch {}
+  try { sh(`git commit -m "release: v${version}"`); }
+  catch { console.warn("No changes to commit."); }
+  // Push current branch
+  try { sh("git rev-parse --abbrev-ref HEAD"); } catch {}
+  try { sh("git push"); } catch {}
+  // Also push HEAD to Prod branch (without switching)
+  try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
+}
+
+function deploy() {
+  if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
+    console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
+    return;
   }
+  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
+  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
+
+  // Ensure path exists, then scp
+  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
+  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
 }
 
-walk(SRC_DIR);
-
-// ---------- Helpers to load & write lang files ----------
-function isLangFile(name) {
-  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
-}
-function toModuleURL(filePath) {
-  return pathToFileURL(filePath).href;
-}
-async function loadLang(filePath) {
-  const mod = await import(toModuleURL(filePath));
-  const dict = mod?.default || {};
-  const normalized = {};
-  for (const [k, v] of Object.entries(dict)) {
-    normalized[k] = typeof v === "string" ? v : String(v);
-  }
-  return normalized;
-}
-function writeLang(filePath, obj) {
-  const sorted = Object.keys(obj)
-    .sort()
-    .reduce((acc, k) => {
-      acc[k] = obj[k];
-      return acc;
-    }, {});
-  const body =
-    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
-    "export default " +
-    JSON.stringify(sorted, null, 2) +
-    ";\n";
-  fs.writeFileSync(filePath, body, "utf8");
-  console.log(`[i18n] Updated ${path.relative(ROOT, filePath)} (${Object.keys(sorted).length} keys)`);
-}
-
-// ---------- OpenAI helpers ----------
-let openai = null;
-if (OPENAI_KEY) {
-  openai = new OpenAI({ apiKey: OPENAI_KEY });
-}
-
-function chunk(arr, size) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
-async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
-  if (!openai) return {};
-  const res = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          `You are a localization copywriter for a web app. ` +
-          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
-          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
-          `Do not add extra keys.`,
-      },
-      { role: "user", content: prompt },
-    ],
-  });
-  const text = res.choices?.[0]?.message?.content || "{}";
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
-
-async function fillEnglish(keys) {
-  const out = {};
-  for (const group of chunk(keys, BATCH_SIZE)) {
-    const prompt =
-      `For each key, produce an English UI string (microcopy). ` +
-      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
-      JSON.stringify({ keys: group }, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-async function translateTo(langCode, pairs /* [{key, en}] */) {
-  const out = {};
-  for (const group of chunk(pairs, BATCH_SIZE)) {
-    const prompt =
-      `Translate the following English app strings to ${langCode}. ` +
-      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
-      `Use natural ${langCode} for a consumer web app (not formal/legal). ` +
-      `Return a JSON object mapping "key" -> "translated string".\n\n` +
-      JSON.stringify({ items: group }, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-// ---------- Main ----------
 (async function main() {
-  // Sanity
-  if (!fs.existsSync(I18N_DIR)) {
-    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
-    process.exit(1);
-  }
+  const { major, minor, text } = readVersion();
+  const nextVersion = writeVersion(major, minor + 1, text);
+  console.log(`Bumped version to ${nextVersion}`);
 
-  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
-  if (langFiles.length === 0) {
-    console.error("[i18n] No language files found in src/i18n");
-    process.exit(1);
-  }
+  build();
+  gitCommitAndPush(nextVersion);
+  deploy();
 
-  const enPath = path.join(I18N_DIR, "en.js");
-  if (!fs.existsSync(enPath)) {
-    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
-    process.exit(1);
-  }
-
-  // Load all dicts
-  const dicts = {};
-  for (const f of langFiles) {
-    dicts[f] = await loadLang(path.join(I18N_DIR, f));
-  }
-
-  const desiredKeys = new Set(usedKeys);
-  console.log(`[i18n] Used keys found: ${desiredKeys.size}`);
-
-  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
-  const enOrig = dicts["en.js"] || {};
-  const enNew = {};
-  const missingEn = [];
-
-  for (const k of desiredKeys) {
-    const v = enOrig[k];
-    const isMissingValue =
-      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-    if (isMissingValue) {
-      enNew[k] = "???";
-      missingEn.push(k);
-    } else {
-      enNew[k] = v;
-    }
-  }
-
-  writeLang(enPath, enNew);
-  console.log(`[i18n] en.js cleaned. Missing or "???": ${missingEn.length}`);
-
-  // ---------- 2) Fill English "???" via OpenAI ----------
-  if (missingEn.length > 0) {
-    if (!openai) {
-      console.warn(
-        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
-      );
-    } else {
-      const filled = await fillEnglish(missingEn);
-      let filledCount = 0;
-      for (const k of missingEn) {
-        const candidate = filled[k];
-        if (typeof candidate === "string" && candidate.trim()) {
-          enNew[k] = candidate.trim();
-          filledCount++;
-        }
-      }
-      writeLang(enPath, enNew);
-      console.log(`[i18n] en.js: filled ${filledCount} English strings via OpenAI.`);
-    }
-  } else {
-    console.log("[i18n] No missing English strings to fill.");
-  }
-
-  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
-  for (const f of langFiles) {
-    if (f === "en.js") continue;
-
-    const langPath = path.join(I18N_DIR, f);
-    const langCode = path.basename(f, ".js");
-    const langDict = dicts[f] || {};
-
-    // Prune/prepare
-    const out = {};
-    const toTranslate = [];
-    for (const k of desiredKeys) {
-      const v = langDict[k];
-      const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-      if (isMissing) {
-        out[k] = "???";
-        // Only translate if we have an English source string
-        if (typeof enNew[k] === "string" && enNew[k].trim()) {
-          toTranslate.push({ key: k, en: enNew[k] });
-        }
-      } else {
-        out[k] = v;
-      }
-    }
-
-    writeLang(langPath, out);
-
-    if (toTranslate.length === 0) {
-      console.log(`[i18n] ${langCode}: nothing to translate.`);
-      continue;
-    }
-
-    if (!openai) {
-      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
-      continue;
-    }
-
-    const translated = await translateTo(langCode, toTranslate);
-    let translatedCount = 0;
-    for (const { key } of toTranslate) {
-      const t = translated[key];
-      if (typeof t === "string" && t.trim() && out[key] === "???") {
-        out[key] = t.trim();
-        translatedCount++;
-      }
-    }
-    writeLang(langPath, out);
-    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
-  }
-
-  console.log("[i18n] Done.");
+  console.log(`Done. Released v${nextVersion}.`);
 })().catch((err) => {
   console.error(err);
   process.exit(1);
@@ -3541,194 +3367,281 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
 </file>
 
-<file path="src/components/main/MainView.jsx">
-// src/components/main/MainView.jsx
-import { createMemo, Show } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import TabsBar from "./TabsBar";
+<file path="src/components/feed/ContentFeed.jsx">
+// src/components/feed/ContentFeed.jsx
+import { createSignal, onCleanup, onMount, For, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
 
-export default function MainView() {
-  const { t, selectedDomain, domainAssetsConfig } = useApp();
+const DEFAULT_PAGE_SIZE = 12;
 
-  // reactive domain name
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    return !d ? "" : typeof d === "string" ? d : d.name || "";
-  });
+export default function ContentFeed(props) {
+  const { t } = useApp();
+  const mode = () => (props.mode === "grid" ? "grid" : "list");
 
-  // keep a localized title ready (even if not shown yet)
-  const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
 
-  // revision flips when domain or asset pack (prod/test) changes
-  const revision = createMemo(() => {
-    const cfg = domainAssetsConfig?.();
-    const cid = cfg?.assets_cid || cfg?.cid || "";
-    const tabs = cfg?.modules?.tabs || "";
-    return `${domainName()}|${cid}|${tabs}`;
+  let sentinel;
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    try {
+      const nextPage = page() + 1;
+      const chunk =
+        (await props.fetchPage?.(nextPage, props.pageSize || DEFAULT_PAGE_SIZE)) ??
+        Array.from({ length: props.pageSize || DEFAULT_PAGE_SIZE }, (_, i) => ({
+          id: `mock_${nextPage}_${i}`,
+          text: `Test content item #${nextPage}-${i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque non turpis sed est malesuada tempus.`
+        }));
+      if (!chunk.length) setHasMore(false);
+      setItems((prev) => prev.concat(chunk));
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(() => {
+    loadMore();
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && loadMore()),
+      { rootMargin: "600px 0px 600px 0px" }
+    );
+    if (sentinel) io.observe(sentinel);
+    onCleanup(() => io.disconnect());
   });
 
   return (
     <div class="w-full">
-      {/* Remount children when revision changes so everything re-reads configs */}
-      <Show when={revision()} keyed>
-        {() => <TabsBar />}
+      <div
+        class={
+          mode() === "grid"
+            ? "grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+            : "flex flex-col gap-3"
+        }
+      >
+        <For each={items()}>
+          {(it) => (
+            <article class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-3">
+              <h4 class="font-semibold mb-2">Post {it.id}</h4>
+              <p class="text-sm leading-snug">
+                {it.text ||
+                  "This is placeholder post content. Scroll down to trigger infinite loading and see more items appear."}
+              </p>
+              <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                — Posted just now
+              </div>
+            </article>
+          )}
+        </For>
+      </div>
+
+      <div ref={(el) => (sentinel = el)} class="h-10" />
+
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))]">{t("common.loading")}</div>
       </Show>
     </div>
   );
 }
 </file>
 
-<file path="src/components/settings/Assets.jsx">
-// src/components/settings/Assets.jsx
-import { createSignal, createMemo, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { assessAssets } from "../../utils/assetsDiagnostics";
+<file path="src/components/layout/Container.jsx">
+// src/components/layout/Container.jsx
+export default function Container(props) {
+  return <div class={`sv-container ${props.class || ""}`}>{props.children}</div>;
+}
+</file>
 
-export default function Assets() {
-  const app = useApp();
-  const { t } = app;
-
-  const env = createMemo(() => app.assetsEnv?.() || "prod");
-  const [busySwitch, setBusySwitch] = createSignal(false);
-  async function switchEnv(next) {
-    if (next === env()) return;
-    try {
-      setBusySwitch(true);
-      app.setAssetsEnv?.(next);
-      await app.refreshDomainAssets?.();
-    } finally { setBusySwitch(false); }
-  }
-
-  const [busyDiag, setBusyDiag] = createSignal(false);
-  const [report, setReport] = createSignal(null);
-  const [err, setErr] = createSignal(null);
-
-  async function runDiagnostics() {
-    setBusyDiag(true); setErr(null);
-    try {
-      const r = await assessAssets({
-        env: app.assetsEnv?.(),
-        assetsBaseUrl: app.assetsBaseUrl?.(),
-        selectedDomainName: (() => { const d = app.selectedDomain?.(); return typeof d === "string" ? d : (d?.name || ""); })(),
-        domainAssetsPrefixActive: app.domainAssetsPrefix?.(),
-        domainAssetsConfig: app.domainAssetsConfig?.(),
-        domainAssetsSource: app.domainAssetsSource?.(),
-      });
-      setReport(r);
-    } catch (e) { setErr(e); } finally { setBusyDiag(false); }
-  }
-
-  const Row = (props) => (
-    <div class="grid grid-cols-[160px_1fr] gap-2 py-1">
-      <div class="text-sm text-[hsl(var(--muted-foreground))]">{props.label}</div>
-      <div class="text-sm break-all">{props.children}</div>
+<file path="src/components/layout/TwoColumn.jsx">
+// src/components/layout/TwoColumn.jsx
+export default function TwoColumn(props) {
+  // props.aside is the node for the right column
+  return (
+    <div class="sv-content-grid">
+      <section class="sv-main">{props.children}</section>
+      {props.aside && <aside class="sv-aside">{props.aside}</aside>}
     </div>
   );
+}
+</file>
+
+<file path="src/components/tabs/ActualTab.jsx">
+// src/components/tabs/ActualTab.jsx
+import TabPanelScaffold from "./TabPanelScaffold";
+
+export default function ActualTab(props) {
+  return (
+    <TabPanelScaffold title={props.title}>
+      {/* TODO: actual content */}
+    </TabPanelScaffold>
+  );
+}
+</file>
+
+<file path="src/components/tabs/CommentsTab.jsx">
+// src/components/tabs/CommentsTab.jsx
+import TabPanelScaffold from "./TabPanelScaffold";
+
+export default function CommentsTab(props) {
+  return (
+    <TabPanelScaffold title={props.title}>
+      {/* TODO: comments stream */}
+    </TabPanelScaffold>
+  );
+}
+</file>
+
+<file path="src/components/tabs/ForYouTab.jsx">
+// src/components/tabs/ForYouTab.jsx
+import TabPanelScaffold from "./TabPanelScaffold";
+
+export default function ForYouTab(props) {
+  return (
+    <TabPanelScaffold title={props.title}>
+      {/* TODO: personalized feed */}
+    </TabPanelScaffold>
+  );
+}
+</file>
+
+<file path="src/components/tabs/LeadersTab.jsx">
+// src/components/tabs/LeadersTab.jsx
+import TabPanelScaffold from "./TabPanelScaffold";
+
+export default function LeadersTab(props) {
+  return (
+    <TabPanelScaffold title={props.title}>
+      {/* TODO: leaders feed */}
+    </TabPanelScaffold>
+  );
+}
+</file>
+
+<file path="src/components/tabs/NILRightPanel.jsx">
+// src/components/tabs/NILRightPanel.jsx
+import { useApp } from "../../context/AppContext.jsx";
+
+const HEADER_H = 48; // keep synced with header height
+
+export default function NILRightPanel() {
+  const { t } = useApp();
 
   return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h3 class="text-lg font-medium">{t("settings.dev.assets.title")}</h3>
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.env")}</span>
-          <div class="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
-            <button
-              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
-              disabled={busySwitch()} onClick={() => switchEnv("prod")}
-            >
-              {t("settings.dev.assets.env.prod")}
-            </button>
-            <button
-              class={`px-3 py-1.5 text-sm border-l border-[hsl(var(--border))] ${env() === "test" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
-              disabled={busySwitch()} onClick={() => switchEnv("test")}
-            >
-              {t("settings.dev.assets.env.test")}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="rounded-md bg-[hsl(var(--muted))] p-3 space-y-1">
-        <Row label={t("settings.dev.assets.env")}>{env()}</Row>
-        <Row label={t("settings.dev.assets.baseUrl")}>{app.assetsBaseUrl?.() || "—"}</Row>
-        <Row label={t("settings.dev.assets.prefix.active")}>{app.domainAssetsPrefix?.() || "—"}</Row>
-        <Row label={t("settings.dev.assets.source")}>{app.domainAssetsSource?.() || "—"}</Row>
-      </div>
-
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">{t("settings.dev.assets.diagnostics.title")}</div>
-        <button
-          class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
-          onClick={runDiagnostics}
-          disabled={busyDiag()}
+    <aside
+      class="hidden lg:block"
+      style={{ position: "sticky", top: `${HEADER_H}px` }}
+    >
+      <div
+        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]"
+        style={{
+          "max-height": `calc(100vh - ${HEADER_H}px)`,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          class="p-3 space-y-3 overflow-auto"
+          style={{ "max-height": `calc(100vh - ${HEADER_H}px - 1px - 1px)` }}
         >
-          {busyDiag() ? t("common.loading") : t("settings.dev.assets.diagnostics.run")}
-        </button>
-      </div>
+          <h4 class="font-semibold">Right Panel</h4>
+          <p class="text-sm">
+            {t("main.tabs.empty")} — this content is intentionally long to
+            demonstrate internal scrolling:
+          </p>
 
-      {err() && <div class="text-sm text-[hsl(var(--destructive))]">
-        {t("settings.dev.assets.diagnostics.error")}: {String(err())}
-      </div>}
-
-      <Show when={report()}>
-        <div class="space-y-2">
-          <Row label={t("settings.dev.assets.domain")}>{report().domain || "—"}</Row>
-          <Row label={t("settings.dev.assets.prefix.computed")}>{report().computedDomainPrefix || "—"}</Row>
-
-          {/* Active config (what the app is really using) */}
-          <Row label={t("settings.dev.assets.configUrl")}>
-            <Show when={report().appConfigUrl} fallback={"—"}>
-              <span class="inline-flex items-center gap-2">
-                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="underline">{report().appConfigUrl}</a>
-                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
-              </span>
-            </Show>
-          </Row>
-
-          {/* Also show the env+domain computed config */}
-          <Row label={t("settings.dev.assets.configUrl.computed")}>
-            <Show when={report().computedDomainPrefix} fallback={"—"}>
-              <span class="inline-flex items-center gap-2">
-                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="underline">
-                  {report().computedDomainPrefix + "config.yaml"}
-                </a>
-                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
-              </span>
-            </Show>
-          </Row>
-
-          {/* Checks */}
-          <div class="pt-2 text-xs space-y-1">
-            <div><b>{t("settings.dev.assets.diagnostics.primary")}</b>: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
-            <Show when={report().primaryConfig.status === -1 && report().primaryConfig.error}>
-              <div class="text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.diagnostics.noteNetwork")} {report().primaryConfig.error}</div>
-            </Show>
-            <div><b>{t("settings.dev.assets.diagnostics.default")}</b>: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
+          {/* demo long content */}
+          <ul class="list-disc ml-5 text-sm space-y-1">
+            <li>Example item A</li>
+            <li>Example item B</li>
+            <li>Example item C</li>
+          </ul>
+          <div class="text-sm leading-snug space-y-2">
+            <p>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis
+              congue, magna non gravida finibus, felis nisl finibus nunc,
+              laoreet imperdiet arcu erat in felis.
+            </p>
+            <p>
+              Sed vitae lectus nec nisl elementum bibendum. Phasellus vel orci
+              vitae lectus dapibus rhoncus. Suspendisse vehicula arcu a sem
+              pharetra, at pulvinar ex gravida.
+            </p>
+            <p>
+              Maecenas at urna sed turpis pretium volutpat. Aliquam vulputate
+              porttitor metus, ut interdum ante semper quis.
+            </p>
+            <p>
+              Praesent fermentum, justo eu volutpat ultricies, eros ante
+              facilisis risus, eget dictum quam nibh a neque. Integer
+              ullamcorper, ipsum non consequat sollicitudin, arcu massa
+              elementum est, vitae gravida nibh nibh vel eros.
+            </p>
+            <p>
+              Ut at vestibulum nibh. Vivamus euismod, justo vitae dictum
+              posuere, mi quam viverra quam, et dictum ex tellus non augue.
+            </p>
+            <p>
+              Integer dignissim lacus sed nibh posuere, vitae luctus lectus
+              rhoncus. Vestibulum ante ipsum primis in faucibus orci luctus et
+              ultrices posuere cubilia curae; Quisque ut odio non velit maximus
+              mollis.
+            </p>
           </div>
-
-          {/* Summary */}
-          <div class="pt-2 text-xs space-y-1">
-            <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasFavicon")}: {String(report().appParsedConfigPresence.hasFavicon)}</div>
-          </div>
-
-          {/* Sample fetches */}
-          <Show when={report().resolvedSamples?.length}>
-            <div class="pt-2">
-              <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.sampleFetches")}</div>
-              <ul class="mt-1 space-y-1 text-xs">
-                {report().resolvedSamples.map((s) => (
-                  <li>{s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})</li>
-                ))}
-              </ul>
-            </div>
-          </Show>
         </div>
-      </Show>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="src/components/tabs/NILTab.jsx">
+// src/components/tabs/NILTab.jsx
+import ContentFeed from "../feed/ContentFeed.jsx";
+
+const HEADER_H = 48; // header height for min page height
+
+export default function NILTab(props) {
+  // mock async page loader; replace with backend fetcher later
+  async function fetchPage(page, pageSize) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (page > 6) return [];
+    return Array.from({ length: pageSize }, (_, i) => ({
+      id: `nil_${page}_${i}`,
+      text: `NIL content item ${page}-${i}: long text to demonstrate scrolling.`,
+    }));
+  }
+
+  return (
+    <section class="w-full" style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}>
+      <ContentFeed
+        mode={props.tab?._raw?.mode === "grid" ? "grid" : "list"}
+        fetchPage={fetchPage}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/TabPanelScaffold.jsx">
+// src/components/tabs/TabPanelScaffold.jsx
+import { useApp } from "../../context/AppContext";
+
+/**
+ * Minimal shared scaffold for tab content: title + body container.
+ */
+export default function TabPanelScaffold(props) {
+  const { t } = useApp();
+  return (
+    <section class="space-y-2">
+      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">
+        {props.title || t("main.tabs.untitled")}
+      </h3>
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">
+        {props.children ?? t("main.tabs.empty")}
+      </div>
     </section>
   );
 }
@@ -3846,6 +3759,34 @@ export default function LangPillSelector(props) {
 }
 </file>
 
+<file path="src/components/ui/RightPaneFooter.jsx">
+// src/components/ui/RightPaneFooter.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { APP_VERSION } from "../../version";
+
+export default function RightPaneFooter() {
+  const { t } = useApp();
+  const WEBSITE_URL = import.meta.env.VITE_WEBSITE_URL || "https://savva.app";
+
+  return (
+    <div class="mt-auto pt-3 border-t border-[hsl(var(--border))] text-xs text-[hsl(var(--muted-foreground))]">
+      <div class="flex items-center justify-between">
+        <span>{t("app.versionLabel")} v{APP_VERSION}</span>
+        <a
+          href={WEBSITE_URL}
+          target="_blank"
+          rel="noreferrer"
+          class="underline hover:opacity-80 text-[hsl(var(--foreground))]"
+        >
+          {t("app.website")}
+        </a>
+      </div>
+      <div class="mt-1 opacity-80">{t("app.poweredBy")}</div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/ThemeToggle.jsx">
 // src/components/ui/ThemeIconToggle.jsx
 import { useTheme } from "../../hooks/useTheme";
@@ -3900,88 +3841,71 @@ export default function ThemeIconToggle(props) {
 }
 </file>
 
-<file path="src/dev/AssetDebugTap.jsx">
-// src/dev/AssetDebugTap.jsx
-/* src/dev/AssetDebugTap.jsx */
-import { createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { dbg } from "../utils/debug";
+<file path="src/components/ui/toast.js">
+import { createSignal } from "solid-js";
 
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
 
-export default function AssetDebugTap() {
-  const app = useApp();
+let counter = 0;
 
-  // Track & log env
-  let prevEnv;
-  createEffect(() => {
-    const next = app.assetsEnv?.();
-    if (prevEnv !== next) {
-      dbg.log("assets", "assetsEnv changed:", { prev: prevEnv, next });
-      prevEnv = next;
-    }
+export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
+  const id = ++counter;
+  const item = { id, type, message: String(message || ""), details, expanded: false };
+  setToasts((curr) => [...curr, item]);
+  if (autohideMs > 0 && type !== "error") {
+    setTimeout(() => dismissToast(id), autohideMs);
+  }
+  return id;
+}
+
+export function dismissToast(id) {
+  setToasts((curr) => curr.filter((t) => t.id !== id));
+}
+
+export function toggleToast(id) {
+  setToasts((curr) =>
+    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
+  );
+}
+
+/** Convenience: turn any Error (or unknown) into a compact, useful details object */
+export function errorDetails(err, extra = {}) {
+  if (!err) return extra || {};
+  const base = {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    type: err.type,
+    status: err.status,
+    stack: err.stack,
+    cause: err.cause && typeof err.cause === "object" ? {
+      name: err.cause.name,
+      message: err.cause.message,
+      code: err.cause.code,
+      status: err.cause.status,
+    } : undefined,
+  };
+  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
+  if (Array.isArray(err.causes)) {
+    base.causes = err.causes.map((e) => ({
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+    }));
+  }
+  // Merge caller-provided context (like URL, gateway, endpoint)
+  return { ...base, ...extra };
+}
+
+/** push an error toast with extracted details */
+export function pushErrorToast(err, context = {}) {
+  return pushToast({
+    type: "error",
+    message: err?.message || "Unexpected error",
+    details: errorDetails(err, context),
+    autohideMs: 0, // errors stay until closed
   });
-
-  // Track & log base URL from /info
-  let prevBase;
-  createEffect(() => {
-    const next = app.assetsBaseUrl?.();
-    if (prevBase !== next) {
-      dbg.log("assets", "assetsBaseUrl changed:", { prev: prevBase, next });
-      prevBase = next;
-    }
-  });
-
-  // Track & log selected domain
-  let prevDomain;
-  createEffect(() => {
-    const next = dn(app.selectedDomain?.());
-    if (prevDomain !== next) {
-      dbg.log("assets", "selectedDomain changed:", { prev: prevDomain, next });
-      prevDomain = next;
-    }
-  });
-
-  // Track & log ACTIVE prefix the app uses for all assets
-  let prevPrefix;
-  createEffect(() => {
-    const next = app.domainAssetsPrefix?.();
-    if (prevPrefix !== next) {
-      dbg.log("assets", "domainAssetsPrefix (ACTIVE) changed:", { prev: prevPrefix, next });
-      prevPrefix = next;
-    }
-  });
-
-  // Track & log where the config came from: remote (domain) vs default pack
-  let prevSource;
-  createEffect(() => {
-    const next = app.domainAssetsSource?.();
-    if (prevSource !== next) {
-      dbg.log("assets", "domainAssetsSource changed:", { prev: prevSource, next });
-      prevSource = next;
-    }
-  });
-
-  // Track & log parsed config.yaml presence and key fields (logos/tabs)
-  let prevStamp;
-  createEffect(() => {
-    const cfg = app.domainAssetsConfig?.();
-    const stamp = cfg ? JSON.stringify({ cid: cfg.assets_cid || cfg.cid || null, gotLogos: !!(cfg.logos || cfg.logo), tabs: !!cfg.modules?.tabs }) : "null";
-    if (prevStamp !== stamp) {
-      dbg.group("assets", "domainAssetsConfig loaded/changed", () => {
-        dbg.log("assets", "summary:", {
-          hasConfig: !!cfg,
-          hasLogos: !!(cfg?.logos || cfg?.logo),
-          tabsPath: cfg?.modules?.tabs || null,
-          assets_cid: cfg?.assets_cid || cfg?.cid || null,
-        });
-      });
-      prevStamp = stamp;
-    }
-  });
-
-  // Nothing to render
-  return null;
 }
 </file>
 
@@ -4132,35 +4056,28 @@ export function useHashRouter() {
 }
 </file>
 
-<file path="src/styles/themed-controls.css">
-/* src/styles/themed-controls.css */
-.themed-segment {
-  display: inline-flex;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 9999px;
-  background: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
+<file path="src/routing/tabRoutes.js">
+// src/routing/tabRoutes.js
+// Tiny helpers for tab <-> URL
+export const TAB_PREFIX = "/t";
+
+function slug(s) {
+  return String(s || "").trim().toLowerCase();
 }
 
-.themed-pill {
-  appearance: none;
-  border: 0;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  line-height: 1;
-  font-weight: 600;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  outline: none;
+/** e.g., "leaders" -> "/t/leaders" */
+export function tabPath(idOrType) {
+  const key = slug(idOrType);
+  return `${TAB_PREFIX}/${encodeURIComponent(key)}`;
 }
-.themed-pill:hover { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
-.themed-pill.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.themed-pill:focus { outline: none; box-shadow: none; }
 
-.themed-pill--icon { padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; }
-.themed-pill--icon svg { display: block; }
+/** If route is "/t/<key>" returns "<key>", else "" */
+export function tabKeyFromRoute(route) {
+  const r = String(route || "");
+  if (!r.startsWith(TAB_PREFIX + "/")) return "";
+  const key = r.slice((TAB_PREFIX + "/").length);
+  return decodeURIComponent(key || "");
+}
 </file>
 
 <file path="src/theme/FaviconLoader.jsx">
@@ -4436,74 +4353,6 @@ export async function fetchWithTimeout(
 }
 </file>
 
-<file path="src/ux/toast.js">
-import { createSignal } from "solid-js";
-
-export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
-
-let counter = 0;
-
-export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
-  const id = ++counter;
-  const item = { id, type, message: String(message || ""), details, expanded: false };
-  setToasts((curr) => [...curr, item]);
-  if (autohideMs > 0 && type !== "error") {
-    setTimeout(() => dismissToast(id), autohideMs);
-  }
-  return id;
-}
-
-export function dismissToast(id) {
-  setToasts((curr) => curr.filter((t) => t.id !== id));
-}
-
-export function toggleToast(id) {
-  setToasts((curr) =>
-    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
-  );
-}
-
-/** Convenience: turn any Error (or unknown) into a compact, useful details object */
-export function errorDetails(err, extra = {}) {
-  if (!err) return extra || {};
-  const base = {
-    name: err.name,
-    message: err.message,
-    code: err.code,
-    type: err.type,
-    status: err.status,
-    stack: err.stack,
-    cause: err.cause && typeof err.cause === "object" ? {
-      name: err.cause.name,
-      message: err.cause.message,
-      code: err.cause.code,
-      status: err.cause.status,
-    } : undefined,
-  };
-  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
-  if (Array.isArray(err.causes)) {
-    base.causes = err.causes.map((e) => ({
-      name: e?.name,
-      message: e?.message,
-      code: e?.code,
-      status: e?.status,
-    }));
-  }
-  // Merge caller-provided context (like URL, gateway, endpoint)
-  return { ...base, ...extra };
-}
-
-/** push an error toast with extracted details */
-export function pushErrorToast(err, context = {}) {
-  return pushToast({
-    type: "error",
-    message: err?.message || "Unexpected error",
-    details: errorDetails(err, context),
-    autohideMs: 0, // errors stay until closed
-  });
-}
-</file>
-
 <file path="src/vite-env.d.js">
 /// <reference types="vite/client" />
 </file>
@@ -4596,6 +4445,272 @@ Learn more about deploying your application with the [documentations](https://vi
   },
   "include": ["vite.config.js"]
 }
+</file>
+
+<file path="scripts/i18n.mjs">
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import dotenv from "dotenv";
+import OpenAI from "openai";
+
+// ---------- Config ----------
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const SRC_DIR = path.join(ROOT, "src");
+const I18N_DIR = path.join(SRC_DIR, "i18n");
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const BATCH_SIZE = 60; // how many keys to ask the model about per request
+
+// ---------- Collect used keys (scan t("key") calls) ----------
+const exts = [".js", ".jsx", ".ts", ".tsx"];
+const usedKeys = new Set();
+
+/**
+ * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
+ * (If you build keys dynamically, they won’t be picked up by any static scan.)
+ */
+const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
+      walk(p);
+    } else if (exts.includes(path.extname(entry.name))) {
+      const text = fs.readFileSync(p, "utf8");
+      let m;
+      while ((m = T_CALL.exec(text))) {
+        usedKeys.add(m[2]);
+      }
+    }
+  }
+}
+
+walk(SRC_DIR);
+
+// ---------- Helpers to load & write lang files ----------
+function isLangFile(name) {
+  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
+}
+function toModuleURL(filePath) {
+  return pathToFileURL(filePath).href;
+}
+async function loadLang(filePath) {
+  const mod = await import(toModuleURL(filePath));
+  const dict = mod?.default || {};
+  const normalized = {};
+  for (const [k, v] of Object.entries(dict)) {
+    normalized[k] = typeof v === "string" ? v : String(v);
+  }
+  return normalized;
+}
+function writeLang(filePath, obj) {
+  const sorted = Object.keys(obj)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = obj[k];
+      return acc;
+    }, {});
+  const body =
+    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
+    "export default " +
+    JSON.stringify(sorted, null, 2) +
+    ";\n";
+  fs.writeFileSync(filePath, body, "utf8");
+}
+
+// ---------- OpenAI helpers ----------
+let openai = null;
+if (OPENAI_KEY) {
+  openai = new OpenAI({ apiKey: OPENAI_KEY });
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
+  if (!openai) return {};
+  const res = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          `You are a localization copywriter for a web app. ` +
+          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
+          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
+          `Do not add extra keys.`,
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+  const text = res.choices?.[0]?.message?.content || "{}";
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+async function fillEnglish(keys) {
+  const out = {};
+  for (const group of chunk(keys, BATCH_SIZE)) {
+    const prompt =
+      `For each key, produce an English UI string (microcopy). ` +
+      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
+      JSON.stringify({ keys: group }, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+async function translateTo(langCode, pairs /* [{key, en}] */) {
+  const out = {};
+  for (const group of chunk(pairs, BATCH_SIZE)) {
+    const prompt =
+      `Translate the following English app strings to ${langCode}. ` +
+      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
+      `Use natural ${langCode} for a consumer web app (not formal/legal). ` +
+      `Return a JSON object mapping "key" -> "translated string".\n\n` +
+      JSON.stringify({ items: group }, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+// ---------- Main ----------
+(async function main() {
+  // Sanity
+  if (!fs.existsSync(I18N_DIR)) {
+    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
+    process.exit(1);
+  }
+
+  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
+  if (langFiles.length === 0) {
+    console.error("[i18n] No language files found in src/i18n");
+    process.exit(1);
+  }
+
+  const enPath = path.join(I18N_DIR, "en.js");
+  if (!fs.existsSync(enPath)) {
+    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
+    process.exit(1);
+  }
+
+  // Load all dicts
+  const dicts = {};
+  for (const f of langFiles) {
+    dicts[f] = await loadLang(path.join(I18N_DIR, f));
+  }
+
+  const desiredKeys = new Set(usedKeys);
+
+  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
+  const enOrig = dicts["en.js"] || {};
+  const enNew = {};
+  const missingEn = [];
+
+  for (const k of desiredKeys) {
+    const v = enOrig[k];
+    const isMissingValue =
+      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+    if (isMissingValue) {
+      enNew[k] = "???";
+      missingEn.push(k);
+    } else {
+      enNew[k] = v;
+    }
+  }
+
+  writeLang(enPath, enNew);
+
+  // ---------- 2) Fill English "???" via OpenAI ----------
+  if (missingEn.length > 0) {
+    if (!openai) {
+      console.warn(
+        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
+      );
+    } else {
+      const filled = await fillEnglish(missingEn);
+      let filledCount = 0;
+      for (const k of missingEn) {
+        const candidate = filled[k];
+        if (typeof candidate === "string" && candidate.trim()) {
+          enNew[k] = candidate.trim();
+          filledCount++;
+        }
+      }
+      writeLang(enPath, enNew);
+    }
+  } else {
+    console.log("[i18n] No missing English strings to fill.");
+  }
+
+  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
+  for (const f of langFiles) {
+    if (f === "en.js") continue;
+
+    const langPath = path.join(I18N_DIR, f);
+    const langCode = path.basename(f, ".js");
+    const langDict = dicts[f] || {};
+
+    // Prune/prepare
+    const out = {};
+    const toTranslate = [];
+    for (const k of desiredKeys) {
+      const v = langDict[k];
+      const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+      if (isMissing) {
+        out[k] = "???";
+        // Only translate if we have an English source string
+        if (typeof enNew[k] === "string" && enNew[k].trim()) {
+          toTranslate.push({ key: k, en: enNew[k] });
+        }
+      } else {
+        out[k] = v;
+      }
+    }
+
+    writeLang(langPath, out);
+
+    if (toTranslate.length === 0) {
+      console.log(`[i18n] ${langCode}: nothing to translate.`);
+      continue;
+    }
+
+    if (!openai) {
+      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
+      continue;
+    }
+
+    const translated = await translateTo(langCode, toTranslate);
+    let translatedCount = 0;
+    for (const { key } of toTranslate) {
+      const t = translated[key];
+      if (typeof t === "string" && t.trim() && out[key] === "???") {
+        out[key] = t.trim();
+        translatedCount++;
+      }
+    }
+    writeLang(langPath, out);
+    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
+  }
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 </file>
 
 <file path="src/blockchain/chainLogos.js">
@@ -4794,6 +4909,893 @@ export async function switchOrAddChain(meta) {
 export { walletAccount, walletChainId };
 </file>
 
+<file path="src/components/main/MainView.jsx">
+// src/components/main/MainView.jsx
+import { createMemo, Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import TabsBar from "./TabsBar";
+import Container from "../layout/Container";
+
+export default function MainView() {
+  const { t, selectedDomain, domainAssetsConfig } = useApp();
+
+  // reactive domain name
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
+  });
+
+  // localized title (not rendered here but kept ready)
+  const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
+
+  // change key when domain or assets pack changes to remount children
+  const revision = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const tabs = cfg?.modules?.tabs || "";
+    return `${domainName()}|${cid}|${tabs}`;
+  });
+
+  return (
+    <Container>
+      <div class="w-full">
+        <Show when={revision()} keyed>
+          {() => <TabsBar />}
+        </Show>
+      </div>
+    </Container>
+  );
+}
+</file>
+
+<file path="src/components/settings/Assets.jsx">
+// src/components/settings/Assets.jsx
+import { createSignal, createMemo, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { assessAssets } from "../../utils/assetsDiagnostics";
+
+export default function Assets() {
+  const app = useApp();
+  const { t } = app;
+
+  const env = createMemo(() => app.assetsEnv?.() || "prod");
+  const [busySwitch, setBusySwitch] = createSignal(false);
+  async function switchEnv(next) {
+    if (next === env()) return;
+    try {
+      setBusySwitch(true);
+      app.setAssetsEnv?.(next);
+      await app.refreshDomainAssets?.();
+    } finally { setBusySwitch(false); }
+  }
+
+  const [busyDiag, setBusyDiag] = createSignal(false);
+  const [report, setReport] = createSignal(null);
+  const [err, setErr] = createSignal(null);
+
+  async function runDiagnostics() {
+    setBusyDiag(true); setErr(null);
+    try {
+      const r = await assessAssets({
+        env: app.assetsEnv?.(),
+        assetsBaseUrl: app.assetsBaseUrl?.(),
+        selectedDomainName: (() => { const d = app.selectedDomain?.(); return typeof d === "string" ? d : (d?.name || ""); })(),
+        domainAssetsPrefixActive: app.domainAssetsPrefix?.(),
+        domainAssetsConfig: app.domainAssetsConfig?.(),
+        domainAssetsSource: app.domainAssetsSource?.(),
+      });
+      setReport(r);
+    } catch (e) { setErr(e); } finally { setBusyDiag(false); }
+  }
+
+  const Row = (props) => (
+    <div class="grid grid-cols-[160px_1fr] gap-2 py-1">
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">{props.label}</div>
+      <div class="text-sm break-all">{props.children}</div>
+    </div>
+  );
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h3 class="text-lg font-medium">{t("settings.dev.assets.title")}</h3>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.env")}</span>
+          <div class="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
+            <button
+              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
+              disabled={busySwitch()} onClick={() => switchEnv("prod")}
+            >
+              {t("settings.dev.assets.env.prod")}
+            </button>
+            <button
+              class={`px-3 py-1.5 text-sm border-l border-[hsl(var(--border))] ${env() === "test" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
+              disabled={busySwitch()} onClick={() => switchEnv("test")}
+            >
+              {t("settings.dev.assets.env.test")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-md bg-[hsl(var(--muted))] p-3 space-y-1">
+        <Row label={t("settings.dev.assets.env")}>{env()}</Row>
+        <Row label={t("settings.dev.assets.baseUrl")}>{app.assetsBaseUrl?.() || "—"}</Row>
+        <Row label={t("settings.dev.assets.prefix.active")}>{app.domainAssetsPrefix?.() || "—"}</Row>
+        <Row label={t("settings.dev.assets.source")}>{app.domainAssetsSource?.() || "—"}</Row>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">{t("settings.dev.assets.diagnostics.title")}</div>
+        <button
+          class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+          onClick={runDiagnostics}
+          disabled={busyDiag()}
+        >
+          {busyDiag() ? t("common.loading") : t("settings.dev.assets.diagnostics.run")}
+        </button>
+      </div>
+
+      {err() && <div class="text-sm text-[hsl(var(--destructive))]">
+        {t("settings.dev.assets.diagnostics.error")}: {String(err())}
+      </div>}
+
+      <Show when={report()}>
+        <div class="space-y-2">
+          <Row label={t("settings.dev.assets.domain")}>{report().domain || "—"}</Row>
+          <Row label={t("settings.dev.assets.prefix.computed")}>{report().computedDomainPrefix || "—"}</Row>
+
+          {/* Active config (what the app is really using) */}
+          <Row label={t("settings.dev.assets.configUrl")}>
+            <Show when={report().appConfigUrl} fallback={"—"}>
+              <span class="inline-flex items-center gap-2">
+                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="underline">{report().appConfigUrl}</a>
+                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
+              </span>
+            </Show>
+          </Row>
+
+          {/* Also show the env+domain computed config */}
+          <Row label={t("settings.dev.assets.configUrl.computed")}>
+            <Show when={report().computedDomainPrefix} fallback={"—"}>
+              <span class="inline-flex items-center gap-2">
+                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="underline">
+                  {report().computedDomainPrefix + "config.yaml"}
+                </a>
+                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
+              </span>
+            </Show>
+          </Row>
+
+          {/* Checks */}
+          <div class="pt-2 text-xs space-y-1">
+            <div><b>{t("settings.dev.assets.diagnostics.primary")}</b>: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
+            <Show when={report().primaryConfig.status === -1 && report().primaryConfig.error}>
+              <div class="text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.diagnostics.noteNetwork")} {report().primaryConfig.error}</div>
+            </Show>
+            <div><b>{t("settings.dev.assets.diagnostics.default")}</b>: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
+          </div>
+
+          {/* Summary */}
+          <div class="pt-2 text-xs space-y-1">
+            <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasFavicon")}: {String(report().appParsedConfigPresence.hasFavicon)}</div>
+          </div>
+
+          {/* Sample fetches */}
+          <Show when={report().resolvedSamples?.length}>
+            <div class="pt-2">
+              <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.sampleFetches")}</div>
+              <ul class="mt-1 space-y-1 text-xs">
+                {report().resolvedSamples.map((s) => (
+                  <li>{s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})</li>
+                ))}
+              </ul>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/index.js">
+// src/components/tabs/index.js
+import NILTab from "./NILTab.jsx";
+import NewTab from "./NewTab.jsx";
+
+/**
+ * Registry of tab type -> component.
+ * Add more mappings as you implement new tab types.
+ */
+const REGISTRY = {
+  nil: NILTab,
+  new: NewTab,
+  "for-you": null, // example: not implemented yet
+  leaders: null,
+  actual: null,
+  comments: null,
+};
+
+export function getTabComponent(type) {
+  const key = String(type || "").toLowerCase();
+  return REGISTRY[key] || null;
+}
+</file>
+
+<file path="src/components/tabs/NewTab.jsx">
+// src/components/tabs/NewTab.jsx
+import ContentFeed from "../feed/ContentFeed.jsx";
+
+export default function NewTab(props) {
+  async function fetchPage(page, pageSize) {
+    await new Promise((r) => setTimeout(r, 200));
+    if (page > 4) return [];
+    return Array.from({ length: pageSize }, (_, i) => ({
+      id: `new_${page}_${i}`,
+      text: `New tab content item ${page}-${i}. Vivamus finibus, sapien sed tempus feugiat, sapien augue facilisis nulla, at vehicula mauris mi eu felis.`
+    }));
+  }
+
+  return (
+    <section class="w-full">
+      <ContentFeed
+        mode={props.tab?._raw?.mode === "grid" ? "grid" : "list"}
+        fetchPage={fetchPage}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/RightRailLayout.jsx">
+// src/components/tabs/RightRailLayout.jsx
+import { createSignal, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+const HEADER_H = 48;          // <header> h-12
+const MAIN_PADDING_TOP = 16;  // .tabs_panel padding-top: 1rem
+const BASE_TOP = HEADER_H + MAIN_PADDING_TOP;
+const PANEL_BOTTOM_SPACING = 16; // (1rem) Tweak this value to account for bottom margin/padding.
+
+export default function RightRailLayout(props) {
+    const { t } = useApp();
+    const Panel = props.PanelComponent;
+
+    let panelRef;
+    const [topPx, setTopPx] = createSignal(BASE_TOP);
+
+    function recompute() {
+        const vh = window.innerHeight || 0;
+        
+        // Use offsetHeight for visual dimensions and add our spacing constant.
+        const panelH = (panelRef?.offsetHeight || 0) + PANEL_BOTTOM_SPACING;
+
+        const availableH = vh - BASE_TOP;
+        let top = BASE_TOP;
+
+        if (panelH > availableH) {
+            top = vh - panelH;
+        }
+
+        setTopPx(top);
+    }
+
+    onMount(() => {
+        requestAnimationFrame(recompute);
+
+        const onResize = () => recompute();
+        window.addEventListener("resize", onResize, { passive: true });
+
+        const ro = new ResizeObserver(recompute);
+        if (panelRef) ro.observe(panelRef);
+
+        onCleanup(() => {
+            window.removeEventListener("resize", onResize);
+            ro.disconnect();
+        });
+    });
+
+    return (
+        <section class="w-full">
+            <div
+                class="
+                    grid gap-4
+                    grid-cols-1
+                    md:grid-cols-[minmax(0,1fr)_320px]
+                    items-start
+                "
+                style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
+            >
+                {/* main column */}
+                <div>{props.children}</div>
+
+                {/* right rail */}
+                <aside
+                    class="hidden md:block sticky"
+                    style={{ top: `${topPx()}px` }}
+                >
+                    <div
+                        ref={panelRef}
+                        class="
+                            rounded-lg border border-[hsl(var(--border))]
+                            bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]
+                            flex flex-col
+                        "
+                    >
+                        <div class="p-3 space-y-3">
+                            {Panel ? (
+                                <Panel />
+                            ) : (
+                                <>
+                                    <h4 class="font-semibold">{t("settings.title")}</h4>
+                                    <p class="text-sm">{t("main.tabs.empty")}</p>
+                                    <ul class="list-disc ml-5 text-sm space-y-1">
+                                        <li>Sample A</li>
+                                        <li>Sample B</li>
+                                        <li>Sample C</li>
+                                        <li>Sample D</li>
+                                        <li>Sample E</li>
+                                        <li>Sample F</li>
+                                        <li>Sample G</li>
+                                        <li>Sample H</li>
+                                        <li>Sample I</li>
+                                        <li>Sample J</li>
+                                        <li>Sample A</li>
+                                        <li>Sample B</li>
+                                        <li>Sample C</li>
+                                        <li>Sample D</li>
+                                        <li>Sample E</li>
+                                        <li>Sample F</li>
+                                        <li>Sample G</li>
+                                        <li>Sample H</li>
+                                        <li>Sample I</li>
+                                        <li>Sample J</li>
+                                    </ul>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </section>
+    );
+}
+</file>
+
+<file path="src/dev/AssetDebugTap.jsx">
+// src/dev/AssetDebugTap.jsx
+/* src/dev/AssetDebugTap.jsx */
+import { createEffect } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+
+export default function AssetDebugTap() {
+    const app = useApp();
+
+    // Track & log env
+    let prevEnv;
+    createEffect(() => {
+        const next = app.assetsEnv?.();
+        if (prevEnv !== next) {
+            dbg.log("assets", "assetsEnv changed:", { prev: prevEnv, next });
+            prevEnv = next;
+        }
+    });
+
+    // Track & log base URL from /info
+    let prevBase;
+    createEffect(() => {
+        const next = app.assetsBaseUrl?.();
+        if (prevBase !== next) {
+            dbg.log("assets", "assetsBaseUrl changed:", { prev: prevBase, next });
+            prevBase = next;
+        }
+    });
+
+    // Track & log selected domain
+    let prevDomain;
+    createEffect(() => {
+        const next = dn(app.selectedDomain?.());
+        if (prevDomain !== next) {
+            dbg.log("assets", "selectedDomain changed:", { prev: prevDomain, next });
+            prevDomain = next;
+        }
+    });
+
+    // Track & log ACTIVE prefix the app uses for all assets
+    let prevPrefix;
+    createEffect(() => {
+        const next = app.domainAssetsPrefix?.();
+        if (prevPrefix !== next) {
+            dbg.log("assets", "domainAssetsPrefix (ACTIVE) changed:", { prev: prevPrefix, next });
+            prevPrefix = next;
+        }
+    });
+
+    // Track & log where the config came from: remote (domain) vs default pack
+    let prevSource;
+    createEffect(() => {
+        const next = app.domainAssetsSource?.();
+        if (prevSource !== next) {
+            dbg.log("assets", "domainAssetsSource changed:", { prev: prevSource, next });
+            prevSource = next;
+        }
+    });
+
+    // Track & log parsed config.yaml presence and key fields (logos/tabs)
+    let prevStamp;
+    createEffect(() => {
+        const cfg = app.domainAssetsConfig?.();
+        const stamp = cfg
+            ? JSON.stringify({
+                cid: cfg.assets_cid || cfg.cid || null,
+                gotLogos: !!(cfg.logos || cfg.logo),
+                tabs: !!cfg.modules?.tabs,
+            })
+            : "null";
+
+        if (prevStamp !== stamp) {
+            dbg.group("assets: domainAssetsConfig loaded/changed");
+            dbg.log("assets", "summary:", {
+                hasConfig: !!cfg,
+                hasLogos: !!(cfg?.logos || cfg?.logo),
+                tabsPath: cfg?.modules?.tabs || null,
+                assets_cid: cfg?.assets_cid || cfg?.cid || null,
+            });
+            dbg.groupEnd();
+            prevStamp = stamp;
+        }
+    });
+
+    // Nothing to render
+    return null;
+}
+</file>
+
+<file path="src/ipfs/index.js">
+// Minimal IPFS client with gateway fallback.
+// Usage:
+//   import { ipfs } from "../ipfs";
+//   const res = await ipfs.fetch("Qm.../file.json", { gateways: myGateways });
+//   const json = await ipfs.getJSON("ipfs://Qm.../file.json", { gateways: myGateways });
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+
+function normalizeInput(input) {
+  // Accepts: "ipfs://CID/path", "/ipfs/CID/path", "CID[/path]"
+  let s = String(input || "").trim();
+  if (!s) throw new Error("ipfs: empty input");
+  s = stripPrefix(s, "ipfs://");
+  s = stripPrefix(s, "/ipfs/");
+  s = stripPrefix(s, "ipfs/");
+  return s; // "CID[/path]"
+}
+
+function buildUrl(baseGateway, cidPath) {
+  const base = normalizeGatewayBase(baseGateway).replace(/\/+$/g, "");
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? base + "/" : base + "/ipfs/";
+  return prefix + cidPath.replace(/^\/+/g, "");
+}
+
+
+async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
+  const compositeSignal = signal
+    ? new AbortController()
+    : null;
+
+  // If a signal was provided, abort our controller when it aborts.
+  if (signal && compositeSignal) {
+    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) return { res, url, gateway: gw };
+      // Treat non-2xx as failure and continue
+      errors.push(new Error(`Gateway ${gw} -> HTTP ${res.status}`));
+    } catch (e) {
+      errors.push(new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`));
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  throw err;
+}
+
+async function fetchIpfs(input, opts = {}) {
+  const {
+    gateways = [],
+    timeoutMs = 8000,
+    signal,
+    cache = "default",
+    headers,
+    method = "GET",
+  } = opts;
+
+  if (!gateways || gateways.length === 0) {
+    throw new Error("ipfs.fetch: no gateways provided");
+  }
+  const cidPath = normalizeInput(input);
+  const { res, url, gateway } = await tryGateways(cidPath, gateways, {
+    timeoutMs,
+    init: { method, headers, cache, signal }
+  });
+  return { response: res, url, gateway };
+}
+
+async function getJSON(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
+  return { data: await response.json(), url, gateway };
+}
+
+async function getText(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.text(), url, gateway };
+}
+
+async function getBlob(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.blob(), url, gateway };
+}
+
+async function getArrayBuffer(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.arrayBuffer(), url, gateway };
+}
+
+export const ipfs = {
+  fetch: fetchIpfs,
+  getJSON,
+  getText,
+  getBlob,
+  getArrayBuffer,
+  // Utils you may want in other places:
+  normalizeInput,
+  buildUrl,
+};
+</file>
+
+<file path="src/styles/layout.css">
+/* src/styles/layout.css */
+:root {
+  --sv-container-max: 1600px;           /* main max width for content container */
+  --sv-container-gutter: clamp(16px, 2vw, 32px); /* responsive padding */
+  --sv-aside-w: clamp(300px, 24vw, 380px);       /* sidebar width on desktop */
+  --sv-content-max-ch: 68ch;            /* comfortable text line length */
+}
+
+/* Centered container */
+.sv-container {
+  max-width: var(--sv-container-max);
+  margin-inline: auto;
+  /* padding-inline: var(--sv-container-gutter); */
+}
+
+/* Content grid: main column + sidebar */
+.sv-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(16px, 2vw, 24px);
+}
+@media (min-width: 1024px) {
+  .sv-content-grid {
+    grid-template-columns: minmax(0, 1fr) var(--sv-aside-w);
+    align-items: start;
+  }
+}
+
+.sv-main { min-width: 0; }
+.sv-aside { min-width: 0; }
+
+/* Text limiter for typography-heavy content */
+.sv-typography {
+  max-width: var(--sv-content-max-ch);
+}
+
+/* Full-bleed section for backgrounds/hero areas */
+.full-bleed {
+  width: 100vw;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+
+@media (min-width: 1800px) {
+  :root { --sv-container-max: 1600px; }
+}
+
+.sv-container--no-gutter {
+  padding-inline: 0; /* keep max-width centering, remove side padding */
+}
+</file>
+
+<file path="src/styles/themed-controls.css">
+/* src/styles/themed-controls.css */
+.themed-segment {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 9999px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+}
+
+.themed-pill {
+  appearance: none;
+  border: 0;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  line-height: 1;
+  font-weight: 600;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  outline: none;
+}
+.themed-pill:hover { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+.themed-pill.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.themed-pill:focus { outline: none; box-shadow: none; }
+
+.themed-pill--icon { padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; }
+.themed-pill--icon svg { display: block; }
+
+/* 1px theme border for dialogs/panels */
+.themed-dialog {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem; /* keeps rounded look if element didn't set one */
+}
+</file>
+
+<file path="src/theme/DomainCssLoader.jsx">
+// src/theme/DomainCssLoader.jsx
+import { createEffect, onCleanup, createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const LINK_ID = "savva-domain-css";
+
+export default function DomainCssLoader() {
+  const app = useApp();
+
+  function ensureLink() {
+    let el = document.getElementById(LINK_ID);
+    if (!el) {
+      el = document.createElement("link");
+      el.id = LINK_ID;
+      el.rel = "stylesheet";
+      el.media = "all";
+      (document.head || document.getElementsByTagName("head")[0]).appendChild(el);
+    }
+    return el;
+  }
+
+  // Flip when env/domain/pack changes; used only for cache busting
+  const rev = createMemo(() => {
+    const cfg = app.domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const env = app.assetsEnv?.() || "prod";
+    const dom = (() => {
+      const d = app.selectedDomain?.();
+      return typeof d === "string" ? d : d?.name || "";
+    })();
+    return `${env}|${dom}|${cid}`;
+  });
+
+  createEffect(() => {
+    const hrefBase = app.assetUrl?.("domain.css"); // <- single source of truth
+    const el = ensureLink();
+
+    if (!hrefBase) {
+      el.parentNode && el.parentNode.removeChild(el);
+      return;
+    }
+
+    const href = `${hrefBase}${hrefBase.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev())}`;
+    if (el.getAttribute("href") === href) return;
+
+    dbg.log("assets", "DomainCssLoader: applying domain.css", { hrefBase, href });
+
+    const onLoad = () => dbg.log("assets", "domain.css loaded", { href });
+    const onError = () => dbg.warn("assets", "domain.css failed to load", { href });
+
+    el.addEventListener("load", onLoad, { once: true });
+    el.addEventListener("error", onError, { once: true });
+    el.setAttribute("href", href);
+  });
+
+  onCleanup(() => {
+    const el = document.getElementById(LINK_ID);
+    if (el?.parentNode) el.parentNode.removeChild(el);
+  });
+
+  return null;
+}
+</file>
+
+<file path="src/utils/debug.js">
+// src/utils/debug.js
+/* src/utils/debug.js */
+const STORE_KEY = "savva_debug_enabled";
+const MAX_LINES = 4000;
+
+function nowStamp() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${hh}:${mm}:${ss}.${ms}`;
+}
+
+function safeStr(x) {
+  if (x instanceof Error) return `${x.name}: ${x.message}`;
+  if (typeof x === "string") return x;
+  try { return JSON.stringify(x, null, 2); } catch { return String(x); }
+}
+
+const state = {
+  enabled: (() => { try { return localStorage.getItem(STORE_KEY) === "1"; } catch { return false; } })(),
+  indent: 0,
+  lines: [],
+  listeners: new Set(),
+};
+
+function push(kind, scope, parts) {
+  const pad = "  ".repeat(Math.max(0, state.indent));
+  const text = `[${nowStamp()}]  ${pad}${scope}${parts.length ? " " + parts.map(safeStr).join(" ") : ""}`;
+  state.lines.push(text);
+  if (state.lines.length > MAX_LINES) state.lines.splice(0, state.lines.length - MAX_LINES);
+  state.listeners.forEach((fn) => { try { fn(text, kind, scope); } catch {} });
+  // mirror to console when enabled
+  if (state.enabled) {
+    const c = console[kind] || console.log;
+    c.call(console, `${scope}:`, ...parts);
+  }
+}
+
+export const dbg = {
+  // enable/disable + both property-style and method-style accessors
+  enable(on = true) {
+    state.enabled = !!on;
+    try { localStorage.setItem(STORE_KEY, state.enabled ? "1" : "0"); } catch {}
+    return state.enabled;
+  },
+  enabled() { return !!state.enabled; },     // method, for call-sites that do dbg.enabled()
+  get isEnabled() { return !!state.enabled; },// getter, in case someone reads dbg.isEnabled
+
+  // core logging
+  log(scope, ...args)  { push("log", scope, args); },
+  info(scope, ...args) { push("info", scope, args); },
+  warn(scope, ...args) { push("warn", scope, args); },
+  error(scope, ...args){ push("error", scope, args); },
+
+  // groups (safe even if console.group* is missing)
+  group(label) {
+    push("log", "▶", [label]);
+    if (state.enabled && console.groupCollapsed) console.groupCollapsed(label);
+    state.indent++;
+  },
+  groupEnd() {
+    state.indent = Math.max(0, state.indent - 1);
+    if (state.enabled && console.groupEnd) console.groupEnd();
+  },
+
+  // listeners
+  onChange(fn) { state.listeners.add(fn); return () => state.listeners.delete(fn); },
+
+  // buffer ops
+  clear() { state.lines = []; },
+  entries() { return state.lines.slice(); },
+
+  // text dump helpers used by the UI
+  getText() { return state.lines.join("\n"); },
+  text()    { return state.lines.join("\n"); }, // backwards compat
+  async copy() {
+    try { await navigator.clipboard.writeText(this.getText()); return true; }
+    catch { return false; }
+  },
+};
+
+export default dbg;
+</file>
+
+<file path="src/index.jsx">
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./context/AppContext.jsx";
+
+const root = document.getElementById("root");
+
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
+</file>
+
+<file path="src/version.js">
+// src/version.js
+export const APP_VERSION = "0.4";
+</file>
+
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="postcss.config.js">
+// postcss.config.js
+export default {
+  plugins: {
+    '@tailwindcss/postcss': { config: './tailwind.config.js' },
+    autoprefixer: {},
+  },
+};
+</file>
+
+<file path="vite.config.js">
+// vite.config.js
+import { defineConfig } from 'vite';
+import solid from 'vite-plugin-solid';
+
+export default defineConfig({
+  plugins: [solid()],
+  server: {
+    port: 5173,
+  },
+  build: {
+    target: 'esnext',
+  },
+});
+</file>
+
 <file path="src/components/settings/LocalIpfsSection.jsx">
 // src/components/settings/LocalIpfsSection.jsx
 import { createSignal, Show } from "solid-js";
@@ -4987,83 +5989,160 @@ export default {
 }
 </file>
 
+<file path="src/components/ui/BrandLogo.jsx">
+// src/components/ui/BrandLogo.jsx
+/* src/components/ui/BrandLogo.jsx */
+import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { dbg } from "../../utils/debug";
+
+export default function BrandLogo(props) {
+  const app = useApp();
+  const { t, domainAssetsConfig, assetUrl } = app;
+
+  // Single source of truth for the domain name (falls back to i18n brand name)
+  const domainTitle = createMemo(() => {
+    const fromCfg = app.config?.()?.domain?.trim();
+    const fallback = t("brand.name");
+    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
+  });
+
+  // Theme + mobile detection
+  const [isDark, setIsDark] = createSignal(false);
+  const [isMobile, setIsMobile] = createSignal(false);
+  onMount(() => {
+    const el = document.documentElement;
+    const updateDark = () => setIsDark(el.classList.contains("dark"));
+    updateDark();
+    const mo = new MutationObserver(updateDark);
+    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onMQ = (e) => setIsMobile(!!e.matches);
+    onMQ(mql);
+    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
+
+    onCleanup(() => {
+      mo.disconnect();
+      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
+    });
+  });
+
+  // logos from active domain assets config
+  const logos = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const raw = cfg?.logos ?? cfg?.logo ?? null;
+    if (!raw) return null;
+    if (typeof raw === "string") return { default: raw };
+    return {
+      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+      mobile:       raw.mobile       ?? null,
+      dark:         raw.dark         ?? null,
+      light:        raw.light        ?? null,
+      default:      raw.default      ?? raw.fallback     ?? null,
+    };
+  });
+
+  const relPath = createMemo(() => {
+    const l = logos();
+    if (!l) return "";
+    const dark = isDark();
+    const mobile = isMobile();
+    const order = dark
+      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
+      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
+    return order.find(Boolean) || "";
+  });
+
+  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
+
+  // 🔎 Debug: log whenever the chosen logo src changes
+  createEffect(() => {
+    const s = src();
+    if (!s) return;
+    dbg.log("logo", "BrandLogo src picked", {
+      src: s,
+      relPath: relPath(),
+      dark: isDark(),
+      mobile: isMobile(),
+      domain: app.config?.()?.domain,
+      activePrefix: app.domainAssetsPrefix?.(),
+      source: app.domainAssetsSource?.(),
+    });
+  });
+
+  const [imgBroken, setImgBroken] = createSignal(false);
+  // reset broken flag whenever src changes
+  createMemo(() => { src(); setImgBroken(false); });
+
+  return (
+    <div class="flex items-center">
+      <Show when={src() && !imgBroken()} fallback={
+        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
+      }>
+        <img
+          src={src()}
+          alt={t("brand.logoAlt", { domain: domainTitle() })}
+          class={props.class || "h-8 w-auto"}
+          decoding="async"
+          loading="eager"
+          onError={() => {
+            dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
+            setImgBroken(true);
+          }}
+        />
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/Tabs.jsx">
 // src/components/ui/Tabs.jsx
-/* src/components/ui/Tabs.jsx */
 import { For, createSignal, onMount, onCleanup, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
 export default function Tabs(props) {
-  // props.items: [{ id, label, icon?, disabled? }]
-  // props.value: selected id
-  // props.onChange(nextId)
-  // props.class?: wrapper classnames
-
   const app = useApp();
   const { t } = app;
 
   const items = () => props.items || [];
   const value = () => props.value;
 
-  // --- responsive compact handling ---
   let listEl;
   const [compact, setCompact] = createSignal(false);
-
-  function hasWrapped() {
-    if (!listEl) return false;
-    const lis = listEl.querySelectorAll(":scope > li");
-    if (!lis.length) return false;
-    const firstTop = lis[0].offsetTop;
-    for (let i = 1; i < lis.length; i++) {
-      if (lis[i].offsetTop > firstTop) return true; // a second row appeared
-    }
-    return false;
-  }
-
   let rafId;
+
   function measure() {
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
       if (!listEl) return;
-
-      // Test full mode first
-      listEl.dataset.compact = "0";
-      setCompact(false);
-
-      if (hasWrapped()) {
-        // Switch to compact (icons only)
-        listEl.dataset.compact = "1";
-        setCompact(true);
-
-        // If it *still* wraps when compact, mark (optional)
-        listEl.dataset.overflow = hasWrapped() ? "1" : "0";
-      } else {
-        listEl.dataset.overflow = "0";
-      }
+      // force full-text for measurement
+      listEl.dataset.compact = "false";
+      const isOverflowing = listEl.scrollWidth > listEl.clientWidth;
+      setCompact(isOverflowing);
     });
   }
 
   onMount(() => {
-    measure();
-
-    // Re‑measure on size changes of the list itself
-    const ro = new ResizeObserver(measure);
+    measure(); // initial
+    const ro = new ResizeObserver(() => measure());
     if (listEl) ro.observe(listEl);
 
-    // And on viewport changes
-    const onResize = () => measure();
-    window.addEventListener("resize", onResize);
+    const onWinResize = () => measure();
+    window.addEventListener("resize", onWinResize, { passive: true });
 
     onCleanup(() => {
-      ro.disconnect?.();
-      window.removeEventListener("resize", onResize);
+      ro.disconnect();
+      window.removeEventListener("resize", onWinResize);
       cancelAnimationFrame(rafId);
     });
   });
 
-  // Re‑measure when the tabs list changes
   createEffect(() => {
-    items(); // track items
+    // re-measure when the list of items changes
+    items();
     measure();
   });
 
@@ -5073,7 +6152,7 @@ export default function Tabs(props) {
       class={`tabs ${props.class || ""}`}
       role="tablist"
       aria-label={t("tabs.aria")}
-      data-compact={compact() ? "1" : "0"}
+      data-compact={compact() ? "true" : "false"}
     >
       <For each={items()}>
         {(it) => {
@@ -5096,28 +6175,20 @@ export default function Tabs(props) {
           };
 
           return (
-            <li
-              classList={{ active: active() }}
-              role="presentation"
-              aria-selected={active()}
-            >
+            <li classList={{ active: active() }} role="presentation" aria-selected={active()}>
               <a
                 id={tabId}
                 href="#"
                 role="tab"
                 aria-selected={active() ? "true" : "false"}
                 aria-disabled={disabled ? "true" : "false"}
-                // Keep accessible name even when the label is visually hidden
                 aria-label={it.label}
                 title={compact() ? it.label : undefined}
                 tabIndex={disabled ? -1 : 0}
                 onClick={onClick}
                 onKeyDown={onKeyDown}
               >
-                {/* icon then text label */}
-                {it.icon ? (
-                  <span class="tab__icon" aria-hidden="true">{it.icon}</span>
-                ) : null}
+                {it.icon ? <span class="tab__icon" aria-hidden="true">{it.icon}</span> : null}
                 <span class="tab__label">{it.label}</span>
               </a>
             </li>
@@ -5132,7 +6203,7 @@ export default function Tabs(props) {
 <file path="src/components/Toaster.jsx">
 // src/components/Toaster.jsx
 import { For, Show } from "solid-js";
-import { toasts, dismissToast, toggleToast } from "../ux/toast";
+import { toasts, dismissToast, toggleToast } from "./ui/toast";
 
 const typeStyles = {
   info:    "bg-blue-600",
@@ -5219,384 +6290,30 @@ export default function Toaster() {
 }
 </file>
 
-<file path="src/ipfs/index.js">
-// Minimal IPFS client with gateway fallback.
-// Usage:
-//   import { ipfs } from "../ipfs";
-//   const res = await ipfs.fetch("Qm.../file.json", { gateways: myGateways });
-//   const json = await ipfs.getJSON("ipfs://Qm.../file.json", { gateways: myGateways });
+<file path="src/hooks/useTheme.js">
+// src/hooks/useTheme.js
+import { createSignal, onMount } from "solid-js";
 
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+export function useTheme() {
+  const [theme, setTheme] = createSignal("light");
 
-function normalizeInput(input) {
-  // Accepts: "ipfs://CID/path", "/ipfs/CID/path", "CID[/path]"
-  let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
-  return s; // "CID[/path]"
-}
-
-function buildUrl(baseGateway, cidPath) {
-  const base = normalizeGatewayBase(baseGateway).replace(/\/+$/g, "");
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? base + "/" : base + "/ipfs/";
-  return prefix + cidPath.replace(/^\/+/g, "");
-}
-
-
-async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
-  const compositeSignal = signal
-    ? new AbortController()
-    : null;
-
-  // If a signal was provided, abort our controller when it aborts.
-  if (signal && compositeSignal) {
-    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  }
-
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(tid);
-  }
-}
-
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) return { res, url, gateway: gw };
-      // Treat non-2xx as failure and continue
-      errors.push(new Error(`Gateway ${gw} -> HTTP ${res.status}`));
-    } catch (e) {
-      errors.push(new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`));
-    }
-  }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  throw err;
-}
-
-async function fetchIpfs(input, opts = {}) {
-  const {
-    gateways = [],
-    timeoutMs = 8000,
-    signal,
-    cache = "default",
-    headers,
-    method = "GET",
-  } = opts;
-
-  if (!gateways || gateways.length === 0) {
-    throw new Error("ipfs.fetch: no gateways provided");
-  }
-  const cidPath = normalizeInput(input);
-  const { res, url, gateway } = await tryGateways(cidPath, gateways, {
-    timeoutMs,
-    init: { method, headers, cache, signal }
-  });
-  return { response: res, url, gateway };
-}
-
-async function getJSON(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
-  return { data: await response.json(), url, gateway };
-}
-
-async function getText(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.text(), url, gateway };
-}
-
-async function getBlob(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.blob(), url, gateway };
-}
-
-async function getArrayBuffer(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.arrayBuffer(), url, gateway };
-}
-
-export const ipfs = {
-  fetch: fetchIpfs,
-  getJSON,
-  getText,
-  getBlob,
-  getArrayBuffer,
-  // Utils you may want in other places:
-  normalizeInput,
-  buildUrl,
-};
-</file>
-
-<file path="src/styles/tabs.css">
-/* src/styles/tabs.css */
-
-
-
-.tabs {
---tabs-active-bg: hsl(var(--background));
---tabs-active-fg: hsl(var(--foreground));
---tabs-inactive-bg: hsl(var(--secondary));
---tabs-inactive-fg: hsl(var(--secondary-foreground));
---tabs-background: hsl(var(--card));
-
-  list-style: none;
-  margin: 0px auto 0;
-  background: var(--tabs-background);
-  background: var(--gradient);
-  display: flow-root;
-  padding-top: 5px;
-}
-
-.tabs li {
-  /* Makes a horizontal row */
-  float: left;
-
-  /* So the psueudo elements can be abs. positioned inside */
-  position: relative;
-}
-
-.tabs a {
-  /* Make them block level and only as wide as they need */
-  float: left;
-  padding: 7px 20px 7px 20px;
-  text-decoration: none;
-
-  /* Colors via design tokens */
-  color: var(--tabs-inactive-fg);
-  background: var(--tabs-inactive-bg);
-  
-  /* Only round the top corners */
-  -webkit-border-top-left-radius: 15px;
-  -webkit-border-top-right-radius: 15px;
-  -moz-border-radius-topleft: 15px;
-  -moz-border-radius-topright: 15px;
-  border-top-left-radius: 15px;
-  border-top-right-radius: 15px;
-}
-
-.tabs .active {
-  /* Highest, active tab is on top */
-  z-index: 3;
-}
-
-.tabs .active a {
-  /* Colors when tab is active */
-  color: var(--tabs-active-fg);
-  background: var(--tabs-active-bg);
-}
-
-.tabs li:before,
-.tabs li:after,
-.tabs li a:before,
-.tabs li a:after {
-  /* All pseudo elements are abs. positioned and on bottom */
-  position: absolute;
-  bottom: 0;
-}
-
-/* Only the first, last, and active tabs need pseudo elements at all */
-.tabs li:last-child:after,
-.tabs li:last-child a:after,
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs .active:after,
-.tabs .active:before,
-.tabs .active a:after,
-.tabs .active a:before {
-  content: "";
-}
-
-.tabs .active:before,
-.tabs .active:after {
-  background: var(--tabs-active-bg);
-  /* Squares below circles */
-  z-index: 1;
-}
-
-/* Squares */
-.tabs li:before,
-.tabs li:after {
-  background: var(--tabs-inactive-bg);
-  width: 10px;
-  height: 10px;
-}
-.tabs li:before {
-  
-  left: -10px;
-}
-.tabs li:after {
-  right: -10px;
-}
-
-/* Circles */
-.tabs li a:after,
-.tabs li a:before {
-  width: 20px;
-  height: 20px;
-
-  /* Circles are circular */
-  -webkit-border-radius: 10px;
-  -moz-border-radius: 10px;
-  border-radius: 10px;
-
-  /* Use theme foreground (dark in light mode, light in dark mode) */
-  background: var(--tabs-background);
-
-  /* Circles over squares */
-  z-index: 2;
-}
-
-.tabs .active a:after,
-.tabs .active a:before {
-  background: var(--tabs-inactive-bg);
-}
-
-/* First and last tabs have different outside color needs */
-.tabs li:first-child.active a:before,
-.tabs li:last-child.active a:after {
-  background: var(--tabs-background);
-}
-
-/* Circle positions */
-.tabs li a:before {
-  left: -20px;
-}
-.tabs li a:after {
-  right: -20px;
-}
-
-/* do not show neither square nor cirle before first and after last */
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs li:last-child:after,
-.tabs li:last-child a:after {
-  content: none;
-}
-
-/* Panel */
-.tabs_panel {
-  clear: both; /* the .tabs list uses floats */
-  position: relative;
-
-  /* Surface + text colors via tokens */
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-
-  padding: 1rem; /* 16px */
-}
-
-.dark .tabs_panel {
-  /* Dark theme surfaces from tokens */
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border-color: hsl(var(--border));
-  box-shadow: none; /* keep it subtle in dark mode */
-}
-
-/* Optional: vertical rhythm if multiple sections render inside */
-.tabs_panel > section + section {
-  margin-top: 0.75rem;
-}
-
-/* ——— Compact mode helpers (auto‑toggled via data-compact) ——— */
-.tabs a .tab__icon { 
-  display: inline-flex;
-  vertical-align: middle;
-  margin-right: 0.5rem;        /* breathing room before label */
-  line-height: 0;              /* tighter alignment for inline SVGs */
-}
-.tabs a .tab__icon svg { 
-  width: 18px; height: 18px;   /* keep icons crisp but modest */
-}
-
-/* When compact, hide labels and tighten horizontal padding */
-.tabs[data-compact="1"] a .tab__label { 
-  display: none; 
-}
-.tabs[data-compact="1"] a { 
-  padding: 10px 12px;          /* narrower pill for icons-only */
-}
-
-/* Remove the right gap if label is hidden */
-.tabs[data-compact="1"] a .tab__icon { 
-  margin-right: 0; 
-}
-</file>
-
-<file path="src/theme/DomainCssLoader.jsx">
-// src/theme/DomainCssLoader.jsx
-import { createEffect, onCleanup, createMemo } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { dbg } from "../utils/debug";
-
-const LINK_ID = "savva-domain-css";
-
-export default function DomainCssLoader() {
-  const app = useApp();
-
-  function ensureLink() {
-    let el = document.getElementById(LINK_ID);
-    if (!el) {
-      el = document.createElement("link");
-      el.id = LINK_ID;
-      el.rel = "stylesheet";
-      el.media = "all";
-      (document.head || document.getElementsByTagName("head")[0]).appendChild(el);
-    }
-    return el;
-  }
-
-  // Flip when env/domain/pack changes; used only for cache busting
-  const rev = createMemo(() => {
-    const cfg = app.domainAssetsConfig?.();
-    const cid = cfg?.assets_cid || cfg?.cid || "";
-    const env = app.assetsEnv?.() || "prod";
-    const dom = (() => {
-      const d = app.selectedDomain?.();
-      return typeof d === "string" ? d : d?.name || "";
-    })();
-    return `${env}|${dom}|${cid}`;
+  onMount(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    setTheme(savedTheme);
+    document.documentElement.classList.toggle("dark", savedTheme === "dark");
   });
 
-  createEffect(() => {
-    const hrefBase = app.assetUrl?.("domain.css"); // <- single source of truth
-    const el = ensureLink();
+  const toggleTheme = () => {
+    const next = theme() === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try { localStorage.setItem("theme", next); } catch {}
+  };
 
-    if (!hrefBase) {
-      el.parentNode && el.parentNode.removeChild(el);
-      return;
-    }
+  // Expose theme signal for external use
+  useTheme.theme = theme;
 
-    const href = `${hrefBase}${hrefBase.includes("?") ? "&" : "?"}rev=${encodeURIComponent(rev())}`;
-    if (el.getAttribute("href") === href) return;
-
-    dbg.log("assets", "DomainCssLoader: applying domain.css", { hrefBase, href });
-
-    const onLoad = () => dbg.log("assets", "domain.css loaded", { href });
-    const onError = () => dbg.warn("assets", "domain.css failed to load", { href });
-
-    el.addEventListener("load", onLoad, { once: true });
-    el.addEventListener("error", onError, { once: true });
-    el.setAttribute("href", href);
-  });
-
-  onCleanup(() => {
-    const el = document.getElementById(LINK_ID);
-    if (el?.parentNode) el.parentNode.removeChild(el);
-  });
-
-  return null;
+  return [theme, toggleTheme];
 }
 </file>
 
@@ -5717,143 +6434,12 @@ export async function assessAssets(p) {
 }
 </file>
 
-<file path="src/utils/debug.js">
-// src/utils/debug.js
-/* src/utils/debug.js */
-const STORE_KEY = "savva_debug_enabled";
-const MAX_LINES = 4000;
-
-function nowStamp() {
-  const d = new Date();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  const ms = String(d.getMilliseconds()).padStart(3, "0");
-  return `${hh}:${mm}:${ss}.${ms}`;
-}
-
-function safeStr(x) {
-  if (x instanceof Error) return `${x.name}: ${x.message}`;
-  if (typeof x === "string") return x;
-  try { return JSON.stringify(x, null, 2); } catch { return String(x); }
-}
-
-const state = {
-  enabled: (() => { try { return localStorage.getItem(STORE_KEY) === "1"; } catch { return false; } })(),
-  indent: 0,
-  lines: [],
-  listeners: new Set(),
-};
-
-function push(kind, scope, parts) {
-  const pad = "  ".repeat(Math.max(0, state.indent));
-  const text = `[${nowStamp()}]  ${pad}${scope}${parts.length ? " " + parts.map(safeStr).join(" ") : ""}`;
-  state.lines.push(text);
-  if (state.lines.length > MAX_LINES) state.lines.splice(0, state.lines.length - MAX_LINES);
-  state.listeners.forEach((fn) => { try { fn(text, kind, scope); } catch {} });
-  // mirror to console when enabled
-  if (state.enabled) {
-    const c = console[kind] || console.log;
-    c.call(console, `${scope}:`, ...parts);
-  }
-}
-
-export const dbg = {
-  // enable/disable + both property-style and method-style accessors
-  enable(on = true) {
-    state.enabled = !!on;
-    try { localStorage.setItem(STORE_KEY, state.enabled ? "1" : "0"); } catch {}
-    return state.enabled;
-  },
-  enabled() { return !!state.enabled; },     // method, for call-sites that do dbg.enabled()
-  get isEnabled() { return !!state.enabled; },// getter, in case someone reads dbg.isEnabled
-
-  // core logging
-  log(scope, ...args)  { push("log", scope, args); },
-  info(scope, ...args) { push("info", scope, args); },
-  warn(scope, ...args) { push("warn", scope, args); },
-  error(scope, ...args){ push("error", scope, args); },
-
-  // groups (safe even if console.group* is missing)
-  group(label) {
-    push("log", "▶", [label]);
-    if (state.enabled && console.groupCollapsed) console.groupCollapsed(label);
-    state.indent++;
-  },
-  groupEnd() {
-    state.indent = Math.max(0, state.indent - 1);
-    if (state.enabled && console.groupEnd) console.groupEnd();
-  },
-
-  // listeners
-  onChange(fn) { state.listeners.add(fn); return () => state.listeners.delete(fn); },
-
-  // buffer ops
-  clear() { state.lines = []; },
-  entries() { return state.lines.slice(); },
-
-  // text dump helpers used by the UI
-  getText() { return state.lines.join("\n"); },
-  text()    { return state.lines.join("\n"); }, // backwards compat
-  async copy() {
-    try { await navigator.clipboard.writeText(this.getText()); return true; }
-    catch { return false; }
-  },
-};
-
-export default dbg;
-</file>
-
-<file path="src/index.jsx">
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./App";
-import { AppProvider } from "./context/AppContext.jsx";
-
-const root = document.getElementById("root");
-
-render(() => (
-  <AppProvider>
-    <App />
-  </AppProvider>
-), root);
-</file>
-
-<file path=".gitignore">
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-.env
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-</file>
-
 <file path="index.html">
 <!doctype html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SAVVA · SolidJS</title>
 
@@ -5891,30 +6477,14 @@ dist-ssr
 </html>
 </file>
 
-<file path="postcss.config.js">
-// postcss.config.js
+<file path="tailwind.config.js">
+// tailwind.config.js
 export default {
-  plugins: {
-    '@tailwindcss/postcss': { config: './tailwind.config.js' },
-    autoprefixer: {},
-  },
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
 };
-</file>
-
-<file path="vite.config.js">
-// vite.config.js
-import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
-
-export default defineConfig({
-  plugins: [solid()],
-  server: {
-    port: 5173,
-  },
-  build: {
-    target: 'esnext',
-  },
-});
 </file>
 
 <file path="public/domain_default/domain.css">
@@ -5950,6 +6520,8 @@ export default defineConfig({
   --ring: 243 100% 13%;
 
   --radius: 0.5rem;
+
+  --tabs-justify: center;
 }
 
 .dark {
@@ -5989,10 +6561,29 @@ export default defineConfig({
 
 <file path="src/components/ui/BackIconButton.jsx">
 // src/components/ui/BackIconButton.jsx
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+
 export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
+  const { route } = useHashRouter();
+
   function goBack() {
-    try { if (window.history.length > 1) return window.history.back(); } catch {}
-    window.location.href = fallbackHref;
+    let before = route();
+    try {
+      if (window.history.length > 1) {
+        window.history.back();
+        // Дадим hashchange шанс сработать; если остались на /settings — уводим вручную
+        setTimeout(() => {
+          const now = route();
+          if (now === before || now === "/settings") {
+            navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
+          }
+        }, 60);
+        return;
+      }
+    } catch { /* ignore */ }
+
+    // Нет истории — уводим сразу через роутер
+    navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
   }
 
   return (
@@ -6001,6 +6592,7 @@ export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
       onClick={goBack}
       aria-label={title}
       title={title}
+      type="button"
     >
       <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
         <path
@@ -6018,376 +6610,132 @@ export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
 }
 </file>
 
-<file path="src/components/ui/BrandLogo.jsx">
-// src/components/ui/BrandLogo.jsx
-/* src/components/ui/BrandLogo.jsx */
-import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { dbg } from "../../utils/debug";
+<file path="src/styles/tabs.css">
+/* src/styles/tabs.css */
 
-export default function BrandLogo(props) {
-  const app = useApp();
-  const { t, domainAssetsConfig, assetUrl } = app;
+.tabs {
+  --tabs-active-bg: hsl(var(--background));
+  --tabs-active-fg: hsl(var(--foreground));
+  --tabs-inactive-bg: hsl(var(--secondary));
+  --tabs-inactive-fg: hsl(var(--secondary-foreground));
+  --tabs-background: hsl(var(--card));
 
-  // Single source of truth for the domain name (falls back to i18n brand name)
-  const domainTitle = createMemo(() => {
-    const fromCfg = app.config?.()?.domain?.trim();
-    const fallback = t("brand.name");
-    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
-  });
+  list-style: none;
+  margin: 0;
+  padding-top: 5px;
 
-  // Theme + mobile detection
-  const [isDark, setIsDark] = createSignal(false);
-  const [isMobile, setIsMobile] = createSignal(false);
-  onMount(() => {
-    const el = document.documentElement;
-    const updateDark = () => setIsDark(el.classList.contains("dark"));
-    updateDark();
-    const mo = new MutationObserver(updateDark);
-    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+  background: var(--tabs-background);
+  background: var(--gradient);
 
-    const mql = window.matchMedia("(max-width: 640px)");
-    const onMQ = (e) => setIsMobile(!!e.matches);
-    onMQ(mql);
-    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
-
-    onCleanup(() => {
-      mo.disconnect();
-      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
-    });
-  });
-
-  // logos from active domain assets config
-  const logos = createMemo(() => {
-    const cfg = domainAssetsConfig?.();
-    const raw = cfg?.logos ?? cfg?.logo ?? null;
-    if (!raw) return null;
-    if (typeof raw === "string") return { default: raw };
-    return {
-      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
-      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-      mobile:       raw.mobile       ?? null,
-      dark:         raw.dark         ?? null,
-      light:        raw.light        ?? null,
-      default:      raw.default      ?? raw.fallback     ?? null,
-    };
-  });
-
-  const relPath = createMemo(() => {
-    const l = logos();
-    if (!l) return "";
-    const dark = isDark();
-    const mobile = isMobile();
-    const order = dark
-      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
-      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
-    return order.find(Boolean) || "";
-  });
-
-  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
-
-  // 🔎 Debug: log whenever the chosen logo src changes
-  createEffect(() => {
-    const s = src();
-    if (!s) return;
-    dbg.log("logo", "BrandLogo src picked", {
-      src: s,
-      relPath: relPath(),
-      dark: isDark(),
-      mobile: isMobile(),
-      domain: app.config?.()?.domain,
-      activePrefix: app.domainAssetsPrefix?.(),
-      source: app.domainAssetsSource?.(),
-    });
-  });
-
-  const [imgBroken, setImgBroken] = createSignal(false);
-  // reset broken flag whenever src changes
-  createMemo(() => { src(); setImgBroken(false); });
-
-  return (
-    <div class="flex items-center">
-      <Show when={src() && !imgBroken()} fallback={
-        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
-      }>
-        <img
-          src={src()}
-          alt={t("brand.logoAlt", { domain: domainTitle() })}
-          class={props.class || "h-8 w-auto"}
-          decoding="async"
-          loading="eager"
-          onError={() => {
-            dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
-            setImgBroken(true);
-          }}
-        />
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/hooks/useTheme.js">
-// src/hooks/useTheme.js
-import { createSignal, onMount } from "solid-js";
-
-export function useTheme() {
-  const [theme, setTheme] = createSignal("light");
-
-  onMount(() => {
-    const savedTheme = localStorage.getItem("theme") || "light";
-    setTheme(savedTheme);
-    document.documentElement.classList.toggle("dark", savedTheme === "dark");
-  });
-
-  const toggleTheme = () => {
-    const next = theme() === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-    try { localStorage.setItem("theme", next); } catch {}
-  };
-
-  // Expose theme signal for external use
-  useTheme.theme = theme;
-
-  return [theme, toggleTheme];
-}
-</file>
-
-<file path="tailwind.config.js">
-// tailwind.config.js
-export default {
-  darkMode: "class",
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-  theme: { extend: {} },
-  plugins: [],
-};
-</file>
-
-<file path="src/components/main/TabsBar.jsx">
-/* src/components/main/TabsBar.jsx */
-import { createResource, For, Show, createMemo, createSignal, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { useI18n } from "../../i18n/useI18n";
-import { loadAssetResource } from "../../utils/assetLoader";
-import Tabs from "../ui/Tabs.jsx";
-
-/* small, consistent SVG wrapper */
-function SvgIcon(props) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      class={props.class || "w-4 h-4"}
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.75"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      {props.children}
-    </svg>
-  );
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
 }
 
-/* default icons by tab type */
-function TrophyIcon() {
-  return (
-    <SvgIcon>
-      <path d="M8 21h8" />
-      <path d="M12 17v4" />
-      <path d="M7 4h10" />
-      <path d="M7 8a5 5 0 0010 0" />
-      <path d="M7 4a4 4 0 01-4 4" />
-      <path d="M17 4a4 4 0 004 4" />
-    </SvgIcon>
-  );
-}
-function BoltIcon() {
-  return (
-    <SvgIcon>
-      <path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z" />
-    </SvgIcon>
-  );
-}
-function CommentIcon() {
-  return (
-    <SvgIcon>
-      <path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z" />
-    </SvgIcon>
-  );
-}
-function SparklesIcon() {
-  return (
-    <SvgIcon>
-      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
-      <path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z" />
-    </SvgIcon>
-  );
-}
-function HeartIcon() {
-  return (
-    <SvgIcon>
-      <path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z" />
-    </SvgIcon>
-  );
-}
-function FallbackIcon() {
-  return (
-    <SvgIcon>
-      <path d="M4 6h16v12H4z" />
-      <path d="M8 10h8M8 14h5" />
-    </SvgIcon>
-  );
+.tabs li {
+  position: relative;
+  flex-shrink: 0;
 }
 
-/* map the known types to icons */
-function iconForType(type) {
-  const k = String(type || "").toLowerCase();
-  if (k === "leaders") return <TrophyIcon />;
-  if (k === "actual") return <BoltIcon />;
-  if (k === "comments") return <CommentIcon />;
-  if (k === "new") return <SparklesIcon />;
-  if (k === "for-you" || k === "foryou") return <HeartIcon />;
-  return <FallbackIcon />;
+.tabs a {
+  display: block;
+  text-decoration: none;
+  padding: 7px clamp(5px, 5vw, 80px);
+  white-space: nowrap;
+  color: var(--tabs-inactive-fg);
+  background: var(--tabs-inactive-bg);
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
 }
 
-/* allow YAML to override icons later, e.g., icon: "emoji:🔥" */
-function iconFromSpec(spec) {
-  if (!spec) return null;
-  if (typeof spec === "string" && spec.startsWith("emoji:")) {
-    const ch = spec.slice("emoji:".length);
-    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
-  }
-  // otherwise ignore untrusted/unknown formats
-  return null;
+.tabs .active { z-index: 3; }
+.tabs .active a {
+  color: var(--tabs-active-fg);
+  background: var(--tabs-active-bg);
 }
 
-export default function TabsBar() {
-  const app = useApp();
-  const { t, domainAssetsConfig, selectedDomain } = app;
-  const { lang } = useI18n();
-
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    return !d ? "" : typeof d === "string" ? d : d.name || "";
-  });
-
-  const tabsPath = createMemo(() => {
-    const cfg = domainAssetsConfig?.();
-    return cfg?.modules?.tabs || "modules/tabs.yaml";
-  });
-
-  const [tabsRaw] = createResource(
-    () => tabsPath(),
-    async (relPath) => {
-      if (!relPath) return [];
-      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
-      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
-      return list.map((x, i) => ({
-        id: x?.id ?? x?.type ?? `tab_${i}`,
-        type: x?.type ?? x?.id ?? `tab_${i}`,
-        title: x?.title,
-        icon: x?.icon || null,
-        _raw: x,
-      }));
-    }
-  );
-
-  function pickByLocale(obj, langCode) {
-    if (!obj || typeof obj !== "object") return undefined;
-    const lc = (langCode || "en").toString();
-    if (obj[lc] !== undefined) return obj[lc];
-    const base = lc.toLowerCase().split(/[-_]/)[0];
-    if (obj[base] !== undefined) return obj[base];
-    return obj["*"];
-  }
-
-  function resolveTitle(title, langCode, domain) {
-    if (!title) return "";
-    if (typeof title === "string") return title;
-    const byLocale = pickByLocale(title, langCode);
-    if (byLocale) {
-      if (typeof byLocale === "string") return byLocale;
-      if (typeof byLocale === "object") {
-        const byDomain = byLocale[domain] ?? byLocale["*"];
-        if (typeof byDomain === "string") return byDomain;
-        const anyStr = Object.values(byLocale).find((v) => typeof v === "string");
-        if (anyStr) return anyStr;
-      }
-    }
-    const topStr = Object.values(title).find((v) => typeof v === "string");
-    if (topStr) return topStr;
-    for (const v of Object.values(title)) {
-      if (v && typeof v === "object") {
-        const byDomain = v[domain] ?? v["*"];
-        if (typeof byDomain === "string") return byDomain;
-        const anyStr = Object.values(v).find((x) => typeof x === "string");
-        if (anyStr) return anyStr;
-      }
-    }
-    return "";
-  }
-
-  const [selectedId, setSelectedId] = createSignal("");
-
-  createEffect(() => {
-    const list = tabsRaw() || [];
-    if (!list.length) return setSelectedId("");
-    if (!list.some((t) => t.id === selectedId())) setSelectedId(list[0].id);
-  });
-
-  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
-
-  const items = createMemo(() =>
-    (tabsRaw() || []).map((tab) => {
-      const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
-      const explicit = iconFromSpec(tab.icon);
-      const auto = iconForType(tab.type || tab.id);
-      return {
-        id: tab.id,
-        label,
-        icon: explicit || auto,
-      };
-    })
-  );
-
-  const labelById = createMemo(() => {
-    const map = new Map();
-    (items() || []).forEach((it) => map.set(it.id, it.label));
-    return map;
-  });
-
-  return (
-    <section class="w-full">
-      <div class="max-w-6xl mx-auto px-0">
-        <Show
-          when={!tabsRaw.loading}
-          fallback={<span class="text-sm text-neutral-500 dark:text-neutral-400">{t("main.tabs.loading")}</span>}
-        >
-          <Tabs items={items()} value={selectedId()} onChange={setSelectedId} />
-        </Show>
-
-        <div class="mt-2 rotabs__panel">
-          <For each={tabsRaw() || []}>
-            {(tab) => (
-              <Show when={selectedId() === tab.id}>
-                <section id={`panel-${tab.id}`} aria-labelledby={`tab-${tab.id}`}>
-                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                    {labelById().get(tab.id) || t("main.tabs.untitled")}
-                  </h3>
-                  <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    {t("main.tabs.empty")}
-                  </p>
-                </section>
-              </Show>
-            )}
-          </For>
-        </div>
-      </div>
-    </section>
-  );
+.tabs li:before,
+.tabs li:after,
+.tabs li a:before,
+.tabs li a:after {
+  position: absolute;
+  bottom: 0;
 }
+
+.tabs li:last-child:after,
+.tabs li:last-child a:after,
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs .active:after,
+.tabs .active:before,
+.tabs .active a:after,
+.tabs .active a:before {
+  content: "";
+}
+
+.tabs .active:before,
+.tabs .active:after {
+  background: var(--tabs-active-bg);
+  z-index: 1;
+}
+
+.tabs li:before,
+.tabs li:after {
+  background: var(--tabs-inactive-bg);
+  width: 10px;
+  height: 10px;
+}
+.tabs li:before { left: -10px; }
+.tabs li:after  { right: -10px; }
+
+.tabs li a:before,
+.tabs li a:after {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--tabs-background);
+  z-index: 2;
+}
+
+.tabs .active a:after,
+.tabs .active a:before {
+  background: var(--tabs-inactive-bg);
+}
+
+.tabs li:first-child.active a:before,
+.tabs li:last-child.active a:after {
+  background: var(--tabs-background);
+}
+
+.tabs li a:before { left: -20px; }
+.tabs li a:after  { right: -20px; }
+
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs li:last-child:after,
+.tabs li:last-child a:after {
+  content: none;
+}
+
+.tabs_panel {
+  position: relative;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 1rem;
+}
+
+.tabs a .tab__icon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  line-height: 0;
+}
+.tabs a .tab__icon svg { width: 18px; height: 18px; }
+
+/* compact mode */
+.tabs[data-compact="true"] a .tab__label { display: none; }
+.tabs[data-compact="true"] a .tab__icon { margin-right: 0; }
+.tabs[data-compact="true"] a { padding: 7px 15px; }
 </file>
 
 <file path="src/components/settings/DeveloperSection.jsx">
@@ -6558,184 +6906,6 @@ export default {
 };
 </file>
 
-<file path="src/components/Header.jsx">
-// File: src/components/Header.jsx
-import { Show, createSignal, onMount } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import {
-  connectWallet,
-  walletAccount,
-  walletChainId,
-  isWalletAvailable,
-  eagerConnect,
-} from "../blockchain/wallet";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const [copyState, setCopyState] = createSignal("");
-  const [eagerDone, setEagerDone] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatched = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  onMount(async () => {
-    if (isWalletAvailable()) {
-      await eagerConnect();
-    }
-    setEagerDone(true);
-  });
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) {
-        try { await app.ensureWalletOnDesiredChain(); } catch {}
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(walletAccount());
-      setCopyState("copied");
-      setTimeout(() => setCopyState(""), 1200);
-    } catch {}
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  const chainLogoSrc = () => {
-    const id = desiredId();
-    return id ? getChainLogo(id) : null;
-  };
-
-  return (
-    <header
-      class="
-        sticky top-0 z-10 h-12
-        flex items-center justify-between p-2
-        bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]
-        border-b border-[hsl(var(--border))] shadow-sm
-      "
-    >
-      {/* Left: brand logo or title */}
-      <div class="ml-2 flex items-center">
-        <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-      </div>
-
-      {/* Right: wallet + menu */}
-      <div class="flex items-center gap-2 mr-2">
-        {/* Wallet area */}
-        <Show
-          when={walletAccount()}
-          fallback={
-            <Show when={eagerDone() && isWalletAvailable()}>
-              <button
-                class="
-                  px-3 py-1 rounded
-                  bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
-                  hover:opacity-90
-                "
-                onClick={onConnect}
-                title={app.t("wallet.connect")}
-                aria-label={app.t("wallet.connect")}
-              >
-                {app.t("wallet.connect")}
-              </button>
-            </Show>
-          }
-        >
-          <div class="flex items-center gap-2">
-            {/* Address pill */}
-            <button
-              class="
-                px-2 py-1 rounded
-                bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
-                hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
-              "
-              onClick={copyAddress}
-              title={app.t("wallet.copyAddress")}
-              aria-label={app.t("wallet.copyAddress")}
-            >
-              {shortAddr(walletAccount())}
-            </button>
-
-            {/* If chain is correct → logo only; if wrong → destructive button */}
-            <Show
-              when={!mismatched()}
-              fallback={
-                <button
-                  class="
-                    px-2 py-1 rounded
-                    bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
-                    hover:opacity-90
-                  "
-                  onClick={onSwitchChain}
-                  title={app.t("wallet.changeChain")}
-                  aria-label={app.t("wallet.changeChain")}
-                >
-                  {app.t("wallet.changeChain")}
-                </button>
-              }
-            >
-              <Show when={chainLogoSrc()}>
-                <img
-                  src={chainLogoSrc()}
-                  alt="chain"
-                  class="w-5 h-5"
-                  title={app.t("wallet.onRequiredNetwork")}
-                />
-              </Show>
-            </Show>
-
-            {/* tiny copied hint */}
-            <Show when={copyState() === "copied"}>
-              <span class="text-xs text-[hsl(var(--primary))]">{app.t("wallet.copied")}</span>
-            </Show>
-          </div>
-        </Show>
-
-        {/* Right menu toggle */}
-        <button
-          class="
-            p-1 rounded transition
-            text-[hsl(var(--muted-foreground))]
-            hover:bg-[hsl(var(--muted))]
-          "
-          onClick={onTogglePane}
-          aria-label={app.t("menu.open")}
-          title={app.t("menu.open")}
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-      </div>
-    </header>
-  );
-}
-</file>
-
 <file path="src/components/SwitchConnectDialog.jsx">
 // src/components/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
@@ -6811,7 +6981,6 @@ export default function SwitchConnectDialog(props) {
           normalized.find((d) => eq(d.name, domain())) ||
           normalized[0];
 
-        // Apply after options exist to avoid browser defaulting to index 0
         const name = resolved.name;
         setDomain(name);
         queueMicrotask(() => setDomain(name));
@@ -6850,13 +7019,9 @@ export default function SwitchConnectDialog(props) {
       setDomains(normalized);
 
       if (normalized.length > 0) {
-        const prefer =
-          dn(props.domain) ||
-          (app.config?.()?.domain || "") ||
-          domain();
-
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
         const keep = normalized.find((d) => eq(d.name, prefer)) || normalized.find((d) => eq(d.name, domain()));
-        const name = (keep?.name || normalized[0].name);
+        const name = keep?.name || normalized[0].name;
         setDomain(name);
         queueMicrotask(() => setDomain(name));
       } else {
@@ -6893,7 +7058,7 @@ export default function SwitchConnectDialog(props) {
     }
 
     setApplying(false);
-    try { aborter?.abort(); } catch { }
+    try { aborter?.abort(); } catch {}
     props.onClose?.();
   }
 
@@ -6902,23 +7067,23 @@ export default function SwitchConnectDialog(props) {
       <div class="fixed inset-0 z-40 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
 
-        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
             {t("rightPane.switch.title")}
           </h3>
 
           <label class="block mb-3">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.backend.label")}</span>
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
             <div class="mt-1 flex gap-2">
               <input
-                class="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
                 value={backendUrl()}
                 onInput={(e) => setBackendUrl(e.currentTarget.value)}
                 placeholder={t("rightPane.switch.backend.placeholder")}
                 spellcheck={false}
               />
               <button
-                class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
                 onClick={handleReload}
                 disabled={fetching()}
                 title={t("rightPane.switch.reload.title")}
@@ -6926,14 +7091,14 @@ export default function SwitchConnectDialog(props) {
                 {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
               </button>
             </div>
-            <p class="text-xs text-gray-500 mt-1">{t("rightPane.switch.backend.help")}</p>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
           </label>
 
           <label class="block mb-1">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{t("rightPane.switch.domain.label")}</span>
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
           </label>
           <select
-            class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 disabled:opacity-60"
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
             value={domain()}
             onChange={(e) => setDomain(e.currentTarget.value)}
             disabled={fetching() || domains().length === 0}
@@ -6946,7 +7111,7 @@ export default function SwitchConnectDialog(props) {
           </select>
 
           <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-gray-600 dark:text-gray-300 space-y-1">
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
               <Show when={selectedDomainObj().website}>
                 <div>
                   {t("rightPane.switch.domain.website")}:{" "}
@@ -6959,27 +7124,27 @@ export default function SwitchConnectDialog(props) {
           </Show>
 
           <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-red-500">
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
               {t("common.error")}: {localError() || props.error?.message}
             </p>
           </Show>
 
           <div class="mt-4 flex gap-2 justify-end">
             <button
-              class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100"
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
               onClick={props.onClose}
             >
               {t("common.cancel")}
             </button>
             <button
-              class="px-3 py-2 rounded bg-red-500 text-white hover:bg-red-600"
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
               onClick={props.onReset}
               title={t("rightPane.switch.reset.title")}
             >
               {t("rightPane.switch.reset")}
             </button>
             <button
-              class="px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
               onClick={onApply}
               disabled={props.loading || fetching() || applying()}
             >
@@ -6993,6 +7158,33 @@ export default function SwitchConnectDialog(props) {
 }
 </file>
 
+<file path="src/pages/Settings.jsx">
+// src/pages/Settings.jsx
+import { useApp } from "../context/AppContext.jsx";
+import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
+import BackIconButton from "../components/ui/BackIconButton.jsx";
+import Assets from "../components/settings/Assets.jsx";
+import DeveloperSection from "../components/settings/DeveloperSection.jsx";
+
+export default function Settings() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
+        <BackIconButton title={t("settings.back")} />
+      </div>
+
+      <LocalIpfsSection />
+      <Assets />
+      <DeveloperSection />
+    </main>
+  );
+}
+</file>
+
 <file path="package.json">
 {
   "name": "savva-ui-solidjs",
@@ -7001,8 +7193,10 @@ export default function SwitchConnectDialog(props) {
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "release": "node scripts/release.mjs",
+    "i18n": "node scripts/i18n.mjs"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",
@@ -7022,6 +7216,416 @@ export default function SwitchConnectDialog(props) {
     "vite-plugin-solid": "^2.11.8"
   }
 }
+</file>
+
+<file path="src/components/main/TabsBar.jsx">
+// src/components/main/TabsBar.jsx
+import { createResource, For, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { useI18n } from "../../i18n/useI18n";
+import { loadAssetResource } from "../../utils/assetLoader";
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+import Tabs from "../ui/Tabs.jsx";
+import { getTabComponent } from "../tabs";
+import RightRailLayout from "../tabs/RightRailLayout.jsx";
+
+// route helpers (no /t prefix; use "/actual", "/leaders", etc.)
+const slug = (s) => String(s || "").trim().toLowerCase();
+const firstSeg = (path) => {
+  const p = String(path || "/");
+  const s = p.startsWith("/") ? p.slice(1) : p;
+  const seg = s.split(/[?#/]/, 1)[0];
+  return slug(seg);
+};
+const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
+
+// icons
+function SvgIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {props.children}
+    </svg>
+  );
+}
+const TrophyIcon  = () => (<SvgIcon><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M7 8a5 5 0 0010 0"/><path d="M7 4a4 4 0 01-4 4"/><path d="M17 4a4 4 0 004 4"/></SvgIcon>);
+const BoltIcon    = () => (<SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>);
+const CommentIcon = () => (<SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>);
+const SparklesIcon= () => (<SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>);
+const HeartIcon   = () => (<SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>);
+const FallbackIcon= () => (<SvgIcon><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></SvgIcon>);
+
+function iconForType(type) {
+  const k = slug(type);
+  if (k === "leaders") return <TrophyIcon />;
+  if (k === "actual") return <BoltIcon />;
+  if (k === "comments") return <CommentIcon />;
+  if (k === "new") return <SparklesIcon />;
+  if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  return <FallbackIcon />;
+}
+function iconFromSpec(spec) {
+  if (!spec) return null;
+  if (typeof spec === "string" && spec.startsWith("emoji:")) {
+    const ch = spec.slice("emoji:".length);
+    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
+  }
+  return null;
+}
+
+export default function TabsBar() {
+  const app = useApp();
+  const { t, domainAssetsConfig, selectedDomain } = app;
+  const { lang } = useI18n();
+  const { route } = useHashRouter();
+
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
+  });
+
+  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
+
+  const [tabsRaw] = createResource(
+    () => tabsPath(),
+    async (relPath) => {
+      if (!relPath) return [];
+      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
+      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
+      return list.map((x, i) => ({
+        id: x?.id ?? x?.type ?? `tab_${i}`,
+        type: x?.type ?? x?.id ?? `tab_${i}`,
+        title: x?.title,
+        icon: x?.icon || null,
+        _raw: x,
+      }));
+    }
+  );
+
+  // i18n helpers
+  function pickByLocale(obj, langCode) {
+    if (!obj || typeof obj !== "object") return undefined;
+    const lc = (langCode || "en").toString();
+    if (obj[lc] !== undefined) return obj[lc];
+    const base = lc.toLowerCase().split(/[-_]/)[0];
+    if (obj[base] !== undefined) return obj[base];
+    return obj["*"];
+  }
+  function resolveTitle(title, langCode, domain) {
+    if (!title) return "";
+    if (typeof title === "string") return title;
+    const byLocale = pickByLocale(title, langCode);
+    if (byLocale) {
+      if (typeof byLocale === "string") return byLocale;
+      if (typeof byLocale === "object") {
+        const byDomain = byLocale[domain] ?? byLocale["*"];
+        if (typeof byDomain === "string") return byDomain;
+        const anyStr = Object.values(byLocale).find((v) => typeof v === "string");
+        if (anyStr) return anyStr;
+      }
+    }
+    const topStr = Object.values(title).find((v) => typeof v === "string");
+    if (topStr) return topStr;
+    for (const v of Object.values(title)) {
+      if (v && typeof v === "object") {
+        const byDomain = v[domain] ?? v["*"];
+        if (typeof byDomain === "string") return byDomain;
+        const anyStr = Object.values(v).find((x) => typeof x === "string");
+        if (anyStr) return anyStr;
+      }
+    }
+    return "";
+  }
+
+  // selection + URL sync
+  const [selectedId, setSelectedId] = createSignal("");
+  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
+
+  const items = createMemo(() =>
+    (tabsRaw() || []).map((tab) => {
+      const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
+      const explicit = iconFromSpec(tab.icon);
+      const auto = iconForType(tab.type || tab.id);
+      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
+    })
+  );
+
+  const labelById = createMemo(() => {
+    const map = new Map();
+    (items() || []).forEach((it) => map.set(it.id, it.label));
+    return map;
+  });
+
+  // init/fix selection vs URL
+  createEffect(() => {
+    const list = tabsRaw() || [];
+    if (!list.length) return setSelectedId("");
+
+    const key = firstSeg(route());
+    const hasKey = (k) => list.some((t) => slug(t.id) === k || slug(t.type) === k);
+
+    if (key && hasKey(key)) {
+      const match = list.find((t) => slug(t.id) === key) || list.find((t) => slug(t.type) === key);
+      if (match && selectedId() !== match.id) setSelectedId(match.id);
+    } else if (!selectedId() || !list.some((t) => t.id === selectedId())) {
+      const first = list[0];
+      batch(() => {
+        setSelectedId(first.id);
+        navigate(pathFor(first.type || first.id), { replace: true });
+      });
+    }
+  });
+
+  function handleTabChange(nextId) {
+    const list = tabsRaw() || [];
+    const entry = list.find((t) => t.id === nextId);
+    if (!entry) return;
+    batch(() => {
+      setSelectedId(nextId);
+      const want = pathFor(entry.type || entry.id);
+      if (route() !== want) navigate(want);
+    });
+  }
+
+  return (
+    <section class="w-full" >
+      {/* changed: let outer Container control width; keep full width here */}
+      <div class="sv-container sv-container--no-gutter">
+        <Show
+          when={!tabsRaw.loading}
+          fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.loading")}</span>}
+        >
+          <Tabs
+            items={(items() || []).map(({ id, label, icon }) => ({ id, label, icon }))}
+            value={selectedId()}
+            onChange={handleTabChange}
+          />
+        </Show>
+
+        <div class="tabs_panel">
+          <For each={tabsRaw() || []}>
+            {(tab) => {
+              const active = () => selectedId() === tab.id;
+              const Comp = getTabComponent(tab.type);
+              const title = labelById().get(tab.id) || t("main.tabs.untitled");
+              const rightCfg = tab?._raw?.right_panel || { available: false };
+
+              return (
+                <Show when={active()}>
+                  {Comp ? (
+                    rightCfg?.available  ? (
+                      <RightRailLayout>
+                        <Comp title={title} tab={tab} />
+                      </RightRailLayout>
+                    ) : (
+                      <Comp title={title} tab={tab} />
+                    )
+                  ) : rightCfg?.available ? (
+                    <RightRailLayout>
+                      <>
+                        <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                      </>
+                    </RightRailLayout>
+                  ) : (
+                    <>
+                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                    </>
+                  )}
+                </Show>
+              );
+            }}
+          </For>
+        </div>
+      </div>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/Header.jsx">
+// File: src/components/Header.jsx
+import { Show, createSignal, onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import {
+  connectWallet,
+  walletAccount,
+  walletChainId,
+  isWalletAvailable,
+  eagerConnect,
+} from "../blockchain/wallet";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const [copyState, setCopyState] = createSignal("");
+  const [eagerDone, setEagerDone] = createSignal(false);
+
+  const desiredId = () => app.desiredChainId();
+  const mismatched = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  onMount(async () => {
+    if (isWalletAvailable()) {
+      await eagerConnect();
+    }
+    setEagerDone(true);
+  });
+
+  async function onConnect() {
+    try {
+      await connectWallet();
+      if (desiredId()) {
+        try { await app.ensureWalletOnDesiredChain(); } catch {}
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+      setCopyState("copied");
+      setTimeout(() => setCopyState(""), 1200);
+    } catch {}
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  const chainLogoSrc = () => {
+    const id = desiredId();
+    return id ? getChainLogo(id) : null;
+  };
+
+  return (
+    <header
+      class="
+        sticky top-0 z-10
+        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
+        border-b shadow-sm
+      "
+    >
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          {/* Left: brand */}
+          <div class="flex items-center">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+          </div>
+
+          {/* Right: wallet + menu */}
+          <div class="flex items-center gap-2">
+            <Show
+              when={walletAccount()}
+              fallback={
+                <Show when={eagerDone() && isWalletAvailable()}>
+                  <button
+                    class="
+                      px-3 py-1 rounded
+                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
+                      hover:opacity-90
+                    "
+                    onClick={onConnect}
+                    title={app.t("wallet.connect")}
+                    aria-label={app.t("wallet.connect")}
+                  >
+                    {app.t("wallet.connect")}
+                  </button>
+                </Show>
+              }
+            >
+              <div class="flex items-center gap-2">
+                <button
+                  class="
+                    px-2 py-1 rounded
+                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
+                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
+                  "
+                  onClick={copyAddress}
+                  title={app.t("wallet.copyAddress")}
+                  aria-label={app.t("wallet.copyAddress")}
+                >
+                  {shortAddr(walletAccount())}
+                </button>
+
+                <Show
+                  when={!mismatched()}
+                  fallback={
+                    <button
+                      class="
+                        px-2 py-1 rounded
+                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
+                        hover:opacity-90
+                      "
+                      onClick={onSwitchChain}
+                      title={app.t("wallet.changeChain")}
+                      aria-label={app.t("wallet.changeChain")}
+                    >
+                      {app.t("wallet.changeChain")}
+                    </button>
+                  }
+                >
+                  <Show when={chainLogoSrc()}>
+                    <img
+                      src={chainLogoSrc()}
+                      alt="chain"
+                      class="w-5 h-5"
+                      title={app.t("wallet.onRequiredNetwork")}
+                    />
+                  </Show>
+                </Show>
+
+                <Show when={copyState() === "copied"}>
+                  <span class="text-xs text-[hsl(var(--primary))]">{app.t("wallet.copied")}</span>
+                </Show>
+              </div>
+            </Show>
+
+            <button
+              class="
+                p-1 rounded transition
+                text-[hsl(var(--muted-foreground))]
+                hover:bg-[hsl(var(--muted))]
+              "
+              onClick={onTogglePane}
+              aria-label={app.t("menu.open")}
+              title={app.t("menu.open")}
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
+  );
+}
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+@import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
+@import "./styles/layout.css";
 </file>
 
 <file path="src/i18n/en.js">
@@ -7123,112 +7727,11 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "app.versionLabel": "Version",
+  "app.poweredBy": "Powered by SAVVA Platform",
+  "app.website": "SAVVA Website"
 };
-</file>
-
-<file path="src/pages/Settings.jsx">
-// src/pages/Settings.jsx
-import { useApp } from "../context/AppContext.jsx";
-import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
-import BackIconButton from "../components/ui/BackIconButton.jsx";
-import Assets from "../components/settings/Assets.jsx";
-import DeveloperSection from "../components/settings/DeveloperSection.jsx";
-
-export default function Settings() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto space-y-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
-        <BackIconButton title={t("settings.back")} />
-      </div>
-
-      <LocalIpfsSection />
-      <Assets />
-      <DeveloperSection />
-    </main>
-  );
-}
-</file>
-
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-@import "./styles/tabs.css";
-@import "./styles/themed-controls.css";
-
-@custom-variant dark (&:where(.dark, .dark *));
-
-:root {
-  --gradient: linear-gradient(to top left, #000c40, #607d8b);
-  --background: 243 100% 98.26%;
-  --foreground: 243 10% 0.52%;
-
-  --muted: 243 10% 91.3%;
-  --muted-foreground: 243 5% 41.3%;
-
-  --popover: 243 10% 91.3%;
-  --popover-foreground: 243 10% 0.65%;
-
-  --card: 243 10% 91.3%;
-  --card-foreground: 243 10% 0.65%;
-
-  --border: 243 15% 89.52%;
-  --input: 243 15% 89.52%;
-
-  --primary: 243 100% 13%;
-  --primary-foreground: 243 2% 91.3%;
-
-  --secondary: 243 5% 81.73%;
-  --secondary-foreground: 243 7% 11.3%;
-
-  --accent: 243 5% 95.65%;
-  --accent-foreground: 243 7% 11.3%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  --ring: 243 100% 13%;
-
-  --radius: 0.5rem;
-}
-
-.dark {
-  /* CSS: .bg-gradient { background: var(--gradient) } */
-  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
-
-  --background: 244 33.800000000000004% 6.32%;
-  --foreground: 244 5.2% 98.95%;
-
-  --muted: 244 26% 23.700000000000003%;
-  --muted-foreground: 244 5.2% 57.9%;
-
-  --popover: 244 54.6% 10.27%;
-  --popover-foreground: 244 5.2% 98.95%;
-
-  --card: 244 54.6% 10.27%;
-  --card-foreground: 244 5.2% 98.95%;
-
-  --border: 244 26% 23.700000000000003%;
-  --input: 244 26% 23.700000000000003%;
-
-  --primary: 244 52% 79%;
-  --primary-foreground: 244 5.2% 7.9%;
-
-  --secondary: 244 26% 23.700000000000003%;
-  --secondary-foreground: 244 5.2% 98.95%;
-
-  --accent: 244 26% 23.700000000000003%;
-  --accent-foreground: 244 5.2% 98.95%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 244 5.2% 98.95%;
-
-  --ring: 244 52% 79%;
-}
 </file>
 
 <file path="src/context/AppContext.jsx">
@@ -7237,7 +7740,7 @@ import * as Solid from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain } from "../blockchain/wallet";
-import { pushToast, pushErrorToast } from "../ux/toast";
+import { pushToast, pushErrorToast } from "../components/ui/toast.js";
 import { useI18n } from "../i18n/useI18n";
 import { fetchWithTimeout } from "../utils/net.js";
 
@@ -7634,6 +8137,7 @@ import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 import ThemeToggle from "./ui/ThemeToggle.jsx";
 import LangSelector from "./ui/LangSelector.jsx";
+import RightPaneFooter from "./ui/RightPaneFooter.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const app = useApp();
@@ -7648,18 +8152,9 @@ export default function RightPane({ isOpen, onClose }) {
         class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
         onClick={handlePanelClick}
         data-testid="right-pane"
+        style="border-left: 1px solid hsl(var(--border));"
       >
-        <div class="p-4 space-y-3">
-          <button
-            class="p-0 rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
-            onClick={onClose}
-            aria-label={t("rightPane.close")}
-          >
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
+        <div class="h-full flex flex-col p-4 space-y-3">
           <nav class="pt-2">
             <ul class="space-y-3">
               <li><ThemeToggle /></li>
@@ -7668,7 +8163,7 @@ export default function RightPane({ isOpen, onClose }) {
               <Show when={app.config()?.gear}>
                 <li>
                   <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent))]"
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                     role="button" tabIndex={0}
                     onClick={() => setShowSwitch(true)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
@@ -7678,7 +8173,7 @@ export default function RightPane({ isOpen, onClose }) {
                 </li>
                 <li>
                   <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent))]"
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                     role="button" tabIndex={0}
                     onClick={() => { navigate("/settings"); onClose(); }}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
@@ -7689,6 +8184,8 @@ export default function RightPane({ isOpen, onClose }) {
               </Show>
             </ul>
           </nav>
+
+          <RightPaneFooter />
         </div>
       </div>
 
@@ -7722,7 +8219,6 @@ export default function RightPane({ isOpen, onClose }) {
 
 <file path="src/App.jsx">
 // src/App.jsx
-/* src/App.jsx */
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -7734,6 +8230,7 @@ import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import DomainCssLoader from "./theme/DomainCssLoader.jsx";
+import FaviconLoader from "./theme/FaviconLoader.jsx";
 import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
 
 export default function App() {
@@ -7753,11 +8250,14 @@ export default function App() {
   return (
     <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
       <DomainCssLoader />
+      <FaviconLoader />
       <GoogleAnalyticsLoader />
+
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>
         <Settings />
       </Show>
+
       <RightPane isOpen={isPaneOpen} onClose={togglePane} />
       <Toaster />
       <AssetDebugTap />

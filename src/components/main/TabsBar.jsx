@@ -177,6 +177,7 @@ export default function TabsBar() {
             items={(items() || []).map(({ id, label, icon }) => ({ id, label, icon }))}
             value={selectedId()}
             onChange={handleTabChange}
+            compactWidth={768} 
           />
         </Show>
 
