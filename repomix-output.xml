@@ -6098,108 +6098,6 @@ export default function BrandLogo(props) {
 }
 </file>
 
-<file path="src/components/ui/Tabs.jsx">
-// src/components/ui/Tabs.jsx
-import { For, createSignal, onMount, onCleanup, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-export default function Tabs(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const items = () => props.items || [];
-  const value = () => props.value;
-
-  let listEl;
-  const [compact, setCompact] = createSignal(false);
-  let rafId;
-
-  function measure() {
-    cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(() => {
-      if (!listEl) return;
-      // force full-text for measurement
-      listEl.dataset.compact = "false";
-      const isOverflowing = listEl.scrollWidth > listEl.clientWidth;
-      setCompact(isOverflowing);
-    });
-  }
-
-  onMount(() => {
-    measure(); // initial
-    const ro = new ResizeObserver(() => measure());
-    if (listEl) ro.observe(listEl);
-
-    const onWinResize = () => measure();
-    window.addEventListener("resize", onWinResize, { passive: true });
-
-    onCleanup(() => {
-      ro.disconnect();
-      window.removeEventListener("resize", onWinResize);
-      cancelAnimationFrame(rafId);
-    });
-  });
-
-  createEffect(() => {
-    // re-measure when the list of items changes
-    items();
-    measure();
-  });
-
-  return (
-    <ul
-      ref={(el) => (listEl = el)}
-      class={`tabs ${props.class || ""}`}
-      role="tablist"
-      aria-label={t("tabs.aria")}
-      data-compact={compact() ? "true" : "false"}
-    >
-      <For each={items()}>
-        {(it) => {
-          const active = () => it.id === value();
-          const disabled = !!it.disabled;
-          const tabId = `tab-${it.id}`;
-
-          const onClick = (e) => {
-            e.preventDefault();
-            if (disabled || active()) return;
-            props.onChange?.(it.id);
-          };
-
-          const onKeyDown = (e) => {
-            if (disabled) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              if (!active()) props.onChange?.(it.id);
-            }
-          };
-
-          return (
-            <li classList={{ active: active() }} role="presentation" aria-selected={active()}>
-              <a
-                id={tabId}
-                href="#"
-                role="tab"
-                aria-selected={active() ? "true" : "false"}
-                aria-disabled={disabled ? "true" : "false"}
-                aria-label={it.label}
-                title={compact() ? it.label : undefined}
-                tabIndex={disabled ? -1 : 0}
-                onClick={onClick}
-                onKeyDown={onKeyDown}
-              >
-                {it.icon ? <span class="tab__icon" aria-hidden="true">{it.icon}</span> : null}
-                <span class="tab__label">{it.label}</span>
-              </a>
-            </li>
-          );
-        }}
-      </For>
-    </ul>
-  );
-}
-</file>
-
 <file path="src/components/Toaster.jsx">
 // src/components/Toaster.jsx
 import { For, Show } from "solid-js";
@@ -6610,132 +6508,90 @@ export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
 }
 </file>
 
-<file path="src/styles/tabs.css">
-/* src/styles/tabs.css */
+<file path="src/components/ui/Tabs.jsx">
+// src/components/ui/Tabs.jsx
+import { For, createSignal, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
 
-.tabs {
-  --tabs-active-bg: hsl(var(--background));
-  --tabs-active-fg: hsl(var(--foreground));
-  --tabs-inactive-bg: hsl(var(--secondary));
-  --tabs-inactive-fg: hsl(var(--secondary-foreground));
-  --tabs-background: hsl(var(--card));
+export default function Tabs(props) {
+  const app = useApp();
+  const { t } = app;
 
-  list-style: none;
-  margin: 0;
-  padding-top: 5px;
+  const items = () => props.items || [];
+  const value = () => props.value;
+  const [compact, setCompact] = createSignal(false);
 
-  background: var(--tabs-background);
-  background: var(--gradient);
+  onMount(() => {
+    // Parse the prop more robustly.
+    const compactWidth = parseInt(props.compactWidth, 10);
 
-  display: flex;
-  justify-content: center;
-  overflow-x: auto;
+    // Check if we received a valid number and enable the feature.
+    if (!isNaN(compactWidth) && compactWidth > 0) {
+      console.log(`[Tabs] Responsive mode enabled with width: ${compactWidth}`);
+
+      const checkWidth = () => {
+        setCompact(window.innerWidth <= compactWidth);
+      };
+
+      checkWidth(); // Run on initial mount
+      window.addEventListener("resize", checkWidth, { passive: true });
+      onCleanup(() => window.removeEventListener("resize", checkWidth));
+    } else {
+      console.log("[Tabs] Responsive mode disabled (compactWidth prop not provided or invalid).");
+    }
+  });
+
+  return (
+    <ul
+      class={`tabs ${props.class || ""}`}
+      role="tablist"
+      aria-label={t("tabs.aria")}
+      data-compact={compact() ? "true" : "false"}
+    >
+      <For each={items()}>
+        {(it) => {
+          const active = () => it.id === value();
+          const disabled = !!it.disabled;
+          const tabId = `tab-${it.id}`;
+
+          const onClick = (e) => {
+            e.preventDefault();
+            if (disabled || active()) return;
+            props.onChange?.(it.id);
+          };
+
+          const onKeyDown = (e) => {
+            if (disabled) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (!active()) props.onChange?.(it.id);
+            }
+          };
+
+          return (
+            <li classList={{ active: active() }} role="presentation" aria-selected={active()}>
+              <a
+                id={tabId}
+                href="#"
+                role="tab"
+                aria-selected={active() ? "true" : "false"}
+                aria-disabled={disabled ? "true" : "false"}
+                aria-label={it.label}
+                title={it.label}
+                tabIndex={disabled ? -1 : 0}
+                onClick={onClick}
+                onKeyDown={onKeyDown}
+              >
+                {it.icon ? <span class="tab__icon" aria-hidden="true">{it.icon}</span> : null}
+                <span class="tab__label">{it.label}</span>
+              </a>
+            </li>
+          );
+        }}
+      </For>
+    </ul>
+  );
 }
-
-.tabs li {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.tabs a {
-  display: block;
-  text-decoration: none;
-  padding: 7px clamp(5px, 5vw, 80px);
-  white-space: nowrap;
-  color: var(--tabs-inactive-fg);
-  background: var(--tabs-inactive-bg);
-  border-top-left-radius: 15px;
-  border-top-right-radius: 15px;
-}
-
-.tabs .active { z-index: 3; }
-.tabs .active a {
-  color: var(--tabs-active-fg);
-  background: var(--tabs-active-bg);
-}
-
-.tabs li:before,
-.tabs li:after,
-.tabs li a:before,
-.tabs li a:after {
-  position: absolute;
-  bottom: 0;
-}
-
-.tabs li:last-child:after,
-.tabs li:last-child a:after,
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs .active:after,
-.tabs .active:before,
-.tabs .active a:after,
-.tabs .active a:before {
-  content: "";
-}
-
-.tabs .active:before,
-.tabs .active:after {
-  background: var(--tabs-active-bg);
-  z-index: 1;
-}
-
-.tabs li:before,
-.tabs li:after {
-  background: var(--tabs-inactive-bg);
-  width: 10px;
-  height: 10px;
-}
-.tabs li:before { left: -10px; }
-.tabs li:after  { right: -10px; }
-
-.tabs li a:before,
-.tabs li a:after {
-  width: 20px;
-  height: 20px;
-  border-radius: 10px;
-  background: var(--tabs-background);
-  z-index: 2;
-}
-
-.tabs .active a:after,
-.tabs .active a:before {
-  background: var(--tabs-inactive-bg);
-}
-
-.tabs li:first-child.active a:before,
-.tabs li:last-child.active a:after {
-  background: var(--tabs-background);
-}
-
-.tabs li a:before { left: -20px; }
-.tabs li a:after  { right: -20px; }
-
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs li:last-child:after,
-.tabs li:last-child a:after {
-  content: none;
-}
-
-.tabs_panel {
-  position: relative;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  padding: 1rem;
-}
-
-.tabs a .tab__icon {
-  display: inline-flex;
-  vertical-align: middle;
-  margin-right: 0.5rem;
-  line-height: 0;
-}
-.tabs a .tab__icon svg { width: 18px; height: 18px; }
-
-/* compact mode */
-.tabs[data-compact="true"] a .tab__label { display: none; }
-.tabs[data-compact="true"] a .tab__icon { margin-right: 0; }
-.tabs[data-compact="true"] a { padding: 7px 15px; }
 </file>
 
 <file path="src/components/settings/DeveloperSection.jsx">
@@ -6904,6 +6760,149 @@ export default {
   "wallet.copyAddress": "Скопировать адрес",
   "wallet.onRequiredNetwork": "В требуемой сети"
 };
+</file>
+
+<file path="src/styles/tabs.css">
+/* src/styles/tabs.css */
+
+.tabs {
+  --tabs-active-bg: hsl(var(--background));
+  --tabs-active-fg: hsl(var(--foreground));
+  --tabs-inactive-bg: hsl(var(--secondary));
+  --tabs-inactive-fg: hsl(var(--secondary-foreground));
+  --tabs-background: hsl(var(--card));
+
+  list-style: none;
+  margin: 0;
+  padding-top: 5px;
+
+  background: var(--tabs-background);
+  background: var(--gradient);
+
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.tabs li {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tabs a {
+  display: block;
+  text-decoration: none;
+  padding: 7px clamp(5px, 5vw, 80px);
+  white-space: nowrap;
+  color: var(--tabs-inactive-fg);
+  background: var(--tabs-inactive-bg);
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
+}
+
+.tabs .active { z-index: 3; }
+.tabs .active a {
+  color: var(--tabs-active-fg);
+  background: var(--tabs-active-bg);
+}
+
+.tabs li:before,
+.tabs li:after,
+.tabs li a:before,
+.tabs li a:after {
+  position: absolute;
+  bottom: 0;
+}
+
+.tabs li:last-child:after,
+.tabs li:last-child a:after,
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs .active:after,
+.tabs .active:before,
+.tabs .active a:after,
+.tabs .active a:before {
+  content: "";
+}
+
+.tabs .active:before,
+.tabs .active:after {
+  background: var(--tabs-active-bg);
+  z-index: 1;
+}
+
+.tabs li:before,
+.tabs li:after {
+  background: var(--tabs-inactive-bg);
+  width: 10px;
+  height: 10px;
+}
+.tabs li:before { left: -10px; }
+.tabs li:after  { right: -10px; }
+
+.tabs li a:before,
+.tabs li a:after {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--tabs-background);
+  z-index: 2;
+}
+
+.tabs .active a:after,
+.tabs .active a:before {
+  background: var(--tabs-inactive-bg);
+}
+
+.tabs li:first-child.active a:before,
+.tabs li:last-child.active a:after {
+  background: var(--tabs-background);
+}
+
+.tabs li a:before { left: -20px; }
+.tabs li a:after  { right: -20px; }
+
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs li:last-child:after,
+.tabs li:last-child a:after {
+  content: none;
+}
+
+.tabs_panel {
+  position: relative;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 1rem;
+}
+
+.tabs a .tab__icon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  line-height: 0;
+}
+.tabs a .tab__icon svg { width: 18px; height: 18px; }
+
+/* --- compact mode --- */
+.tabs[data-compact="true"] a .tab__icon {
+  margin-right: 0;
+}
+.tabs[data-compact="true"] a {
+  padding: 7px 15px;
+}
+.tabs[data-compact="true"] a .tab__label {
+  /* Visually hide but keep in accessibility tree */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
 </file>
 
 <file path="src/components/SwitchConnectDialog.jsx">
@@ -7218,231 +7217,6 @@ export default function Settings() {
 }
 </file>
 
-<file path="src/components/main/TabsBar.jsx">
-// src/components/main/TabsBar.jsx
-import { createResource, For, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { useI18n } from "../../i18n/useI18n";
-import { loadAssetResource } from "../../utils/assetLoader";
-import { useHashRouter, navigate } from "../../routing/hashRouter";
-import Tabs from "../ui/Tabs.jsx";
-import { getTabComponent } from "../tabs";
-import RightRailLayout from "../tabs/RightRailLayout.jsx";
-
-// route helpers (no /t prefix; use "/actual", "/leaders", etc.)
-const slug = (s) => String(s || "").trim().toLowerCase();
-const firstSeg = (path) => {
-  const p = String(path || "/");
-  const s = p.startsWith("/") ? p.slice(1) : p;
-  const seg = s.split(/[?#/]/, 1)[0];
-  return slug(seg);
-};
-const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
-
-// icons
-function SvgIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      {props.children}
-    </svg>
-  );
-}
-const TrophyIcon  = () => (<SvgIcon><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M7 8a5 5 0 0010 0"/><path d="M7 4a4 4 0 01-4 4"/><path d="M17 4a4 4 0 004 4"/></SvgIcon>);
-const BoltIcon    = () => (<SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>);
-const CommentIcon = () => (<SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>);
-const SparklesIcon= () => (<SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>);
-const HeartIcon   = () => (<SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>);
-const FallbackIcon= () => (<SvgIcon><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></SvgIcon>);
-
-function iconForType(type) {
-  const k = slug(type);
-  if (k === "leaders") return <TrophyIcon />;
-  if (k === "actual") return <BoltIcon />;
-  if (k === "comments") return <CommentIcon />;
-  if (k === "new") return <SparklesIcon />;
-  if (k === "for-you" || k === "foryou") return <HeartIcon />;
-  return <FallbackIcon />;
-}
-function iconFromSpec(spec) {
-  if (!spec) return null;
-  if (typeof spec === "string" && spec.startsWith("emoji:")) {
-    const ch = spec.slice("emoji:".length);
-    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
-  }
-  return null;
-}
-
-export default function TabsBar() {
-  const app = useApp();
-  const { t, domainAssetsConfig, selectedDomain } = app;
-  const { lang } = useI18n();
-  const { route } = useHashRouter();
-
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    return !d ? "" : typeof d === "string" ? d : d.name || "";
-  });
-
-  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
-
-  const [tabsRaw] = createResource(
-    () => tabsPath(),
-    async (relPath) => {
-      if (!relPath) return [];
-      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
-      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
-      return list.map((x, i) => ({
-        id: x?.id ?? x?.type ?? `tab_${i}`,
-        type: x?.type ?? x?.id ?? `tab_${i}`,
-        title: x?.title,
-        icon: x?.icon || null,
-        _raw: x,
-      }));
-    }
-  );
-
-  // i18n helpers
-  function pickByLocale(obj, langCode) {
-    if (!obj || typeof obj !== "object") return undefined;
-    const lc = (langCode || "en").toString();
-    if (obj[lc] !== undefined) return obj[lc];
-    const base = lc.toLowerCase().split(/[-_]/)[0];
-    if (obj[base] !== undefined) return obj[base];
-    return obj["*"];
-  }
-  function resolveTitle(title, langCode, domain) {
-    if (!title) return "";
-    if (typeof title === "string") return title;
-    const byLocale = pickByLocale(title, langCode);
-    if (byLocale) {
-      if (typeof byLocale === "string") return byLocale;
-      if (typeof byLocale === "object") {
-        const byDomain = byLocale[domain] ?? byLocale["*"];
-        if (typeof byDomain === "string") return byDomain;
-        const anyStr = Object.values(byLocale).find((v) => typeof v === "string");
-        if (anyStr) return anyStr;
-      }
-    }
-    const topStr = Object.values(title).find((v) => typeof v === "string");
-    if (topStr) return topStr;
-    for (const v of Object.values(title)) {
-      if (v && typeof v === "object") {
-        const byDomain = v[domain] ?? v["*"];
-        if (typeof byDomain === "string") return byDomain;
-        const anyStr = Object.values(v).find((x) => typeof x === "string");
-        if (anyStr) return anyStr;
-      }
-    }
-    return "";
-  }
-
-  // selection + URL sync
-  const [selectedId, setSelectedId] = createSignal("");
-  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
-
-  const items = createMemo(() =>
-    (tabsRaw() || []).map((tab) => {
-      const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
-      const explicit = iconFromSpec(tab.icon);
-      const auto = iconForType(tab.type || tab.id);
-      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
-    })
-  );
-
-  const labelById = createMemo(() => {
-    const map = new Map();
-    (items() || []).forEach((it) => map.set(it.id, it.label));
-    return map;
-  });
-
-  // init/fix selection vs URL
-  createEffect(() => {
-    const list = tabsRaw() || [];
-    if (!list.length) return setSelectedId("");
-
-    const key = firstSeg(route());
-    const hasKey = (k) => list.some((t) => slug(t.id) === k || slug(t.type) === k);
-
-    if (key && hasKey(key)) {
-      const match = list.find((t) => slug(t.id) === key) || list.find((t) => slug(t.type) === key);
-      if (match && selectedId() !== match.id) setSelectedId(match.id);
-    } else if (!selectedId() || !list.some((t) => t.id === selectedId())) {
-      const first = list[0];
-      batch(() => {
-        setSelectedId(first.id);
-        navigate(pathFor(first.type || first.id), { replace: true });
-      });
-    }
-  });
-
-  function handleTabChange(nextId) {
-    const list = tabsRaw() || [];
-    const entry = list.find((t) => t.id === nextId);
-    if (!entry) return;
-    batch(() => {
-      setSelectedId(nextId);
-      const want = pathFor(entry.type || entry.id);
-      if (route() !== want) navigate(want);
-    });
-  }
-
-  return (
-    <section class="w-full" >
-      {/* changed: let outer Container control width; keep full width here */}
-      <div class="sv-container sv-container--no-gutter">
-        <Show
-          when={!tabsRaw.loading}
-          fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.loading")}</span>}
-        >
-          <Tabs
-            items={(items() || []).map(({ id, label, icon }) => ({ id, label, icon }))}
-            value={selectedId()}
-            onChange={handleTabChange}
-          />
-        </Show>
-
-        <div class="tabs_panel">
-          <For each={tabsRaw() || []}>
-            {(tab) => {
-              const active = () => selectedId() === tab.id;
-              const Comp = getTabComponent(tab.type);
-              const title = labelById().get(tab.id) || t("main.tabs.untitled");
-              const rightCfg = tab?._raw?.right_panel || { available: false };
-
-              return (
-                <Show when={active()}>
-                  {Comp ? (
-                    rightCfg?.available  ? (
-                      <RightRailLayout>
-                        <Comp title={title} tab={tab} />
-                      </RightRailLayout>
-                    ) : (
-                      <Comp title={title} tab={tab} />
-                    )
-                  ) : rightCfg?.available ? (
-                    <RightRailLayout>
-                      <>
-                        <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
-                      </>
-                    </RightRailLayout>
-                  ) : (
-                    <>
-                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
-                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
-                    </>
-                  )}
-                </Show>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/Header.jsx">
 // File: src/components/Header.jsx
 import { Show, createSignal, onMount } from "solid-js";
@@ -7626,6 +7400,232 @@ export default function Header({ onTogglePane }) {
 @import "./styles/tabs.css";
 @import "./styles/themed-controls.css";
 @import "./styles/layout.css";
+</file>
+
+<file path="src/components/main/TabsBar.jsx">
+// src/components/main/TabsBar.jsx
+import { createResource, For, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { useI18n } from "../../i18n/useI18n";
+import { loadAssetResource } from "../../utils/assetLoader";
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+import Tabs from "../ui/Tabs.jsx";
+import { getTabComponent } from "../tabs";
+import RightRailLayout from "../tabs/RightRailLayout.jsx";
+
+// route helpers (no /t prefix; use "/actual", "/leaders", etc.)
+const slug = (s) => String(s || "").trim().toLowerCase();
+const firstSeg = (path) => {
+  const p = String(path || "/");
+  const s = p.startsWith("/") ? p.slice(1) : p;
+  const seg = s.split(/[?#/]/, 1)[0];
+  return slug(seg);
+};
+const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
+
+// icons
+function SvgIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {props.children}
+    </svg>
+  );
+}
+const TrophyIcon  = () => (<SvgIcon><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M7 8a5 5 0 0010 0"/><path d="M7 4a4 4 0 01-4 4"/><path d="M17 4a4 4 0 004 4"/></SvgIcon>);
+const BoltIcon    = () => (<SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>);
+const CommentIcon = () => (<SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>);
+const SparklesIcon= () => (<SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>);
+const HeartIcon   = () => (<SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>);
+const FallbackIcon= () => (<SvgIcon><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></SvgIcon>);
+
+function iconForType(type) {
+  const k = slug(type);
+  if (k === "leaders") return <TrophyIcon />;
+  if (k === "actual") return <BoltIcon />;
+  if (k === "comments") return <CommentIcon />;
+  if (k === "new") return <SparklesIcon />;
+  if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  return <FallbackIcon />;
+}
+function iconFromSpec(spec) {
+  if (!spec) return null;
+  if (typeof spec === "string" && spec.startsWith("emoji:")) {
+    const ch = spec.slice("emoji:".length);
+    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
+  }
+  return null;
+}
+
+export default function TabsBar() {
+  const app = useApp();
+  const { t, domainAssetsConfig, selectedDomain } = app;
+  const { lang } = useI18n();
+  const { route } = useHashRouter();
+
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
+  });
+
+  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
+
+  const [tabsRaw] = createResource(
+    () => tabsPath(),
+    async (relPath) => {
+      if (!relPath) return [];
+      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
+      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
+      return list.map((x, i) => ({
+        id: x?.id ?? x?.type ?? `tab_${i}`,
+        type: x?.type ?? x?.id ?? `tab_${i}`,
+        title: x?.title,
+        icon: x?.icon || null,
+        _raw: x,
+      }));
+    }
+  );
+
+  // i18n helpers
+  function pickByLocale(obj, langCode) {
+    if (!obj || typeof obj !== "object") return undefined;
+    const lc = (langCode || "en").toString();
+    if (obj[lc] !== undefined) return obj[lc];
+    const base = lc.toLowerCase().split(/[-_]/)[0];
+    if (obj[base] !== undefined) return obj[base];
+    return obj["*"];
+  }
+  function resolveTitle(title, langCode, domain) {
+    if (!title) return "";
+    if (typeof title === "string") return title;
+    const byLocale = pickByLocale(title, langCode);
+    if (byLocale) {
+      if (typeof byLocale === "string") return byLocale;
+      if (typeof byLocale === "object") {
+        const byDomain = byLocale[domain] ?? byLocale["*"];
+        if (typeof byDomain === "string") return byDomain;
+        const anyStr = Object.values(byLocale).find((v) => typeof v === "string");
+        if (anyStr) return anyStr;
+      }
+    }
+    const topStr = Object.values(title).find((v) => typeof v === "string");
+    if (topStr) return topStr;
+    for (const v of Object.values(title)) {
+      if (v && typeof v === "object") {
+        const byDomain = v[domain] ?? v["*"];
+        if (typeof byDomain === "string") return byDomain;
+        const anyStr = Object.values(v).find((x) => typeof x === "string");
+        if (anyStr) return anyStr;
+      }
+    }
+    return "";
+  }
+
+  // selection + URL sync
+  const [selectedId, setSelectedId] = createSignal("");
+  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
+
+  const items = createMemo(() =>
+    (tabsRaw() || []).map((tab) => {
+      const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
+      const explicit = iconFromSpec(tab.icon);
+      const auto = iconForType(tab.type || tab.id);
+      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
+    })
+  );
+
+  const labelById = createMemo(() => {
+    const map = new Map();
+    (items() || []).forEach((it) => map.set(it.id, it.label));
+    return map;
+  });
+
+  // init/fix selection vs URL
+  createEffect(() => {
+    const list = tabsRaw() || [];
+    if (!list.length) return setSelectedId("");
+
+    const key = firstSeg(route());
+    const hasKey = (k) => list.some((t) => slug(t.id) === k || slug(t.type) === k);
+
+    if (key && hasKey(key)) {
+      const match = list.find((t) => slug(t.id) === key) || list.find((t) => slug(t.type) === key);
+      if (match && selectedId() !== match.id) setSelectedId(match.id);
+    } else if (!selectedId() || !list.some((t) => t.id === selectedId())) {
+      const first = list[0];
+      batch(() => {
+        setSelectedId(first.id);
+        navigate(pathFor(first.type || first.id), { replace: true });
+      });
+    }
+  });
+
+  function handleTabChange(nextId) {
+    const list = tabsRaw() || [];
+    const entry = list.find((t) => t.id === nextId);
+    if (!entry) return;
+    batch(() => {
+      setSelectedId(nextId);
+      const want = pathFor(entry.type || entry.id);
+      if (route() !== want) navigate(want);
+    });
+  }
+
+  return (
+    <section class="w-full" >
+      {/* changed: let outer Container control width; keep full width here */}
+      <div class="sv-container sv-container--no-gutter">
+        <Show
+          when={!tabsRaw.loading}
+          fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.loading")}</span>}
+        >
+          <Tabs
+            items={(items() || []).map(({ id, label, icon }) => ({ id, label, icon }))}
+            value={selectedId()}
+            onChange={handleTabChange}
+            compactWidth={768} 
+          />
+        </Show>
+
+        <div class="tabs_panel">
+          <For each={tabsRaw() || []}>
+            {(tab) => {
+              const active = () => selectedId() === tab.id;
+              const Comp = getTabComponent(tab.type);
+              const title = labelById().get(tab.id) || t("main.tabs.untitled");
+              const rightCfg = tab?._raw?.right_panel || { available: false };
+
+              return (
+                <Show when={active()}>
+                  {Comp ? (
+                    rightCfg?.available  ? (
+                      <RightRailLayout>
+                        <Comp title={title} tab={tab} />
+                      </RightRailLayout>
+                    ) : (
+                      <Comp title={title} tab={tab} />
+                    )
+                  ) : rightCfg?.available ? (
+                    <RightRailLayout>
+                      <>
+                        <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                      </>
+                    </RightRailLayout>
+                  ) : (
+                    <>
+                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                    </>
+                  )}
+                </Show>
+              );
+            }}
+          </For>
+        </div>
+      </div>
+    </section>
+  );
+}
 </file>
 
 <file path="src/i18n/en.js">

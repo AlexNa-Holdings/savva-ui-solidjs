@@ -1,4 +1,4 @@
-// src/App.jsx
+// File: src/App.jsx
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -12,6 +12,7 @@ import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import DomainCssLoader from "./theme/DomainCssLoader.jsx";
 import FaviconLoader from "./theme/FaviconLoader.jsx";
 import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
+import WsConnector from "./net/WsConnector.jsx"; // ← add this
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -32,6 +33,7 @@ export default function App() {
       <DomainCssLoader />
       <FaviconLoader />
       <GoogleAnalyticsLoader />
+      <WsConnector />  {/* ← one lightweight, headless service */}
 
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>

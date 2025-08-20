@@ -1,8 +1,8 @@
-// src/components/SwitchConnectDialog.jsx
+// File: src/components/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
+import { httpBase } from "../net/endpoints";
 
-function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
 
@@ -14,9 +14,9 @@ function isAbortError(e) {
   return false;
 }
 
-async function fetchInfoJSON(baseUrl, { signal } = {}) {
-  const url = ensureSlash(baseUrl) + "info";
-  const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
+async function fetchInfoJSON(backendLink, { signal } = {}) {
+  const base = httpBase(backendLink);
+  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
   if (!res.ok) throw new Error(`/info failed: ${res.status}`);
   return await res.json();
 }
@@ -89,9 +89,17 @@ export default function SwitchConnectDialog(props) {
 
   async function handleReload() {
     setLocalError("");
+
+    // Normalize the user-entered backend URL (candidate) without touching global config.
+    let candidate = (backendUrl() || "").trim();
     try {
-      const u = new URL((backendUrl() || "").trim());
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+      const u = new URL(candidate);
+      if (!/^https?:$/.test(u.protocol)) {
+        throw new Error(t("rightPane.switch.validation.protocol"));
+      }
+      // Ensure trailing slash for consistent "base + 'info'" concatenation.
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
+      candidate = u.toString();
     } catch (e) {
       setLocalError(e.message || t("rightPane.switch.validation.protocol"));
       return;
@@ -100,18 +108,31 @@ export default function SwitchConnectDialog(props) {
     setFetching(true);
     aborter?.abort();
     aborter = new AbortController();
+
     try {
-      const info = await fetchInfoJSON((backendUrl() || "").trim(), { signal: aborter.signal });
+      // Probe the candidate backend’s /info to list available domains.
+      const res = await fetch(candidate + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+
       const normalized = (Array.isArray(info?.domains) ? info.domains : [])
         .filter(Boolean)
         .map((d) => (typeof d === "string" ? { name: d } : d))
         .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
 
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
       setDomains(normalized);
 
       if (normalized.length > 0) {
+        // Try to keep current/wanted domain if present; otherwise pick the first.
         const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
-        const keep = normalized.find((d) => eq(d.name, prefer)) || normalized.find((d) => eq(d.name, domain()));
+        const keep =
+          normalized.find((d) => eq(d.name, prefer)) ||
+          normalized.find((d) => eq(d.name, domain()));
         const name = keep?.name || normalized[0].name;
         setDomain(name);
         queueMicrotask(() => setDomain(name));
@@ -135,13 +156,22 @@ export default function SwitchConnectDialog(props) {
       if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
       if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
 
+      // Configure once for the new selection
+      configureEndpoints({ backendLink: url, domain: chosen, lang: app.lang ? app.lang() : "en" });
+
       if (typeof props.onApply === "function") {
-        await props.onApply({ backendLink: url, domain: chosen });
+        await props.onApply({ backendLink: httpBase(), domain: chosen });
       }
 
-      await app.updateConnect?.({ backendLink: url });
+      await app.updateConnect?.({ backendLink: httpBase() });
       await app.setDomain?.(chosen);
       await app.refreshDomainAssets?.();
+
+      // Nudge WS to new URL immediately (no waiting for mounts)
+      if (app.ws) {
+        app.ws.setUrl(wsUrl());
+        app.ws.reconnect("switch-backend");
+      }
     } catch (e) {
       if (!isAbortError(e)) setLocalError(e.message || String(e));
       setApplying(false);
@@ -149,7 +179,7 @@ export default function SwitchConnectDialog(props) {
     }
 
     setApplying(false);
-    try { aborter?.abort(); } catch {}
+    try { aborter?.abort(); } catch { }
     props.onClose?.();
   }
 
