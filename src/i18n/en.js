@@ -96,5 +96,8 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "app.versionLabel": "Version",
+  "app.poweredBy": "Powered by SAVVA Platform",
+  "app.website": "SAVVA Website"
 };

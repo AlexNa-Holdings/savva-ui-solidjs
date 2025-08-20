@@ -1,0 +1,80 @@
+// scripts/release.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import dotenv from "dotenv";
+
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const VERSION_FILE = path.join(ROOT, "src", "version.js");
+const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
+const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
+
+const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
+const DEPLOY_USER = process.env.DEPLOY_USER || "";
+const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
+const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
+const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
+
+function sh(cmd, opts = {}) {
+  console.log(`$ ${cmd}`);
+  return execSync(cmd, { stdio: "inherit", ...opts });
+}
+
+function readVersion() {
+  const text = fs.readFileSync(VERSION_FILE, "utf8");
+  const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
+  if (!m) throw new Error("Could not parse APP_VERSION in src/version.js");
+  return { major: Number(m[1]), minor: Number(m[2]), text };
+}
+
+function writeVersion(major, minor, prevText) {
+  const next = `${major}.${minor}`;
+  const out = prevText.replace(/APP_VERSION\s*=\s*["'`](\d+\.\d+)["'`]/, `APP_VERSION = "${next}"`);
+  fs.writeFileSync(VERSION_FILE, out, "utf8");
+  return next;
+}
+
+function build() {
+  sh("npm run build");
+}
+
+function gitCommitAndPush(version) {
+  try { sh("git add -A"); } catch {}
+  try { sh(`git commit -m "release: v${version}"`); }
+  catch { console.warn("No changes to commit."); }
+  // Push current branch
+  try { sh("git rev-parse --abbrev-ref HEAD"); } catch {}
+  try { sh("git push"); } catch {}
+  // Also push HEAD to Prod branch (without switching)
+  try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
+}
+
+function deploy() {
+  if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
+    console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
+    return;
+  }
+  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
+  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
+
+  // Ensure path exists, then scp
+  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
+  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
+}
+
+(async function main() {
+  const { major, minor, text } = readVersion();
+  const nextVersion = writeVersion(major, minor + 1, text);
+  console.log(`Bumped version to ${nextVersion}`);
+
+  build();
+  gitCommitAndPush(nextVersion);
+  deploy();
+
+  console.log(`Done. Released v${nextVersion}.`);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

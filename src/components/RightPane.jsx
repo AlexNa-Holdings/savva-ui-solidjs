@@ -5,6 +5,7 @@ import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 import ThemeToggle from "./ui/ThemeToggle.jsx";
 import LangSelector from "./ui/LangSelector.jsx";
+import RightPaneFooter from "./ui/RightPaneFooter.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const app = useApp();
@@ -21,9 +22,7 @@ export default function RightPane({ isOpen, onClose }) {
         data-testid="right-pane"
         style="border-left: 1px solid hsl(var(--border));"
       >
-        <div class="p-4 space-y-3">
-
-
+        <div class="h-full flex flex-col p-4 space-y-3">
           <nav class="pt-2">
             <ul class="space-y-3">
               <li><ThemeToggle /></li>
@@ -32,7 +31,7 @@ export default function RightPane({ isOpen, onClose }) {
               <Show when={app.config()?.gear}>
                 <li>
                   <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent))]"
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                     role="button" tabIndex={0}
                     onClick={() => setShowSwitch(true)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
@@ -42,7 +41,7 @@ export default function RightPane({ isOpen, onClose }) {
                 </li>
                 <li>
                   <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent))]"
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                     role="button" tabIndex={0}
                     onClick={() => { navigate("/settings"); onClose(); }}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
@@ -53,6 +52,8 @@ export default function RightPane({ isOpen, onClose }) {
               </Show>
             </ul>
           </nav>
+
+          <RightPaneFooter />
         </div>
       </div>
 
