@@ -71,7 +71,6 @@ function writeLang(filePath, obj) {
     JSON.stringify(sorted, null, 2) +
     ";\n";
   fs.writeFileSync(filePath, body, "utf8");
-  console.log(`[i18n] Updated ${path.relative(ROOT, filePath)} (${Object.keys(sorted).length} keys)`);
 }
 
 // ---------- OpenAI helpers ----------
@@ -167,7 +166,6 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
   }
 
   const desiredKeys = new Set(usedKeys);
-  console.log(`[i18n] Used keys found: ${desiredKeys.size}`);
 
   // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
   const enOrig = dicts["en.js"] || {};
@@ -187,7 +185,6 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
   }
 
   writeLang(enPath, enNew);
-  console.log(`[i18n] en.js cleaned. Missing or "???": ${missingEn.length}`);
 
   // ---------- 2) Fill English "???" via OpenAI ----------
   if (missingEn.length > 0) {
@@ -206,7 +203,6 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
         }
       }
       writeLang(enPath, enNew);
-      console.log(`[i18n] en.js: filled ${filledCount} English strings via OpenAI.`);
     }
   } else {
     console.log("[i18n] No missing English strings to fill.");
@@ -261,8 +257,6 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
     writeLang(langPath, out);
     console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
   }
-
-  console.log("[i18n] Done.");
 })().catch((err) => {
   console.error(err);
   process.exit(1);
