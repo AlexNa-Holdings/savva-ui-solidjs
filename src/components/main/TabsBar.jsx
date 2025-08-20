@@ -166,8 +166,9 @@ export default function TabsBar() {
   }
 
   return (
-    <section class="w-full">
-      <div class="max-w-6xl mx-auto px-0">
+    <section class="w-full" >
+      {/* changed: let outer Container control width; keep full width here */}
+      <div class="sv-container sv-container--no-gutter">
         <Show
           when={!tabsRaw.loading}
           fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.loading")}</span>}
@@ -206,7 +207,7 @@ export default function TabsBar() {
                     </RightRailLayout>
                   ) : (
                     <>
-                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
+                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
                       <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
                     </>
                   )}

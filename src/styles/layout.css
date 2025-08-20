@@ -1,0 +1,50 @@
+/* src/styles/layout.css */
+:root {
+  --sv-container-max: 1600px;           /* main max width for content container */
+  --sv-container-gutter: clamp(16px, 2vw, 32px); /* responsive padding */
+  --sv-aside-w: clamp(300px, 24vw, 380px);       /* sidebar width on desktop */
+  --sv-content-max-ch: 68ch;            /* comfortable text line length */
+}
+
+/* Centered container */
+.sv-container {
+  max-width: var(--sv-container-max);
+  margin-inline: auto;
+  padding-inline: var(--sv-container-gutter);
+}
+
+/* Content grid: main column + sidebar */
+.sv-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(16px, 2vw, 24px);
+}
+@media (min-width: 1024px) {
+  .sv-content-grid {
+    grid-template-columns: minmax(0, 1fr) var(--sv-aside-w);
+    align-items: start;
+  }
+}
+
+.sv-main { min-width: 0; }
+.sv-aside { min-width: 0; }
+
+/* Text limiter for typography-heavy content */
+.sv-typography {
+  max-width: var(--sv-content-max-ch);
+}
+
+/* Full-bleed section for backgrounds/hero areas */
+.full-bleed {
+  width: 100vw;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+
+@media (min-width: 1800px) {
+  :root { --sv-container-max: 1600px; }
+}
+
+.sv-container--no-gutter {
+  padding-inline: 0; /* keep max-width centering, remove side padding */
+}
