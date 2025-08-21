@@ -43,7 +43,7 @@ export default function DocsPager(props) {
   return (
     <Show when={!data.loading && (nav().prev || nav().next)}>
       <nav class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-stretch justify-between gap-3 text-sm">
-        {/* Prev */}
+        {/* Prev (left) */}
         <div class="min-w-0 flex-1">
           <Show when={nav().prev}>
             {(p) => (
@@ -52,32 +52,44 @@ export default function DocsPager(props) {
                 class="w-full rounded-md px-3 py-2 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] text-left"
                 onClick={() => go(p().file)}
                 aria-label={app.t("docs.prev")}
-                title={app.t("docs.prev")}
+                title={p().label}
               >
-                <div class="opacity-70">{app.t("docs.prev")} · {p().section}</div>
-                <div class="truncate flex items-center gap-2">
+                <div class="flex items-start gap-2">
                   <span aria-hidden="true">←</span>
-                  <span class="font-medium">{p().label}</span>
+                  <div class="min-w-0">
+                    <div class="font-medium whitespace-normal break-words leading-snug">
+                      {p().label}
+                    </div>
+                    <div class="opacity-70 text-xs whitespace-normal break-words leading-snug">
+                      {p().section}
+                    </div>
+                  </div>
                 </div>
               </button>
             )}
           </Show>
         </div>
 
-        {/* Next */}
+        {/* Next (right) */}
         <div class="min-w-0 flex-1 text-right">
           <Show when={nav().next}>
             {(n) => (
               <button
                 type="button"
-                class="w-full rounded-md px-3 py-2 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] text-right"
+                class="w-full rounded-md px-3 py-2 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))]"
                 onClick={() => go(n().file)}
                 aria-label={app.t("docs.next")}
-                title={app.t("docs.next")}
+                title={n().label}
               >
-                <div class="opacity-70">{app.t("docs.next")} · {n().section}</div>
-                <div class="truncate flex items-center gap-2 justify-end">
-                  <span class="font-medium">{n().label}</span>
+                <div class="flex items-start gap-2 justify-end">
+                  <div class="min-w-0">
+                    <div class="font-medium whitespace-normal break-words leading-snug text-right">
+                      {n().label}
+                    </div>
+                    <div class="opacity-70 text-xs whitespace-normal break-words leading-snug text-right">
+                      {n().section}
+                    </div>
+                  </div>
                   <span aria-hidden="true">→</span>
                 </div>
               </button>

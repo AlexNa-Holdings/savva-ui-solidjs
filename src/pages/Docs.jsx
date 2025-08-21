@@ -4,8 +4,7 @@ import { useApp } from "../context/AppContext.jsx";
 import { useHashRouter } from "../routing/hashRouter";
 import DocsIndex from "../components/docs/DocsIndex.jsx";
 import DocsContent from "../components/docs/DocsContent.jsx";
-import BackIconButton from "../components/ui/BackIconButton.jsx";
-import ToTopButton from "../components/ui/ToTopButton.jsx";
+import ToMainPageButton from "../components/ui/ToMainPageButton.jsx";
 
 const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
 const fileFromRoute = (route) => {
@@ -23,14 +22,13 @@ export default function Docs() {
 
   return (
     <div class="sv-container sv-container--no-gutter">
-      <ToTopButton />
       <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
+      <ToMainPageButton />
         {/* Left sidebar */}
         <aside class="min-w-0">
           <div>
             <div class="flex items-center justify-between">
               <h2 class="text-sm font-semibold mb-2">{title()}</h2>
-              <BackIconButton />
             </div>
             <DocsIndex active={file()} onPick={onPick} />
           </div>
