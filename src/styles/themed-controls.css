@@ -1,3 +1,4 @@
+
 /* src/styles/themed-controls.css */
 
 /* ────────────────────────────────────────────────────────── */
@@ -121,8 +122,8 @@
 /* ────────────────────────────────────────────────────────── */
 
 .sv-docs pre {
-  background: hsl(var(--muted));
-  color: hsl(var(--foreground));
+  /* background: hsl(var(--muted)); <-- REMOVED */
+  /* color: hsl(var(--foreground)); <-- REMOVED */
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
   padding: 1rem 1.125rem;        /* a touch more padding */
