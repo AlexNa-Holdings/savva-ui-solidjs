@@ -140,7 +140,7 @@ Contents
 /* ---------------------------------------------- */
 
 /* Tweak here to change density in one place */
-.sv-docs { --docs-code-lh: 1.3; } /* ↓ tighter line spacing in code blocks */
+.sv-docs { --docs-code-lh: 0.9; } 
 
 .sv-docs pre {
   position: relative;
@@ -234,3 +234,30 @@ html.dark .sv-docs code[data-theme*=" "] span {
   background: var(--shiki-dark-bg, hsl(var(--muted)));
   color: var(--shiki-dark, hsl(var(--foreground)));
 }
+
+/* Scroll-to-top floating button */
+.sv-to-top {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(12px, 2.5vh, 24px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+
+  background: color-mix(in oklab, hsl(var(--card)) 88%, transparent);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+
+  opacity: .85;
+  backdrop-filter: blur(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 60;
+}
+.sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
+.sv-to-top:active { transform: translateX(-50%) translateY(0); }

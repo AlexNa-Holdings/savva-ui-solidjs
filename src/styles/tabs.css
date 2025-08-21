@@ -124,7 +124,7 @@
   margin-right: 0;
 }
 .tabs[data-compact="true"] a {
-  padding: 7px 15px;
+  padding: 7px clamp(5px, 6vw, 80px);
 }
 .tabs[data-compact="true"] a .tab__label {
   /* Visually hide but keep in accessibility tree */

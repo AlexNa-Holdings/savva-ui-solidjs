@@ -2,6 +2,7 @@
 import { createMemo, createResource, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import MarkdownView from "./MarkdownView.jsx";
+import DocsPager from "./DocsPager.jsx";
 
 async function fetchMd({ lang, relPath }) {
   const clean = String(relPath || "index.md").replace(/^\/*/, "");
@@ -22,6 +23,8 @@ export default function DocsContent(props) {
         <div class="text-sm text-[hsl(var(--muted-foreground))]">{app.t("common.loading")}</div>
       }>
         <MarkdownView markdown={doc()?.text || ""} />
+        {/* Pager */}
+        <DocsPager activeRelPath={props.relPath} onPick={props.onPick} />
       </Show>
     </div>
   );

@@ -1,3 +1,4 @@
+# public/dev_docs/en/sidebar.yaml
 sections:
   - title: Getting Started
     items:
@@ -5,3 +6,12 @@ sections:
         file: index.md
       - label: Setup
         file: getting-started.md
+
+  - title: Core Concepts
+    items:
+      - label: Overview
+        file: core-concepts/index.md
+      - label: App initialization & backend connect
+        file: core-concepts/app-init.md
+      - label: Working with domains
+        file: core-concepts/domain.md

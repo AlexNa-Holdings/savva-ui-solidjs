@@ -1,38 +1,53 @@
 // src/components/ui/BackIconButton.jsx
+import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter";
 
-export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
+export default function BackIconButton(props) {
+  const app = useApp();
   const { route } = useHashRouter();
 
+  const label = () =>
+    props.title ||
+    app.t(props.titleKey || "settings.back"); // default key exists today
+
+  const size = () => (Number(props.size) > 0 ? Number(props.size) : 20);
+  const fallback = () =>
+    typeof props.fallbackHref === "string" ? props.fallbackHref : "/";
+
   function goBack() {
-    let before = route();
+    const before = route();
+    let attemptedHistory = false;
+
     try {
       if (window.history.length > 1) {
         window.history.back();
-        // Дадим hashchange шанс сработать; если остались на /settings — уводим вручную
+        attemptedHistory = true;
+        // Give hashchange a tick; if we didn't move, go to fallback.
         setTimeout(() => {
           const now = route();
-          if (now === before || now === "/settings") {
-            navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
-          }
-        }, 60);
-        return;
+          if (now === before) navigate(fallback());
+          props.onBack?.(now, before);
+        }, 80);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
-    // Нет истории — уводим сразу через роутер
-    navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
+    if (!attemptedHistory) {
+      navigate(fallback());
+      props.onBack?.(route(), before);
+    }
   }
 
   return (
     <button
-      class="p-2 rounded text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]"
-      onClick={goBack}
-      aria-label={title}
-      title={title}
       type="button"
+      onClick={goBack}
+      class={`p-2 rounded text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] ${props.class || ""}`}
+      aria-label={label()}
+      title={label()}
     >
-      <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size()} height={size()} aria-hidden="true">
         <path
           d="M9 15L3 9m0 0l6-6M3 9h11a4 4 0 014 4v7"
           fill="none"
@@ -42,7 +57,7 @@ export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
           stroke-linejoin="round"
         />
       </svg>
-      <span class="sr-only">{title}</span>
+      <span class="sr-only">{label()}</span>
     </button>
   );
 }

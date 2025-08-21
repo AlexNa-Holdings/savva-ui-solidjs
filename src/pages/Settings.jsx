@@ -13,7 +13,7 @@ export default function Settings() {
     <main class="p-4 max-w-3xl mx-auto space-y-6">
       <div class="flex items-center justify-between">
         <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
-        <BackIconButton title={t("settings.back")} />
+        <BackIconButton />
       </div>
 
       <LocalIpfsSection />

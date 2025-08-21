@@ -135,6 +135,7 @@ src/
       Tabs.jsx
       ThemeToggle.jsx
       toast.js
+      ToTopButton.jsx
     Header.jsx
     RightPane.jsx
     RightPaneFooter.jsx
@@ -200,6 +201,82 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
+<file path="src/components/ui/ToTopButton.jsx">
+// src/components/ui/ToTopButton.jsx
+import { createSignal, onMount, onCleanup, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+/**
+ * ToTopButton
+ * - Appears when scrolled beyond `threshold` (default: 240px)
+ * - By default listens to window scroll; pass `targetEl` to watch a specific container
+ * - Position: bottom-center (fixed) – style via .sv-to-top classes
+ */
+export default function ToTopButton(props) {
+  const app = useApp();
+  const threshold = typeof props.threshold === "number" ? props.threshold : 240;
+
+  const [visible, setVisible] = createSignal(false);
+
+  let el; // button node (not strictly needed, but handy if you want to focus etc.)
+
+  function getScrollTop() {
+    const t = props.targetEl;
+    if (t && t.scrollTop != null) return t.scrollTop;
+    return window.scrollY || document.documentElement.scrollTop || 0;
+  }
+
+  function onScroll() {
+    setVisible(getScrollTop() > threshold);
+  }
+
+  function scrollToTop() {
+    const t = props.targetEl;
+    if (t && typeof t.scrollTo === "function") {
+      t.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  onMount(() => {
+    const target = props.targetEl || window;
+    target.addEventListener("scroll", onScroll, { passive: true });
+    // initial state
+    onScroll();
+
+    onCleanup(() => {
+      target.removeEventListener("scroll", onScroll);
+    });
+  });
+
+  return (
+    <Show when={visible()}>
+      <button
+        ref={el}
+        type="button"
+        class={`sv-to-top ${props.class || ""}`}
+        aria-label={app.t("ui.toTop")}
+        title={app.t("ui.toTop")}
+        onClick={scrollToTop}
+      >
+        {/* up arrow */}
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M12 4l-7 7m7-7l7 7M12 4v16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </Show>
+  );
+}
+</file>
+
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 540 879.4">
@@ -245,42 +322,6 @@ This section contains the contents of the repository's files.
   <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
   <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h14"/>
 </svg>
-</file>
-
-<file path="public/dev_docs/en/index.md">
-# SAVVA Developer Documentation
-
-Welcome to the **SAVVA Platform** developer docs.
-
----
-
-## What is SAVVA?
-
-SAVVA is an **open-source platform** for building next-generation social networks.  
-Unlike traditional platforms, SAVVA combines **blockchain** and **IPFS** to create a decentralized, trustable, and censorship-resistant foundation.
-
-- **Blockchain-anchored posts**  
-  Every piece of content is registered on-chain and signed with the author’s cryptographic key. This ensures authenticity and makes it possible to trust that the post truly comes from its stated author.
-
-- **Decentralized storage with IPFS**  
-  Content is stored in the InterPlanetary File System rather than in a single company’s database. This removes single points of failure and makes the system more resilient.
-
-Together, blockchain and IPFS form a new kind of social network: one without centralized control, without a single company behind it, and without a pressure point that can be exploited.
-
----
-
-## About This Documentation
-
-This is **developer documentation**, not end-user help.  
-SAVVA is open source, and we actively encourage developers to fork, extend, and adapt the codebase.  
-
-Here you’ll find:
-
-- The **core principles** behind the architecture.  
-- How the **interfaces and APIs** are structured.  
-- Best practices for extending and integrating the platform.
-
-If you are a developer exploring SAVVA, this is the place to start. 🚀
 </file>
 
 <file path="public/dev_docs/en/sidebar.yaml">
@@ -3536,150 +3577,6 @@ export default function DocsIndex(props) {
 }
 </file>
 
-<file path="src/components/docs/MarkdownView.jsx">
-// src/components/docs/MarkdownView.jsx
-import { createSignal, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-/* Injects a copy button into each <pre> before stringify */
-function rehypeCopyButton() {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      visit(tree, "element", (node) => {
-        if (node.tagName !== "pre") return;
-        const exists = Array.isArray(node.children) &&
-          node.children.some((c) => c?.type === "element" && c?.properties?.className?.includes?.("sv-copy-btn"));
-        if (exists) return;
-        node.children.push({
-          type: "element",
-          tagName: "button",
-          properties: { className: ["sv-copy-btn"], type: "button" },
-          children: [{ type: "text", value: "Copy" }],
-        });
-      });
-      return tree;
-    });
-}
-
-export default function MarkdownView(props) {
-  const { t } = useApp();
-  const [html, setHtml] = createSignal("");
-  let disposed = false;
-  let container;
-
-  async function renderMd() {
-    try {
-      const [
-        { unified },
-        { default: remarkParse },
-        { default: remarkGfm },
-        { default: remarkFrontmatter },
-        { default: remarkRehype },
-        { default: rehypeSlug },
-        { default: rehypeAutolinkHeadings },
-        { default: rehypePrettyCode },
-        { default: rehypeStringify },
-        DOMPurify,
-      ] = await Promise.all([
-        import("unified"),
-        import("remark-parse"),
-        import("remark-gfm"),
-        import("remark-frontmatter"),
-        import("remark-rehype"),
-        import("rehype-slug"),
-        import("rehype-autolink-headings"),
-        import("rehype-pretty-code"),
-        import("rehype-stringify"),
-        import("dompurify"),
-      ]);
-
-      const processor = unified()
-        .use(remarkParse)
-        .use(remarkFrontmatter, ["yaml", "toml"])
-        .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true })
-        .use(rehypeSlug)
-        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
-        .use(rehypePrettyCode, {
-          keepBackground: true, // let Shiki control bg + tokens
-          theme: { light: "github-light", dark: "github-dark" },
-        })
-        .use(rehypeCopyButton)
-        .use(rehypeStringify, { allowDangerousHtml: true });
-
-      const file = await processor.process(String(props.markdown || ""));
-      const rawHtml = String(file);
-
-      // ✅ allow inline styles + CSS custom properties (Shiki tokens)
-      const safe = DOMPurify.default.sanitize(rawHtml, {
-        USE_PROFILES: { html: true },
-        ADD_ATTR: ["style", "data-theme", "data-language"],
-        ALLOW_DATA_ATTR: true,
-        ALLOW_CSS_CUSTOM_PROPERTIES: true,
-      });
-
-      if (!disposed) setHtml(safe);
-    } catch {
-      const safe = `<pre>${String(props.markdown || "")
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>`;
-      if (!disposed) setHtml(safe);
-    }
-  }
-
-  function copy(text) {
-    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
-    return new Promise((res, rej) => {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
-        document.body.appendChild(ta); ta.select(); document.execCommand("copy");
-        document.body.removeChild(ta); res();
-      } catch (e) { rej(e); }
-    });
-  }
-
-  function onClick(e) {
-    const btn = e.target.closest?.(".sv-copy-btn");
-    if (!btn) return;
-    const code = btn.closest("pre")?.querySelector("code");
-    const text = code ? code.innerText : "";
-    copy(text).then(() => {
-      const prev = btn.textContent;
-      btn.textContent = t("docs.copied") || "Copied";
-      setTimeout(() => { btn.textContent = t("docs.copy") || prev || "Copy"; }, 1200);
-    });
-  }
-
-  function relabelButtons() {
-    container?.querySelectorAll(".sv-copy-btn").forEach((b) => {
-      b.textContent = t("docs.copy") || "Copy";
-      b.title = t("docs.copy") || "Copy";
-      b.setAttribute("aria-label", t("docs.copy") || "Copy");
-    });
-  }
-
-  onMount(async () => {
-    await renderMd();
-    relabelButtons();
-    container?.addEventListener("click", onClick);
-  });
-
-  onCleanup(() => {
-    disposed = true;
-    container?.removeEventListener("click", onClick);
-  });
-
-  return (
-    <article
-      ref={(el) => (container = el)}
-      class="sv-docs prose prose-sm md:prose-base max-w-none"
-      innerHTML={html()}
-      aria-label={t("docs.article")}
-    />
-  );
-}
-</file>
-
 <file path="src/components/feed/ContentFeed.jsx">
 // src/components/feed/ContentFeed.jsx
 import { createSignal, onCleanup, onMount, For, Show } from "solid-js";
@@ -4463,39 +4360,46 @@ import { useApp } from "../context/AppContext.jsx";
 import { useHashRouter } from "../routing/hashRouter";
 import DocsIndex from "../components/docs/DocsIndex.jsx";
 import DocsContent from "../components/docs/DocsContent.jsx";
+import BackIconButton from "../components/ui/BackIconButton.jsx";
+import ToTopButton from "../components/ui/ToTopButton.jsx";
 
 const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
 const fileFromRoute = (route) => {
-  if (!String(route || "").startsWith("/docs")) return "index.md";
-  const rest = String(route).slice("/docs".length);
-  return trim(rest) || "index.md";
+    if (!String(route || "").startsWith("/docs")) return "index.md";
+    const rest = String(route).slice("/docs".length);
+    return trim(rest) || "index.md";
 };
 
 export default function Docs() {
-  const app = useApp();
-  const { route, navigate } = useHashRouter();
-  const file = createMemo(() => fileFromRoute(route()));
-  const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
-  const title = createMemo(() => app.t("docs.title"));
+    const app = useApp();
+    const { route, navigate } = useHashRouter();
+    const file = createMemo(() => fileFromRoute(route()));
+    const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
+    const title = createMemo(() => app.t("docs.title"));
 
-  return (
-    <div class="sv-container sv-container--no-gutter">
-      <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
-        {/* Left sidebar */}
-        <aside class="min-w-0">
-          <div>
-            <h2 class="text-sm font-semibold mb-2">{title()}</h2>
-            <DocsIndex active={file()} onPick={onPick} />
-          </div>
-        </aside>
+    return (
+        <div class="sv-container sv-container--no-gutter">
+            <ToTopButton />
+            <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
+                {/* Left sidebar */}
+                <aside class="min-w-0">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-sm font-semibold mb-2">{title()}</h2>
+                            <BackIconButton />
+                        </div>
+                        <DocsIndex active={file()} onPick={onPick} />
+                    </div>
 
-        {/* Right content */}
-        <main class="min-w-0">
-          <DocsContent relPath={file()} />
-        </main>
-      </div>
-    </div>
-  );
+                </aside>
+
+                {/* Right content */}
+                <main class="min-w-0">
+                    <DocsContent relPath={file()} />
+                </main>
+            </div>
+        </div>
+    );
 }
 </file>
 
@@ -4919,6 +4823,40 @@ Learn more about deploying your application with the [documentations](https://vi
   },
   "include": ["vite.config.js"]
 }
+</file>
+
+<file path="public/dev_docs/en/index.md">
+# SAVVA Developer Documentation
+
+Welcome to the **SAVVA Platform** developer docs.
+
+
+## What is SAVVA?
+
+SAVVA is an **open-source platform** for building next-generation social networks.  
+Unlike traditional platforms, SAVVA combines **blockchain** and **IPFS** to create a decentralized, trustable, and censorship-resistant foundation.
+
+- **Blockchain-anchored posts**  
+  Every piece of content is registered on-chain and signed with the author’s cryptographic key. This ensures authenticity and makes it possible to trust that the post truly comes from its stated author.
+
+- **Decentralized storage with IPFS**  
+  Content is stored in the InterPlanetary File System rather than in a single company’s database. This removes single points of failure and makes the system more resilient.
+
+Together, blockchain and IPFS form a new kind of social network: one without centralized control, without a single company behind it, and without a pressure point that can be exploited.
+
+
+## About This Documentation
+
+This is **developer documentation**, not end-user help.  
+SAVVA is open source, and we actively encourage developers to fork, extend, and adapt the codebase.  
+
+Here you’ll find:
+
+- The **core principles** behind the architecture.  
+- How the **interfaces and APIs** are structured.  
+- Best practices for extending and integrating the platform.
+
+If you are a developer exploring SAVVA, this is the place to start. 🚀
 </file>
 
 <file path="scripts/i18n.mjs">
@@ -5381,6 +5319,185 @@ export async function switchOrAddChain(meta) {
 }
 
 export { walletAccount, walletChainId };
+</file>
+
+<file path="src/components/docs/MarkdownView.jsx">
+// src/components/docs/MarkdownView.jsx
+import { createSignal, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+/* Inject a copy button into each <pre> before stringify */
+function rehypeCopyButton() {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      visit(tree, "element", (node) => {
+        if (node.tagName !== "pre") return;
+        const exists =
+          Array.isArray(node.children) &&
+          node.children.some(
+            (c) =>
+              c?.type === "element" &&
+              c?.properties?.className?.includes?.("sv-copy-btn")
+          );
+        if (exists) return;
+        node.children.push({
+          type: "element",
+          tagName: "button",
+          properties: { className: ["sv-copy-btn"], type: "button" },
+          children: [{ type: "text", value: "Copy" }],
+        });
+      });
+      return tree;
+    });
+}
+
+export default function MarkdownView(props) {
+  const { t } = useApp();
+  const [html, setHtml] = createSignal("");
+  let disposed = false;
+  let container;
+
+  async function renderMd() {
+    try {
+      const [
+        { unified },
+        { default: remarkParse },
+        { default: remarkGfm },
+        { default: remarkFrontmatter },
+        { default: remarkRehype },
+        { default: rehypeSlug },
+        { default: rehypeAutolinkHeadings },
+        { default: rehypePrettyCode },
+        { default: rehypeStringify },
+        DOMPurify,
+      ] = await Promise.all([
+        import("unified"),
+        import("remark-parse"),
+        import("remark-gfm"),
+        import("remark-frontmatter"),
+        import("remark-rehype"),
+        import("rehype-slug"),
+        import("rehype-autolink-headings"),
+        import("rehype-pretty-code"),
+        import("rehype-stringify"),
+        import("dompurify"),
+      ]);
+
+      // Preserve Shiki styles: allow CSS variables and var() uses on style attrs
+      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => {
+        if (data.attrName !== "style") return;
+        const src = String(data.attrValue || "");
+        const safe = [];
+        for (const decl of src.split(";")) {
+          const i = decl.indexOf(":");
+          if (i <= 0) continue;
+          const prop = decl.slice(0, i).trim().toLowerCase();
+          const val = decl.slice(i + 1).trim();
+          const isVarDecl = prop.startsWith("--"); // e.g., --shiki-*
+          const isVarUse = /^var\(/i.test(val);
+          const isColorProp =
+            prop === "color" ||
+            prop === "background" ||
+            prop === "background-color";
+          if (isVarDecl || isVarUse || isColorProp) safe.push(`${prop}:${val}`);
+        }
+        data.attrValue = safe.join(";");
+        if (data.attrValue) data.keepAttr = true;
+      });
+
+      const processor = unified()
+        .use(remarkParse)
+        .use(remarkFrontmatter, ["yaml", "toml"])
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeSlug)
+        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
+        .use(rehypePrettyCode, {
+          keepBackground: true,
+          theme: { light: "github-light", dark: "github-dark" },
+        })
+        .use(rehypeCopyButton)
+        .use(rehypeStringify, { allowDangerousHtml: true });
+
+      const file = await processor.process(String(props.markdown || ""));
+      const rawHtml = String(file);
+
+      const safe = DOMPurify.default.sanitize(rawHtml, {
+        USE_PROFILES: { html: true },
+        ADD_ATTR: ["style", "data-theme", "data-language", "data-line"],
+        ALLOW_DATA_ATTR: true,
+      });
+
+      if (!disposed) setHtml(safe);
+    } catch {
+      const safe = `<pre>${String(props.markdown || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")}</pre>`;
+      if (!disposed) setHtml(safe);
+    }
+  }
+
+  function copy(text) {
+    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+    return new Promise((res, rej) => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        res();
+      } catch (e) {
+        rej(e);
+      }
+    });
+  }
+
+  function onClick(e) {
+    const btn = e.target.closest?.(".sv-copy-btn");
+    if (!btn) return;
+    const code = btn.closest("pre")?.querySelector("code");
+    const text = code ? code.innerText : "";
+    copy(text).then(() => {
+      const prev = btn.textContent;
+      btn.textContent = t("docs.copied") || "Copied";
+      setTimeout(() => {
+        btn.textContent = t("docs.copy") || prev || "Copy";
+      }, 1200);
+    });
+  }
+
+  function relabelButtons() {
+    container?.querySelectorAll(".sv-copy-btn").forEach((b) => {
+      b.textContent = t("docs.copy") || "Copy";
+      b.title = t("docs.copy") || "Copy";
+      b.setAttribute("aria-label", t("docs.copy") || "Copy");
+    });
+  }
+
+  onMount(async () => {
+    await renderMd();
+    relabelButtons();
+    container?.addEventListener("click", onClick);
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    container?.removeEventListener("click", onClick);
+  });
+
+  return (
+    <article
+      ref={(el) => (container = el)}
+      class="sv-docs prose prose-sm md:prose-base max-w-none"
+      innerHTML={html()}
+      aria-label={t("docs.article")}
+    />
+  );
+}
 </file>
 
 <file path="src/components/main/MainView.jsx">
@@ -7454,40 +7571,55 @@ export default {
 
 <file path="src/components/ui/BackIconButton.jsx">
 // src/components/ui/BackIconButton.jsx
+import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter";
 
-export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
+export default function BackIconButton(props) {
+  const app = useApp();
   const { route } = useHashRouter();
 
+  const label = () =>
+    props.title ||
+    app.t(props.titleKey || "settings.back"); // default key exists today
+
+  const size = () => (Number(props.size) > 0 ? Number(props.size) : 20);
+  const fallback = () =>
+    typeof props.fallbackHref === "string" ? props.fallbackHref : "/";
+
   function goBack() {
-    let before = route();
+    const before = route();
+    let attemptedHistory = false;
+
     try {
       if (window.history.length > 1) {
         window.history.back();
-        // Дадим hashchange шанс сработать; если остались на /settings — уводим вручную
+        attemptedHistory = true;
+        // Give hashchange a tick; if we didn't move, go to fallback.
         setTimeout(() => {
           const now = route();
-          if (now === before || now === "/settings") {
-            navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
-          }
-        }, 60);
-        return;
+          if (now === before) navigate(fallback());
+          props.onBack?.(now, before);
+        }, 80);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
-    // Нет истории — уводим сразу через роутер
-    navigate(typeof fallbackHref === "string" ? fallbackHref : "/");
+    if (!attemptedHistory) {
+      navigate(fallback());
+      props.onBack?.(route(), before);
+    }
   }
 
   return (
     <button
-      class="p-2 rounded text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]"
-      onClick={goBack}
-      aria-label={title}
-      title={title}
       type="button"
+      onClick={goBack}
+      class={`p-2 rounded text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] ${props.class || ""}`}
+      aria-label={label()}
+      title={label()}
     >
-      <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size()} height={size()} aria-hidden="true">
         <path
           d="M9 15L3 9m0 0l6-6M3 9h11a4 4 0 014 4v7"
           fill="none"
@@ -7497,7 +7629,7 @@ export default function BackIconButton({ title = "Back", fallbackHref = "/" }) {
           stroke-linejoin="round"
         />
       </svg>
-      <span class="sr-only">{title}</span>
+      <span class="sr-only">{label()}</span>
     </button>
   );
 }
@@ -7587,196 +7719,6 @@ export default function Tabs(props) {
     </ul>
   );
 }
-</file>
-
-<file path="src/styles/themed-controls.css">
-/* src/styles/themed-controls.css */
-
-/* ────────────────────────────────────────────────────────── */
-/* Themed segmented controls                                  */
-/* ────────────────────────────────────────────────────────── */
-.themed-segment {
-  display: inline-flex;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 9999px;
-  background: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
-}
-
-.themed-pill {
-  appearance: none;
-  border: 0;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  line-height: 1;
-  font-weight: 600;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  outline: none;
-}
-.themed-pill:hover { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
-.themed-pill.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.themed-pill:focus { outline: none; box-shadow: none; }
-
-.themed-pill--icon { padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; }
-.themed-pill--icon svg { display: block; }
-
-/* 1px theme border for dialogs/panels */
-.themed-dialog {
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem; /* keeps rounded look if element didn't set one */
-}
-
-/* ────────────────────────────────────────────────────────── */
-/* Docs typography (MarkdownView -> <article class="sv-docs">)*/
-/* ────────────────────────────────────────────────────────── */
-
-/* Titles */
-.sv-docs h1 {
-  font-size: 1.75rem;
-  line-height: 1.25;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-  margin: 0 0 1rem;
-}
-
-.sv-docs h2 {
-  font-size: 1.25rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-  margin: 1.5rem 0 0.75rem;
-}
-
-.sv-docs h3 {
-  font-size: 1.05rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-  margin: 1.25rem 0 0.5rem;
-}
-
-/* Paragraphs & lists */
-.sv-docs p {
-  margin: 0.5rem 0 0.85rem;
-  line-height: 1.65;
-  color: hsl(var(--foreground));
-}
-
-.sv-docs ul,
-.sv-docs ol {
-  margin: 0.6rem 0 0.9rem 1.25rem;
-  padding: 0;
-}
-
-.sv-docs li { margin: 0.25rem 0; }
-
-/* Links inside docs keep theme color and underline on hover */
-.sv-docs a {
-  color: hsl(var(--primary));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.sv-docs a:hover { opacity: 0.9; }
-
-/* Blockquotes (subtle) */
-.sv-docs blockquote {
-  margin: 1rem 0;
-  padding: 0.6rem 0.9rem;
-  border-left: 3px solid hsl(var(--border));
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  border-radius: 0.25rem;
-}
-
-/* Tables (very light theming) */
-.sv-docs table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.95rem;
-}
-.sv-docs th,
-.sv-docs td {
-  border: 1px solid hsl(var(--border));
-  padding: 0.5rem 0.6rem;
-}
-.sv-docs th {
-  background: hsl(var(--muted));
-  text-align: left;
-}
-
-/* ────────────────────────────────────────────────────────── */
-/* Code blocks & inline code                                  */
-/* ────────────────────────────────────────────────────────── */
-
-.sv-docs pre {
-  /* background: hsl(var(--muted)); <-- REMOVED */
-  /* color: hsl(var(--foreground)); <-- REMOVED */
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  padding: 1rem 1.125rem;        /* a touch more padding */
-  margin: 1rem 0 1.25rem;        /* spacing around code blocks */
-  overflow-x: auto;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-/* Avoid double backgrounds inside fenced blocks */
-.sv-docs pre code {
-  background: transparent;
-  padding: 0;
-}
-
-/* Inline code (backticks) in paragraphs/lists */
-.sv-docs :not(pre) > code {
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.35rem;
-  padding: 0.12rem 0.35rem;
-  font-size: 0.9em;
-}
-
-/* Optional: line numbers + highlights (rehype-pretty-code helpers) */
-.sv-docs pre code > span { display: block; }
-
-.sv-docs .line--highlighted {
-  background: hsl(var(--accent));
-}
-.sv-docs .word--highlighted {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-radius: 0.2rem;
-  padding: 0.05rem 0.2rem;
-}
-
-/* Button Copy */
-.sv-docs .anchor {
-  text-decoration: none;
-  color: inherit;
-  position: relative;
-}
-.sv-docs .anchor:hover { text-decoration: underline; }
-
-.sv-docs pre { position: relative; }
-.sv-docs pre .sv-copy-btn {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.35rem;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-.sv-docs pre:hover .sv-copy-btn { opacity: 1; }
 </file>
 
 <file path="src/index.jsx">
@@ -7986,7 +7928,7 @@ export default function DeveloperSection() {
   margin-right: 0;
 }
 .tabs[data-compact="true"] a {
-  padding: 7px 15px;
+  padding: 7px clamp(5px, 6vw, 80px);
 }
 .tabs[data-compact="true"] a .tab__label {
   /* Visually hide but keep in accessibility tree */
@@ -8000,6 +7942,272 @@ export default function DeveloperSection() {
   white-space: nowrap;
   border-width: 0;
 }
+</file>
+
+<file path="src/styles/themed-controls.css">
+/* src/styles/themed-controls.css
+──────────────────────────────────────────────────────────────
+Contents
+1) Themed segmented controls
+2) Light 1px dialog borders
+3) Docs typography (.sv-docs)
+4) Code & syntax highlighting (Shiki / pretty-code)
+────────────────────────────────────────────────────────────── */
+
+/* ---------------------------------------------- */
+/* 1) Themed segmented controls                   */
+/* ---------------------------------------------- */
+
+.themed-segment {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--muted));
+}
+
+.themed-pill {
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  line-height: 1;
+  font-weight: 600;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  outline: none;
+}
+.themed-pill:hover {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+.themed-pill.is-active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+/* Keyboard focus (accessible) */
+.themed-pill:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+.themed-pill--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+}
+.themed-pill--icon svg { display: block; }
+
+/* ---------------------------------------------- */
+/* 2) Light 1px dialog/panel border               */
+/* ---------------------------------------------- */
+
+.themed-dialog {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem; /* preserves rounding if none set on element */
+}
+
+/* ---------------------------------------------- */
+/* 3) Docs typography (.sv-docs)                  */
+/* ---------------------------------------------- */
+
+.sv-docs h1 {
+  margin: 0 0 1rem;
+  font-size: 1.75rem;
+  line-height: 1.25;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.sv-docs h2 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.sv-docs h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs p {
+  margin: 0.5rem 0 0.85rem;
+  line-height: 1.65;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs ul,
+.sv-docs ol {
+  margin: 0.6rem 0 0.9rem 1.25rem;
+  padding: 0;
+}
+.sv-docs li { margin: 0.25rem 0; }
+
+.sv-docs a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sv-docs a:hover { opacity: 0.9; }
+
+.sv-docs blockquote {
+  margin: 1rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid hsl(var(--border));
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border-radius: 0.25rem;
+}
+
+.sv-docs table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.sv-docs th,
+.sv-docs td {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid hsl(var(--border));
+}
+.sv-docs th {
+  text-align: left;
+  background: hsl(var(--muted));
+}
+
+/* ---------------------------------------------- */
+/* 4) Code & syntax highlighting                  */
+/*    (rehype-pretty-code + Shiki)                */
+/* ---------------------------------------------- */
+
+/* Tweak here to change density in one place */
+.sv-docs { --docs-code-lh: 0.9; } 
+
+.sv-docs pre {
+  position: relative;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.125rem;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  line-height: var(--docs-code-lh); /* was 1.45 */
+}
+
+/* Avoid double backgrounds inside fenced blocks */
+.sv-docs pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* pretty-code: each line is a span; keep them block-level and inherit the tighter line-height */
+.sv-docs pre code > span {
+  display: block;
+  line-height: inherit; /* ensures tighter spacing applies to each line */
+}
+
+/* Inline code */
+.sv-docs :not(pre) > code {
+  display: inline;
+  padding: 0.12rem 0.35rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  font-size: 0.9em;
+}
+
+/* Dual-theme token colors produced by Shiki */
+.sv-docs code[data-theme*=" "],
+.sv-docs code[data-theme*=" "] span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+html.dark .sv-docs code[data-theme*=" "],
+html.dark .sv-docs code[data-theme*=" "] span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+/* Optional: line/word highlights from pretty-code */
+.sv-docs .line--highlighted { background: hsl(var(--accent)); }
+.sv-docs .word--highlighted {
+  padding: 0.05rem 0.2rem;
+  border-radius: 0.2rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* Heading anchors */
+.sv-docs .anchor {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+}
+.sv-docs .anchor:hover { text-decoration: underline; }
+
+/* Copy button */
+.sv-docs pre .sv-copy-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+.sv-docs pre:hover .sv-copy-btn { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sv-docs pre .sv-copy-btn { transition: none; }
+}
+
+/* Let <pre> background follow computed theme vars from Shiki */
+.sv-docs pre[data-theme] {
+  background: var(--shiki-light-bg, hsl(var(--muted)));
+  color: var(--shiki-light, hsl(var(--foreground)));
+}
+.dark .sv-docs pre[data-theme] {
+  background: var(--shiki-dark-bg, hsl(var(--muted)));
+  color: var(--shiki-dark, hsl(var(--foreground)));
+}
+
+/* Scroll-to-top floating button */
+.sv-to-top {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(12px, 2.5vh, 24px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+
+  background: color-mix(in oklab, hsl(var(--card)) 88%, transparent);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+
+  opacity: .85;
+  backdrop-filter: blur(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 60;
+}
+.sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
+.sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
 <file path="src/i18n/ru.js">
@@ -8128,7 +8336,7 @@ export default function Settings() {
     <main class="p-4 max-w-3xl mx-auto space-y-6">
       <div class="flex items-center justify-between">
         <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
-        <BackIconButton title={t("settings.back")} />
+        <BackIconButton />
       </div>
 
       <LocalIpfsSection />
@@ -8322,51 +8530,6 @@ export default function Header({ onTogglePane }) {
 @import "./styles/tabs.css";
 @import "./styles/themed-controls.css";
 @import "./styles/layout.css";
-</file>
-
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "release": "node scripts/release.mjs",
-    "i18n": "node scripts/i18n.mjs"
-  },
-  "dependencies": {
-    "@solidjs/router": "^0.15.3",
-    "dompurify": "^3.2.6",
-    "dotenv": "^17.2.1",
-    "js-yaml": "^4.1.0",
-    "marked": "^16.2.0",
-    "openai": "^5.12.2",
-    "rehype-autolink-headings": "^7.1.0",
-    "rehype-pretty-code": "^0.14.1",
-    "rehype-slug": "^6.0.0",
-    "rehype-stringify": "^10.0.1",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2",
-    "shiki": "^3.11.0",
-    "solid-js": "^1.9.8",
-    "unified": "^11.0.5",
-    "viem": "^2.33.3",
-    "yaml": "^2.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
-  }
-}
 </file>
 
 <file path="src/components/main/TabsBar.jsx">
@@ -8874,6 +9037,52 @@ export default function SwitchConnectDialog(props) {
       </div>
     </Show>
   );
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "release": "node scripts/release.mjs",
+    "i18n": "node scripts/i18n.mjs"
+  },
+  "dependencies": {
+    "@shikijs/themes": "^3.11.0",
+    "@solidjs/router": "^0.15.3",
+    "dompurify": "^3.2.6",
+    "dotenv": "^17.2.1",
+    "js-yaml": "^4.1.0",
+    "marked": "^16.2.0",
+    "openai": "^5.12.2",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-pretty-code": "^0.14.1",
+    "rehype-slug": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "shiki": "^3.11.0",
+    "solid-js": "^1.9.8",
+    "unified": "^11.0.5",
+    "viem": "^2.33.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
 }
 </file>
 
