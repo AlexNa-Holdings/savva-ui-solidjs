@@ -19,8 +19,8 @@ Before you begin, make sure you have the following tools installed:
 The source code is hosted on GitHub. To get the latest version:
 
 ```bash
-git clone https://github.com/savva-project/savva-platform.git
-cd savva-platform
+git clone https://github.com/AlexNa-Holdings/savva-ui-solidjs
+cd savva-ui-solidjs
 ````
 
 ## Install Dependencies
