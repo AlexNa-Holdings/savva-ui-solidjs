@@ -2,7 +2,6 @@
 
 Welcome to the **SAVVA Platform** developer docs.
 
----
 
 ## What is SAVVA?
 
@@ -17,7 +16,6 @@ Unlike traditional platforms, SAVVA combines **blockchain** and **IPFS** to crea
 
 Together, blockchain and IPFS form a new kind of social network: one without centralized control, without a single company behind it, and without a pressure point that can be exploited.
 
----
 
 ## About This Documentation
 
