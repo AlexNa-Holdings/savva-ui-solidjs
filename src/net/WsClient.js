@@ -1,18 +1,21 @@
 // File: src/net/WsClient.js
 import { dbg } from "../utils/debug";
-import { wsUrl } from "./endpoints";
+import { wsUrl as endpointsWsUrl } from "./endpoints";
+
 
 /**
  * Pure WebSocket transport.
- * URL comes only from endpoints.wsUrl() (single source of truth).
+ * Request:  { id: number, type: string, data: any }
+ * Response: { id?: number, type?: string, error?: string, data?: any }
+ * Alerts:   { type: string, data?: any }  (no id)
  */
 export default class WsClient {
-  constructor({ protocols } = {}) {
-    this._url = "";                     // filled from wsUrl()
+  constructor({ url = "", protocols } = {}) {
+    this._url = url || "";
     this._protocols = protocols || undefined;
     this._ws = null;
 
-    this._status = "idle";              // idle | connecting | open | closed
+    this._status = "idle";                // idle | connecting | open | closed
     this._attempt = 0;
     this._shouldReconnect = true;
     this._reconnectTid = null;
@@ -21,7 +24,7 @@ export default class WsClient {
     this._heartbeatMs = 25_000;
 
     this._sendQueue = [];
-    this._pending = new Map();          // id -> { resolve, reject, timer }
+    this._pending = new Map();            // id (string) -> { resolve, reject, timer }
     this._nextId = 1;
 
     this._listeners = new Map();
@@ -37,7 +40,7 @@ export default class WsClient {
     }
   }
 
-  // ── public API ────────────────────────────────────────────────────────────────
+  // ─── public API ───────────────────────────────────────────────────────────────
   dispose() {
     this._shouldReconnect = false;
     this._clearReconnect();
@@ -55,14 +58,11 @@ export default class WsClient {
   status()  { return this._status; }
   attempt() { return this._attempt; }
 
-  /**
-   * No-arg: always pull the canonical URL from endpoints.
-   * (We ignore any caller-provided URL to prevent drift.)
-   */
-  setUrl() {
-    const u = String(wsUrl() || "");
+  setUrl(nextUrl) {
+    const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
+    const u = String(source || "");
     if (!u) {
-      dbg.warn("ws", "No WS URL configured in endpoints");
+      dbg.warn("ws", "No WS URL configured");
       return;
     }
     if (u === this._url) return;
@@ -73,9 +73,7 @@ export default class WsClient {
   setAutoReconnect(on) { this._shouldReconnect = !!on; }
 
   connect() {
-    if (!this._url) this.setUrl();
     if (!this._url) return;
-
     if (this._ws && (this._ws.readyState === WebSocket.OPEN || this._ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -123,8 +121,6 @@ export default class WsClient {
     this._clearReconnect();
     try { this._ws && this._ws.close(); } catch {}
     this._ws = null;
-    // Re-pull URL in case endpoints changed (backend/domain switch)
-    this.setUrl();
     this.connect();
   }
 
@@ -145,8 +141,15 @@ export default class WsClient {
   }
   sendJson(obj) { this.send(JSON.stringify(obj)); }
 
+  /** Backend dialect:
+   * send: { id: number, name: "<handler>", data: {...} }
+   * ok:   { id, data, [type] }
+   * err:  { id, error: "<string>", [type] }
+   */
   call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
-    const callId = String(id || this._nextId++);
+    const numericId = Number.isFinite(id) ? id : this._nextId++;
+    const callId = String(numericId);
+
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this._pending.delete(callId);
@@ -156,7 +159,7 @@ export default class WsClient {
       }, timeoutMs);
 
       this._pending.set(callId, { resolve, reject, timer });
-      this.sendJson({ id: callId, type: "call", method, params });
+      this.sendJson({ id: numericId, type: String(method), data: params || {} });
     });
   }
 
@@ -174,7 +177,7 @@ export default class WsClient {
     if (set.size === 0) this._listeners.delete(type);
   }
 
-  // ── internals ────────────────────────────────────────────────────────────────
+  // ─── internals ────────────────────────────────────────────────────────────────
   _setStatus(s) { if (this._status !== s) { this._status = s; this._emit("status", s); } }
 
   _emit(type, payload) {
@@ -187,23 +190,41 @@ export default class WsClient {
     let data = ev.data;
     try {
       const obj = JSON.parse(data);
-      if (obj && obj.id != null && (Object.prototype.hasOwnProperty.call(obj, "result") || obj.error)) {
-        const entry = this._pending.get(String(obj.id));
+
+      // Correlated response: match (stringified) id
+      if (obj && obj.id != null) {
+        const key = String(obj.id);
+        const entry = this._pending.get(key);
         if (entry) {
           clearTimeout(entry.timer);
-          this._pending.delete(String(obj.id));
-          if (obj.error) {
-            const err = new Error(obj.error.message || "WS error");
-            err.code = obj.error.code;
+          this._pending.delete(key);
+
+          if (typeof obj.error === "string" && obj.error) {
+            const err = new Error(obj.error || "WS error");
+            err.code = "WS_ERROR";
             entry.reject(err);
-          } else {
-            entry.resolve(obj.result);
+            return;
           }
+
+          if ("data" in obj) { entry.resolve(obj.data); return; }
+          // if backend someday returns {result: ...}, accept that too
+          if ("result" in obj) { entry.resolve(obj.result); return; }
+
+          entry.resolve(obj);
           return;
         }
       }
-      if (obj && obj.type) this._emit(obj.type, obj);
-      else this._emit("message", obj);
+
+      // Alerts / broadcasts: frames with a type and no matching id
+      if (obj && obj.type) {
+        // forward both the whole obj on "message" and the typed payload
+        this._emit(obj.type, obj.data ?? obj);
+        this._emit("message", obj);
+        return;
+      }
+
+      // Fallback
+      this._emit("message", obj);
     } catch {
       this._emit("raw", data);
     }

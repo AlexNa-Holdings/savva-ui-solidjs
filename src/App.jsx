@@ -33,7 +33,7 @@ export default function App() {
       <DomainCssLoader />
       <FaviconLoader />
       <GoogleAnalyticsLoader />
-      <WsConnector />  {/* ← one lightweight, headless service */}
+      <WsConnector /> 
 
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>

@@ -5,7 +5,7 @@ import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 import ThemeToggle from "./ui/ThemeToggle.jsx";
 import LangSelector from "./ui/LangSelector.jsx";
-import RightPaneFooter from "./ui/RightPaneFooter.jsx";
+import RightPaneFooter from "./RightPaneFooter.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const app = useApp();

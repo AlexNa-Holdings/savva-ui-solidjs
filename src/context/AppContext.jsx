@@ -1,4 +1,4 @@
-/* src/context/AppContext.jsx */
+// File: src/context/AppContext.jsx
 import * as Solid from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
@@ -6,6 +6,7 @@ import { switchOrAddChain } from "../blockchain/wallet";
 import { pushToast, pushErrorToast } from "../components/ui/toast.js";
 import { useI18n } from "../i18n/useI18n";
 import { fetchWithTimeout } from "../utils/net.js";
+import { configureEndpoints } from "../net/endpoints";
 
 // ───────────────────────────────────────────────────────────────────────────────
 // small string utils (local)
@@ -44,24 +45,24 @@ function saveOverride(obj) {
   try {
     if (!obj) localStorage.removeItem(OVERRIDE_KEY);
     else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj)));
-  } catch {}
+  } catch { }
 }
 
 export function AppProvider(props) {
   const i18n = useI18n();
 
   // top-level app state
-  const [config, setConfig]               = Solid.createSignal(null);
-  const [info, setInfo]                   = Solid.createSignal(null);
-  const [error, setError]                 = Solid.createSignal(null);
-  const [loading, setLoading]             = Solid.createSignal(true);
+  const [config, setConfig] = Solid.createSignal(null);
+  const [info, setInfo] = Solid.createSignal(null);
+  const [error, setError] = Solid.createSignal(null);
+  const [loading, setLoading] = Solid.createSignal(true);
   const [lastUpdatedAt, setLastUpdatedAt] = Solid.createSignal(null);
 
   // Local IPFS prefs/state
   const [localIpfsEnabled, setLocalIpfsEnabled] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
-  const [localIpfsApiUrl, setLocalIpfsApiUrl]   = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
+  const [localIpfsApiUrl, setLocalIpfsApiUrl] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
   const [localIpfsGateway, setLocalIpfsGateway] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
-  const [localIpfsStatus, setLocalIpfsStatus]   = Solid.createSignal("unknown"); // "unknown" | "ok" | "down"
+  const [localIpfsStatus, setLocalIpfsStatus] = Solid.createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;
 
   // domain assets env (prod/test)
@@ -83,6 +84,10 @@ export function AppProvider(props) {
     const data = await fetchInfo(nextCfg);
     setInfo(data);
     setLastUpdatedAt(Date.now());
+    // push into endpoints immediately with what we know (backend + domain)
+    try {
+      configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
+    } catch { /* ignore */ }
   }
 
   async function init() {
@@ -131,14 +136,19 @@ export function AppProvider(props) {
       } else {
         setConfig(next);
         setLastUpdatedAt(Date.now());
+        // endpoints still need a nudge when only domain changes
+        try {
+          const langVal = i18n?.lang ? i18n.lang() : "en";
+          configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+        } catch { }
       }
       saveOverride(next);
     } catch (e) {
       setError(e);
       pushErrorToast(e, {
         op: "updateConnect",
-        backendLink: partial?.backendLink ?? cur?.backendLink,
-        domain: partial?.domain ?? cur?.domain,
+        backendLink: partial?.backendLink ?? config()?.backendLink,
+        domain: partial?.domain ?? config()?.domain,
       });
     } finally {
       setLoading(false);
@@ -151,6 +161,11 @@ export function AppProvider(props) {
     setConfig(next);
     saveOverride(next);
     setLastUpdatedAt(Date.now());
+    // keep endpoints in sync
+    try {
+      const langVal = i18n?.lang ? i18n.lang() : "en";
+      configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "", lang: langVal });
+    } catch { }
   }
 
   async function clearConnectOverride() {
@@ -200,9 +215,9 @@ export function AppProvider(props) {
     const arr = info()?.ipfs_gateways;
     return Array.isArray(arr)
       ? arr
-          .filter(Boolean)
-          .map((s) => ensureSlash(s.trim()))
-          .filter(Boolean)
+        .filter(Boolean)
+        .map((s) => ensureSlash(s.trim()))
+        .filter(Boolean)
       : [];
   });
 
@@ -241,12 +256,12 @@ export function AppProvider(props) {
         const r = await fetchWithTimeout(primaryUrl, { timeoutMs: 8000 });
         if (r.ok) { res = r; used = "remote"; }
       }
-    } catch {}
+    } catch { }
     if (!res) {
       try {
         const r = await fetchWithTimeout(fallbackUrl, { timeoutMs: 8000 });
         if (r.ok) { res = r; used = "default"; }
-      } catch {}
+      } catch { }
     }
     if (!res) {
       setDomainAssetsConfig(null);
@@ -276,6 +291,16 @@ export function AppProvider(props) {
     if (!prefix) return "";
     return ensureSlash(prefix) + rel;
   }
+
+  // Keep endpoints synced reactively (backend/domain/lang)
+  Solid.createEffect(() => {
+    const backend = config()?.backendLink;
+    const domainName = selectedDomainName();
+    const langVal = i18n?.lang ? i18n.lang() : "en";
+    if (backend) {
+      configureEndpoints({ backendLink: backend, domain: domainName, lang: langVal });
+    }
+  });
 
   // ----- Local IPFS helpers -----
   async function pingLocalIpfs() {
@@ -318,6 +343,13 @@ export function AppProvider(props) {
     localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
     pushToast({ type: "info", message: i18n.t("settings.ipfs.localDisabled") });
   }
+
+  Solid.createEffect(() => {
+    const backend = config()?.backendLink;
+    const domainName = selectedDomainName();
+    if (backend) configureEndpoints({ backendLink: backend, domain: domainName });
+  });
+
 
   const value = {
     // state
@@ -388,5 +420,9 @@ export function AppProvider(props) {
 export function useApp() {
   const ctx = Solid.useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
+
+  if (typeof window !== "undefined") {
+    window.__app = ctx; // for devtools poking
+  }
   return ctx;
 }

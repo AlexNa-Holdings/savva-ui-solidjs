@@ -1,32 +1,35 @@
 // File: src/net/WsConnector.jsx
-import { onMount, onCleanup } from "solid-js";
+import { onMount } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
-import WsClient from "./WsClient";
+import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
 import { wsUrl } from "./endpoints";
-import { dbg } from "../utils/debug";
+
+let _mounted = false;
 
 export default function WsConnector() {
-  const app = useApp();
-  const ws = new WsClient();
+  if (_mounted) return null;
+  _mounted = true;
 
-  // expose
-  app.ws           = ws;
-  app.wsUrl        = wsUrl; // zero-arg getter now
-  app.wsStatus     = () => ws.status();
-  app.wsConnected  = () => ws.status() === "open";
-  app.wsReconnect  = (reason) => ws.reconnect(reason || "manual");
-  app.wsCall       = (m, p = {}, o) => ws.call(m, p, o);
-  app.wsNotify     = (m, p = {}) => ws.sendJson({ type: "notify", method: m, params: p });
-  app.onWsEvent    = (t, fn) => ws.on(t, fn);
-  app.offWsEvent   = (t, fn) => ws.off(t, fn);
+  const app = useApp();
+
+  // Expose helpers from the singleton runtime
+  const ws = getWsClient();
+  const api = getWsApi();
+
+  app.ws = ws;
+  app.wsUrl = wsUrl;                 // zero-arg getter
+  app.wsStatus = () => ws.status();
+  app.wsConnected = () => ws.status() === "open";
+  app.wsReconnect = (r) => ws.reconnect(r || "manual");
+  app.wsCall = api.call;
+  app.wsMethod = api.method;
+  app.alertBus = { on: onAlert, off: offAlert };
+  app.onAlert = onAlert;
+  app.offAlert = offAlert;
 
   onMount(() => {
-    const url = wsUrl();
-    if (!url) { dbg.warn("ws", "No WS URL configured"); return; }
-    ws.setUrl(url);
-    ws.connect();
+    ensureWsStarted("connector-mount");
   });
 
-  onCleanup(() => ws.close());
   return null;
 }

@@ -1,7 +1,7 @@
 // File: src/components/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
-import { httpBase } from "../net/endpoints";
+import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
 
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
