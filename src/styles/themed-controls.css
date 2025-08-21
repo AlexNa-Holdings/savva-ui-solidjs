@@ -1,4 +1,8 @@
 /* src/styles/themed-controls.css */
+
+/* ────────────────────────────────────────────────────────── */
+/* Themed segmented controls                                  */
+/* ────────────────────────────────────────────────────────── */
 .themed-segment {
   display: inline-flex;
   gap: 6px;
@@ -32,3 +36,152 @@
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem; /* keeps rounded look if element didn't set one */
 }
+
+/* ────────────────────────────────────────────────────────── */
+/* Docs typography (MarkdownView -> <article class="sv-docs">)*/
+/* ────────────────────────────────────────────────────────── */
+
+/* Titles */
+.sv-docs h1 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin: 0 0 1rem;
+}
+
+.sv-docs h2 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin: 1.5rem 0 0.75rem;
+}
+
+.sv-docs h3 {
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  margin: 1.25rem 0 0.5rem;
+}
+
+/* Paragraphs & lists */
+.sv-docs p {
+  margin: 0.5rem 0 0.85rem;
+  line-height: 1.65;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs ul,
+.sv-docs ol {
+  margin: 0.6rem 0 0.9rem 1.25rem;
+  padding: 0;
+}
+
+.sv-docs li { margin: 0.25rem 0; }
+
+/* Links inside docs keep theme color and underline on hover */
+.sv-docs a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sv-docs a:hover { opacity: 0.9; }
+
+/* Blockquotes (subtle) */
+.sv-docs blockquote {
+  margin: 1rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid hsl(var(--border));
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border-radius: 0.25rem;
+}
+
+/* Tables (very light theming) */
+.sv-docs table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+.sv-docs th,
+.sv-docs td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5rem 0.6rem;
+}
+.sv-docs th {
+  background: hsl(var(--muted));
+  text-align: left;
+}
+
+/* ────────────────────────────────────────────────────────── */
+/* Code blocks & inline code                                  */
+/* ────────────────────────────────────────────────────────── */
+
+.sv-docs pre {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: 1rem 1.125rem;        /* a touch more padding */
+  margin: 1rem 0 1.25rem;        /* spacing around code blocks */
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* Avoid double backgrounds inside fenced blocks */
+.sv-docs pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Inline code (backticks) in paragraphs/lists */
+.sv-docs :not(pre) > code {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.35rem;
+  font-size: 0.9em;
+}
+
+/* Optional: line numbers + highlights (rehype-pretty-code helpers) */
+.sv-docs pre code > span { display: block; }
+
+.sv-docs .line--highlighted {
+  background: hsl(var(--accent));
+}
+.sv-docs .word--highlighted {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.2rem;
+}
+
+/* Button Copy */
+.sv-docs .anchor {
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+}
+.sv-docs .anchor:hover { text-decoration: underline; }
+
+.sv-docs pre { position: relative; }
+.sv-docs pre .sv-copy-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+.sv-docs pre:hover .sv-copy-btn { opacity: 1; }

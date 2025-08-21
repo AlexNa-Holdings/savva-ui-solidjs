@@ -123,12 +123,12 @@ src/
       BackIconButton.jsx
       BrandLogo.jsx
       LangSelector.jsx
-      RightPaneFooter.jsx
       Tabs.jsx
       ThemeToggle.jsx
       toast.js
     Header.jsx
     RightPane.jsx
+    RightPaneFooter.jsx
     SwitchConnectDialog.jsx
     Toaster.jsx
   context/
@@ -144,6 +144,15 @@ src/
     useI18n.js
   ipfs/
     index.js
+  net/
+    endpoints.js
+    index.js
+    wsApi.js
+    wsBus.js
+    WsClient.js
+    WsConnector.jsx
+    wsRuntime.js
+    wsUrl.js
   pages/
     Settings.jsx
   routing/
@@ -3759,34 +3768,6 @@ export default function LangPillSelector(props) {
 }
 </file>
 
-<file path="src/components/ui/RightPaneFooter.jsx">
-// src/components/ui/RightPaneFooter.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { APP_VERSION } from "../../version";
-
-export default function RightPaneFooter() {
-  const { t } = useApp();
-  const WEBSITE_URL = import.meta.env.VITE_WEBSITE_URL || "https://savva.app";
-
-  return (
-    <div class="mt-auto pt-3 border-t border-[hsl(var(--border))] text-xs text-[hsl(var(--muted-foreground))]">
-      <div class="flex items-center justify-between">
-        <span>{t("app.versionLabel")} v{APP_VERSION}</span>
-        <a
-          href={WEBSITE_URL}
-          target="_blank"
-          rel="noreferrer"
-          class="underline hover:opacity-80 text-[hsl(var(--foreground))]"
-        >
-          {t("app.website")}
-        </a>
-      </div>
-      <div class="mt-1 opacity-80">{t("app.poweredBy")}</div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/ui/ThemeToggle.jsx">
 // src/components/ui/ThemeIconToggle.jsx
 import { useTheme } from "../../hooks/useTheme";
@@ -3909,46 +3890,35 @@ export function pushErrorToast(err, context = {}) {
 }
 </file>
 
-<file path="src/hooks/useConnect.js">
-import { createSignal, onMount } from "solid-js";
-import { parse } from "yaml";
+<file path="src/components/RightPaneFooter.jsx">
+// File: src/components/ui/RightPaneFooter.jsx
+import { APP_VERSION } from "../version.js";
+import { useApp } from "../context/AppContext.jsx";
 
-export function useConnect() {
-  const [config, setConfig] = createSignal(null);
-  const [info, setInfo] = createSignal(null);
-  const [error, setError] = createSignal(null);
-  const [loading, setLoading] = createSignal(true);
+export default function RightPaneFooter() {
+  const app = useApp();
+  const { t } = app;
+  const WEBSITE_URL = import.meta.env.VITE_WEBSITE_URL || "https://savva.app";
 
-  onMount(async () => {
-    try {
-      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
-      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
-      const text = await res.text();
-      const data = parse(text);
-      if (!data.backendLink) throw new Error("Missing backendLink in config");
-
-      const backend = data.backendLink.endsWith("/")
-        ? data.backendLink
-        : data.backendLink + "/";
-
-      const cfg = {
-        domain: data.domain || "",
-        backendLink: backend,
-        default_ipfs_link: data.default_ipfs_link || ""
-      };
-      setConfig(cfg);
-
-      const infoRes = await fetch(cfg.backendLink + "info");
-      if (!infoRes.ok) throw new Error(`/info failed: ${infoRes.status}`);
-      setInfo(await infoRes.json());
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  });
-
-  return { config, info, error, loading };
+  return (
+    <div class="mt-auto pt-3 border-t border-[hsl(var(--border))] text-sm text-[hsl(var(--muted-foreground))]">
+      <div class=" items-center justify-between">
+        <div>{t("app.versionLabel")} <b>v{APP_VERSION}</b></div>
+        <div>
+          Powered by{" "}
+          <b><a
+            href={WEBSITE_URL}
+            target="_blank"
+            rel="noreferrer"
+            class="underline hover:opacity-80 text-[hsl(var(--foreground))]"
+          >
+            SAVVA Platform
+          </a>
+          </b>
+        </div>
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -4022,6 +3992,163 @@ export function useI18n() {
     };
   }
   return i18nSingleton;
+}
+</file>
+
+<file path="src/net/wsApi.js">
+// File: src/net/wsApi.js
+// Thin helper over WsClient for JSON-RPC-like calls and simple method sugar.
+
+export function createWsApi(wsClient) {
+  function call(method, params = {}, opts) {
+    return wsClient.call(String(method), params, opts);
+  }
+
+  // Sugar: api.method("get-user") returns (...args) => call("get-user", ...mergedParams)
+  function method(name, fixedParams = {}) {
+    const m = String(name);
+    return (params = {}, opts) => call(m, { ...fixedParams, ...params }, opts);
+  }
+
+  // Optional: define a few common factories here as you add them over time.
+  const api = { call, method };
+
+  return api;
+}
+</file>
+
+<file path="src/net/wsBus.js">
+// File: src/net/wsBus.js
+// Lightweight event bus for WS alerts (type-based) with a small replay buffer.
+
+export function createWsBus({ replay = 0 } = {}) {
+  const map = new Map();          // type -> Set<fn>
+  const any = new Set();          // watchers of all events
+  const buf = [];                 // [{type, payload, ts}]
+  const max = Math.max(0, replay | 0);
+
+  function on(type, fn) {
+    if (!type || type === "*") { any.add(fn); return () => any.delete(fn); }
+    let set = map.get(type); if (!set) { set = new Set(); map.set(type, set); }
+    set.add(fn);
+    if (max > 0) {
+      for (let i = 0; i < buf.length; i++) if (buf[i].type === type) try { fn(buf[i].payload); } catch {}
+    }
+    return () => set.delete(fn);
+  }
+
+  function off(type, fn) {
+    if (!type || type === "*") { any.delete(fn); return; }
+    const set = map.get(type); if (set) set.delete(fn);
+  }
+
+  function emit(type, payload) {
+    if (max > 0) {
+      buf.push({ type, payload, ts: Date.now() });
+      if (buf.length > max) buf.splice(0, buf.length - max);
+    }
+    const set = map.get(type);
+    if (set) for (const fn of Array.from(set)) try { fn(payload); } catch {}
+    for (const fn of Array.from(any)) try { fn({ type, payload }); } catch {}
+  }
+
+  function clear() { map.clear(); any.clear(); buf.length = 0; }
+
+  return { on, off, emit, clear };
+}
+</file>
+
+<file path="src/net/wsRuntime.js">
+// File: src/net/wsRuntime.js
+import WsClient from "./WsClient";
+import { wsUrl } from "./endpoints";
+import { createWsBus } from "./wsBus";
+import { createWsApi } from "./wsApi";
+import { dbg } from "../utils/debug";
+
+let _client = null;
+let _bus = null;
+let _api = null;
+let _started = false;
+
+// Initialize once; safe to call multiple times.
+export function ensureWsStarted(reason = "init") {
+  if (!_client) {
+    _client = new WsClient();
+    _bus = createWsBus({ replay: 32 });
+    _api = createWsApi(_client);
+
+    // Wire incoming notifications to the bus
+    _client.on("message", (obj) => {
+      const t = obj && (obj.type || obj.event);
+      if (t) _bus.emit(String(t), obj);
+    });
+  }
+
+  // Always pull the canonical URL from endpoints
+  _client.setUrl(); // zero-arg; reads from endpoints
+  const url = _client.url();
+  if (!url) {
+    dbg.warn("ws", "No WS URL configured");
+    return { client: _client, bus: _bus, api: _api };
+  }
+
+  if (_client.status() !== "open" && !_started) {
+    _client.connect();
+    _started = true;
+    dbg.log("ws", "singleton connect", { url, reason });
+  }
+  return { client: _client, bus: _bus, api: _api };
+}
+
+// React to backend/domain changes from endpoints
+function onEndpointsUpdate() {
+  if (!_client) return;
+  const prev = _client.url();
+  _client.setUrl();
+  const next = _client.url();
+  if (next && next !== prev) {
+    dbg.log("ws", "singleton endpoints changed → reconnect", { prev, next });
+    _client.reconnect("endpoints-updated");
+  } else if (next && _client.status() !== "open") {
+    _client.connect();
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("savva:endpoints-updated", onEndpointsUpdate);
+
+  // Dev aid: expose runtime for quick poking
+  window.__ws = {
+    get client() { return _client; },
+    get bus() { return _bus; },
+    get api() { return _api; },
+    start: ensureWsStarted,
+  };
+}
+
+export function getWsClient() { return ensureWsStarted().client; }
+export function getWsApi()    { return ensureWsStarted().api; }
+export function onAlert(type, fn){ return ensureWsStarted().bus.on(type, fn); }
+export function offAlert(type, fn){ return ensureWsStarted().bus.off(type, fn); }
+</file>
+
+<file path="src/net/wsUrl.js">
+// File: src/net/wsUrl.js
+export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
+  if (!backendHttpUrl) return "";
+  const u = new URL(backendHttpUrl);
+  u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
+  const basePath = u.pathname.endsWith("/") ? u.pathname : (u.pathname + "/");
+  const wsPath = path.startsWith("/") ? path.slice(1) : path;
+  u.pathname = basePath + wsPath;
+
+  const params = new URLSearchParams(u.search);
+  for (const [k, v] of Object.entries(query)) {
+    if (v != null && v !== "") params.set(k, String(v));
+  }
+  u.search = params.toString() ? `?${params.toString()}` : "";
+  return u.toString();
 }
 </file>
 
@@ -5128,31 +5255,6 @@ export function getTabComponent(type) {
 }
 </file>
 
-<file path="src/components/tabs/NewTab.jsx">
-// src/components/tabs/NewTab.jsx
-import ContentFeed from "../feed/ContentFeed.jsx";
-
-export default function NewTab(props) {
-  async function fetchPage(page, pageSize) {
-    await new Promise((r) => setTimeout(r, 200));
-    if (page > 4) return [];
-    return Array.from({ length: pageSize }, (_, i) => ({
-      id: `new_${page}_${i}`,
-      text: `New tab content item ${page}-${i}. Vivamus finibus, sapien sed tempus feugiat, sapien augue facilisis nulla, at vehicula mauris mi eu felis.`
-    }));
-  }
-
-  return (
-    <section class="w-full">
-      <ContentFeed
-        mode={props.tab?._raw?.mode === "grid" ? "grid" : "list"}
-        fetchPage={fetchPage}
-      />
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/tabs/RightRailLayout.jsx">
 // src/components/tabs/RightRailLayout.jsx
 import { createSignal, onMount, onCleanup } from "solid-js";
@@ -5360,6 +5462,54 @@ export default function AssetDebugTap() {
 }
 </file>
 
+<file path="src/hooks/useConnect.js">
+// File: src/hooks/useConnect.js
+import { createSignal, onMount } from "solid-js";
+import { parse } from "yaml";
+import { configureEndpoints, httpBase } from "../net/endpoints";
+
+export function useConnect() {
+  const [config, setConfig] = createSignal(null);
+  const [info, setInfo] = createSignal(null);
+  const [error, setError] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+
+  onMount(async () => {
+    try {
+      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
+      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
+      const text = await res.text();
+      const data = parse(text);
+      if (!data.backendLink) throw new Error("Missing backendLink in config");
+
+      // Configure endpoints once
+      configureEndpoints({
+        backendLink: data.backendLink,
+        domain: data.domain || "",
+        lang: "en",
+      });
+
+      const cfg = {
+        domain: data.domain || "",
+        backendLink: httpBase(), // normalized canonical HTTP base
+        default_ipfs_link: data.default_ipfs_link || ""
+      };
+      setConfig(cfg);
+
+      const infoRes = await fetch(httpBase() + "info", { headers: { Accept: "application/json" } });
+      if (!infoRes.ok) throw new Error(`/info failed: ${infoRes.status}`);
+      setInfo(await infoRes.json());
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  return { config, info, error, loading };
+}
+</file>
+
 <file path="src/ipfs/index.js">
 // Minimal IPFS client with gateway fallback.
 // Usage:
@@ -5477,6 +5627,381 @@ export const ipfs = {
   normalizeInput,
   buildUrl,
 };
+</file>
+
+<file path="src/net/endpoints.js">
+// File: src/net/endpoints.js
+// Single source of truth. Configure once, zero-arg getters. Emits a CustomEvent on changes.
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+
+let _backendHttpBase = "";
+let _wsUrl = "";
+let _domain = "";
+
+function buildHttpBase(backendLink) {
+  if (!backendLink) return "";
+  const u = new URL(backendLink);
+  u.pathname = ensureSlash(u.pathname || "/");
+  return u.toString();
+}
+
+function buildWsUrl(backendBase, domain) {
+  if (!backendBase) return "";
+  const u = new URL(backendBase);
+  const hasApi = (u.pathname || "/").toLowerCase().includes("/api/");
+  const wsPath = hasApi ? "ws" : "api/ws";
+  u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
+  u.pathname = ensureSlash(u.pathname || "/") + wsPath;
+
+  // Only domain as query (per your request) — no lang.
+  const q = new URLSearchParams(u.search);
+  if (domain) q.set("domain", String(domain));
+  u.search = q.toString() ? `?${q.toString()}` : "";
+  return u.toString();
+}
+
+function notify() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("savva:endpoints-updated", {
+        detail: { httpBase: _backendHttpBase, wsUrl: _wsUrl, domain: _domain },
+      })
+    );
+  }
+}
+
+/** Configure once per backend/domain switch */
+export function configureEndpoints({ backendLink, domain }) {
+  _domain = domain || "";
+  _backendHttpBase = buildHttpBase(backendLink || "");
+  _wsUrl = buildWsUrl(_backendHttpBase, _domain);
+  notify();
+}
+
+export function httpBase() { return _backendHttpBase; }
+export function wsUrl()    { return _wsUrl; }
+export function currentDomain() { return _domain; }
+</file>
+
+<file path="src/net/index.js">
+// src/ws/index.js
+</file>
+
+<file path="src/net/WsClient.js">
+// File: src/net/WsClient.js
+import { dbg } from "../utils/debug";
+import { wsUrl as endpointsWsUrl } from "./endpoints";
+
+
+/**
+ * Pure WebSocket transport.
+ * Request:  { id: number, type: string, data: any }
+ * Response: { id?: number, type?: string, error?: string, data?: any }
+ * Alerts:   { type: string, data?: any }  (no id)
+ */
+export default class WsClient {
+  constructor({ url = "", protocols } = {}) {
+    this._url = url || "";
+    this._protocols = protocols || undefined;
+    this._ws = null;
+
+    this._status = "idle";                // idle | connecting | open | closed
+    this._attempt = 0;
+    this._shouldReconnect = true;
+    this._reconnectTid = null;
+
+    this._heartbeatTid = null;
+    this._heartbeatMs = 25_000;
+
+    this._sendQueue = [];
+    this._pending = new Map();            // id (string) -> { resolve, reject, timer }
+    this._nextId = 1;
+
+    this._listeners = new Map();
+
+    this._onOnline = () => this.reconnect("online");
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", this._onOnline);
+      window.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && this._status !== "open") {
+          this.reconnect("visible");
+        }
+      });
+    }
+  }
+
+  // ─── public API ───────────────────────────────────────────────────────────────
+  dispose() {
+    this._shouldReconnect = false;
+    this._clearReconnect();
+    this._stopHeartbeat();
+    if (this._ws) { try { this._ws.close(); } catch {} }
+    this._ws = null;
+    if (typeof window !== "undefined") {
+      window.removeEventListener("online", this._onOnline);
+    }
+    this._failInflight(new Error("WS disposed"));
+    this._emit("status", "closed");
+  }
+
+  url()     { return this._url; }
+  status()  { return this._status; }
+  attempt() { return this._attempt; }
+
+  setUrl(nextUrl) {
+    const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
+    const u = String(source || "");
+    if (!u) {
+      dbg.warn("ws", "No WS URL configured");
+      return;
+    }
+    if (u === this._url) return;
+    this._url = u;
+    dbg.log("ws", "URL updated", { url: u });
+  }
+
+  setAutoReconnect(on) { this._shouldReconnect = !!on; }
+
+  connect() {
+    if (!this._url) return;
+    if (this._ws && (this._ws.readyState === WebSocket.OPEN || this._ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    this._clearReconnect();
+    this._setStatus("connecting");
+    dbg.log("ws", "Connecting…", { url: this._url });
+
+    try {
+      const ws = new WebSocket(this._url, this._protocols);
+      this._ws = ws;
+
+      ws.addEventListener("open", () => {
+        this._attempt = 0;
+        this._setStatus("open");
+        dbg.log("ws", "Connected", { url: this._url });
+        this._flushQueue();
+        this._startHeartbeat();
+        this._emit("open");
+      });
+
+      ws.addEventListener("message", (ev) => this._onMessage(ev));
+
+      ws.addEventListener("error", (ev) => {
+        dbg.warn("ws", "Error", { event: ev });
+        this._emit("error", ev);
+      });
+
+      ws.addEventListener("close", (ev) => {
+        dbg.warn("ws", "Closed", { code: ev.code, reason: ev.reason });
+        this._stopHeartbeat();
+        this._setStatus("closed");
+        this._emit("close", ev);
+        this._failInflight(new Error("WS closed"));
+        if (this._shouldReconnect) this._scheduleReconnect();
+      });
+    } catch (e) {
+      dbg.error("ws", "Connect exception", e);
+      this._setStatus("closed");
+      this._scheduleReconnect();
+    }
+  }
+
+  reconnect(reason = "manual") {
+    dbg.log("ws", "Reconnecting…", { reason });
+    this._clearReconnect();
+    try { this._ws && this._ws.close(); } catch {}
+    this._ws = null;
+    this.connect();
+  }
+
+  close() {
+    this._clearReconnect();
+    this._stopHeartbeat();
+    this._shouldReconnect = false;
+    try { this._ws && this._ws.close(1000, "client-close"); } catch {}
+    this._ws = null;
+    this._setStatus("closed");
+    this._failInflight(new Error("WS closed by client"));
+  }
+
+  send(data) {
+    const open = this._ws && this._ws.readyState === WebSocket.OPEN;
+    if (open) this._ws.send(data);
+    else this._sendQueue.push(data);
+  }
+  sendJson(obj) { this.send(JSON.stringify(obj)); }
+
+  /** Backend dialect:
+   * send: { id: number, name: "<handler>", data: {...} }
+   * ok:   { id, data, [type] }
+   * err:  { id, error: "<string>", [type] }
+   */
+  call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
+    const numericId = Number.isFinite(id) ? id : this._nextId++;
+    const callId = String(numericId);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pending.delete(callId);
+        const err = new Error("WS request timeout");
+        err.code = "ETIMEDOUT";
+        reject(err);
+      }, timeoutMs);
+
+      this._pending.set(callId, { resolve, reject, timer });
+      this.sendJson({ id: numericId, type: String(method), data: params || {} });
+    });
+  }
+
+  on(type, fn) {
+    const key = String(type || "");
+    const set = this._listeners.get(key) || new Set();
+    set.add(fn);
+    this._listeners.set(key, set);
+    return () => this.off(key, fn);
+  }
+  off(type, fn) {
+    const set = this._listeners.get(type);
+    if (!set) return;
+    set.delete(fn);
+    if (set.size === 0) this._listeners.delete(type);
+  }
+
+  // ─── internals ────────────────────────────────────────────────────────────────
+  _setStatus(s) { if (this._status !== s) { this._status = s; this._emit("status", s); } }
+
+  _emit(type, payload) {
+    const set = this._listeners.get(type);
+    if (!set || set.size === 0) return;
+    for (const fn of Array.from(set)) { try { fn(payload); } catch (e) { dbg.error("ws", "listener error", e); } }
+  }
+
+  _onMessage(ev) {
+    let data = ev.data;
+    try {
+      const obj = JSON.parse(data);
+
+      // Correlated response: match (stringified) id
+      if (obj && obj.id != null) {
+        const key = String(obj.id);
+        const entry = this._pending.get(key);
+        if (entry) {
+          clearTimeout(entry.timer);
+          this._pending.delete(key);
+
+          if (typeof obj.error === "string" && obj.error) {
+            const err = new Error(obj.error || "WS error");
+            err.code = "WS_ERROR";
+            entry.reject(err);
+            return;
+          }
+
+          if ("data" in obj) { entry.resolve(obj.data); return; }
+          // if backend someday returns {result: ...}, accept that too
+          if ("result" in obj) { entry.resolve(obj.result); return; }
+
+          entry.resolve(obj);
+          return;
+        }
+      }
+
+      // Alerts / broadcasts: frames with a type and no matching id
+      if (obj && obj.type) {
+        // forward both the whole obj on "message" and the typed payload
+        this._emit(obj.type, obj.data ?? obj);
+        this._emit("message", obj);
+        return;
+      }
+
+      // Fallback
+      this._emit("message", obj);
+    } catch {
+      this._emit("raw", data);
+    }
+  }
+
+  _flushQueue() {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+    while (this._sendQueue.length) {
+      const item = this._sendQueue.shift();
+      try { this._ws.send(item); } catch {}
+    }
+  }
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    if (this._heartbeatMs > 0) {
+      this._heartbeatTid = setInterval(() => {
+        try {
+          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+            this._ws.send('{"type":"ping"}');
+          }
+        } catch {}
+      }, this._heartbeatMs);
+    }
+  }
+  _stopHeartbeat() { if (this._heartbeatTid) { clearInterval(this._heartbeatTid); this._heartbeatTid = null; } }
+
+  _scheduleReconnect() {
+    if (!this._shouldReconnect) return;
+    this._attempt += 1;
+    const base = 300 * Math.pow(2, this._attempt - 1);
+    const jitter = Math.floor(Math.random() * 400);
+    const delay = Math.min(10_000, base + jitter);
+    dbg.log("ws", "Reconnect scheduled", { inMs: delay, attempt: this._attempt });
+    this._clearReconnect();
+    this._reconnectTid = setTimeout(() => this.connect(), delay);
+  }
+  _clearReconnect() { if (this._reconnectTid) { clearTimeout(this._reconnectTid); this._reconnectTid = null; } }
+
+  _failInflight(err) {
+    if (!this._pending.size) return;
+    for (const [, entry] of this._pending) {
+      clearTimeout(entry.timer);
+      try { entry.reject(err); } catch {}
+    }
+    this._pending.clear();
+  }
+}
+</file>
+
+<file path="src/net/WsConnector.jsx">
+// File: src/net/WsConnector.jsx
+import { onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
+import { wsUrl } from "./endpoints";
+
+let _mounted = false;
+
+export default function WsConnector() {
+  if (_mounted) return null;
+  _mounted = true;
+
+  const app = useApp();
+
+  // Expose helpers from the singleton runtime
+  const ws = getWsClient();
+  const api = getWsApi();
+
+  app.ws = ws;
+  app.wsUrl = wsUrl;                 // zero-arg getter
+  app.wsStatus = () => ws.status();
+  app.wsConnected = () => ws.status() === "open";
+  app.wsReconnect = (r) => ws.reconnect(r || "manual");
+  app.wsCall = api.call;
+  app.wsMethod = api.method;
+  app.alertBus = { on: onAlert, off: offAlert };
+  app.onAlert = onAlert;
+  app.offAlert = offAlert;
+
+  onMount(() => {
+    ensureWsStarted("connector-mount");
+  });
+
+  return null;
+}
 </file>
 
 <file path="src/styles/layout.css">
@@ -5720,21 +6245,6 @@ export const dbg = {
 };
 
 export default dbg;
-</file>
-
-<file path="src/index.jsx">
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./App";
-import { AppProvider } from "./context/AppContext.jsx";
-
-const root = document.getElementById("root");
-
-render(() => (
-  <AppProvider>
-    <App />
-  </AppProvider>
-), root);
 </file>
 
 <file path="src/version.js">
@@ -5984,6 +6494,72 @@ export default {
           </div>
         </div>
       </Show>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/NewTab.jsx">
+// File: src/components/tabs/NewTab.jsx
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function NewTab(props) {
+  const app = useApp();
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+
+  // WS method sugar for 'content-list'
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  async function fetchPage(page, pageSize) {
+    // page starts at 1 in ContentFeed’s loader (nextPage = page() + 1)
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+
+    try {
+      if (!contentList) return [];
+
+      const res = await contentList({
+        domain: domainName(),
+        limit,
+        offset,
+      });
+
+      // Accept a few common shapes: array or {list|items|data:[...]}
+      const arr =
+        Array.isArray(res) ? res :
+        Array.isArray(res?.list) ? res.list :
+        Array.isArray(res?.items) ? res.items :
+        Array.isArray(res?.data) ? res.data : [];
+
+      // Normalize into ContentFeed item shape
+      return arr.map((it, i) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id || `content_${page}_${i}`,
+        text:
+          it?.text_preview ||
+          it?.textPreview ||
+          it?.title ||
+          it?.description ||
+          it?.summary ||
+          "",
+        _raw: it,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  return (
+    <section class="w-full">
+      <ContentFeed
+        mode={props.tab?._raw?.mode === "grid" ? "grid" : "list"}
+        fetchPage={fetchPage}
+        pageSize={12}
+      />
     </section>
   );
 }
@@ -6594,6 +7170,21 @@ export default function Tabs(props) {
 }
 </file>
 
+<file path="src/index.jsx">
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./context/AppContext.jsx";
+
+const root = document.getElementById("root");
+
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
+</file>
+
 <file path="src/components/settings/DeveloperSection.jsx">
 // src/components/settings/DeveloperSection.jsx
 /* src/components/settings/DeveloperSection.jsx */
@@ -6902,258 +7493,6 @@ export default {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
-}
-</file>
-
-<file path="src/components/SwitchConnectDialog.jsx">
-// src/components/SwitchConnectDialog.jsx
-import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext";
-
-function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
-
-function isAbortError(e) {
-  const msg = String(e?.message || e || "").toLowerCase();
-  if (e?.name === "AbortError") return true;
-  if (e?.code === 20) return true;
-  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
-  return false;
-}
-
-async function fetchInfoJSON(baseUrl, { signal } = {}) {
-  const url = ensureSlash(baseUrl) + "info";
-  const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
-  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-  return await res.json();
-}
-
-export default function SwitchConnectDialog(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
-  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
-  const [domains, setDomains] = createSignal([]); // [{ name }]
-  const [fetching, setFetching] = createSignal(false);
-  const [applying, setApplying] = createSignal(false);
-  const [localError, setLocalError] = createSignal("");
-
-  let aborter;
-
-  const selectedDomainObj = createMemo(() => {
-    const cur = (domain() || "").trim().toLowerCase();
-    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
-  });
-
-  createEffect(async () => {
-    if (!props.open) return;
-
-    setLocalError("");
-    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
-    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
-    setDomains([]);
-
-    aborter?.abort();
-    aborter = new AbortController();
-    setFetching(true);
-
-    try {
-      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
-      const u = new URL(initialUrl);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-
-      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
-        const resolved =
-          normalized.find((d) => eq(d.name, wanted)) ||
-          normalized.find((d) => eq(d.name, domain())) ||
-          normalized[0];
-
-        const name = resolved.name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  });
-
-  onCleanup(() => aborter?.abort());
-
-  async function handleReload() {
-    setLocalError("");
-    try {
-      const u = new URL((backendUrl() || "").trim());
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-    } catch (e) {
-      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
-      return;
-    }
-
-    setFetching(true);
-    aborter?.abort();
-    aborter = new AbortController();
-    try {
-      const info = await fetchInfoJSON((backendUrl() || "").trim(), { signal: aborter.signal });
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
-        const keep = normalized.find((d) => eq(d.name, prefer)) || normalized.find((d) => eq(d.name, domain()));
-        const name = keep?.name || normalized[0].name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function onApply() {
-    setLocalError("");
-    setApplying(true);
-    try {
-      const url = (backendUrl() || "").trim();
-      const chosen = (domain() || "").trim();
-      const u = new URL(url);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-      if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
-
-      if (typeof props.onApply === "function") {
-        await props.onApply({ backendLink: url, domain: chosen });
-      }
-
-      await app.updateConnect?.({ backendLink: url });
-      await app.setDomain?.(chosen);
-      await app.refreshDomainAssets?.();
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-      setApplying(false);
-      return;
-    }
-
-    setApplying(false);
-    try { aborter?.abort(); } catch {}
-    props.onClose?.();
-  }
-
-  return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 z-40 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-
-        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-3">
-            {t("rightPane.switch.title")}
-          </h3>
-
-          <label class="block mb-3">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
-            <div class="mt-1 flex gap-2">
-              <input
-                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                value={backendUrl()}
-                onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder={t("rightPane.switch.backend.placeholder")}
-                spellcheck={false}
-              />
-              <button
-                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
-                onClick={handleReload}
-                disabled={fetching()}
-                title={t("rightPane.switch.reload.title")}
-              >
-                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
-              </button>
-            </div>
-            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
-          </label>
-
-          <label class="block mb-1">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
-          </label>
-          <select
-            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name} selected={eq(d.name, domain())}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-
-          <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-              <Show when={selectedDomainObj().website}>
-                <div>
-                  {t("rightPane.switch.domain.website")}:{" "}
-                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
-                    {selectedDomainObj().website}
-                  </a>
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
-              {t("common.error")}: {localError() || props.error?.message}
-            </p>
-          </Show>
-
-          <div class="mt-4 flex gap-2 justify-end">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              onClick={props.onReset}
-              title={t("rightPane.switch.reset.title")}
-            >
-              {t("rightPane.switch.reset")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onApply}
-              disabled={props.loading || fetching() || applying()}
-            >
-              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
-  );
 }
 </file>
 
@@ -7628,6 +7967,288 @@ export default function TabsBar() {
 }
 </file>
 
+<file path="src/components/SwitchConnectDialog.jsx">
+// File: src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
+import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
+
+function isAbortError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  if (e?.name === "AbortError") return true;
+  if (e?.code === 20) return true;
+  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
+  return false;
+}
+
+async function fetchInfoJSON(backendLink, { signal } = {}) {
+  const base = httpBase(backendLink);
+  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+  return await res.json();
+}
+
+export default function SwitchConnectDialog(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains] = createSignal([]); // [{ name }]
+  const [fetching, setFetching] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
+  const [localError, setLocalError] = createSignal("");
+
+  let aborter;
+
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
+  });
+
+  createEffect(async () => {
+    if (!props.open) return;
+
+    setLocalError("");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
+    setDomains([]);
+
+    aborter?.abort();
+    aborter = new AbortController();
+    setFetching(true);
+
+    try {
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
+        const resolved =
+          normalized.find((d) => eq(d.name, wanted)) ||
+          normalized.find((d) => eq(d.name, domain())) ||
+          normalized[0];
+
+        const name = resolved.name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  });
+
+  onCleanup(() => aborter?.abort());
+
+  async function handleReload() {
+    setLocalError("");
+
+    // Normalize the user-entered backend URL (candidate) without touching global config.
+    let candidate = (backendUrl() || "").trim();
+    try {
+      const u = new URL(candidate);
+      if (!/^https?:$/.test(u.protocol)) {
+        throw new Error(t("rightPane.switch.validation.protocol"));
+      }
+      // Ensure trailing slash for consistent "base + 'info'" concatenation.
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
+      candidate = u.toString();
+    } catch (e) {
+      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    setFetching(true);
+    aborter?.abort();
+    aborter = new AbortController();
+
+    try {
+      // Probe the candidate backend’s /info to list available domains.
+      const res = await fetch(candidate + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        // Try to keep current/wanted domain if present; otherwise pick the first.
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
+        const keep =
+          normalized.find((d) => eq(d.name, prefer)) ||
+          normalized.find((d) => eq(d.name, domain()));
+        const name = keep?.name || normalized[0].name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function onApply() {
+    setLocalError("");
+    setApplying(true);
+    try {
+      const url = (backendUrl() || "").trim();
+      const chosen = (domain() || "").trim();
+      const u = new URL(url);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+      if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
+
+      // Configure once for the new selection
+      configureEndpoints({ backendLink: url, domain: chosen, lang: app.lang ? app.lang() : "en" });
+
+      if (typeof props.onApply === "function") {
+        await props.onApply({ backendLink: httpBase(), domain: chosen });
+      }
+
+      await app.updateConnect?.({ backendLink: httpBase() });
+      await app.setDomain?.(chosen);
+      await app.refreshDomainAssets?.();
+
+      // Nudge WS to new URL immediately (no waiting for mounts)
+      if (app.ws) {
+        app.ws.setUrl(wsUrl());
+        app.ws.reconnect("switch-backend");
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+      setApplying(false);
+      return;
+    }
+
+    setApplying(false);
+    try { aborter?.abort(); } catch { }
+    props.onClose?.();
+  }
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
+            {t("rightPane.switch.title")}
+          </h3>
+
+          <label class="block mb-3">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
+            <div class="mt-1 flex gap-2">
+              <input
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                value={backendUrl()}
+                onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                placeholder={t("rightPane.switch.backend.placeholder")}
+                spellcheck={false}
+              />
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                onClick={handleReload}
+                disabled={fetching()}
+                title={t("rightPane.switch.reload.title")}
+              >
+                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+              </button>
+            </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
+          </label>
+
+          <label class="block mb-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
+          </label>
+          <select
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
+            value={domain()}
+            onChange={(e) => setDomain(e.currentTarget.value)}
+            disabled={fetching() || domains().length === 0}
+          >
+            {domains().map((d) => (
+              <option value={d.name} selected={eq(d.name, domain())}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <Show when={selectedDomainObj()}>
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+              <Show when={selectedDomainObj().website}>
+                <div>
+                  {t("rightPane.switch.domain.website")}:{" "}
+                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                    {selectedDomainObj().website}
+                  </a>
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={localError() || props.error}>
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
+              {t("common.error")}: {localError() || props.error?.message}
+            </p>
+          </Show>
+
+          <div class="mt-4 flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              onClick={props.onReset}
+              title={t("rightPane.switch.reset.title")}
+            >
+              {t("rightPane.switch.reset")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onApply}
+              disabled={props.loading || fetching() || applying()}
+            >
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/i18n/en.js">
 // Auto-generated by scripts/i18n.mjs. Do not edit by hand.
 export default {
@@ -7735,7 +8356,7 @@ export default {
 </file>
 
 <file path="src/context/AppContext.jsx">
-/* src/context/AppContext.jsx */
+// File: src/context/AppContext.jsx
 import * as Solid from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
@@ -7743,6 +8364,7 @@ import { switchOrAddChain } from "../blockchain/wallet";
 import { pushToast, pushErrorToast } from "../components/ui/toast.js";
 import { useI18n } from "../i18n/useI18n";
 import { fetchWithTimeout } from "../utils/net.js";
+import { configureEndpoints } from "../net/endpoints";
 
 // ───────────────────────────────────────────────────────────────────────────────
 // small string utils (local)
@@ -7781,24 +8403,24 @@ function saveOverride(obj) {
   try {
     if (!obj) localStorage.removeItem(OVERRIDE_KEY);
     else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj)));
-  } catch {}
+  } catch { }
 }
 
 export function AppProvider(props) {
   const i18n = useI18n();
 
   // top-level app state
-  const [config, setConfig]               = Solid.createSignal(null);
-  const [info, setInfo]                   = Solid.createSignal(null);
-  const [error, setError]                 = Solid.createSignal(null);
-  const [loading, setLoading]             = Solid.createSignal(true);
+  const [config, setConfig] = Solid.createSignal(null);
+  const [info, setInfo] = Solid.createSignal(null);
+  const [error, setError] = Solid.createSignal(null);
+  const [loading, setLoading] = Solid.createSignal(true);
   const [lastUpdatedAt, setLastUpdatedAt] = Solid.createSignal(null);
 
   // Local IPFS prefs/state
   const [localIpfsEnabled, setLocalIpfsEnabled] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
-  const [localIpfsApiUrl, setLocalIpfsApiUrl]   = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
+  const [localIpfsApiUrl, setLocalIpfsApiUrl] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
   const [localIpfsGateway, setLocalIpfsGateway] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
-  const [localIpfsStatus, setLocalIpfsStatus]   = Solid.createSignal("unknown"); // "unknown" | "ok" | "down"
+  const [localIpfsStatus, setLocalIpfsStatus] = Solid.createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;
 
   // domain assets env (prod/test)
@@ -7820,6 +8442,10 @@ export function AppProvider(props) {
     const data = await fetchInfo(nextCfg);
     setInfo(data);
     setLastUpdatedAt(Date.now());
+    // push into endpoints immediately with what we know (backend + domain)
+    try {
+      configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
+    } catch { /* ignore */ }
   }
 
   async function init() {
@@ -7868,14 +8494,19 @@ export function AppProvider(props) {
       } else {
         setConfig(next);
         setLastUpdatedAt(Date.now());
+        // endpoints still need a nudge when only domain changes
+        try {
+          const langVal = i18n?.lang ? i18n.lang() : "en";
+          configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+        } catch { }
       }
       saveOverride(next);
     } catch (e) {
       setError(e);
       pushErrorToast(e, {
         op: "updateConnect",
-        backendLink: partial?.backendLink ?? cur?.backendLink,
-        domain: partial?.domain ?? cur?.domain,
+        backendLink: partial?.backendLink ?? config()?.backendLink,
+        domain: partial?.domain ?? config()?.domain,
       });
     } finally {
       setLoading(false);
@@ -7888,6 +8519,11 @@ export function AppProvider(props) {
     setConfig(next);
     saveOverride(next);
     setLastUpdatedAt(Date.now());
+    // keep endpoints in sync
+    try {
+      const langVal = i18n?.lang ? i18n.lang() : "en";
+      configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "", lang: langVal });
+    } catch { }
   }
 
   async function clearConnectOverride() {
@@ -7937,9 +8573,9 @@ export function AppProvider(props) {
     const arr = info()?.ipfs_gateways;
     return Array.isArray(arr)
       ? arr
-          .filter(Boolean)
-          .map((s) => ensureSlash(s.trim()))
-          .filter(Boolean)
+        .filter(Boolean)
+        .map((s) => ensureSlash(s.trim()))
+        .filter(Boolean)
       : [];
   });
 
@@ -7978,12 +8614,12 @@ export function AppProvider(props) {
         const r = await fetchWithTimeout(primaryUrl, { timeoutMs: 8000 });
         if (r.ok) { res = r; used = "remote"; }
       }
-    } catch {}
+    } catch { }
     if (!res) {
       try {
         const r = await fetchWithTimeout(fallbackUrl, { timeoutMs: 8000 });
         if (r.ok) { res = r; used = "default"; }
-      } catch {}
+      } catch { }
     }
     if (!res) {
       setDomainAssetsConfig(null);
@@ -8013,6 +8649,16 @@ export function AppProvider(props) {
     if (!prefix) return "";
     return ensureSlash(prefix) + rel;
   }
+
+  // Keep endpoints synced reactively (backend/domain/lang)
+  Solid.createEffect(() => {
+    const backend = config()?.backendLink;
+    const domainName = selectedDomainName();
+    const langVal = i18n?.lang ? i18n.lang() : "en";
+    if (backend) {
+      configureEndpoints({ backendLink: backend, domain: domainName, lang: langVal });
+    }
+  });
 
   // ----- Local IPFS helpers -----
   async function pingLocalIpfs() {
@@ -8055,6 +8701,13 @@ export function AppProvider(props) {
     localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
     pushToast({ type: "info", message: i18n.t("settings.ipfs.localDisabled") });
   }
+
+  Solid.createEffect(() => {
+    const backend = config()?.backendLink;
+    const domainName = selectedDomainName();
+    if (backend) configureEndpoints({ backendLink: backend, domain: domainName });
+  });
+
 
   const value = {
     // state
@@ -8125,6 +8778,10 @@ export function AppProvider(props) {
 export function useApp() {
   const ctx = Solid.useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
+
+  if (typeof window !== "undefined") {
+    window.__app = ctx; // for devtools poking
+  }
   return ctx;
 }
 </file>
@@ -8137,7 +8794,7 @@ import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
 import ThemeToggle from "./ui/ThemeToggle.jsx";
 import LangSelector from "./ui/LangSelector.jsx";
-import RightPaneFooter from "./ui/RightPaneFooter.jsx";
+import RightPaneFooter from "./RightPaneFooter.jsx";
 
 export default function RightPane({ isOpen, onClose }) {
   const app = useApp();
@@ -8218,7 +8875,7 @@ export default function RightPane({ isOpen, onClose }) {
 </file>
 
 <file path="src/App.jsx">
-// src/App.jsx
+// File: src/App.jsx
 import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
@@ -8232,6 +8889,7 @@ import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import DomainCssLoader from "./theme/DomainCssLoader.jsx";
 import FaviconLoader from "./theme/FaviconLoader.jsx";
 import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
+import WsConnector from "./net/WsConnector.jsx"; // ← add this
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -8252,6 +8910,7 @@ export default function App() {
       <DomainCssLoader />
       <FaviconLoader />
       <GoogleAnalyticsLoader />
+      <WsConnector /> 
 
       <Header onTogglePane={togglePane} />
       <Show when={route() === "/settings"} fallback={<MainView />}>

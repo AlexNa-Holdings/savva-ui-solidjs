@@ -11,7 +11,7 @@ export default function RightPane({ isOpen, onClose }) {
   const app = useApp();
   const { t } = app;
   const [showSwitch, setShowSwitch] = createSignal(false);
-  const noopApply = () => {};
+  const noopApply = () => { };
   const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
 
   return (
@@ -39,6 +39,23 @@ export default function RightPane({ isOpen, onClose }) {
                     {t("rightPane.switch.open")}
                   </div>
                 </li>
+
+                {/* DevDocs (before Settings) */}
+                <li>
+                  <div
+                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => { navigate("/docs"); onClose(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
+                    aria-label={t("docs.nav")}
+                    title={t("docs.nav")}
+                  >
+                    {t("docs.nav")}
+                  </div>
+                </li>
+
+
+
                 <li>
                   <div
                     class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"

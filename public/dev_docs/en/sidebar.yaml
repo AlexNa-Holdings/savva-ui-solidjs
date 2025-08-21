@@ -1,0 +1,7 @@
+sections:
+  - title: Getting Started
+    items:
+      - label: Overview
+        file: index.md
+      - label: Setup
+        file: getting-started.md
