@@ -1,4 +1,4 @@
-// File: src/hooks/useConnect.js
+// src/hooks/useConnect.js
 import { createSignal, onMount } from "solid-js";
 import { parse } from "yaml";
 import { configureEndpoints, httpBase } from "../net/endpoints";
@@ -21,7 +21,6 @@ export function useConnect() {
       configureEndpoints({
         backendLink: data.backendLink,
         domain: data.domain || "",
-        lang: "en",
       });
 
       const cfg = {

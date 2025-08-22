@@ -1,3 +1,4 @@
+// src/context/AppContext.jsx
 import * as Solid from "solid-js";
 import { parse } from "yaml";
 import { getChainMeta } from "../blockchain/chains";
@@ -18,26 +19,9 @@ const OVERRIDE_KEY = "connect_override";
 const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
 const ASSETS_ENV_KEY = "domain_assets_env";
 
-function pickPersistable(cfg) {
-  if (!cfg) return null;
-  return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") };
-}
-
-function loadOverride() {
-  try {
-    const raw = localStorage.getItem(OVERRIDE_KEY);
-    if (!raw) return null;
-    return pickPersistable(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-}
-function saveOverride(obj) {
-  try {
-    if (!obj) localStorage.removeItem(OVERRIDE_KEY);
-    else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj)));
-  } catch { }
-}
+function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
+function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
+function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch {} }
 
 export function AppProvider(props) {
   const i18n = useI18n();
@@ -55,8 +39,6 @@ export function AppProvider(props) {
     localStorage.setItem(ASSETS_ENV_KEY, v);
     setAssetsEnvState(v);
   }
-  
-  // --- Start of Restored Core Functions ---
 
   async function fetchInfo(cfg) {
     const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
@@ -69,14 +51,11 @@ export function AppProvider(props) {
     const data = await fetchInfo(nextCfg);
     setInfo(data);
     setLastUpdatedAt(Date.now());
-    try {
-      configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
-    } catch { }
+    try { configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" }); } catch {}
   }
 
   async function init() {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await fetch("/default_connect.yaml", { cache: "no-store" });
       if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
@@ -90,15 +69,12 @@ export function AppProvider(props) {
       await applyConfig(merged);
     } catch (e) {
       setError(e);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   async function updateConnect(partial) {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       const cur = config() || {};
       const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
       const backendChanged = next.backendLink !== cur.backendLink;
@@ -107,18 +83,13 @@ export function AppProvider(props) {
       } else {
         setConfig(next);
         setLastUpdatedAt(Date.now());
-        try {
-          const langVal = i18n?.lang ? i18n.lang() : "en";
-          configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
-        } catch { }
+        try { configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" }); } catch {}
       }
       saveOverride(next);
     } catch (e) {
       setError(e);
       pushErrorToast(e, { op: "updateConnect", backendLink: partial?.backendLink ?? config()?.backendLink, domain: partial?.domain ?? config()?.domain });
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   function setDomain(nextDomain) {
@@ -127,48 +98,58 @@ export function AppProvider(props) {
     setConfig(next);
     saveOverride(next);
     setLastUpdatedAt(Date.now());
-    try {
-      const langVal = i18n?.lang ? i18n.lang() : "en";
-      configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "", lang: langVal });
-    } catch { }
+    try { configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" }); } catch {}
   }
 
-  async function clearConnectOverride() {
-    saveOverride(null);
-    await init();
-  }
-
-  // --- End of Restored Core Functions ---
+  async function clearConnectOverride() { saveOverride(null); await init(); }
 
   Solid.onMount(init);
 
-  const supportedDomains = Solid.createMemo(() => { /* ... */ });
-  const selectedDomain = Solid.createMemo(() => { /* ... */ });
+  // --- Domain resolution ---
+  const supportedDomains = Solid.createMemo(() => {
+    const list = info()?.domains;
+    if (!Array.isArray(list)) return [];
+    const res = [];
+    const seen = new Set();
+    for (const d of list) {
+      const name = typeof d === "string" ? d : (d && d.name) || "";
+      const website = typeof d === "object" ? (d.website || d.url || d.link || "") : "";
+      const key = name.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      res.push({ name, website });
+    }
+    return res;
+  });
+
+  // IMPORTANT: prefer explicit config domain (YAML/override). If it isn't in /info, still use it.
+  const selectedDomain = Solid.createMemo(() => {
+    const explicit = String(config()?.domain || "").trim();
+    if (explicit) {
+      const hit = supportedDomains().find((d) => eq(d.name, explicit));
+      return hit || explicit; // string if not present in /info
+    }
+    // no explicit domain: take the first from /info if available
+    return supportedDomains()[0] || "";
+  });
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()) || "");
 
+  // --- Blockchain target ---
   const desiredChainId = Solid.createMemo(() => typeof info()?.blockchain_id === "number" ? info().blockchain_id : null);
-  const desiredChain = Solid.createMemo(() => {
-    const id = desiredChainId();
-    return id ? getChainMeta(id) : null;
-  });
-  async function ensureWalletOnDesiredChain() {
-    const meta = desiredChain();
-    if (!meta) throw new Error("Unknown target chain");
-    await switchOrAddChain(meta);
-  }
+  const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
+  async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
 
+  // --- IPFS gateways ---
   const remoteIpfsGateways = Solid.createMemo(() => {
     const arr = info()?.ipfs_gateways;
     return Array.isArray(arr) ? arr.filter(Boolean).map((s) => ensureSlash(s.trim())).filter(Boolean) : [];
   });
-
   const activeIpfsGateways = Solid.createMemo(() => {
-    if (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) {
-      return [ensureSlash(ipfs.localIpfsGateway())];
-    }
+    if (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) return [ensureSlash(ipfs.localIpfsGateway())];
     return remoteIpfsGateways();
   });
 
+  // --- Assets base URL from /info ---
   const assetsBaseUrl = Solid.createMemo(() => {
     const baseProd = info()?.assets_url || "";
     const baseTest = info()?.temp_assets_url || "";
@@ -176,8 +157,9 @@ export function AppProvider(props) {
     return ensureSlash(base || "");
   });
 
+  // --- Domain assets state ---
   const [domainAssetsConfig, setDomainAssetsConfig] = Solid.createSignal(null);
-  const [domainAssetsSource, setDomainAssetsSource] = Solid.createSignal(null);
+  const [domainAssetsSource, setDomainAssetsSource] = Solid.createSignal(null); // "domain" | "default" | null
   const [domainAssetsPrefix, setDomainAssetsPrefix] = Solid.createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
   const domainAssetsPrefixActive = Solid.createMemo(() => domainAssetsPrefix() || DEFAULT_DOMAIN_ASSETS_PREFIX);
 
@@ -188,24 +170,118 @@ export function AppProvider(props) {
     return ensureSlash(prefix) + rel;
   }
 
-  const [domainDictionaries] = Solid.createResource(/* ... */);
-  Solid.createEffect(() => { /* ... */ });
-  async function refreshDomainAssets() { /* ... */ }
-  Solid.createEffect(() => { /* ... */ });
-  Solid.createEffect(() => { /* ... */ });
+  // --- Load domain dictionaries (i18n) from the active assets pack ---
+  const [domainDictionaries] = Solid.createResource(
+    () => {
+      const cfg = domainAssetsConfig();
+      if (!cfg) return null;
+      const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+      const items = locales
+        .map((l) => {
+          const code = (l?.code || "").toLowerCase();
+          const path = l?.dictionary || l?.file || (code ? `i18n/${code}.yaml` : "");
+          if (!code || !path) return null;
+          return { code, path };
+        })
+        .filter(Boolean);
+      if (items.length === 0) return null;
+      const rev = `${domainAssetsPrefixActive()}|${cfg.assets_cid || cfg.cid || ""}`;
+      return { items, rev };
+    },
+    async (key) => {
+      if (!key) return {};
+      const out = {};
+      for (const { code, path } of key.items) {
+        try {
+          const url = assetUrl(path);
+          const res = await fetchWithTimeout(url, { timeoutMs: 8000, cache: "no-store" });
+          if (!res.ok) continue;
+          const text = await res.text();
+          const parsed = parse(text) || {};
+          const normalized = {};
+          for (const [k, v] of Object.entries(parsed)) normalized[k] = typeof v === "string" ? v : String(v);
+          out[code] = normalized;
+        } catch { /* ignore */ }
+      }
+      return out;
+    }
+  );
+
+  Solid.createEffect(() => {
+    const dicts = domainDictionaries() || {};
+    if (i18n && typeof i18n.setDomainDictionaries === "function") {
+      i18n.setDomainDictionaries(dicts);
+    }
+  });
+
+  // --- Refresh domain assets (config.yaml + prefix)
+  async function refreshDomainAssets() {
+    const base = assetsBaseUrl();
+    const domain = selectedDomainName();
+    const computed = base && domain ? ensureSlash(base) + domain + "/" : "";
+    const defaultPrefix = DEFAULT_DOMAIN_ASSETS_PREFIX;
+
+    // Helper to load and parse config.yaml from a prefix
+    async function tryLoad(prefix) {
+      if (!prefix) return null;
+      const url = ensureSlash(prefix) + "config.yaml";
+      let res;
+      try {
+        res = await fetchWithTimeout(url, { timeoutMs: 8000, cache: "no-store" });
+      } catch { return null; }
+      if (!res.ok) return null;
+      try {
+        const text = await res.text();
+        return parse(text) || {};
+      } catch { return null; }
+    }
+
+    // 1) Try domain-specific pack
+    let source = null;
+    let usedPrefix = computed || "";
+    let cfg = await tryLoad(usedPrefix);
+    if (cfg) {
+      source = "domain";
+    } else {
+      // 2) Fallback to default pack
+      usedPrefix = defaultPrefix;
+      cfg = await tryLoad(usedPrefix);
+      source = cfg ? "default" : null;
+    }
+
+    setDomainAssetsPrefix(usedPrefix || defaultPrefix);
+    setDomainAssetsSource(source);
+    setDomainAssetsConfig(cfg || null);
+  }
+
+  // React to changes in assets base, env, or domain
+  Solid.createEffect(() => {
+    // Build a reactive key to avoid redundant fetches
+    const key = `${assetsBaseUrl()}|${assetsEnv()}|${selectedDomainName()}`;
+    if (!assetsBaseUrl()) {
+      setDomainAssetsPrefix(DEFAULT_DOMAIN_ASSETS_PREFIX);
+      setDomainAssetsSource(null);
+      setDomainAssetsConfig(null);
+      return;
+    }
+    // Run async without blocking the effect
+    Promise.resolve().then(refreshDomainAssets);
+  });
+
+  // Also re-apply when /info finishes loading for the first time
+  Solid.createEffect(() => { if (info()) Promise.resolve().then(refreshDomainAssets); });
 
   const value = {
     config, info, error, loading, lastUpdatedAt,
     ...ipfs,
-    supportedDomains, selectedDomain, desiredChainId, desiredChain, remoteIpfsGateways, activeIpfsGateways,
-    assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl,
+    supportedDomains, selectedDomain,
+    desiredChainId, desiredChain, remoteIpfsGateways, activeIpfsGateways,
+    assetsEnv, setAssetsEnv, assetsBaseUrl,
+    domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive,
+    refreshDomainAssets, assetUrl,
     reload: init, updateConnect, clearConnectOverride, setDomain, ensureWalletOnDesiredChain,
-    t: i18n.t,
-    lang: i18n.lang,
-    setLang: i18n.setLang,
-    showKeys: i18n.showKeys,
-    setShowKeys: i18n.setShowKeys,
-    i18nAvailable: i18n.available,
+    t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
+    showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys, i18nAvailable: i18n.available,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
@@ -214,8 +290,6 @@ export function AppProvider(props) {
 export function useApp() {
   const ctx = Solid.useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
-  if (typeof window !== "undefined") {
-    window.__app = ctx;
-  }
+  if (typeof window !== "undefined") window.__app = ctx;
   return ctx;
 }

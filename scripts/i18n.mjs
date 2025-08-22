@@ -1,3 +1,4 @@
+// scripts/i18n.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -124,15 +125,20 @@ async function fillEnglish(keys) {
   return out;
 }
 
-async function translateTo(langCode, pairs /* [{key, en}] */) {
+async function translateTo(langCode, englishPairs) {
   const out = {};
-  for (const group of chunk(pairs, BATCH_SIZE)) {
+  const keys = Object.keys(englishPairs);
+  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
+    const batchToTranslate = {};
+    for (const k of keyGroup) {
+      batchToTranslate[k] = englishPairs[k];
+    }
     const prompt =
-      `Translate the following English app strings to ${langCode}. ` +
+      `Translate the values in the following JSON object to ${langCode}. ` +
+      `Return a JSON object with the same keys, but with translated string values. ` +
       `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
-      `Use natural ${langCode} for a consumer web app (not formal/legal). ` +
-      `Return a JSON object mapping "key" -> "translated string".\n\n` +
-      JSON.stringify({ items: group }, null, 2);
+      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
+      JSON.stringify(batchToTranslate, null, 2);
     const json = await askJson(prompt);
     Object.assign(out, json);
   }
@@ -193,6 +199,7 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
         "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
       );
     } else {
+      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
       const filled = await fillEnglish(missingEn);
       let filledCount = 0;
       for (const k of missingEn) {
@@ -202,7 +209,10 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
           filledCount++;
         }
       }
-      writeLang(enPath, enNew);
+      if (filledCount > 0) {
+        writeLang(enPath, enNew);
+        console.log(`[i18n] Filled ${filledCount} English strings.`);
+      }
     }
   } else {
     console.log("[i18n] No missing English strings to fill.");
@@ -218,15 +228,15 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
 
     // Prune/prepare
     const out = {};
-    const toTranslate = [];
+    const toTranslate = {};
     for (const k of desiredKeys) {
       const v = langDict[k];
       const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
       if (isMissing) {
         out[k] = "???";
-        // Only translate if we have an English source string
-        if (typeof enNew[k] === "string" && enNew[k].trim()) {
-          toTranslate.push({ key: k, en: enNew[k] });
+        // Only translate if we have an English source string that isn't a placeholder
+        if (typeof enNew[k] === "string" && enNew[k].trim() && enNew[k] !== "???") {
+          toTranslate[k] = enNew[k];
         }
       } else {
         out[k] = v;
@@ -234,8 +244,9 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
     }
 
     writeLang(langPath, out);
+    const toTranslateCount = Object.keys(toTranslate).length;
 
-    if (toTranslate.length === 0) {
+    if (toTranslateCount === 0) {
       console.log(`[i18n] ${langCode}: nothing to translate.`);
       continue;
     }
@@ -245,16 +256,20 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
       continue;
     }
 
+    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
     const translated = await translateTo(langCode, toTranslate);
     let translatedCount = 0;
-    for (const { key } of toTranslate) {
+    for (const key of Object.keys(toTranslate)) {
       const t = translated[key];
       if (typeof t === "string" && t.trim() && out[key] === "???") {
         out[key] = t.trim();
         translatedCount++;
       }
     }
-    writeLang(langPath, out);
+    
+    if (translatedCount > 0) {
+        writeLang(langPath, out);
+    }
     console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
   }
 })().catch((err) => {

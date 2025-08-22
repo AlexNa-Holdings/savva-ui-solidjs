@@ -221,105 +221,6 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/hooks/useLocalIpfs.js">
-// src/hooks/useLocalIpfs.js
-import { createSignal, onCleanup } from "solid-js";
-import { fetchWithTimeout } from "../utils/net.js";
-
-// Constants are now local to this hook
-const IPFS_LOCAL_KEY = "ipfs_local_enabled";
-const IPFS_LOCAL_API_KEY = "ipfs_local_api";
-const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway";
-
-function trimSlash(s) { if (!s) return ""; return s.endsWith("/") ? s.slice(0, -1) : s; }
-
-export function useLocalIpfs(dependencies) {
-  const { pushToast, pushErrorToast, t } = dependencies;
-
-  const [localIpfsEnabled, setLocalIpfsEnabled] = createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
-  const [localIpfsApiUrl, setLocalIpfsApiUrl] = createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://127.0.0.1:5001");
-  const [localIpfsGateway, setLocalIpfsGateway] = createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
-  const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown");
-  let ipfsMonitorTid = null;
-
-  async function pingLocalIpfs() {
-    try {
-      const base = trimSlash(localIpfsApiUrl());
-      if (!base) throw new Error("No API URL");
-      const res = await fetchWithTimeout(`${base}/api/v0/id`, { method: "POST", timeoutMs: 5000 });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setLocalIpfsStatus("ok");
-      return true;
-    } catch (e) {
-      setLocalIpfsStatus("down");
-      pushErrorToast(e, { op: "pingLocalIpfs", apiUrl: localIpfsApiUrl() });
-      return false;
-    }
-  }
-
-  async function probeLocalIpfs(apiUrl) {
-    const url = trimSlash(apiUrl || "");
-    if (!url) throw new Error("Empty IPFS API URL");
-    const res = await fetchWithTimeout(`${url}/api/v0/version`, { method: "POST", timeoutMs: 4000 });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const gw = url.replace(/:\d+$/, ":8080").replace(/\/api$/, "");
-    return gw.endsWith("/") ? gw : gw + "/";
-  }
-
-  function startLocalIpfsMonitor() {
-    stopLocalIpfsMonitor();
-    ipfsMonitorTid = setInterval(() => { pingLocalIpfs(); }, 10_000);
-    pingLocalIpfs();
-  }
-
-  function stopLocalIpfsMonitor() {
-    if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
-  }
-
-  async function enableLocalIpfs(apiUrl) {
-    try {
-      const gw = await probeLocalIpfs(apiUrl);
-      setLocalIpfsApiUrl(apiUrl);
-      setLocalIpfsGateway(gw);
-      setLocalIpfsEnabled(true);
-      localStorage.setItem(IPFS_LOCAL_KEY, "1");
-      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
-      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-      startLocalIpfsMonitor();
-    } catch (e) {
-      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
-      throw e;
-    }
-  }
-
-  async function disableLocalIpfs() {
-    stopLocalIpfsMonitor();
-    setLocalIpfsEnabled(false);
-    setLocalIpfsGateway("");
-    localStorage.setItem(IPFS_LOCAL_KEY, "0");
-    localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
-    pushToast({ type: "info", message: t("settings.ipfs.localDisabled") });
-  }
-
-  // Start the monitor if it was enabled on page load
-  if (localIpfsEnabled() && localIpfsApiUrl()) {
-    startLocalIpfsMonitor();
-  }
-
-  onCleanup(() => stopLocalIpfsMonitor());
-
-  return {
-    localIpfsEnabled,
-    localIpfsApiUrl,
-    localIpfsGateway,
-    localIpfsStatus,
-    enableLocalIpfs,
-    disableLocalIpfs,
-    setLocalIpfsApiUrl,
-  };
-}
-</file>
-
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 540 879.4">
@@ -4083,51 +3984,6 @@ staker_levels:
         text: "Wal"
 </file>
 
-<file path="public/domain_default/modules/tabs.yaml">
-tabs:
-  - type: leaders
-    right_panel:
-      available: true
-      blocks:
-        - type: html
-          en: /html/info_block_en.html
-          ru: /html/info_block_ru.html
-          ua: /html/info_block_ua.html
-          fr: /html/info_block_fr.html
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: actual
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: comments
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: new
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: for-you
-    private: true
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-</file>
-
 <file path="public/domain_default/config.yaml">
 logo:
   light: images/logo_light.png
@@ -4450,89 +4306,6 @@ async function main() {
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
-</file>
-
-<file path="scripts/release.mjs">
-// scripts/release.mjs
-import fs from "node:fs";
-import path from "node:path";
-import { execSync } from "node:child_process";
-import dotenv from "dotenv";
-
-const ROOT = process.cwd();
-dotenv.config({ path: path.join(ROOT, ".env") });
-
-const VERSION_FILE = path.join(ROOT, "src", "version.js");
-const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
-const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
-
-const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
-const DEPLOY_USER = process.env.DEPLOY_USER || "";
-const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
-const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
-const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
-
-function sh(cmd, opts = {}) {
-  console.log(`$ ${cmd}`);
-  return execSync(cmd, { stdio: "inherit", ...opts });
-}
-
-function readVersion() {
-  const text = fs.readFileSync(VERSION_FILE, "utf8");
-  const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
-  if (!m) throw new Error("Could not parse APP_VERSION in src/version.js");
-  return { major: Number(m[1]), minor: Number(m[2]), text };
-}
-
-function writeVersion(major, minor, prevText) {
-  const next = `${major}.${minor}`;
-  const out = prevText.replace(/APP_VERSION\s*=\s*["'`](\d+\.\d+)["'`]/, `APP_VERSION = "${next}"`);
-  fs.writeFileSync(VERSION_FILE, out, "utf8");
-  return next;
-}
-
-function build() {
-  sh("npm run build");
-}
-
-function gitCommitAndPush(version) {
-  try { sh("git add -A"); } catch {}
-  try { sh(`git commit -m "release: v${version}"`); }
-  catch { console.warn("No changes to commit."); }
-  // Push current branch
-  try { sh("git rev-parse --abbrev-ref HEAD"); } catch {}
-  try { sh("git push"); } catch {}
-  // Also push HEAD to Prod branch (without switching)
-  try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
-}
-
-function deploy() {
-  if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
-    console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
-    return;
-  }
-  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
-  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
-
-  // Ensure path exists, then scp
-  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
-  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
-}
-
-(async function main() {
-  const { major, minor, text } = readVersion();
-  const nextVersion = writeVersion(major, minor + 1, text);
-  console.log(`Bumped version to ${nextVersion}`);
-
-  build();
-  gitCommitAndPush(nextVersion);
-  deploy();
-
-  console.log(`Done. Released v${nextVersion}.`);
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
 </file>
 
 <file path="src/assets/solid.svg">
@@ -4983,46 +4756,6 @@ export default function IpfsImage(props) {
 }
 </file>
 
-<file path="src/components/ui/LangSelector.jsx">
-// src/components/ui/LangSelector.jsx
-import { For } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { LANG_INFO } from "../../i18n/useI18n";
-
-export default function LangSelector(props) {
-  const app = useApp();
-
-  // The component now receives the list of codes directly.
-  const codes = () => props.codes || [];
-  const value = () => (props.value || app.lang?.() || "").toLowerCase();
-  const onChange = (code) => (props.onChange ? props.onChange(code) : app.setLang?.(code));
-
-  return (
-    <div class={`themed-segment ${props.class || ""}`} role="radiogroup" aria-label={app.t("rightPane.language")}>
-      <For each={codes()}>
-        {(code) => {
-          const c = String(code).toLowerCase();
-          const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
-          const active = () => value() === c;
-          return (
-            <button
-              type="button"
-              class={`themed-pill ${active() ? "is-active" : ""}`}
-              role="radio"
-              aria-checked={active()}
-              onClick={() => onChange(c)}
-              title={info.name}
-            >
-              {info.code}
-            </button>
-          );
-        }}
-      </For>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/ui/Spinner.jsx">
 // src/components/ui/Spinner.jsx
 
@@ -5265,80 +4998,102 @@ export default function RightPaneFooter() {
 }
 </file>
 
-<file path="src/i18n/useI18n.js">
-// src/i18n/useI18n.js
-import { createSignal } from "solid-js";
-import en from "./en";
-import ru from "./ru";
+<file path="src/hooks/useLocalIpfs.js">
+// src/hooks/useLocalIpfs.js
+import { createSignal, onCleanup } from "solid-js";
+import { fetchWithTimeout } from "../utils/net.js";
 
-const DICTS = { en, ru };
-const DEFAULT_LANG = "en";
-const LANG_KEY = "lang";
-const SHOW_KEYS_KEY = "i18n_show_keys";
+// Constants are now local to this hook
+const IPFS_LOCAL_KEY = "ipfs_local_enabled";
+const IPFS_LOCAL_API_KEY = "ipfs_local_api";
+const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway";
 
-let i18nSingleton;
+function trimSlash(s) { if (!s) return ""; return s.endsWith("/") ? s.slice(0, -1) : s; }
 
-// --- Start of New Logic ---
-// This signal will hold the dictionaries loaded from the domain's config.yaml
-const [domainDicts, setDomainDicts] = createSignal({});
+export function useLocalIpfs(dependencies) {
+  const { pushToast, pushErrorToast, t } = dependencies;
 
-function resolveKey(lang, key) {
-  const dDicts = domainDicts();
-  
-  // Priority 1: Check the domain-specific dictionary for the current language.
-  const domainVal = dDicts[lang]?.[key];
-  if (domainVal != null) return domainVal;
+  const [localIpfsEnabled, setLocalIpfsEnabled] = createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
+  const [localIpfsApiUrl, setLocalIpfsApiUrl] = createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://127.0.0.1:5001");
+  const [localIpfsGateway, setLocalIpfsGateway] = createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
+  const [localIpfsStatus, setLocalIpfsStatus] = createSignal("unknown");
+  let ipfsMonitorTid = null;
 
-  // Priority 2: Fall back to the app's built-in dictionary for the current language.
-  const appVal = DICTS[lang]?.[key];
-  if (appVal != null) return appVal;
-  
-  // Priority 3: Fall back to the app's built-in English dictionary.
-  if (DICTS[DEFAULT_LANG]?.[key] != null) return DICTS[DEFAULT_LANG][key];
-
-  return `[${key}]`;
-}
-// --- End of New Logic ---
-
-export const LANG_INFO = {
-  en: { code: "EN", name: "English" },
-  ru: { code: "RU", name: "Русский" }
-};
-
-export function useI18n() {
-  if (!i18nSingleton) {
-    const initialLang = (() => { /* ... unchanged ... */ })();
-    const initialShowKeys = (() => { /* ... unchanged ... */ })();
-
-    const [lang, setLangSignal] = createSignal(initialLang);
-    const [showKeys, setShowKeysSignal] = createSignal(initialShowKeys);
-
-    const setLang = (next) => { /* ... unchanged ... */ };
-    const setShowKeys = (on) => { /* ... unchanged ... */ };
-
-    const t = (key) => {
-      const base = resolveKey(lang(), key);
-      return showKeys() ? `${base} [${key}]` : base;
-    };
-
-    // --- Start of New Logic ---
-    // This new function will be called by AppContext to update the domain dictionaries.
-    const setDomainDictionaries = (newDicts) => {
-      setDomainDicts(newDicts || {});
-    };
-    // --- End of New Logic ---
-
-    i18nSingleton = {
-      t,
-      lang,
-      setLang,
-      showKeys,
-      setShowKeys,
-      available: Object.keys(DICTS),
-      setDomainDictionaries, // Expose the new setter function
-    };
+  async function pingLocalIpfs() {
+    try {
+      const base = trimSlash(localIpfsApiUrl());
+      if (!base) throw new Error("No API URL");
+      const res = await fetchWithTimeout(`${base}/api/v0/id`, { method: "POST", timeoutMs: 5000 });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setLocalIpfsStatus("ok");
+      return true;
+    } catch (e) {
+      setLocalIpfsStatus("down");
+      pushErrorToast(e, { op: "pingLocalIpfs", apiUrl: localIpfsApiUrl() });
+      return false;
+    }
   }
-  return i18nSingleton;
+
+  async function probeLocalIpfs(apiUrl) {
+    const url = trimSlash(apiUrl || "");
+    if (!url) throw new Error("Empty IPFS API URL");
+    const res = await fetchWithTimeout(`${url}/api/v0/version`, { method: "POST", timeoutMs: 4000 });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const gw = url.replace(/:\d+$/, ":8080").replace(/\/api$/, "");
+    return gw.endsWith("/") ? gw : gw + "/";
+  }
+
+  function startLocalIpfsMonitor() {
+    stopLocalIpfsMonitor();
+    ipfsMonitorTid = setInterval(() => { pingLocalIpfs(); }, 10_000);
+    pingLocalIpfs();
+  }
+
+  function stopLocalIpfsMonitor() {
+    if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
+  }
+
+  async function enableLocalIpfs(apiUrl) {
+    try {
+      const gw = await probeLocalIpfs(apiUrl);
+      setLocalIpfsApiUrl(apiUrl);
+      setLocalIpfsGateway(gw);
+      setLocalIpfsEnabled(true);
+      localStorage.setItem(IPFS_LOCAL_KEY, "1");
+      localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
+      localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
+      startLocalIpfsMonitor();
+    } catch (e) {
+      pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
+      throw e;
+    }
+  }
+
+  async function disableLocalIpfs() {
+    stopLocalIpfsMonitor();
+    setLocalIpfsEnabled(false);
+    setLocalIpfsGateway("");
+    localStorage.setItem(IPFS_LOCAL_KEY, "0");
+    localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
+    pushToast({ type: "info", message: t("settings.ipfs.localDisabled") });
+  }
+
+  // Start the monitor if it was enabled on page load
+  if (localIpfsEnabled() && localIpfsApiUrl()) {
+    startLocalIpfsMonitor();
+  }
+
+  onCleanup(() => stopLocalIpfsMonitor());
+
+  return {
+    localIpfsEnabled,
+    localIpfsApiUrl,
+    localIpfsGateway,
+    localIpfsStatus,
+    enableLocalIpfs,
+    disableLocalIpfs,
+    setLocalIpfsApiUrl,
+  };
 }
 </file>
 
@@ -5975,13 +5730,53 @@ sections:
         file: core-concepts/domain.md
 </file>
 
-<file path="public/default_connect.yaml">
-domain: savva.app
-backendLink: https://ui.savva.app/api/
-gear: true
+<file path="public/domain_default/modules/tabs.yaml">
+tabs:
+  - type: leaders
+    right_panel:
+      available: true
+      blocks:
+        - type: html
+          en: /html/info_block_en.html
+          ru: /html/info_block_ru.html
+          ua: /html/info_block_ua.html
+          fr: /html/info_block_fr.html
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: actual
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: comments
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: new
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: for-you
+    private: true
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
 </file>
 
 <file path="scripts/i18n.mjs">
+// scripts/i18n.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -6108,15 +5903,20 @@ async function fillEnglish(keys) {
   return out;
 }
 
-async function translateTo(langCode, pairs /* [{key, en}] */) {
+async function translateTo(langCode, englishPairs) {
   const out = {};
-  for (const group of chunk(pairs, BATCH_SIZE)) {
+  const keys = Object.keys(englishPairs);
+  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
+    const batchToTranslate = {};
+    for (const k of keyGroup) {
+      batchToTranslate[k] = englishPairs[k];
+    }
     const prompt =
-      `Translate the following English app strings to ${langCode}. ` +
+      `Translate the values in the following JSON object to ${langCode}. ` +
+      `Return a JSON object with the same keys, but with translated string values. ` +
       `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
-      `Use natural ${langCode} for a consumer web app (not formal/legal). ` +
-      `Return a JSON object mapping "key" -> "translated string".\n\n` +
-      JSON.stringify({ items: group }, null, 2);
+      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
+      JSON.stringify(batchToTranslate, null, 2);
     const json = await askJson(prompt);
     Object.assign(out, json);
   }
@@ -6177,6 +5977,7 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
         "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
       );
     } else {
+      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
       const filled = await fillEnglish(missingEn);
       let filledCount = 0;
       for (const k of missingEn) {
@@ -6186,7 +5987,10 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
           filledCount++;
         }
       }
-      writeLang(enPath, enNew);
+      if (filledCount > 0) {
+        writeLang(enPath, enNew);
+        console.log(`[i18n] Filled ${filledCount} English strings.`);
+      }
     }
   } else {
     console.log("[i18n] No missing English strings to fill.");
@@ -6202,15 +6006,15 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
 
     // Prune/prepare
     const out = {};
-    const toTranslate = [];
+    const toTranslate = {};
     for (const k of desiredKeys) {
       const v = langDict[k];
       const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
       if (isMissing) {
         out[k] = "???";
-        // Only translate if we have an English source string
-        if (typeof enNew[k] === "string" && enNew[k].trim()) {
-          toTranslate.push({ key: k, en: enNew[k] });
+        // Only translate if we have an English source string that isn't a placeholder
+        if (typeof enNew[k] === "string" && enNew[k].trim() && enNew[k] !== "???") {
+          toTranslate[k] = enNew[k];
         }
       } else {
         out[k] = v;
@@ -6218,8 +6022,9 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
     }
 
     writeLang(langPath, out);
+    const toTranslateCount = Object.keys(toTranslate).length;
 
-    if (toTranslate.length === 0) {
+    if (toTranslateCount === 0) {
       console.log(`[i18n] ${langCode}: nothing to translate.`);
       continue;
     }
@@ -6229,18 +6034,112 @@ async function translateTo(langCode, pairs /* [{key, en}] */) {
       continue;
     }
 
+    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
     const translated = await translateTo(langCode, toTranslate);
     let translatedCount = 0;
-    for (const { key } of toTranslate) {
+    for (const key of Object.keys(toTranslate)) {
       const t = translated[key];
       if (typeof t === "string" && t.trim() && out[key] === "???") {
         out[key] = t.trim();
         translatedCount++;
       }
     }
-    writeLang(langPath, out);
+    
+    if (translatedCount > 0) {
+        writeLang(langPath, out);
+    }
     console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
   }
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+</file>
+
+<file path="scripts/release.mjs">
+// scripts/release.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import dotenv from "dotenv";
+
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const VERSION_FILE = path.join(ROOT, "src", "version.js");
+const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
+const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
+
+const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
+const DEPLOY_USER = process.env.DEPLOY_USER || "";
+const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
+const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
+const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
+
+function sh(cmd, opts = {}) {
+  console.log(`$ ${cmd}`);
+  return execSync(cmd, { stdio: "inherit", ...opts });
+}
+
+function readVersion() {
+  const text = fs.readFileSync(VERSION_FILE, "utf8");
+  const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
+  if (!m) throw new Error("Could not parse APP_VERSION in src/version.js");
+  return { major: Number(m[1]), minor: Number(m[2]), text };
+}
+
+function writeVersion(major, minor, prevText) {
+  const next = `${major}.${minor}`;
+  const out = prevText.replace(/APP_VERSION\s*=\s*["'`](\d+\.\d+)["'`]/, `APP_VERSION = "${next}"`);
+  fs.writeFileSync(VERSION_FILE, out, "utf8");
+  return next;
+}
+
+function runI18nScripts() {
+  console.log("Running i18n scripts...");
+  sh("node scripts/i18n.mjs");
+  sh("node scripts/i18n-docs.mjs");
+}
+
+function build() {
+  sh("npm run build");
+}
+
+function gitCommitAndPush(version) {
+  try { sh("git add -A"); } catch {}
+  try { sh(`git commit -m "release: v${version}"`); }
+  catch { console.warn("No changes to commit."); }
+  // Push current branch
+  try { sh("git rev-parse --abbrev-ref HEAD"); } catch {}
+  try { sh("git push"); } catch {}
+  // Also push HEAD to Prod branch (without switching)
+  try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
+}
+
+function deploy() {
+  if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
+    console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
+    return;
+  }
+  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
+  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
+
+  // Ensure path exists, then scp
+  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
+  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
+}
+
+(async function main() {
+  const { major, minor, text } = readVersion();
+  const nextVersion = writeVersion(major, minor + 1, text);
+  console.log(`Bumped version to ${nextVersion}`);
+
+  runI18nScripts();
+  build();
+  gitCommitAndPush(nextVersion);
+  deploy();
+
+  console.log(`Done. Released v${nextVersion}.`);
 })().catch((err) => {
   console.error(err);
   process.exit(1);
@@ -7171,6 +7070,46 @@ export default function RightRailLayout(props) {
 }
 </file>
 
+<file path="src/components/ui/LangSelector.jsx">
+// src/components/ui/LangSelector.jsx
+import { For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { LANG_INFO } from "../../i18n/useI18n";
+
+export default function LangSelector(props) {
+  const app = useApp();
+
+  // The component now receives the list of codes directly.
+  const codes = () => props.codes || [];
+  const value = () => (props.value || app.lang?.() || "").toLowerCase();
+  const onChange = (code) => (props.onChange ? props.onChange(code) : app.setLang?.(code));
+
+  return (
+    <div class={`themed-segment ${props.class || ""}`} role="radiogroup" aria-label={app.t("rightPane.language")}>
+      <For each={codes()}>
+        {(code) => {
+          const c = String(code).toLowerCase();
+          const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
+          const active = () => value() === c;
+          return (
+            <button
+              type="button"
+              class={`themed-pill ${active() ? "is-active" : ""}`}
+              role="radio"
+              aria-checked={active()}
+              onClick={() => onChange(c)}
+              title={info.name}
+            >
+              {info.code}
+            </button>
+          );
+        }}
+      </For>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/toast.js">
 // src/components/ui/toast.js
 import { createSignal } from "solid-js";
@@ -7441,7 +7380,7 @@ export default function AssetDebugTap() {
 </file>
 
 <file path="src/hooks/useConnect.js">
-// File: src/hooks/useConnect.js
+// src/hooks/useConnect.js
 import { createSignal, onMount } from "solid-js";
 import { parse } from "yaml";
 import { configureEndpoints, httpBase } from "../net/endpoints";
@@ -7464,7 +7403,6 @@ export function useConnect() {
       configureEndpoints({
         backendLink: data.backendLink,
         domain: data.domain || "",
-        lang: "en",
       });
 
       const cfg = {
@@ -7485,6 +7423,83 @@ export function useConnect() {
   });
 
   return { config, info, error, loading };
+}
+</file>
+
+<file path="src/i18n/useI18n.js">
+// src/i18n/useI18n.js
+import { createSignal } from "solid-js";
+import en from "./en";
+import ru from "./ru";
+
+const DICTS = { en, ru };
+const DEFAULT_LANG = "en";
+const LANG_KEY = "lang";
+const SHOW_KEYS_KEY = "i18n_show_keys";
+
+let i18nSingleton;
+
+// --- Start of New Logic ---
+// This signal will hold the dictionaries loaded from the domain's config.yaml
+const [domainDicts, setDomainDicts] = createSignal({});
+
+function resolveKey(lang, key) {
+  const dDicts = domainDicts();
+  
+  // Priority 1: Check the domain-specific dictionary for the current language.
+  const domainVal = dDicts[lang]?.[key];
+  if (domainVal != null) return domainVal;
+
+  // Priority 2: Fall back to the app's built-in dictionary for the current language.
+  const appVal = DICTS[lang]?.[key];
+  if (appVal != null) return appVal;
+  
+  // Priority 3: Fall back to the app's built-in English dictionary.
+  if (DICTS[DEFAULT_LANG]?.[key] != null) return DICTS[DEFAULT_LANG][key];
+
+  return `[${key}]`;
+}
+// --- End of New Logic ---
+
+export const LANG_INFO = {
+  en: { code: "EN", name: "English" },
+  ru: { code: "RU", name: "Русский" }
+};
+
+export function useI18n() {
+  if (!i18nSingleton) {
+    const initialLang = (() => { /* ... unchanged ... */ })();
+    const initialShowKeys = (() => { /* ... unchanged ... */ })();
+
+    const [lang, setLangSignal] = createSignal(initialLang);
+    const [showKeys, setShowKeysSignal] = createSignal(initialShowKeys);
+
+    const setLang = (next) => { /* ... unchanged ... */ };
+    const setShowKeys = (on) => { /* ... unchanged ... */ };
+
+    const t = (key) => {
+      const base = resolveKey(lang(), key);
+      return showKeys() ? `${base} [${key}]` : base;
+    };
+
+    // --- Start of New Logic ---
+    // This new function will be called by AppContext to update the domain dictionaries.
+    const setDomainDictionaries = (newDicts) => {
+      setDomainDicts(newDicts || {});
+    };
+    // --- End of New Logic ---
+
+    i18nSingleton = {
+      t,
+      lang,
+      setLang,
+      showKeys,
+      setShowKeys,
+      available: Object.keys(DICTS),
+      setDomainDictionaries, // Expose the new setter function
+    };
+  }
+  return i18nSingleton;
 }
 </file>
 
@@ -8192,6 +8207,12 @@ That’s it! 🎉 You’re ready to start working with the **SAVVA Platform**.
 
 </html>
 ```
+</file>
+
+<file path="public/default_connect.yaml">
+domain: savva.app
+backendLink: https://ui.savva.app/api/
+gear: true
 </file>
 
 <file path="src/components/ui/BrandLogo.jsx">
@@ -9951,208 +9972,6 @@ export default function Header({ onTogglePane }) {
 }
 </file>
 
-<file path="src/components/main/TabsBar.jsx">
-// src/components/main/TabsBar.jsx
-import { createResource, For, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { useI18n } from "../../i18n/useI18n";
-import { loadAssetResource } from "../../utils/assetLoader";
-import { useHashRouter, navigate } from "../../routing/hashRouter";
-import Tabs from "../ui/Tabs.jsx";
-import { getTabComponent } from "../tabs";
-import RightRailLayout from "../tabs/RightRailLayout.jsx";
-
-// route helpers (no /t prefix; use "/actual", "/leaders", etc.)
-const slug = (s) => String(s || "").trim().toLowerCase();
-const firstSeg = (path) => {
-  const p = String(path || "/");
-  const s = p.startsWith("/") ? p.slice(1) : p;
-  const seg = s.split(/[?#/]/, 1)[0];
-  return slug(seg);
-};
-const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
-
-// icons
-function SvgIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      {props.children}
-    </svg>
-  );
-}
-const TrophyIcon  = () => (<SvgIcon><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M7 8a5 5 0 0010 0"/><path d="M7 4a4 4 0 01-4 4"/><path d="M17 4a4 4 0 004 4"/></SvgIcon>);
-const BoltIcon    = () => (<SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>);
-const CommentIcon = () => (<SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>);
-const SparklesIcon= () => (<SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>);
-const HeartIcon   = () => (<SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>);
-const FallbackIcon= () => (<SvgIcon><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></SvgIcon>);
-
-function iconForType(type) {
-  const k = slug(type);
-  if (k === "leaders") return <TrophyIcon />;
-  if (k === "actual") return <BoltIcon />;
-  if (k === "comments") return <CommentIcon />;
-  if (k === "new") return <SparklesIcon />;
-  if (k === "for-you" || k === "foryou") return <HeartIcon />;
-  return <FallbackIcon />;
-}
-function iconFromSpec(spec) {
-  if (!spec) return null;
-  if (typeof spec === "string" && spec.startsWith("emoji:")) {
-    const ch = spec.slice("emoji:".length);
-    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
-  }
-  return null;
-}
-
-export default function TabsBar() {
-  const app = useApp();
-  const { t, domainAssetsConfig, selectedDomain } = app;
-  const { lang } = useI18n();
-  const { route } = useHashRouter();
-
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    return !d ? "" : typeof d === "string" ? d : d.name || "";
-  });
-
-  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
-
-  const [tabsRaw] = createResource(
-    () => tabsPath(),
-    async (relPath) => {
-      if (!relPath) return [];
-      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
-      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
-      return list.map((x, i) => ({
-        id: x?.id ?? x?.type ?? `tab_${i}`,
-        type: x?.type ?? x?.id ?? `tab_${i}`,
-        title: x?.title,
-        icon: x?.icon || null,
-        _raw: x,
-      }));
-    }
-  );
-
-  // i18n helpers
-  function pickByLocale(obj, langCode) {
-    if (!obj || typeof obj !== "object") return undefined;
-    const lc = (langCode || "en").toString();
-    if (obj[lc] !== undefined) return obj[lc];
-    const base = lc.toLowerCase().split(/[-_]/)[0];
-    if (obj[base] !== undefined) return obj[base];
-    return obj["*"];
-  }
-
-
-  // selection + URL sync
-  const [selectedId, setSelectedId] = createSignal("");
-  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
-
-  const items = createMemo(() =>
-    (tabsRaw() || []).map((tab) => {
-      const label = t("tabs.title." + tab.type) || t("main.tabs.untitled");
-      const explicit = iconFromSpec(tab.icon);
-      const auto = iconForType(tab.type || tab.id);
-      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
-    })
-  );
-
-  const labelById = createMemo(() => {
-    const map = new Map();
-    (items() || []).forEach((it) => map.set(it.id, it.label));
-    return map;
-  });
-
-  // init/fix selection vs URL
-  createEffect(() => {
-    const list = tabsRaw() || [];
-    if (!list.length) return setSelectedId("");
-
-    const key = firstSeg(route());
-    const hasKey = (k) => list.some((t) => slug(t.id) === k || slug(t.type) === k);
-
-    if (key && hasKey(key)) {
-      const match = list.find((t) => slug(t.id) === key) || list.find((t) => slug(t.type) === key);
-      if (match && selectedId() !== match.id) setSelectedId(match.id);
-    } else if (!selectedId() || !list.some((t) => t.id === selectedId())) {
-      const first = list[0];
-      batch(() => {
-        setSelectedId(first.id);
-        navigate(pathFor(first.type || first.id), { replace: true });
-      });
-    }
-  });
-
-  function handleTabChange(nextId) {
-    const list = tabsRaw() || [];
-    const entry = list.find((t) => t.id === nextId);
-    if (!entry) return;
-    batch(() => {
-      setSelectedId(nextId);
-      const want = pathFor(entry.type || entry.id);
-      if (route() !== want) navigate(want);
-    });
-  }
-
-  return (
-    <section class="w-full" >
-      {/* changed: let outer Container control width; keep full width here */}
-      <div class="sv-container sv-container--no-gutter">
-        <Show
-          when={!tabsRaw.loading}
-          fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.loading")}</span>}
-        >
-          <Tabs
-            items={(items() || []).map(({ id, label, icon }) => ({ id, label, icon }))}
-            value={selectedId()}
-            onChange={handleTabChange}
-            compactWidth={768} 
-          />
-        </Show>
-
-        <div class="tabs_panel">
-          <For each={tabsRaw() || []}>
-            {(tab) => {
-              const active = () => selectedId() === tab.id;
-              const Comp = getTabComponent(tab.type);
-              const title = labelById().get(tab.id) || t("main.tabs.untitled");
-              const rightCfg = tab?._raw?.right_panel || { available: false };
-
-              return (
-                <Show when={active()}>
-                  {Comp ? (
-                    rightCfg?.available  ? (
-                      <RightRailLayout>
-                        <Comp title={title} tab={tab} />
-                      </RightRailLayout>
-                    ) : (
-                      <Comp title={title} tab={tab} />
-                    )
-                  ) : rightCfg?.available ? (
-                    <RightRailLayout>
-                      <>
-                        <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
-                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
-                      </>
-                    </RightRailLayout>
-                  ) : (
-                    <>
-                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
-                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
-                    </>
-                  )}
-                </Show>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/SwitchConnectDialog.jsx">
 // File: src/components/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
@@ -10435,127 +10254,6 @@ export default function SwitchConnectDialog(props) {
 }
 </file>
 
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "docs.article": "Статья документации",
-  "docs.copied": "Скопировано в буфер обмена!",
-  "docs.copy": "Копировать",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.list": "Список",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.debug.gateways.title": "Шлюзы IPFS (активный порядок)",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.clear": "Очистить лог",
-  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
-  "settings.developer.debug.copy": "Скопировать лог",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.help": "Мы вызовем",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.help.api.tip": "Совет: держите это строго в разработке; избегайте \"*\" для продакшн настроек.",
-  "settings.localIpfs.help.api.title": "1) Разрешите происхождение вашего приложения на API (обязательно)",
-  "settings.localIpfs.help.gateway.note": "Необходимо только если приложение загружает файлы напрямую из локального шлюза.",
-  "settings.localIpfs.help.gateway.title": "2) (Необязательно) Разрешите ваше приложение на шлюзе (для прямых выборок активов)",
-  "settings.localIpfs.help.intro": "Вашему браузеру должно быть разрешено вызывать локальные конечные точки API IPFS",
-  "settings.localIpfs.help.proxy.note": "Затем установите \"URL API локального IPFS\" и нажмите \"Тестировать и включить\".",
-  "settings.localIpfs.help.proxy.text": "Проксируйте API через Vite, чтобы он был с тем же происхождением:",
-  "settings.localIpfs.help.proxy.title": "Альтернатива для разработки (без изменений конфигурации IPFS)",
-  "settings.localIpfs.help.restart.title": "3) Перезапустите демон",
-  "settings.localIpfs.help.toggle.hide": "Скрыть помощь",
-  "settings.localIpfs.help.toggle.show": "Как включить локальный IPFS (CORS)",
-  "settings.localIpfs.help.verify.note": "Шлюз обычно",
-  "settings.localIpfs.help.verify.title": "4) Проверьте",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "tabs.aria": "Вкладки раздела",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copied": "Скопировано",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети",
-    "error.connection.title": "Ошибка подключения",
-  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
-  "error.connection.retry": "Обновить страницу",
-
-};
-</file>
-
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -10631,6 +10329,337 @@ export default function Settings() {
 }
 </file>
 
+<file path="src/components/main/TabsBar.jsx">
+// src/components/main/TabsBar.jsx
+import { createResource, For, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { useI18n } from "../../i18n/useI18n";
+import { loadAssetResource } from "../../utils/assetLoader";
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+import Tabs from "../ui/Tabs.jsx";
+import { getTabComponent } from "../tabs";
+import RightRailLayout from "../tabs/RightRailLayout.jsx";
+
+// route helpers (no /t prefix; use "/actual", "/leaders", etc.)
+const slug = (s) => String(s || "").trim().toLowerCase();
+const firstSeg = (path) => {
+  const p = String(path || "/");
+  const s = p.startsWith("/") ? p.slice(1) : p;
+  const seg = s.split(/[?#/]/, 1)[0];
+  return slug(seg);
+};
+const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
+
+// icons
+function SvgIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {props.children}
+    </svg>
+  );
+}
+const TrophyIcon  = () => (<SvgIcon><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M7 8a5 5 0 0010 0"/><path d="M7 4a4 4 0 01-4 4"/><path d="M17 4a4 4 0 004 4"/></SvgIcon>);
+const BoltIcon    = () => (<SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>);
+const CommentIcon = () => (<SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>);
+const SparklesIcon= () => (<SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>);
+const HeartIcon   = () => (<SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>);
+const FallbackIcon= () => (<SvgIcon><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></SvgIcon>);
+
+function iconForType(type) {
+  const k = slug(type);
+  if (k === "leaders") return <TrophyIcon />;
+  if (k === "actual") return <BoltIcon />;
+  if (k === "comments") return <CommentIcon />;
+  if (k === "new") return <SparklesIcon />;
+  if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  return <FallbackIcon />;
+}
+function iconFromSpec(spec) {
+  if (!spec) return null;
+  if (typeof spec === "string" && spec.startsWith("emoji:")) {
+    const ch = spec.slice("emoji:".length);
+    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
+  }
+  return null;
+}
+
+export default function TabsBar() {
+  const app = useApp();
+  const { t, domainAssetsConfig, selectedDomain } = app;
+  const { lang } = useI18n();
+  const { route } = useHashRouter();
+
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
+  });
+
+  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
+
+  const [tabsRaw] = createResource(
+    () => tabsPath(),
+    async (relPath) => {
+      if (!relPath) return [];
+      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
+      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
+      return list.map((x, i) => ({
+        id: x?.id ?? x?.type ?? `tab_${i}`,
+        type: x?.type ?? x?.id ?? `tab_${i}`,
+        title: x?.title,
+        icon: x?.icon || null,
+        _raw: x,
+      }));
+    }
+  );
+
+  // i18n helpers
+  function pickByLocale(obj, langCode) {
+    if (!obj || typeof obj !== "object") return undefined;
+    const lc = (langCode || "en").toString();
+    if (obj[lc] !== undefined) return obj[lc];
+    const base = lc.toLowerCase().split(/[-_]/)[0];
+    if (obj[base] !== undefined) return obj[base];
+    return obj["*"];
+  }
+
+
+  // selection + URL sync
+  const [selectedId, setSelectedId] = createSignal("");
+  const langCode = () => (typeof lang === "function" ? lang() : lang) || "en";
+
+  const items = createMemo(() =>
+    (tabsRaw() || []).map((tab) => {
+      // Following comments are used by the auto translator. Do not remove these comments
+      // t("tabs.title.leaders")
+      // t("tabs.title.actual")
+      // t("tabs.title.comments")
+      // t("tabs.title.new")
+      // t("tabs.title.for-you")
+      const label = t("tabs.title." + tab.type) || t("main.tabs.untitled");
+      const explicit = iconFromSpec(tab.icon);
+      const auto = iconForType(tab.type || tab.id);
+      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
+    })
+  );
+
+  const labelById = createMemo(() => {
+    const map = new Map();
+    (items() || []).forEach((it) => map.set(it.id, it.label));
+    return map;
+  });
+
+  // init/fix selection vs URL
+  createEffect(() => {
+    const list = tabsRaw() || [];
+    if (!list.length) return setSelectedId("");
+
+    const key = firstSeg(route());
+    const hasKey = (k) => list.some((t) => slug(t.id) === k || slug(t.type) === k);
+
+    if (key && hasKey(key)) {
+      const match = list.find((t) => slug(t.id) === key) || list.find((t) => slug(t.type) === key);
+      if (match && selectedId() !== match.id) setSelectedId(match.id);
+    } else if (!selectedId() || !list.some((t) => t.id === selectedId())) {
+      const first = list[0];
+      batch(() => {
+        setSelectedId(first.id);
+        navigate(pathFor(first.type || first.id), { replace: true });
+      });
+    }
+  });
+
+  function handleTabChange(nextId) {
+    const list = tabsRaw() || [];
+    const entry = list.find((t) => t.id === nextId);
+    if (!entry) return;
+    batch(() => {
+      setSelectedId(nextId);
+      const want = pathFor(entry.type || entry.id);
+      if (route() !== want) navigate(want);
+    });
+  }
+
+  return (
+    <section class="w-full" >
+      {/* changed: let outer Container control width; keep full width here */}
+      <div class="sv-container sv-container--no-gutter">
+        <Show
+          when={!tabsRaw.loading}
+          fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.loading")}</span>}
+        >
+          <Tabs
+            items={(items() || []).map(({ id, label, icon }) => ({ id, label, icon }))}
+            value={selectedId()}
+            onChange={handleTabChange}
+            compactWidth={768} 
+          />
+        </Show>
+
+        <div class="tabs_panel">
+          <For each={tabsRaw() || []}>
+            {(tab) => {
+              const active = () => selectedId() === tab.id;
+              const Comp = getTabComponent(tab.type);
+              const title = labelById().get(tab.id) || t("main.tabs.untitled");
+              const rightCfg = tab?._raw?.right_panel || { available: false };
+
+              return (
+                <Show when={active()}>
+                  {Comp ? (
+                    rightCfg?.available  ? (
+                      <RightRailLayout>
+                        <Comp title={title} tab={tab} />
+                      </RightRailLayout>
+                    ) : (
+                      <Comp title={title} tab={tab} />
+                    )
+                  ) : rightCfg?.available ? (
+                    <RightRailLayout>
+                      <>
+                        <h3 class="text-base font-semibold text-[hsl(var(--foreground))] mb-2">{title}</h3>
+                        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                      </>
+                    </RightRailLayout>
+                  ) : (
+                    <>
+                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
+                    </>
+                  )}
+                </Show>
+              );
+            }}
+          </For>
+        </div>
+      </div>
+    </section>
+  );
+}
+</file>
+
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "docs.article": "Статья документации",
+  "docs.copied": "Скопировано в буфер обмена!",
+  "docs.copy": "Копировать",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+  "error.connection.title": "Ошибка подключения",
+  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
+  "error.ws.title": "Ошибка подключения",
+  "ipfs.diag.cors.name": "Проверка CORS шлюза",
+  "ipfs.diag.fetch.name": "Получение из живого шлюза",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
+  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
+  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
+  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
+  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
+  "ipfs.diag.liveness.name": "Проверка работоспособности API",
+  "ipfs.diag.run": "Запустить диагностику",
+  "ipfs.diag.title": "Диагностика узла IPFS",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.group": "Просмотреть группу",
+  "newTab.view.list": "Список",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.clear": "Очистить лог",
+  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
+  "settings.developer.debug.copy": "Скопировать лог",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "tabs.aria": "Вкладки раздела",
+  "tabs.title.actual": "Актуально",
+  "tabs.title.comments": "Комментарии",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лидеры",
+  "tabs.title.new": "Новый",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copied": "Скопировано",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети"
+};
+</file>
+
 <file path="src/index.css">
 /* src/index.css */
 @import "tailwindcss";
@@ -10642,7 +10671,7 @@ export default function Settings() {
 
 <file path="src/version.js">
 // src/version.js
-export const APP_VERSION = "0.12";
+export const APP_VERSION = "0.100";
 </file>
 
 <file path="src/context/AppContext.jsx">
@@ -10894,12 +10923,28 @@ export default {
   "docs.section": "Section",
   "docs.sidebar.empty": "No docs yet. Add sidebar.yaml under dev_docs/<lang>/",
   "docs.title": "Developer Docs",
+  "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
+  "error.connection.retry": "Refresh Page",
+  "error.connection.title": "Connection Failed",
+  "error.ws.message": "Unable to connect. Please try again.",
+  "error.ws.title": "Connection Error",
+  "ipfs.diag.cors.name": "Gateway CORS Check",
+  "ipfs.diag.fetch.name": "Live Gateway Fetch",
+  "ipfs.diag.fetch.warnSkipped": "Skipped: ABI CID not found in /info response.",
+  "ipfs.diag.fix.browser": "If it's running, check your browser. For Brave, disable Shields for this site. For other browsers like Chrome, you may need to 'Allow Insecure content' in Site Settings.",
+  "ipfs.diag.fix.cors": "If it still fails, run this command to fix the API CORS policy:",
+  "ipfs.diag.fix.daemon": "First, ensure your IPFS daemon is running in a terminal:",
+  "ipfs.diag.fix.title": "To fix, run this in your terminal (then restart the daemon):",
+  "ipfs.diag.liveness.name": "API Liveness Check",
+  "ipfs.diag.run": "Run Diagnostics",
+  "ipfs.diag.title": "IPFS Node Diagnostics",
   "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",
   "menu.open": "Open menu",
   "newTab.category": "Category",
   "newTab.view.grid": "Grid View",
+  "newTab.view.group": "View Group",
   "newTab.view.list": "List View",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
@@ -10919,7 +10964,6 @@ export default {
   "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
   "rightPane.theme": "Theme",
   "settings.back": "Back",
-  "settings.debug.gateways.title": "IPFS Gateways (active order)",
   "settings.dev.assets.baseUrl": "Assets base URL",
   "settings.dev.assets.configUrl": "Config URL",
   "settings.dev.assets.configUrl.computed": "Computed URL",
@@ -10952,29 +10996,20 @@ export default {
   "settings.developer.showKeys": "Show API Keys",
   "settings.developer.title": "Developer Settings",
   "settings.ipfs.localDisabled": "Local IPFS disabled",
-  "settings.localIpfs.apiUrl.help": "We will call",
   "settings.localIpfs.apiUrl.label": "Local IPFS API URL",
   "settings.localIpfs.disable": "Disable",
   "settings.localIpfs.enableCheckbox": "Use local IPFS node",
   "settings.localIpfs.gateway.label": "Gateway",
-  "settings.localIpfs.help.api.tip": "Tip: keep this strict in dev; avoid \"*\" for production setups.",
-  "settings.localIpfs.help.api.title": "1) Allow your app origin on the API (required)",
-  "settings.localIpfs.help.gateway.note": "Only needed if the app loads files straight from the local gateway origin.",
-  "settings.localIpfs.help.gateway.title": "2) (Optional) Allow your app on the Gateway (for direct asset fetches)",
-  "settings.localIpfs.help.intro": "Your browser must be allowed to call the local IPFS API endpoints",
-  "settings.localIpfs.help.proxy.note": "Then set “Local IPFS API URL” to and click “Test & enable”.",
-  "settings.localIpfs.help.proxy.text": "Proxy the API through Vite so it’s same-origin:",
-  "settings.localIpfs.help.proxy.title": "Alternative for dev (no IPFS config changes)",
-  "settings.localIpfs.help.restart.title": "3) Restart the daemon",
-  "settings.localIpfs.help.toggle.hide": "Hide help",
-  "settings.localIpfs.help.toggle.show": "How to enable Local IPFS (CORS)",
-  "settings.localIpfs.help.verify.note": "The gateway is usually",
-  "settings.localIpfs.help.verify.title": "4) Verify",
   "settings.localIpfs.status.label": "Status",
   "settings.localIpfs.testEnable": "Test & enable",
   "settings.localIpfs.title": "Local IPFS",
   "settings.title": "Settings",
   "tabs.aria": "Section tabs",
+  "tabs.title.actual": "Actual",
+  "tabs.title.comments": "Comments",
+  "tabs.title.for-you": "For You",
+  "tabs.title.leaders": "Leaders",
+  "tabs.title.new": "New",
   "ui.mode.dark": "Dark mode",
   "ui.mode.light": "Light mode",
   "ui.toTop": "Back to Top",
@@ -10982,35 +11017,7 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network",
-    "error.connection.title": "Connection Failed",
-  "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
-  "error.connection.retry": "Refresh Page",
-    "ipfs.diag.title": "IPFS Node Diagnostics",
-  "ipfs.diag.run": "Run Diagnostics",
-  "ipfs.diag.liveness.name": "API Liveness Check",
-  "ipfs.diag.liveness.ok": "Successfully connected to IPFS API at {url}.",
-  "ipfs.diag.liveness.error": "Failed to connect to the IPFS API at {url}. This usually means the IPFS daemon is not running, or there is a CORS issue.",
-  "ipfs.diag.config.name": "Fetch Configuration",
-  "ipfs.diag.config.ok": "Successfully retrieved IPFS configuration.",
-  "ipfs.diag.config.error": "Could not fetch config. This is a CORS issue on your IPFS API.",
-  "ipfs.diag.cors.name": "Gateway CORS Check",
-  "ipfs.diag.cors.ok": "CORS origin '{origin}' is correctly configured.",
-  "ipfs.diag.cors.error": "CORS origin '{origin}' is missing from the Gateway config.",
-  "ipfs.diag.fetch.name": "Live Gateway Fetch",
-  "ipfs.diag.fetch.ok": "Successfully fetched test CID from {url}. Setup is complete!",
-  "ipfs.diag.fetch.errorFirewall": "Final test failed. Error: {error}. This could be a firewall issue on port 8080.",
-  "ipfs.diag.fetch.warnSkipped": "Skipped: ABI CID not found in /info response.",
-  "ipfs.diag.fix.title": "To fix, run this in your terminal (then restart the daemon):",
-  "ipfs.diag.fix.daemon": "First, ensure your IPFS daemon is running in a terminal:",
-  "ipfs.diag.fix.browser": "If it's running, check your browser. For Brave, disable Shields for this site. For other browsers like Chrome, you may need to 'Allow Insecure content' in Site Settings.",
-  "ipfs.diag.fix.cors": "If it still fails, run this command to fix the API CORS policy:",
-    "tabs.title.leaders": "Leaders",
-  "tabs.title.actual": "Actual",
-  "tabs.title.comments": "Comments",
-  "tabs.title.new": "New",
-  "tabs.title.for-you": "For You",
-
+  "wallet.onRequiredNetwork": "On required network"
 };
 </file>
 

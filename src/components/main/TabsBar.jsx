@@ -97,6 +97,12 @@ export default function TabsBar() {
 
   const items = createMemo(() =>
     (tabsRaw() || []).map((tab) => {
+      // Following comments are used by the auto translator. Do not remove these comments
+      // t("tabs.title.leaders")
+      // t("tabs.title.actual")
+      // t("tabs.title.comments")
+      // t("tabs.title.new")
+      // t("tabs.title.for-you")
       const label = t("tabs.title." + tab.type) || t("main.tabs.untitled");
       const explicit = iconFromSpec(tab.icon);
       const auto = iconForType(tab.type || tab.id);
