@@ -1,3 +1,4 @@
+// src/components/ui/toast.js
 import { createSignal } from "solid-js";
 
 export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
@@ -8,7 +9,9 @@ export function pushToast({ type = "info", message = "", details = null, autohid
   const id = ++counter;
   const item = { id, type, message: String(message || ""), details, expanded: false };
   setToasts((curr) => [...curr, item]);
-  if (autohideMs > 0 && type !== "error") {
+
+  // MODIFICATION: Removed '&& type !== "error"' to allow the timer to apply to all toast types.
+  if (autohideMs > 0) {
     setTimeout(() => dismissToast(id), autohideMs);
   }
   return id;
@@ -41,16 +44,17 @@ export function errorDetails(err, extra = {}) {
       status: err.cause.status,
     } : undefined,
   };
-  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
+  
   if (Array.isArray(err.causes)) {
     base.causes = err.causes.map((e) => ({
       name: e?.name,
       message: e?.message,
       code: e?.code,
       status: e?.status,
+      url: e?.url 
     }));
   }
-  // Merge caller-provided context (like URL, gateway, endpoint)
+  
   return { ...base, ...extra };
 }
 
@@ -60,6 +64,7 @@ export function pushErrorToast(err, context = {}) {
     type: "error",
     message: err?.message || "Unexpected error",
     details: errorDetails(err, context),
-    autohideMs: 0, // errors stay until closed
+    // MODIFICATION: Changed from 0 to 60000ms (1 minute).
+    autohideMs: 60000,
   });
 }

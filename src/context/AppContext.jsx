@@ -18,14 +18,14 @@ const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").tr
 
 // ---------- context ----------
 const AppContext = Solid.createContext();
-const OVERRIDE_KEY = "connect_override_v1";
-const IPFS_LOCAL_KEY = "ipfs_local_enabled_v1";
-const IPFS_LOCAL_API_KEY = "ipfs_local_api_v1";
-const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway_v1";
+const OVERRIDE_KEY = "connect_override";
+const IPFS_LOCAL_KEY = "ipfs_local_enabled";
+const IPFS_LOCAL_API_KEY = "ipfs_local_api";
+const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway";
 const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
 
 // domain assets env persistence key
-const ASSETS_ENV_KEY = "domain_assets_env_v1"; // "prod" | "test"
+const ASSETS_ENV_KEY = "domain_assets_env"; // "prod" | "test"
 
 function pickPersistable(cfg) {
   if (!cfg) return null;
