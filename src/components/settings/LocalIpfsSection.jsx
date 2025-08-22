@@ -13,7 +13,6 @@ export default function LocalIpfsSection() {
   const [diagRunning, setDiagRunning] = createSignal(false);
   const [diagResults, setDiagResults] = createSignal(null);
 
-  // --- Start of New Intelligent Diagnostics Logic ---
   async function runDiagnostics() {
     setDiagRunning(true);
     setDiagResults(null);
@@ -23,8 +22,10 @@ export default function LocalIpfsSection() {
     const currentOrigin = window.location.origin;
     const originsList = [...new Set([currentOrigin, 'http://localhost:5173', 'http://127.0.0.1:5173'])];
     const originsJson = JSON.stringify(originsList);
+    
+    // --- Start of Modified Diagnostics Logic ---
 
-    // 1. Check API Connectivity
+    // 1. Check API Connectivity and fetch config in one step
     let config = null;
     try {
       const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
@@ -32,12 +33,21 @@ export default function LocalIpfsSection() {
       config = await res.json();
       results.push({ name: "API Connection", status: "ok", details: `Successfully connected to API at ${localApi}` });
     } catch (err) {
-      results.push({ name: "API Connection", status: "error", details: err.toString() });
+      // If the initial connection fails, provide a helpful error with the fix.
+      const fixCommand = `ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
+      results.push({
+        name: "API Connection",
+        status: "error",
+        details: `Failed to connect to the local IPFS API at ${localApi}. This is usually a CORS issue. Your browser blocks the request for security reasons.`,
+        fixCommand: fixCommand
+      });
       setDiagResults(results);
       setDiagRunning(false);
-      return; // Stop if we can't even connect to the API
+      return; // Stop diagnostics here, as other checks will also fail.
     }
 
+    // If API connection was successful, proceed with other checks.
+    
     // 2. Check Gateway CORS Origin
     const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
     if (originsList.every(o => gatewayOrigins.includes(o)) || gatewayOrigins.includes("*")) {
@@ -46,25 +56,12 @@ export default function LocalIpfsSection() {
       results.push({
         name: "Gateway CORS Origin",
         status: "error",
-        details: `CORS origin '${currentOrigin}' is not configured.`,
+        details: `CORS origin '${currentOrigin}' is not configured for the Gateway.`,
         fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
       });
     }
     
-    // 3. Check Gateway CORS Methods
-    const gatewayMethods = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Methods"] || [];
-    if (gatewayMethods.includes("GET")) {
-        results.push({ name: "Gateway CORS Methods", status: "ok", details: "CORS methods are correctly configured." });
-    } else {
-        results.push({
-            name: "Gateway CORS Methods",
-            status: "error",
-            details: "Required 'GET' method not found in CORS config.",
-            fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Methods '["GET", "HEAD", "OPTIONS"]'`
-        });
-    }
-
-    // 4. Check Gateway Fetch
+    // 3. Check Gateway Live Fetch
     const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
     if (testCID) {
       try {
@@ -82,7 +79,8 @@ export default function LocalIpfsSection() {
     setDiagResults(results);
     setDiagRunning(false);
   }
-  // --- End of New Intelligent Diagnostics Logic ---
+  // --- End of Modified Diagnostics Logic ---
+
 
   async function onEnableLocal() {
     setTesting(true);
