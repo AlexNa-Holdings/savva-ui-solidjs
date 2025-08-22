@@ -31,7 +31,7 @@ export default function RightPane({ isOpen, onClose }) {
               <Show when={app.config()?.gear}>
                 <li>
                   <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                     role="button" tabIndex={0}
                     onClick={() => setShowSwitch(true)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
@@ -39,34 +39,34 @@ export default function RightPane({ isOpen, onClose }) {
                     {t("rightPane.switch.open")}
                   </div>
                 </li>
-
-                {/* DevDocs (before Settings) */}
-                <li>
-                  <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => { navigate("/docs"); onClose(); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
-                    aria-label={t("docs.nav")}
-                    title={t("docs.nav")}
-                  >
-                    {t("docs.nav")}
-                  </div>
-                </li>
-
-
-
-                <li>
-                  <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => { navigate("/settings"); onClose(); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
-                  >
-                    {t("rightPane.settings")}
-                  </div>
-                </li>
               </Show>
+
+              <li>
+                <div
+                  class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => { navigate("/docs"); onClose(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+
+
+              <li>
+                <div
+                  class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => { navigate("/settings"); onClose(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+
             </ul>
           </nav>
 

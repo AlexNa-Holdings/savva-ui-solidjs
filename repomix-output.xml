@@ -124,6 +124,7 @@ src/
       Container.jsx
       TwoColumn.jsx
     main/
+      ConnectionError.jsx
       MainView.jsx
       TabsBar.jsx
     settings/
@@ -145,7 +146,9 @@ src/
       icons/
         TabIcons.jsx
       BrandLogo.jsx
+      IpfsImage.jsx
       LangSelector.jsx
+      Spinner.jsx
       Tabs.jsx
       ThemeToggle.jsx
       toast.js
@@ -4540,88 +4543,6 @@ export default function DocsIndex(props) {
 }
 </file>
 
-<file path="src/components/feed/ContentFeed.jsx">
-// src/components/feed/ContentFeed.jsx
-import { createSignal, onCleanup, onMount, For, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-const DEFAULT_PAGE_SIZE = 12;
-
-export default function ContentFeed(props) {
-  const { t } = useApp();
-  const mode = () => (props.mode === "grid" ? "grid" : "list");
-
-  const [items, setItems] = createSignal([]);
-  const [page, setPage] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
-
-  let sentinel;
-
-  async function loadMore() {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-    try {
-      const nextPage = page() + 1;
-      const chunk =
-        (await props.fetchPage?.(nextPage, props.pageSize || DEFAULT_PAGE_SIZE)) ??
-        Array.from({ length: props.pageSize || DEFAULT_PAGE_SIZE }, (_, i) => ({
-          id: `mock_${nextPage}_${i}`,
-          text: `Test content item #${nextPage}-${i}: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque non turpis sed est malesuada tempus.`
-        }));
-      if (!chunk.length) setHasMore(false);
-      setItems((prev) => prev.concat(chunk));
-      setPage(nextPage);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(() => {
-    loadMore();
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && loadMore()),
-      { rootMargin: "600px 0px 600px 0px" }
-    );
-    if (sentinel) io.observe(sentinel);
-    onCleanup(() => io.disconnect());
-  });
-
-  return (
-    <div class="w-full">
-      <div
-        class={
-          mode() === "grid"
-            ? "grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-            : "flex flex-col gap-3"
-        }
-      >
-        <For each={items()}>
-          {(it) => (
-            <article class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-3">
-              <h4 class="font-semibold mb-2">Post {it.id}</h4>
-              <p class="text-sm leading-snug">
-                {it.text ||
-                  "This is placeholder post content. Scroll down to trigger infinite loading and see more items appear."}
-              </p>
-              <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                — Posted just now
-              </div>
-            </article>
-          )}
-        </For>
-      </div>
-
-      <div ref={(el) => (sentinel = el)} class="h-10" />
-
-      <Show when={loading()}>
-        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))]">{t("common.loading")}</div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/layout/Container.jsx">
 // src/components/layout/Container.jsx
 export default function Container(props) {
@@ -4637,6 +4558,42 @@ export default function TwoColumn(props) {
     <div class="sv-content-grid">
       <section class="sv-main">{props.children}</section>
       {props.aside && <aside class="sv-aside">{props.aside}</aside>}
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/main/ConnectionError.jsx">
+// src/components/main/ConnectionError.jsx
+import { Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function ConnectionError(props) {
+  const { t } = useApp();
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  return (
+    <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))] p-4">
+      <div class="w-full max-w-md p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] text-center shadow-lg">
+        <h2 class="text-xl font-semibold mb-3">{t("error.connection.title")}</h2>
+        <p class="mb-4 text-[hsl(var(--muted-foreground))]">
+          {t("error.connection.message")}
+        </p>
+        <Show when={props.error}>
+          <pre class="mb-4 p-2 text-xs text-left bg-[hsl(var(--muted))] rounded overflow-x-auto">
+            {props.error.message || props.error.toString()}
+          </pre>
+        </Show>
+        <button
+          class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+          onClick={handleRetry}
+        >
+          {t("error.connection.retry")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -4886,6 +4843,77 @@ export function tabIconFor(type) {
 }
 </file>
 
+<file path="src/components/ui/IpfsImage.jsx">
+// src/components/ui/IpfsImage.jsx
+
+import { createSignal, createEffect, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { ipfs } from "../../ipfs/index.js";
+import { pushErrorToast } from "./toast.js";
+import Spinner from "./Spinner.jsx";
+
+export default function IpfsImage(props) {
+  const app = useApp();
+  const [imageUrl, setImageUrl] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+  const [error, setError] = createSignal(false);
+
+  createEffect(async () => {
+    setLoading(true);
+    setError(false);
+    setImageUrl(null);
+
+    const gateways = app.activeIpfsGateways();
+    if (!props.src || gateways.length === 0) {
+      console.warn("[IpfsImage] Aborting: No src or no gateways available.", { src: props.src, gateways });
+      setError(true);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { url } = await ipfs.fetchBest(app, props.src);
+      setImageUrl(url);
+    } catch (e) {
+      // --- MODIFICATION START ---
+      // Removed the `if` condition to ensure the toast appears for ALL failures.
+      pushErrorToast(e, {
+        context: "IPFS image failed to load.", // Made the message more general
+        cid: props.src,
+      });
+      // --- MODIFICATION END ---
+      
+      console.error(`[IpfsImage] All gateways failed for ${props.src}:`, e.causes || e);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  return (
+    <div class={`relative w-full h-full ${props.class || ""}`}>
+      <Show when={loading()}>
+        <div class="absolute inset-0 flex items-center justify-center bg-[hsl(var(--muted))]">
+          <Spinner />
+        </div>
+      </Show>
+      <Show when={!loading() && imageUrl()}>
+        <img
+          src={imageUrl()}
+          alt={props.alt || "IPFS Image"}
+          class="w-full h-full object-cover"
+        />
+      </Show>
+      <Show when={!loading() && error()}>
+        <div class="absolute inset-0 flex items-center justify-center bg-[hsl(var(--muted))]">
+          {/* Error icon can go here */}
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/LangSelector.jsx">
 // src/components/ui/LangPillSelector.jsx
 import { createMemo, For } from "solid-js";
@@ -4928,6 +4956,35 @@ export default function LangPillSelector(props) {
         }}
       </For>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/Spinner.jsx">
+// src/components/ui/Spinner.jsx
+
+export default function Spinner(props) {
+  return (
+    <svg
+      class={`animate-spin ${props.class || "h-5 w-5 text-[hsl(var(--foreground))]"}`}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        class="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        stroke-width="4"
+      />
+      <path
+        class="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
   );
 }
 </file>
@@ -4983,74 +5040,6 @@ export default function ThemeIconToggle(props) {
       </button>
     </div>
   );
-}
-</file>
-
-<file path="src/components/ui/toast.js">
-import { createSignal } from "solid-js";
-
-export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
-
-let counter = 0;
-
-export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
-  const id = ++counter;
-  const item = { id, type, message: String(message || ""), details, expanded: false };
-  setToasts((curr) => [...curr, item]);
-  if (autohideMs > 0 && type !== "error") {
-    setTimeout(() => dismissToast(id), autohideMs);
-  }
-  return id;
-}
-
-export function dismissToast(id) {
-  setToasts((curr) => curr.filter((t) => t.id !== id));
-}
-
-export function toggleToast(id) {
-  setToasts((curr) =>
-    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
-  );
-}
-
-/** Convenience: turn any Error (or unknown) into a compact, useful details object */
-export function errorDetails(err, extra = {}) {
-  if (!err) return extra || {};
-  const base = {
-    name: err.name,
-    message: err.message,
-    code: err.code,
-    type: err.type,
-    status: err.status,
-    stack: err.stack,
-    cause: err.cause && typeof err.cause === "object" ? {
-      name: err.cause.name,
-      message: err.cause.message,
-      code: err.cause.code,
-      status: err.cause.status,
-    } : undefined,
-  };
-  // Some of our code throws {causes: Error[]} arrays (e.g., IPFS gateway fallbacks)
-  if (Array.isArray(err.causes)) {
-    base.causes = err.causes.map((e) => ({
-      name: e?.name,
-      message: e?.message,
-      code: e?.code,
-      status: e?.status,
-    }));
-  }
-  // Merge caller-provided context (like URL, gateway, endpoint)
-  return { ...base, ...extra };
-}
-
-/** push an error toast with extracted details */
-export function pushErrorToast(err, context = {}) {
-  return pushToast({
-    type: "error",
-    message: err?.message || "Unexpected error",
-    details: errorDetails(err, context),
-    autohideMs: 0, // errors stay until closed
-  });
 }
 </file>
 
@@ -5179,110 +5168,6 @@ export default function ToTopButton(props) {
     </Show>
   );
 }
-</file>
-
-<file path="src/components/ui/ViewModeToggle.jsx">
-// src/components/ui/ViewModeToggle.jsx
-import { createSignal } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-// ── Global view mode (list|grid), persisted ───────────────────────────────────
-const VIEW_KEY = "content_list_view_mode"; // match your simple style like `lang`, `theme`
-
-function readInitial() {
-  let initial = "grid"; // default = grid
-  try {
-    const v = localStorage.getItem(VIEW_KEY);
-    if (v === "list" || v === "grid") initial = v;
-    else localStorage.setItem(VIEW_KEY, initial); // write default once so key appears
-  } catch {}
-  return initial;
-}
-
-const [viewMode, setViewModeSignal] = createSignal(readInitial());
-
-function setViewMode(next) {
-  const v = next === "list" ? "list" : "grid";
-  setViewModeSignal(v);
-  try { localStorage.setItem(VIEW_KEY, v); } catch {}
-}
-
-// cross‑tab sync
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (e) => {
-    if (e.key === VIEW_KEY && (e.newValue === "list" || e.newValue === "grid")) {
-      setViewModeSignal(e.newValue);
-    }
-  });
-}
-
-// ── Provided SVGs (paths untouched), just color/size inherit ──────────────────
-function ListIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-         width={props.size || "1.25em"} height={props.size || "1.25em"}
-         fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" class={props.class}>
-      <path d="M8 6L21 6.00078M8 12L21 12.0008M8 18L21 18.0007M3 6.5H4V5.5H3V6.5ZM3 12.5H4V11.5H3V12.5ZM3 18.5H4V17.5H3V18.5Z" />
-    </svg>
-  );
-}
-function GridIcon(props) {
-  return (
-    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"
-         width={props.size || "1.25em"} height={props.size || "1.25em"}
-         fill="currentColor" class={props.class}>
-      <path fill-rule="evenodd" clip-rule="evenodd"
-            d="M7 1H1V7H7V1ZM7 9H1V15H7V9ZM9 1H15V7H9V1ZM15 9H9V15H15V9Z" />
-    </svg>
-  );
-}
-
-/**
- * Compact toggle for list/grid view mode.
- * If value/onChange are not provided, uses the global viewMode above.
- */
-export default function ViewModeToggle(props) {
-  const { t } = useApp();
-  const controlled = typeof props.value !== "undefined" && typeof props.onChange === "function";
-
-  const current = () => (controlled ? (props.value === "list" ? "list" : "grid") : viewMode());
-  const change = (next) => (controlled ? props.onChange(next) : setViewMode(next));
-
-  const size = props.size === "sm" ? { box: "h-8 w-8", icon: "w-4 h-4" } : { box: "h-9 w-9", icon: "w-5 h-5" };
-  const btnCls = (active) =>
-    `inline-flex items-center justify-center ${size.box} rounded-md border transition-colors ` +
-    (active
-      ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] border-[hsl(var(--primary))]"
-      : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]");
-
-  return (
-    <div class={`inline-flex items-center gap-2 ${props.class || ""}`} role="group" aria-label={t("newTab.view.group")}>
-      <button
-        type="button"
-        class={btnCls(current() === "list")}
-        onClick={() => change("list")}
-        aria-pressed={current() === "list" ? "true" : "false"}
-        aria-label={t("newTab.view.list")}
-        title={t("newTab.view.list")}
-      >
-        <ListIcon class={size.icon} />
-      </button>
-      <button
-        type="button"
-        class={btnCls(current() === "grid")}
-        onClick={() => change("grid")}
-        aria-pressed={current() === "grid" ? "true" : "false"}
-        aria-label={t("newTab.view.grid")}
-        title={t("newTab.view.grid")}
-      >
-        <GridIcon class={size.icon} />
-      </button>
-    </div>
-  );
-}
-
-export { viewMode, setViewMode };
 </file>
 
 <file path="src/components/RightPaneFooter.jsx">
@@ -6803,6 +6688,82 @@ export default function MarkdownView(props) {
 }
 </file>
 
+<file path="src/components/feed/ContentFeed.jsx">
+// src/components/feed/ContentFeed.jsx
+import { createSignal, onCleanup, onMount, For, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+
+export default function ContentFeed(props) {
+  const { t } = useApp();
+  const mode = () => (props.mode === "grid" ? "grid" : "list");
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+  let sentinel;
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    try {
+      const nextPage = page() + 1;
+      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
+      if (!chunk.length) setHasMore(false);
+      setItems((prev) => prev.concat(chunk));
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(() => {
+    loadMore();
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && loadMore()),
+      { rootMargin: "600px 0px 600px 0px" }
+    );
+    if (sentinel) io.observe(sentinel);
+    onCleanup(() => io.disconnect());
+  });
+
+  return (
+    <div class="w-full">
+      <div class={mode() === "grid" ? "grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "flex flex-col gap-3"}>
+        <For each={items()}>
+          {(it) => {
+            // MODIFICATION: Use `thumbnail` first, then fall back to `author.avatar`.
+            // The `?.` (optional chaining) safely handles cases where `author` might be missing.
+            const imageCid = () => it._raw?.thumbnail || it._raw?.author?.avatar;
+            
+            return (
+              <article class="flex flex-col rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+                <Show when={imageCid()}>
+                  <div class="aspect-video w-full overflow-hidden rounded-t-lg border-b border-[hsl(var(--border))]">
+                    <IpfsImage src={imageCid()} />
+                  </div>
+                </Show>
+                <div class="p-3 flex-1 flex flex-col">
+                  <h4 class="font-semibold mb-2">Post {it.id}</h4>
+                  <p class="text-sm leading-snug">{it.text || "Placeholder text..."}</p>
+                  <div class="mt-auto pt-2 text-xs text-[hsl(var(--muted-foreground))]">
+                    — Posted just now
+                  </div>
+                </div>
+              </article>
+            );
+          }}
+        </For>
+      </div>
+      <div ref={(el) => (sentinel = el)} class="h-10" />
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))]">{t("common.loading")}</div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/main/MainView.jsx">
 // src/components/main/MainView.jsx
 import { createMemo, Show } from "solid-js";
@@ -7137,6 +7098,183 @@ export default function RightRailLayout(props) {
 }
 </file>
 
+<file path="src/components/ui/toast.js">
+// src/components/ui/toast.js
+import { createSignal } from "solid-js";
+
+export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
+
+let counter = 0;
+
+export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
+  const id = ++counter;
+  const item = { id, type, message: String(message || ""), details, expanded: false };
+  setToasts((curr) => [...curr, item]);
+
+  // MODIFICATION: Removed '&& type !== "error"' to allow the timer to apply to all toast types.
+  if (autohideMs > 0) {
+    setTimeout(() => dismissToast(id), autohideMs);
+  }
+  return id;
+}
+
+export function dismissToast(id) {
+  setToasts((curr) => curr.filter((t) => t.id !== id));
+}
+
+export function toggleToast(id) {
+  setToasts((curr) =>
+    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
+  );
+}
+
+/** Convenience: turn any Error (or unknown) into a compact, useful details object */
+export function errorDetails(err, extra = {}) {
+  if (!err) return extra || {};
+  const base = {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    type: err.type,
+    status: err.status,
+    stack: err.stack,
+    cause: err.cause && typeof err.cause === "object" ? {
+      name: err.cause.name,
+      message: err.cause.message,
+      code: err.cause.code,
+      status: err.cause.status,
+    } : undefined,
+  };
+  
+  if (Array.isArray(err.causes)) {
+    base.causes = err.causes.map((e) => ({
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+      url: e?.url 
+    }));
+  }
+  
+  return { ...base, ...extra };
+}
+
+/** push an error toast with extracted details */
+export function pushErrorToast(err, context = {}) {
+  return pushToast({
+    type: "error",
+    message: err?.message || "Unexpected error",
+    details: errorDetails(err, context),
+    // MODIFICATION: Changed from 0 to 60000ms (1 minute).
+    autohideMs: 60000,
+  });
+}
+</file>
+
+<file path="src/components/ui/ViewModeToggle.jsx">
+// src/components/ui/ViewModeToggle.jsx
+import { createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+// ── Global view mode (list|grid), persisted ───────────────────────────────────
+const VIEW_KEY = "content_list_view_mode"; // match your simple style like `lang`, `theme`
+
+function readInitial() {
+  let initial = "grid"; // default = grid
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    if (v === "list" || v === "grid") initial = v;
+    else localStorage.setItem(VIEW_KEY, initial); // write default once so key appears
+  } catch {}
+  return initial;
+}
+
+const [viewMode, setViewModeSignal] = createSignal(readInitial());
+
+function setViewMode(next) {
+  const v = next === "list" ? "list" : "grid";
+  setViewModeSignal(v);
+  try { localStorage.setItem(VIEW_KEY, v); } catch {}
+}
+
+// cross‑tab sync
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key === VIEW_KEY && (e.newValue === "list" || e.newValue === "grid")) {
+      setViewModeSignal(e.newValue);
+    }
+  });
+}
+
+// ── Provided SVGs (paths untouched), just color/size inherit ──────────────────
+function ListIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+         width={props.size || "1.25em"} height={props.size || "1.25em"}
+         fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" class={props.class}>
+      <path d="M8 6L21 6.00078M8 12L21 12.0008M8 18L21 18.0007M3 6.5H4V5.5H3V6.5ZM3 12.5H4V11.5H3V12.5ZM3 18.5H4V17.5H3V18.5Z" />
+    </svg>
+  );
+}
+function GridIcon(props) {
+  return (
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"
+         width={props.size || "1.25em"} height={props.size || "1.25em"}
+         fill="currentColor" class={props.class}>
+      <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M7 1H1V7H7V1ZM7 9H1V15H7V9ZM9 1H15V7H9V1ZM15 9H9V15H15V9Z" />
+    </svg>
+  );
+}
+
+/**
+ * Compact toggle for list/grid view mode.
+ * If value/onChange are not provided, uses the global viewMode above.
+ */
+export default function ViewModeToggle(props) {
+  const { t } = useApp();
+  const controlled = typeof props.value !== "undefined" && typeof props.onChange === "function";
+
+  const current = () => (controlled ? (props.value === "list" ? "list" : "grid") : viewMode());
+  const change = (next) => (controlled ? props.onChange(next) : setViewMode(next));
+
+  const size = props.size === "sm" ? { box: "h-8 w-8", icon: "w-4 h-4" } : { box: "h-9 w-9", icon: "w-5 h-5" };
+  const btnCls = (active) =>
+    `inline-flex items-center justify-center ${size.box} rounded-md border transition-colors ` +
+    (active
+      ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] border-[hsl(var(--primary))]"
+      : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]");
+
+  return (
+    <div class={`inline-flex items-center gap-2 ${props.class || ""}`} role="group" aria-label={t("newTab.view.group")}>
+      <button
+        type="button"
+        class={btnCls(current() === "list")}
+        onClick={() => change("list")}
+        aria-pressed={current() === "list" ? "true" : "false"}
+        aria-label={t("newTab.view.list")}
+        title={t("newTab.view.list")}
+      >
+        <ListIcon class={size.icon} />
+      </button>
+      <button
+        type="button"
+        class={btnCls(current() === "grid")}
+        onClick={() => change("grid")}
+        aria-pressed={current() === "grid" ? "true" : "false"}
+        aria-label={t("newTab.view.grid")}
+        title={t("newTab.view.grid")}
+      >
+        <GridIcon class={size.icon} />
+      </button>
+    </div>
+  );
+}
+
+export { viewMode, setViewMode };
+</file>
+
 <file path="src/dev/AssetDebugTap.jsx">
 // src/dev/AssetDebugTap.jsx
 /* src/dev/AssetDebugTap.jsx */
@@ -7275,125 +7413,6 @@ export function useConnect() {
 
   return { config, info, error, loading };
 }
-</file>
-
-<file path="src/ipfs/index.js">
-// Minimal IPFS client with gateway fallback.
-// Usage:
-//   import { ipfs } from "../ipfs";
-//   const res = await ipfs.fetch("Qm.../file.json", { gateways: myGateways });
-//   const json = await ipfs.getJSON("ipfs://Qm.../file.json", { gateways: myGateways });
-
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
-
-function normalizeInput(input) {
-  // Accepts: "ipfs://CID/path", "/ipfs/CID/path", "CID[/path]"
-  let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
-  return s; // "CID[/path]"
-}
-
-function buildUrl(baseGateway, cidPath) {
-  const base = normalizeGatewayBase(baseGateway).replace(/\/+$/g, "");
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? base + "/" : base + "/ipfs/";
-  return prefix + cidPath.replace(/^\/+/g, "");
-}
-
-
-async function fetchWithTimeout(url, { timeoutMs, signal, ...init }) {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(new DOMException("Timeout", "TimeoutError")), timeoutMs);
-  const compositeSignal = signal
-    ? new AbortController()
-    : null;
-
-  // If a signal was provided, abort our controller when it aborts.
-  if (signal && compositeSignal) {
-    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  }
-
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(tid);
-  }
-}
-
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) return { res, url, gateway: gw };
-      // Treat non-2xx as failure and continue
-      errors.push(new Error(`Gateway ${gw} -> HTTP ${res.status}`));
-    } catch (e) {
-      errors.push(new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`));
-    }
-  }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  throw err;
-}
-
-async function fetchIpfs(input, opts = {}) {
-  const {
-    gateways = [],
-    timeoutMs = 8000,
-    signal,
-    cache = "default",
-    headers,
-    method = "GET",
-  } = opts;
-
-  if (!gateways || gateways.length === 0) {
-    throw new Error("ipfs.fetch: no gateways provided");
-  }
-  const cidPath = normalizeInput(input);
-  const { res, url, gateway } = await tryGateways(cidPath, gateways, {
-    timeoutMs,
-    init: { method, headers, cache, signal }
-  });
-  return { response: res, url, gateway };
-}
-
-async function getJSON(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
-  return { data: await response.json(), url, gateway };
-}
-
-async function getText(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.text(), url, gateway };
-}
-
-async function getBlob(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.blob(), url, gateway };
-}
-
-async function getArrayBuffer(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.arrayBuffer(), url, gateway };
-}
-
-export const ipfs = {
-  fetch: fetchIpfs,
-  getJSON,
-  getText,
-  getBlob,
-  getArrayBuffer,
-  // Utils you may want in other places:
-  normalizeInput,
-  buildUrl,
-};
 </file>
 
 <file path="src/net/endpoints.js">
@@ -7733,44 +7752,6 @@ export default class WsClient {
 }
 </file>
 
-<file path="src/net/WsConnector.jsx">
-// File: src/net/WsConnector.jsx
-import { onMount } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
-import { wsUrl } from "./endpoints";
-
-let _mounted = false;
-
-export default function WsConnector() {
-  if (_mounted) return null;
-  _mounted = true;
-
-  const app = useApp();
-
-  // Expose helpers from the singleton runtime
-  const ws = getWsClient();
-  const api = getWsApi();
-
-  app.ws = ws;
-  app.wsUrl = wsUrl;                 // zero-arg getter
-  app.wsStatus = () => ws.status();
-  app.wsConnected = () => ws.status() === "open";
-  app.wsReconnect = (r) => ws.reconnect(r || "manual");
-  app.wsCall = api.call;
-  app.wsMethod = api.method;
-  app.alertBus = { on: onAlert, off: offAlert };
-  app.onAlert = onAlert;
-  app.offAlert = offAlert;
-
-  onMount(() => {
-    ensureWsStarted("connector-mount");
-  });
-
-  return null;
-}
-</file>
-
 <file path="src/styles/layout.css">
 /* src/styles/layout.css */
 :root {
@@ -7977,11 +7958,6 @@ export const dbg = {
 export default dbg;
 </file>
 
-<file path="src/version.js">
-// src/version.js
-export const APP_VERSION = "0.4";
-</file>
-
 <file path=".gitignore">
 # Logs
 logs
@@ -8143,199 +8119,6 @@ That’s it! 🎉 You’re ready to start working with the **SAVVA Platform**.
 
 </html>
 ```
-</file>
-
-<file path="src/components/settings/LocalIpfsSection.jsx">
-// src/components/settings/LocalIpfsSection.jsx
-import { createSignal, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-export default function LocalIpfsSection() {
-  const app = useApp(); // exposes t, local IPFS signals, actions
-  const { t } = app;
-
-  const [testing, setTesting] = createSignal(false);
-  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
-  const [showIpfsHelp, setShowIpfsHelp] = createSignal(false);
-
-  async function onEnableLocal() {
-    setTesting(true);
-    try {
-      await app.enableLocalIpfs(apiUrl().trim());
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
-
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={app.localIpfsEnabled()}
-          onInput={(e) => {
-            const checked = e.currentTarget.checked;
-            if (!checked) app.disableLocalIpfs();
-          }}
-        />
-        <span>{t("settings.localIpfs.enableCheckbox")}</span>
-      </label>
-
-      {/* Input + button row (aligned bottoms); hint on its own row */}
-      <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
-        {/* Left: label + input */}
-        <label class="block">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">
-            {t("settings.localIpfs.apiUrl.label")}
-          </span>
-          <input
-            class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={apiUrl()}
-            onInput={(e) => {
-              const val = e.currentTarget.value;
-              setApiUrl(val);
-              app.setLocalIpfsApiUrl?.(val);
-            }}
-            placeholder="http://localhost:5001"
-            spellcheck={false}
-          />
-        </label>
-
-        {/* Right: action button, bottom-aligned to the input */}
-        <div class="flex md:self-end">
-          <Show
-            when={!app.localIpfsEnabled()}
-            fallback={
-              <button
-                class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-                onClick={() => app.disableLocalIpfs()}
-              >
-                {t("settings.localIpfs.disable")}
-              </button>
-            }
-          >
-            <button
-              class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onEnableLocal}
-              disabled={testing()}
-              title={t("settings.localIpfs.testEnable")}
-            >
-              {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
-            </button>
-          </Show>
-        </div>
-
-        {/* Hint line */}
-        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 md:col-span-2">
-          {t("settings.localIpfs.apiUrl.help")} <code>/api/v0/config/show</code>.
-        </p>
-      </div>
-
-      {/* Status */}
-      <div class="text-sm text-[hsl(var(--muted-foreground))]">
-        {t("settings.localIpfs.status.label")}:{" "}
-        <span
-          class={
-            app.localIpfsStatus() === "ok"
-              ? "text-[hsl(var(--primary))]"
-              : app.localIpfsStatus() === "down"
-              ? "text-[hsl(var(--destructive))]"
-              : "opacity-70"
-          }
-        >
-          {app.localIpfsStatus()}
-        </span>
-        <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
-          <span class="ml-2 opacity-70">
-            • {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}
-          </span>
-        </Show>
-      </div>
-
-      {/* Help toggle */}
-      <div class="pt-2">
-        <button
-          class="text-sm underline text-[hsl(var(--primary))] hover:opacity-80"
-          onClick={() => setShowIpfsHelp(!showIpfsHelp())}
-        >
-          {showIpfsHelp()
-            ? t("settings.localIpfs.help.toggle.hide")
-            : t("settings.localIpfs.help.toggle.show")}
-        </button>
-      </div>
-
-      <div class="bg-[hsl(var(--muted))] rounded p-3">
-        <h4 class="font-medium mb-2">{t("settings.debug.gateways.title")}</h4>
-        <ul class="list-disc pl-6 text-sm">
-          <For each={app.activeIpfsGateways()}>
-            {(g) => <li>{g}</li>}
-          </For>
-        </ul>
-      </div>
-
-      {/* Collapsible help content */}
-      <Show when={showIpfsHelp()}>
-        <div class="mt-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-3 space-y-3 text-sm">
-          <p class="opacity-90">
-            {t("settings.localIpfs.help.intro")} <code>/api/v0/*</code>
-          </p>
-
-          <div>
-            <p class="font-medium mb-1">{t("settings.localIpfs.help.api.title")}</p>
-            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
-ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["GET","POST","PUT","OPTIONS"]'
-ipfs config --json API.HTTPHeaders.Access-Control-Allow-Headers '["Content-Type","Authorization"]'`}</pre>
-            <p class="opacity-75 mt-1">{t("settings.localIpfs.help.api.tip")}</p>
-          </div>
-
-          <div>
-            <p class="font-medium mb-1">{t("settings.localIpfs.help.gateway.title")}</p>
-            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '["http://localhost:5173","http://127.0.0.1:5173"]'
-ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Methods '["GET","HEAD","OPTIONS"]'`}</pre>
-            <p class="opacity-75 mt-1">{t("settings.localIpfs.help.gateway.note")}</p>
-          </div>
-
-          <div>
-            <p class="font-medium mb-1">{t("settings.localIpfs.help.restart.title")}</p>
-            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`ipfs shutdown 2>/dev/null || true
-ipfs daemon`}</pre>
-          </div>
-
-          <div>
-            <p class="font-medium mb-1">{t("settings.localIpfs.help.verify.title")}</p>
-            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`curl -X POST http://localhost:5001/api/v0/id
-curl -X POST http://localhost:5001/api/v0/config/show | jq -r '.Addresses.Gateway'`}</pre>
-            <p class="opacity-75 mt-1">
-              {t("settings.localIpfs.help.verify.note")} <code>/ip4/127.0.0.1/tcp/8080</code>.
-            </p>
-          </div>
-
-          <div>
-            <p class="font-medium mb-1">{t("settings.localIpfs.help.proxy.title")}</p>
-            <p class="opacity-90">{t("settings.localIpfs.help.proxy.text")}</p>
-            <pre class="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] p-2 rounded overflow-x-auto text-xs">{`// vite.config.js
-export default {
-  server: {
-    proxy: {
-      "/ipfs-api": {
-        target: "http://localhost:5001",
-        changeOrigin: true,
-        rewrite: p => p.replace(/^\\/ipfs-api/, "")
-      }
-    }
-  }
-};`}</pre>
-            <p class="opacity-75 mt-1">
-              {t("settings.localIpfs.help.proxy.note")} <code>http://localhost:5173/ipfs-api</code>.
-            </p>
-          </div>
-        </div>
-      </Show>
-    </section>
-  );
-}
 </file>
 
 <file path="src/components/ui/BrandLogo.jsx">
@@ -8561,6 +8344,222 @@ export function useTheme() {
   useTheme.theme = theme;
 
   return [theme, toggleTheme];
+}
+</file>
+
+<file path="src/ipfs/index.js">
+// src/ipfs/index.js
+import { fetchWithTimeout } from "../utils/net.js";
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+
+function normalizeInput(input) {
+  let s = String(input || "").trim();
+  if (!s) throw new Error("ipfs: empty input");
+  s = stripPrefix(s, "ipfs://");
+  s = stripPrefix(s, "/ipfs/");
+  s = stripPrefix(s, "ipfs/");
+  return s;
+}
+
+// FIXED: This helper function was missing, causing the ReferenceError.
+function normalizeGatewayBase(s) {
+  return String(s || "").trim();
+}
+
+async function fetchIpfs(input, opts = {}) {
+  const { gateways = [], ...rest } = opts;
+  if (!gateways || gateways.length === 0) throw new Error("ipfs.fetch: no gateways provided");
+  const cidPath = normalizeInput(input);
+  const { res, url, gateway } = await tryGateways(cidPath, gateways, { init: rest });
+  return { response: res, url, gateway };
+}
+
+async function getJSON(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
+  return { data: await response.json(), url, gateway };
+}
+
+async function getText(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.text(), url, gateway };
+}
+
+async function getBlob(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.blob(), url, gateway };
+}
+
+async function getArrayBuffer(input, opts) {
+  const { response, url, gateway } = await fetchIpfs(input, opts);
+  return { data: await response.arrayBuffer(), url, gateway };
+}
+
+
+// --- New Smart Fetching Logic ---
+
+async function fetchBest(app, ipfsPath, options = {}) {
+  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
+  const cidPath = normalizeInput(ipfsPath);
+  let gatewaysToTry = [];
+  
+  // -- MODIFICATION START --
+  let effectiveTimeout = timeoutMs; // Default timeout
+
+  // 1. If local IPFS is enabled, use it exclusively with a longer timeout.
+  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+    gatewaysToTry = [app.localIpfsGateway()];
+    effectiveTimeout = 30000; // 30 seconds for local gateway
+  } else {
+    // 2. Otherwise, combine post-specific gateways with system-wide remote gateways.
+    const systemGateways = app.remoteIpfsGateways() || [];
+    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
+  }
+  // -- MODIFICATION END --
+
+  if (gatewaysToTry.length === 0) {
+    throw new Error("No IPFS gateways available to try.");
+  }
+
+  // Use the new effectiveTimeout when calling the helper
+  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
+}
+
+async function getJSONBest(app, ipfsPath, options = {}) {
+  const { response, url, gateway } = await fetchBest(app, ipfsPath, {
+    ...options,
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+  });
+  return { data: await response.json(), url, gateway };
+}
+
+function buildUrl(baseGateway, cidPath) {
+  // This restored logic correctly handles gateways that may or may not include /ipfs
+  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
+  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
+
+  if (!base || !path) return "";
+
+  // Check if the gateway already ends with /ipfs
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
+
+  return prefix + path;
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) return { res, url, gateway: gw };
+
+      // --- MODIFICATION START ---
+      // Create a detailed error object and add the 'url' to it.
+      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
+      httpError.url = url; 
+      errors.push(httpError);
+      // --- MODIFICATION END ---
+
+    } catch (e) {
+      // --- MODIFICATION START ---
+      // Also add the 'url' to network/timeout errors.
+      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
+      networkError.url = url;
+      errors.push(networkError);
+      // --- MODIFICATION END ---
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  throw err;
+}
+
+export const ipfs = {
+  // Original methods
+  fetch: fetchIpfs,
+  getJSON,
+  getText,
+  getBlob,
+  getArrayBuffer,
+  // New, smarter methods
+  fetchBest,
+  getJSONBest,
+  // Exported utils
+  normalizeInput,
+  buildUrl,
+};
+</file>
+
+<file path="src/net/WsConnector.jsx">
+// src/net/WsConnector.jsx
+import { onMount, onCleanup, createSignal } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
+import { wsUrl } from "./endpoints";
+import { pushToast } from "../components/ui/toast.js"; // Import the toast helper
+import { useI18n } from "../i18n/useI18n.js"; // Import i18n for the message
+
+let _mounted = false;
+
+export default function WsConnector() {
+  if (_mounted) return null;
+  _mounted = true;
+
+  const app = useApp();
+  const { t } = useI18n();
+
+  // Expose helpers from the singleton runtime
+  const ws = getWsClient();
+  const api = getWsApi();
+
+  app.ws = ws;
+  app.wsUrl = wsUrl;
+  app.wsStatus = () => ws.status();
+  app.wsConnected = () => ws.status() === "open";
+  app.wsReconnect = (r) => ws.reconnect(r || "manual");
+  app.wsCall = api.call;
+  app.wsMethod = api.method;
+  app.alertBus = { on: onAlert, off: offAlert };
+  app.onAlert = onAlert;
+  app.offAlert = offAlert;
+
+  onMount(() => {
+    ensureWsStarted("connector-mount");
+
+    // This logic prevents the toast from showing on every reconnect attempt.
+    // It only shows if the *initial* connection fails.
+    const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
+
+    const onOpen = () => {
+      setHasConnectedOnce(true);
+    };
+
+    const onClose = () => {
+      if (!hasConnectedOnce()) {
+        pushToast({
+          type: "warning", // A warning is less severe than a hard error
+          message: t("error.ws.title"),
+          details: t("error.ws.message"),
+          autohideMs: 15000, // Show for 15 seconds
+        });
+      }
+    };
+
+    // Attach listeners to the WebSocket client
+    ws.on("open", onOpen);
+    ws.on("close", onClose);
+
+    // Clean up listeners when the component is unmounted
+    onCleanup(() => {
+      ws.off("open", onOpen);
+      ws.off("close", onClose);
+    });
+  });
+
+  return null;
 }
 </file>
 
@@ -8853,108 +8852,194 @@ export default {
 }
 </file>
 
-<file path="src/components/tabs/NewTab.jsx">
-// src/components/tabs/NewTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
+<file path="src/components/settings/LocalIpfsSection.jsx">
+// src/components/settings/LocalIpfsSection.jsx
+import { createSignal, Show, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle from "../ui/ViewModeToggle.jsx";
+import { fetchWithTimeout } from "../../utils/net.js";
 
-/** Load categories from modules/categories.yaml with i18n fallback; refetch on lang change */
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-
-  // Refetch whenever either the relPath OR current lang changes
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    const data = await loadAssetResource(app, rel, { type: "yaml" });
-    const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-    return (Array.isArray(listByLang) ? listByLang : []).map(String);
-  });
-
-  return cats;
-}
-
-export default function NewTab() {
+export default function LocalIpfsSection() {
   const app = useApp();
+  const { t } = app;
 
-  // View mode (no persistence)
-  const [mode, setMode] = createSignal("list");
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
 
-  // Category (no persistence) — string "ALL" or localized category label
-  const [category, setCategory] = createSignal("ALL");
+  const [diagRunning, setDiagRunning] = createSignal(false);
+  const [diagResults, setDiagResults] = createSignal(null);
 
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+  // --- Start of New Intelligent Diagnostics Logic ---
+  async function runDiagnostics() {
+    setDiagRunning(true);
+    setDiagResults(null);
+    const results = [];
+    const localApi = apiUrl().trim().replace(/\/+$/, "");
+    const localGateway = localApi.replace(/:\d+$/, ":8080");
+    const currentOrigin = window.location.origin;
+    const originsList = [...new Set([currentOrigin, 'http://localhost:5173', 'http://127.0.0.1:5173'])];
+    const originsJson = JSON.stringify(originsList);
 
-  // Reset selection to "ALL" whenever the UI language changes
-  createEffect(() => {
-    void app.lang?.(); // track lang
-    setCategory("ALL");
-  });
-
-  // Backend sugar
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
+    // 1. Check API Connectivity
+    let config = null;
     try {
-      if (!contentList) return [];
-      const params = { domain: domainName(), limit, offset };
-      const cat = category();
-      if (cat && cat !== "ALL") params.category = cat; // safe if backend ignores
-      const res = await contentList(params);
+      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
+      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
+      config = await res.json();
+      results.push({ name: "API Connection", status: "ok", details: `Successfully connected to API at ${localApi}` });
+    } catch (err) {
+      results.push({ name: "API Connection", status: "error", details: err.toString() });
+      setDiagResults(results);
+      setDiagRunning(false);
+      return; // Stop if we can't even connect to the API
+    }
 
-      const arr =
-        Array.isArray(res) ? res :
-        Array.isArray(res?.list) ? res.list :
-        Array.isArray(res?.items) ? res.items :
-        Array.isArray(res?.data) ? res.data : [];
+    // 2. Check Gateway CORS Origin
+    const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
+    if (originsList.every(o => gatewayOrigins.includes(o)) || gatewayOrigins.includes("*")) {
+      results.push({ name: "Gateway CORS Origin", status: "ok", details: "CORS origin is correctly configured." });
+    } else {
+      results.push({
+        name: "Gateway CORS Origin",
+        status: "error",
+        details: `CORS origin '${currentOrigin}' is not configured.`,
+        fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
+      });
+    }
+    
+    // 3. Check Gateway CORS Methods
+    const gatewayMethods = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Methods"] || [];
+    if (gatewayMethods.includes("GET")) {
+        results.push({ name: "Gateway CORS Methods", status: "ok", details: "CORS methods are correctly configured." });
+    } else {
+        results.push({
+            name: "Gateway CORS Methods",
+            status: "error",
+            details: "Required 'GET' method not found in CORS config.",
+            fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Methods '["GET", "HEAD", "OPTIONS"]'`
+        });
+    }
 
-      return arr.map((it, i) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id || `content_${page}_${i}`,
-        text: it?.text_preview || it?.textPreview || it?.title || it?.description || it?.summary || "",
-        _raw: it,
-      }));
-    } catch {
-      return [];
+    // 4. Check Gateway Fetch
+    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
+    if (testCID) {
+      try {
+        const testUrl = `${localGateway}/ipfs/${testCID}`;
+        const res = await fetchWithTimeout(testUrl);
+        if (!res.ok) throw new Error(`Gateway responded with status ${res.status}`);
+        results.push({ name: "Gateway Live Fetch", status: "ok", details: `Successfully fetched test CID from ${localGateway}` });
+      } catch (err) {
+        results.push({ name: "Gateway Live Fetch", status: "error", details: err.toString() });
+      }
+    } else {
+      results.push({ name: "Gateway Live Fetch", status: "warn", details: "Skipped: ABI CID not found in /info response." });
+    }
+
+    setDiagResults(results);
+    setDiagRunning(false);
+  }
+  // --- End of New Intelligent Diagnostics Logic ---
+
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      await app.enableLocalIpfs(apiUrl().trim());
+    } finally {
+      setTesting(false);
     }
   }
 
+  const statusColorClass = (status) => {
+    if (status === 'ok') return 'text-emerald-600';
+    if (status === 'error') return 'text-red-600';
+    return 'text-amber-500'; // for 'warn'
+  };
+
   return (
-    <section class="w-full">
-      {/* Compact top controls */}
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle  size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
+
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.localIpfsEnabled()}
+          onInput={(e) => {
+            const checked = e.currentTarget.checked;
+            if (checked) { onEnableLocal(); } else { app.disableLocalIpfs(); }
+          }}
+        />
+        <span>{t("settings.localIpfs.enableCheckbox")}</span>
+      </label>
+
+      <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
+        <label class="block">
+          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
+          <input
+            class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={apiUrl()}
+            onInput={(e) => {
+              const val = e.currentTarget.value;
+              setApiUrl(val);
+              app.setLocalIpfsApiUrl?.(val);
+            }}
+            placeholder="http://localhost:5001"
+            spellcheck={false}
+          />
+        </label>
+        <div class="flex md:self-end">
+          <Show when={!app.localIpfsEnabled()}
+            fallback={ <button class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={() => app.disableLocalIpfs()}>{t("settings.localIpfs.disable")}</button> } >
+            <button class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={onEnableLocal} disabled={testing()} title={t("settings.localIpfs.testEnable")}>
+              {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
+            </button>
           </Show>
         </div>
       </div>
 
-      <ContentFeed mode={mode()} fetchPage={fetchPage} pageSize={12} />
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">
+        {t("settings.localIpfs.status.label")}:{" "}
+        <span class={ app.localIpfsStatus() === "ok" ? "text-[hsl(var(--primary))]" : app.localIpfsStatus() === "down" ? "text-[hsl(var(--destructive))]" : "opacity-70" }>
+          {app.localIpfsStatus()}
+        </span>
+        <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+          <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
+        </Show>
+      </div>
+      
+      <div class="pt-2 border-t border-[hsl(var(--border))]">
+        <div class="flex items-center justify-between">
+            <h4 class="font-medium">IPFS Node Diagnostics</h4>
+            <button
+                class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+                onClick={runDiagnostics}
+                disabled={diagRunning()}
+            >
+                {diagRunning() ? t("common.loading") : "Run Diagnostics"}
+            </button>
+        </div>
+        <Show when={diagResults()}>
+            <div class="mt-2 space-y-2 text-xs">
+                <For each={diagResults()}>
+                    {(result) => (
+                        <div class="p-2 rounded bg-[hsl(var(--muted))]">
+                            <div class="flex items-center">
+                                <span class={`font-bold ${statusColorClass(result.status)}`}>
+                                    {result.status.toUpperCase()}:
+                                </span>
+                                <span class="font-semibold ml-2">{result.name}</span>
+                            </div>
+                            <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
+                            <Show when={result.fixCommand}>
+                                <p class="mt-2 font-medium">To fix, run this in your terminal (then restart the daemon):</p>
+                                <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
+                                    {result.fixCommand}
+                                </pre>
+                            </Show>
+                        </div>
+                    )}
+                </For>
+            </div>
+        </Show>
+      </div>
     </section>
   );
 }
@@ -9124,6 +9209,110 @@ export default function DeveloperSection() {
     </section>
   );
 }
+</file>
+
+<file path="src/components/tabs/NewTab.jsx">
+// src/components/tabs/NewTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+export default function NewTab() {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    void app.lang?.();
+    setCategory("ALL");
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      if (!contentList) return [];
+      const params = { domain: domainName(), limit, offset, lang: lang() };
+      const cat = category();
+      if (cat && cat !== "ALL") params.category = cat;
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+
+      return arr.map((it, i) => {
+        if (page === 1 && i === 0) {
+          console.log("Using real data from backend:", it);
+        }
+        return {
+          id: it?.savva_cid || it?.savvaCID || it?.id || `content_${page}_${i}`,
+          text: it?.text_preview || it?.textPreview || it?.title || "",
+          _raw: it,
+        };
+      });
+    } catch (err) {
+      console.error("fetchPage error:", err);
+      return [];
+    }
+  }
+
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={category()}
+            onInput={(e) => setCategory(e.currentTarget.value)}
+            aria-label={app.t("newTab.category")}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+            </For>
+          </select>
+          <Show when={categoriesRes.loading}>
+            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+          </Show>
+        </div>
+      </div>
+      <ContentFeed mode={viewMode()} fetchPage={fetchPage} pageSize={12} />
+    </section>
+  );
+}
+</file>
+
+<file path="src/version.js">
+// src/version.js
+export const APP_VERSION = "0.7";
 </file>
 
 <file path="src/styles/tabs.css">
@@ -9712,131 +9901,6 @@ export default function Header({ onTogglePane }) {
 }
 </file>
 
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "docs.article": "Статья документации",
-  "docs.copied": "Скопировано в буфер обмена!",
-  "docs.copy": "Копировать",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.list": "Список",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.debug.gateways.title": "Шлюзы IPFS (активный порядок)",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.clear": "Очистить лог",
-  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
-  "settings.developer.debug.copy": "Скопировать лог",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.help": "Мы вызовем",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.help.api.tip": "Совет: держите это строго в разработке; избегайте \"*\" для продакшн настроек.",
-  "settings.localIpfs.help.api.title": "1) Разрешите происхождение вашего приложения на API (обязательно)",
-  "settings.localIpfs.help.gateway.note": "Необходимо только если приложение загружает файлы напрямую из локального шлюза.",
-  "settings.localIpfs.help.gateway.title": "2) (Необязательно) Разрешите ваше приложение на шлюзе (для прямых выборок активов)",
-  "settings.localIpfs.help.intro": "Вашему браузеру должно быть разрешено вызывать локальные конечные точки API IPFS",
-  "settings.localIpfs.help.proxy.note": "Затем установите \"URL API локального IPFS\" и нажмите \"Тестировать и включить\".",
-  "settings.localIpfs.help.proxy.text": "Проксируйте API через Vite, чтобы он был с тем же происхождением:",
-  "settings.localIpfs.help.proxy.title": "Альтернатива для разработки (без изменений конфигурации IPFS)",
-  "settings.localIpfs.help.restart.title": "3) Перезапустите демон",
-  "settings.localIpfs.help.toggle.hide": "Скрыть помощь",
-  "settings.localIpfs.help.toggle.show": "Как включить локальный IPFS (CORS)",
-  "settings.localIpfs.help.verify.note": "Шлюз обычно",
-  "settings.localIpfs.help.verify.title": "4) Проверьте",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "tabs.aria": "Вкладки раздела",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copied": "Скопировано",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
-};
-</file>
-
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-@import "./styles/tabs.css";
-@import "./styles/themed-controls.css";
-@import "./styles/layout.css";
-</file>
-
 <file path="src/components/main/TabsBar.jsx">
 // src/components/main/TabsBar.jsx
 import { createResource, For, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
@@ -10345,6 +10409,127 @@ export default function SwitchConnectDialog(props) {
 }
 </file>
 
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "docs.article": "Статья документации",
+  "docs.copied": "Скопировано в буфер обмена!",
+  "docs.copy": "Копировать",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.list": "Список",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.debug.gateways.title": "Шлюзы IPFS (активный порядок)",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.clear": "Очистить лог",
+  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
+  "settings.developer.debug.copy": "Скопировать лог",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.help": "Мы вызовем",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.help.api.tip": "Совет: держите это строго в разработке; избегайте \"*\" для продакшн настроек.",
+  "settings.localIpfs.help.api.title": "1) Разрешите происхождение вашего приложения на API (обязательно)",
+  "settings.localIpfs.help.gateway.note": "Необходимо только если приложение загружает файлы напрямую из локального шлюза.",
+  "settings.localIpfs.help.gateway.title": "2) (Необязательно) Разрешите ваше приложение на шлюзе (для прямых выборок активов)",
+  "settings.localIpfs.help.intro": "Вашему браузеру должно быть разрешено вызывать локальные конечные точки API IPFS",
+  "settings.localIpfs.help.proxy.note": "Затем установите \"URL API локального IPFS\" и нажмите \"Тестировать и включить\".",
+  "settings.localIpfs.help.proxy.text": "Проксируйте API через Vite, чтобы он был с тем же происхождением:",
+  "settings.localIpfs.help.proxy.title": "Альтернатива для разработки (без изменений конфигурации IPFS)",
+  "settings.localIpfs.help.restart.title": "3) Перезапустите демон",
+  "settings.localIpfs.help.toggle.hide": "Скрыть помощь",
+  "settings.localIpfs.help.toggle.show": "Как включить локальный IPFS (CORS)",
+  "settings.localIpfs.help.verify.note": "Шлюз обычно",
+  "settings.localIpfs.help.verify.title": "4) Проверьте",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "tabs.aria": "Вкладки раздела",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copied": "Скопировано",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети",
+    "error.connection.title": "Ошибка подключения",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+
+};
+</file>
+
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -10372,6 +10557,15 @@ export default function Settings() {
     </main>
   );
 }
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+@import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
+@import "./styles/layout.css";
+@import "./public/domain_default/domain.css";
 </file>
 
 <file path="package.json">
@@ -10964,7 +11158,10 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "error.connection.title": "Connection Failed",
+  "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
+  "error.connection.retry": "Refresh Page",
 };
 </file>
 
@@ -11079,10 +11276,9 @@ import { createSignal, onMount, Show } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
 import Settings from "./pages/Settings";
-import Docs from "./pages/Docs";                  // ← add
+import Docs from "./pages/Docs";
 import { useHashRouter } from "./routing/hashRouter";
 import { useApp } from "./context/AppContext.jsx";
-import { useI18n } from "./i18n/useI18n";
 import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
@@ -11090,12 +11286,13 @@ import DomainCssLoader from "./theme/DomainCssLoader.jsx";
 import FaviconLoader from "./theme/FaviconLoader.jsx";
 import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
 import WsConnector from "./net/WsConnector.jsx";
+import ConnectionError from "./components/main/ConnectionError.jsx"; // Import the new component
+import Spinner from "./components/ui/Spinner.jsx"; // Import a spinner for loading state
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
   const { route } = useHashRouter();
   const app = useApp();
-  const { t } = useI18n();
 
   onMount(() => {
     const handleKeydown = (e) => { if (e.key === "Escape") setIsPaneOpen(false); };
@@ -11104,28 +11301,43 @@ export default function App() {
   });
 
   const togglePane = () => setIsPaneOpen(!isPaneOpen());
-  const isDocs = () => route() === "/docs" || route().startsWith("/docs/");  // ← add
+  const isDocs = () => route() === "/docs" || route().startsWith("/docs/");
 
   return (
-    <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
-      <DomainCssLoader />
-      <FaviconLoader />
-      <GoogleAnalyticsLoader />
-      <WsConnector />
+    <Show
+      when={!app.loading()}
+      fallback={
+        <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
+          <Spinner class="w-8 h-8" />
+        </div>
+      }
+    >
+      <Show
+        when={!app.error()}
+        fallback={<ConnectionError error={app.error()} />}
+      >
+        <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
+          <DomainCssLoader />
+          <FaviconLoader />
+          <GoogleAnalyticsLoader />
+          <WsConnector />
 
-      <Header onTogglePane={togglePane} />
-      <Show when={route() === "/settings"} fallback={
-        <Show when={isDocs()} fallback={<MainView />}>   {/* ← add */}
-          <Docs />
-        </Show>
-      }>
-        <Settings />
+          <Header onTogglePane={togglePane} />
+          
+          <Show when={route() === "/settings"} fallback={
+            <Show when={isDocs()} fallback={<MainView />}>
+              <Docs />
+            </Show>
+          }>
+            <Settings />
+          </Show>
+
+          <RightPane isOpen={isPaneOpen} onClose={togglePane} />
+          <Toaster />
+          <AssetDebugTap />
+        </div>
       </Show>
-
-      <RightPane isOpen={isPaneOpen} onClose={togglePane} />
-      <Toaster />
-      <AssetDebugTap />
-    </div>
+    </Show>
   );
 }
 </file>
