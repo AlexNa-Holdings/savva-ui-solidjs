@@ -1,4 +1,3 @@
-// src/components/settings/LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { fetchWithTimeout } from "../../utils/net.js";
@@ -23,20 +22,30 @@ export default function LocalIpfsSection() {
     const currentOrigin = window.location.origin;
     const originsJson = JSON.stringify([currentOrigin]);
 
-    // --- New Step-by-Step Diagnostics Logic ---
-
     // Step 1: Check basic API liveness
     let config = null;
     try {
       await fetchWithTimeout(`${localApi}/api/v0/version`, { method: "POST" });
       results.push({ name: "API Liveness Check", status: "ok", details: `Successfully connected to IPFS API at ${localApi}.` });
     } catch (err) {
-      results.push({ name: "API Liveness Check", status: "error", details: `Failed to connect to the IPFS API. Ensure your IPFS daemon is running at ${localApi}. Error: ${err.message}` });
+      const fixCommand = 
+`# 1. Make sure your IPFS daemon is running in a terminal:
+ipfs daemon
+
+# 2. If it's running and still fails, run this command to fix CORS:
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
+
+      results.push({
+        name: "API Liveness Check",
+        status: "error",
+        details: `Failed to connect to the IPFS API at ${localApi}. This usually means the IPFS daemon is not running, or there is a CORS issue.`,
+        fixCommand: fixCommand
+      });
       setDiagResults(results);
       setDiagRunning(false);
       return;
     }
-    setDiagResults([...results]); // Update UI after first check
+    setDiagResults([...results]);
 
     // Step 2: Fetch the full configuration
     try {
