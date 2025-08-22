@@ -1,5 +1,4 @@
-// src/components/RightPane.jsx
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, createMemo, createEffect } from "solid-js";
 import { navigate } from "../routing/hashRouter";
 import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
@@ -11,8 +10,24 @@ export default function RightPane({ isOpen, onClose }) {
   const app = useApp();
   const { t } = app;
   const [showSwitch, setShowSwitch] = createSignal(false);
-  const noopApply = () => { };
+
   const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  const domainLangCodes = createMemo(() => {
+    const fromDomain = (app.domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
+  });
+
+  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
+
+  createEffect(() => {
+    const availableCodes = domainLangCodes();
+    const currentLang = app.lang?.();
+
+    if (!availableCodes.includes(currentLang)) {
+      app.setLang?.(availableCodes[0]);
+    }
+  });
 
   return (
     <>
@@ -26,24 +41,14 @@ export default function RightPane({ isOpen, onClose }) {
           <nav class="pt-2">
             <ul class="space-y-3">
               <li><ThemeToggle /></li>
-              <li><LangSelector /></li>
 
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
+              <Show when={showLangSelector()}>
+                <li><LangSelector codes={domainLangCodes()} /></li>
               </Show>
 
               <li>
                 <div
-                  class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                   role="button" tabIndex={0}
                   onClick={() => { navigate("/docs"); onClose(); }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
@@ -53,12 +58,21 @@ export default function RightPane({ isOpen, onClose }) {
                   {t("docs.nav")}
                 </div>
               </li>
-
-
-
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
               <li>
                 <div
-                  class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                   role="button" tabIndex={0}
                   onClick={() => { navigate("/settings"); onClose(); }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
@@ -66,10 +80,8 @@ export default function RightPane({ isOpen, onClose }) {
                   {t("rightPane.settings")}
                 </div>
               </li>
-
             </ul>
           </nav>
-
           <RightPaneFooter />
         </div>
       </div>
@@ -84,18 +96,16 @@ export default function RightPane({ isOpen, onClose }) {
       )}
 
       <Show when={showSwitch()} keyed>
-        {() => (
-          <SwitchConnectDialog
-            open={true}
-            domain={app.config()?.domain}
-            backendLink={app.config()?.backendLink}
-            loading={app.loading()}
-            error={app.error()}
-            onApply={noopApply}
-            onReset={app.clearConnectOverride}
-            onClose={() => setShowSwitch(false)}
-          />
-        )}
+        <SwitchConnectDialog
+          open={true}
+          domain={app.config()?.domain}
+          backendLink={app.config()?.backendLink}
+          loading={app.loading()}
+          error={app.error()}
+          onApply={() => { }}
+          onReset={app.clearConnectOverride}
+          onClose={() => setShowSwitch(false)}
+        />
       </Show>
     </>
   );

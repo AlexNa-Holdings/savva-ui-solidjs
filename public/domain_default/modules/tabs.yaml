@@ -1,10 +1,5 @@
 tabs:
   - type: leaders
-    title:
-      en: Leaders
-      ru: Лидеры
-      ua: Лідери
-      fr: Leaders
     right_panel:
       available: true
       blocks:
@@ -17,11 +12,6 @@ tabs:
           list_name: main
           count: 7
   - type: actual
-    title:
-      en: Actual
-      ru: Актуальное
-      ua: Актуальне
-      fr: Actuel
     right_panel:
       available: true
       blocks:
@@ -29,11 +19,6 @@ tabs:
           list_name: main
           count: 7
   - type: comments
-    title:
-      en: Comments
-      ru: Комментарии
-      ua: Коментарі
-      fr: Commentaires
     right_panel:
       available: true
       blocks:
@@ -41,11 +26,6 @@ tabs:
           list_name: main
           count: 7
   - type: new
-    title:
-      en: New
-      ru: Новое
-      ua: Нове
-      fr: Nouveau
     right_panel:
       available: true
       blocks:
@@ -54,11 +34,6 @@ tabs:
           count: 7
   - type: for-you
     private: true
-    title:
-      en: For you
-      ru: Лента
-      ua: Для вас
-      fr: Pour vous
     right_panel:
       available: true
       blocks:

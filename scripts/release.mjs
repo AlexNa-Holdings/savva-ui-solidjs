@@ -36,6 +36,12 @@ function writeVersion(major, minor, prevText) {
   return next;
 }
 
+function runI18nScripts() {
+  console.log("Running i18n scripts...");
+  sh("node scripts/i18n.mjs");
+  sh("node scripts/i18n-docs.mjs");
+}
+
 function build() {
   sh("npm run build");
 }
@@ -69,6 +75,7 @@ function deploy() {
   const nextVersion = writeVersion(major, minor + 1, text);
   console.log(`Bumped version to ${nextVersion}`);
 
+  runI18nScripts();
   build();
   gitCommitAndPush(nextVersion);
   deploy();

@@ -89,31 +89,7 @@ export default function TabsBar() {
     if (obj[base] !== undefined) return obj[base];
     return obj["*"];
   }
-  function resolveTitle(title, langCode, domain) {
-    if (!title) return "";
-    if (typeof title === "string") return title;
-    const byLocale = pickByLocale(title, langCode);
-    if (byLocale) {
-      if (typeof byLocale === "string") return byLocale;
-      if (typeof byLocale === "object") {
-        const byDomain = byLocale[domain] ?? byLocale["*"];
-        if (typeof byDomain === "string") return byDomain;
-        const anyStr = Object.values(byLocale).find((v) => typeof v === "string");
-        if (anyStr) return anyStr;
-      }
-    }
-    const topStr = Object.values(title).find((v) => typeof v === "string");
-    if (topStr) return topStr;
-    for (const v of Object.values(title)) {
-      if (v && typeof v === "object") {
-        const byDomain = v[domain] ?? v["*"];
-        if (typeof byDomain === "string") return byDomain;
-        const anyStr = Object.values(v).find((x) => typeof x === "string");
-        if (anyStr) return anyStr;
-      }
-    }
-    return "";
-  }
+
 
   // selection + URL sync
   const [selectedId, setSelectedId] = createSignal("");
@@ -121,7 +97,7 @@ export default function TabsBar() {
 
   const items = createMemo(() =>
     (tabsRaw() || []).map((tab) => {
-      const label = resolveTitle(tab.title, langCode(), domainName()) || t("main.tabs.untitled");
+      const label = t("tabs.title." + tab.type) || t("main.tabs.untitled");
       const explicit = iconFromSpec(tab.icon);
       const auto = iconForType(tab.type || tab.id);
       return { id: tab.id, label, icon: explicit || auto, type: tab.type };
