@@ -110,5 +110,9 @@ export default {
   "wallet.connect": "Подключить кошелек",
   "wallet.copied": "Скопировано",
   "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
+  "wallet.onRequiredNetwork": "В требуемой сети",
+    "error.connection.title": "Ошибка подключения",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+
 };

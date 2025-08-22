@@ -110,5 +110,8 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "error.connection.title": "Connection Failed",
+  "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
+  "error.connection.retry": "Refresh Page",
 };
