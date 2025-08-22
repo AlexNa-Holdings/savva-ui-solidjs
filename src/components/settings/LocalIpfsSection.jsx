@@ -7,7 +7,7 @@ export default function LocalIpfsSection() {
   const { t } = app;
 
   const [testing, setTesting] = createSignal(false);
-  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://127.0.0.1:5001");
 
   const [diagRunning, setDiagRunning] = createSignal(false);
   const [diagResults, setDiagResults] = createSignal(null);
@@ -20,90 +20,59 @@ export default function LocalIpfsSection() {
     const localApi = apiUrl().trim().replace(/\/+$/, "");
     const localGateway = localApi.replace(/:\d+$/, ":8080");
     const currentOrigin = window.location.origin;
-    const originsJson = JSON.stringify([currentOrigin]);
 
-    // Step 1: Check basic API liveness
+    // Step 1: Check basic API liveness and fetch config
     let config = null;
-    try {
-      await fetchWithTimeout(`${localApi}/api/v0/version`, { method: "POST" });
-      results.push({ name: "API Liveness Check", status: "ok", details: `Successfully connected to IPFS API at ${localApi}.` });
-    } catch (err) {
-      const fixCommand = 
-`# 1. Make sure your IPFS daemon is running in a terminal:
-ipfs daemon
-
-# 2. If it's running and still fails, run this command to fix CORS:
-ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
-
-      results.push({
-        name: "API Liveness Check",
-        status: "error",
-        details: `Failed to connect to the IPFS API at ${localApi}. This usually means the IPFS daemon is not running, or there is a CORS issue.`,
-        fixCommand: fixCommand
-      });
-      setDiagResults(results);
-      setDiagRunning(false);
-      return;
-    }
-    setDiagResults([...results]);
-
-    // Step 2: Fetch the full configuration
     try {
       const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
       if (!res.ok) throw new Error(`API responded with status ${res.status}`);
       config = await res.json();
-      results.push({ name: "Fetch Configuration", status: "ok", details: "Successfully retrieved IPFS configuration." });
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok", { url: localApi }) });
     } catch (err) {
-      results.push({
-        name: "Fetch Configuration",
-        status: "error",
-        details: "Could not fetch config. This is a CORS issue on your IPFS API.",
-        fixCommand: `ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
-      });
+      const originsJson = JSON.stringify([currentOrigin]);
+      const fixCommand = 
+`# 1. ${t("ipfs.diag.fix.daemon")}
+ipfs daemon
+
+# 2. ${t("ipfs.diag.fix.browser")}
+
+# 3. ${t("ipfs.diag.fix.cors")}
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
+
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error", { url: localApi }), fixCommand: fixCommand });
       setDiagResults(results);
       setDiagRunning(false);
       return;
     }
     setDiagResults([...results]);
 
-    // Step 3: Analyze Gateway CORS Configuration
+    // Step 2: Analyze Gateway CORS Configuration
     const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
     if (gatewayOrigins.includes(currentOrigin) || gatewayOrigins.includes("*")) {
-      results.push({ name: "Gateway CORS Check", status: "ok", details: `CORS origin '${currentOrigin}' is correctly configured.` });
+      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok", { origin: currentOrigin }) });
     } else {
+      const newOriginsList = [...new Set([currentOrigin, ...gatewayOrigins])];
+      const fixCommand = `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${JSON.stringify(newOriginsList)}'`;
       results.push({
-        name: "Gateway CORS Check",
+        name: t("ipfs.diag.cors.name"),
         status: "error",
-        details: `CORS origin '${currentOrigin}' is missing from the Gateway config.`,
-        fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
+        details: t("ipfs.diag.cors.error", { origin: currentOrigin }),
+        fixCommand: fixCommand
       });
     }
-
-    // Step 4: Analyze Gateway NoFetch (Redirect) Setting
-    if (config?.Gateway?.NoFetch === true) {
-        results.push({ name: "Gateway Redirect Check", status: "ok", details: "'NoFetch' is correctly set to true, preventing redirects." });
-    } else {
-        results.push({
-            name: "Gateway Redirect Check",
-            status: "error",
-            details: "Gateway is configured to redirect requests, which browsers block. 'NoFetch' must be true.",
-            fixCommand: `ipfs config --bool Gateway.NoFetch true`
-        });
-    }
-    setDiagResults([...results]);
-
-    // Step 5: Final Live Gateway Fetch Test
+    
+    // Step 3: Final Live Gateway Fetch Test
     const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
     if (testCID) {
       try {
         const testUrl = `${localGateway}/ipfs/${testCID}`;
         await fetchWithTimeout(testUrl);
-        results.push({ name: "Live Gateway Fetch", status: "ok", details: `Successfully fetched test CID from ${localGateway}. Setup is complete!` });
+        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok", { url: localGateway }) });
       } catch (err) {
-        results.push({ name: "Live Gateway Fetch", status: "error", details: `Final test failed. Error: ${err.message}. This could be a firewall issue on port 8080.` });
+        results.push({ name: t("ipfs.diag.fetch.name"), status: "error", details: t("ipfs.diag.fetch.errorFirewall", { error: err.message }) });
       }
     } else {
-      results.push({ name: "Live Gateway Fetch", status: "warn", details: "Skipped: ABI CID not found in /info response." });
+      results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
     }
 
     setDiagResults(results);
@@ -145,7 +114,7 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
                         setApiUrl(val);
                         app.setLocalIpfsApiUrl?.(val);
                     }}
-                    placeholder="http://localhost:5001" spellcheck={false}/>
+                    placeholder="http://127.0.0.1:5001" spellcheck={false}/>
             </label>
             <div class="flex md:self-end">
                 <Show when={!app.localIpfsEnabled()}
@@ -167,11 +136,11 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
         </div>
         <div class="pt-2 border-t border-[hsl(var(--border))]">
             <div class="flex items-center justify-between">
-                <h4 class="font-medium">IPFS Node Diagnostics</h4>
+                <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
                 <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
                     onClick={runDiagnostics}
                     disabled={diagRunning()}>
-                    {diagRunning() ? t("common.loading") : "Run Diagnostics"}
+                    {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
                 </button>
             </div>
             <Show when={diagResults() && diagResults().length > 0}>
@@ -187,7 +156,7 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
                                 </div>
                                 <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
                                 <Show when={result.fixCommand}>
-                                    <p class="mt-2 font-medium">To fix, run this in your terminal (then restart the daemon):</p>
+                                    <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
                                     <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
                                         {result.fixCommand}
                                     </pre>

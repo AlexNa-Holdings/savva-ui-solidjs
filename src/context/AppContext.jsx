@@ -60,7 +60,7 @@ export function AppProvider(props) {
 
   // Local IPFS prefs/state
   const [localIpfsEnabled, setLocalIpfsEnabled] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_KEY) === "1");
-  const [localIpfsApiUrl, setLocalIpfsApiUrl] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://localhost:5001");
+  const [localIpfsApiUrl, setLocalIpfsApiUrl] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_API_KEY) || "http://127.0.0.1:5001");
   const [localIpfsGateway, setLocalIpfsGateway] = Solid.createSignal(localStorage.getItem(IPFS_LOCAL_GATEWAY_KEY) || "");
   const [localIpfsStatus, setLocalIpfsStatus] = Solid.createSignal("unknown"); // "unknown" | "ok" | "down"
   let ipfsMonitorTid = null;

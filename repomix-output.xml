@@ -4100,12 +4100,6 @@ locales:
     dictionary: i18n/ua.yaml
 </file>
 
-<file path="public/default_connect.yaml">
-domain: savva.app
-backendLink: https://ui.savva.app/api/
-gear: true
-</file>
-
 <file path="scripts/i18n-docs.mjs">
 // scripts/i18n-docs.mjs
 //
@@ -5906,6 +5900,12 @@ sections:
         file: core-concepts/app-init.md
       - label: Working with domains
         file: core-concepts/domain.md
+</file>
+
+<file path="public/default_connect.yaml">
+domain: savva.app
+backendLink: https://ui.savva.app/api/
+gear: false
 </file>
 
 <file path="scripts/i18n.mjs">
@@ -8852,199 +8852,6 @@ export default {
 }
 </file>
 
-<file path="src/components/settings/LocalIpfsSection.jsx">
-// src/components/settings/LocalIpfsSection.jsx
-import { createSignal, Show, For } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { fetchWithTimeout } from "../../utils/net.js";
-
-export default function LocalIpfsSection() {
-  const app = useApp();
-  const { t } = app;
-
-  const [testing, setTesting] = createSignal(false);
-  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
-
-  const [diagRunning, setDiagRunning] = createSignal(false);
-  const [diagResults, setDiagResults] = createSignal(null);
-
-  // --- Start of New Intelligent Diagnostics Logic ---
-  async function runDiagnostics() {
-    setDiagRunning(true);
-    setDiagResults(null);
-    const results = [];
-    const localApi = apiUrl().trim().replace(/\/+$/, "");
-    const localGateway = localApi.replace(/:\d+$/, ":8080");
-    const currentOrigin = window.location.origin;
-    const originsList = [...new Set([currentOrigin, 'http://localhost:5173', 'http://127.0.0.1:5173'])];
-    const originsJson = JSON.stringify(originsList);
-
-    // 1. Check API Connectivity
-    let config = null;
-    try {
-      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
-      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
-      config = await res.json();
-      results.push({ name: "API Connection", status: "ok", details: `Successfully connected to API at ${localApi}` });
-    } catch (err) {
-      results.push({ name: "API Connection", status: "error", details: err.toString() });
-      setDiagResults(results);
-      setDiagRunning(false);
-      return; // Stop if we can't even connect to the API
-    }
-
-    // 2. Check Gateway CORS Origin
-    const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
-    if (originsList.every(o => gatewayOrigins.includes(o)) || gatewayOrigins.includes("*")) {
-      results.push({ name: "Gateway CORS Origin", status: "ok", details: "CORS origin is correctly configured." });
-    } else {
-      results.push({
-        name: "Gateway CORS Origin",
-        status: "error",
-        details: `CORS origin '${currentOrigin}' is not configured.`,
-        fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
-      });
-    }
-    
-    // 3. Check Gateway CORS Methods
-    const gatewayMethods = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Methods"] || [];
-    if (gatewayMethods.includes("GET")) {
-        results.push({ name: "Gateway CORS Methods", status: "ok", details: "CORS methods are correctly configured." });
-    } else {
-        results.push({
-            name: "Gateway CORS Methods",
-            status: "error",
-            details: "Required 'GET' method not found in CORS config.",
-            fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Methods '["GET", "HEAD", "OPTIONS"]'`
-        });
-    }
-
-    // 4. Check Gateway Fetch
-    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
-    if (testCID) {
-      try {
-        const testUrl = `${localGateway}/ipfs/${testCID}`;
-        const res = await fetchWithTimeout(testUrl);
-        if (!res.ok) throw new Error(`Gateway responded with status ${res.status}`);
-        results.push({ name: "Gateway Live Fetch", status: "ok", details: `Successfully fetched test CID from ${localGateway}` });
-      } catch (err) {
-        results.push({ name: "Gateway Live Fetch", status: "error", details: err.toString() });
-      }
-    } else {
-      results.push({ name: "Gateway Live Fetch", status: "warn", details: "Skipped: ABI CID not found in /info response." });
-    }
-
-    setDiagResults(results);
-    setDiagRunning(false);
-  }
-  // --- End of New Intelligent Diagnostics Logic ---
-
-  async function onEnableLocal() {
-    setTesting(true);
-    try {
-      await app.enableLocalIpfs(apiUrl().trim());
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  const statusColorClass = (status) => {
-    if (status === 'ok') return 'text-emerald-600';
-    if (status === 'error') return 'text-red-600';
-    return 'text-amber-500'; // for 'warn'
-  };
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
-
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={app.localIpfsEnabled()}
-          onInput={(e) => {
-            const checked = e.currentTarget.checked;
-            if (checked) { onEnableLocal(); } else { app.disableLocalIpfs(); }
-          }}
-        />
-        <span>{t("settings.localIpfs.enableCheckbox")}</span>
-      </label>
-
-      <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
-        <label class="block">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
-          <input
-            class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={apiUrl()}
-            onInput={(e) => {
-              const val = e.currentTarget.value;
-              setApiUrl(val);
-              app.setLocalIpfsApiUrl?.(val);
-            }}
-            placeholder="http://localhost:5001"
-            spellcheck={false}
-          />
-        </label>
-        <div class="flex md:self-end">
-          <Show when={!app.localIpfsEnabled()}
-            fallback={ <button class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={() => app.disableLocalIpfs()}>{t("settings.localIpfs.disable")}</button> } >
-            <button class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={onEnableLocal} disabled={testing()} title={t("settings.localIpfs.testEnable")}>
-              {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
-            </button>
-          </Show>
-        </div>
-      </div>
-
-      <div class="text-sm text-[hsl(var(--muted-foreground))]">
-        {t("settings.localIpfs.status.label")}:{" "}
-        <span class={ app.localIpfsStatus() === "ok" ? "text-[hsl(var(--primary))]" : app.localIpfsStatus() === "down" ? "text-[hsl(var(--destructive))]" : "opacity-70" }>
-          {app.localIpfsStatus()}
-        </span>
-        <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
-          <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
-        </Show>
-      </div>
-      
-      <div class="pt-2 border-t border-[hsl(var(--border))]">
-        <div class="flex items-center justify-between">
-            <h4 class="font-medium">IPFS Node Diagnostics</h4>
-            <button
-                class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
-                onClick={runDiagnostics}
-                disabled={diagRunning()}
-            >
-                {diagRunning() ? t("common.loading") : "Run Diagnostics"}
-            </button>
-        </div>
-        <Show when={diagResults()}>
-            <div class="mt-2 space-y-2 text-xs">
-                <For each={diagResults()}>
-                    {(result) => (
-                        <div class="p-2 rounded bg-[hsl(var(--muted))]">
-                            <div class="flex items-center">
-                                <span class={`font-bold ${statusColorClass(result.status)}`}>
-                                    {result.status.toUpperCase()}:
-                                </span>
-                                <span class="font-semibold ml-2">{result.name}</span>
-                            </div>
-                            <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
-                            <Show when={result.fixCommand}>
-                                <p class="mt-2 font-medium">To fix, run this in your terminal (then restart the daemon):</p>
-                                <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
-                                    {result.fixCommand}
-                                </pre>
-                            </Show>
-                        </div>
-                    )}
-                </For>
-            </div>
-        </Show>
-      </div>
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/ui/Tabs.jsx">
 // src/components/ui/Tabs.jsx
 import { For, createSignal, onMount, onCleanup } from "solid-js";
@@ -9308,11 +9115,6 @@ export default function NewTab() {
     </section>
   );
 }
-</file>
-
-<file path="src/version.js">
-// src/version.js
-export const APP_VERSION = "0.7";
 </file>
 
 <file path="src/styles/tabs.css">
@@ -9722,6 +9524,268 @@ html.dark .sv-docs code[data-theme*=" "] span {
 }
 .sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
+</file>
+
+<file path="src/components/settings/LocalIpfsSection.jsx">
+// src/components/settings/LocalIpfsSection.jsx
+import { createSignal, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { fetchWithTimeout } from "../../utils/net.js";
+
+export default function LocalIpfsSection() {
+  const app = useApp();
+  const { t } = app;
+
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://localhost:5001");
+
+  const [diagRunning, setDiagRunning] = createSignal(false);
+  const [diagResults, setDiagResults] = createSignal(null);
+
+  // Prefer 127.0.0.1 over localhost to avoid redirect to <cid>.ipfs.localhost
+  function normalizeLocalApiUrl(u) {
+    try {
+      const url = new URL(String(u).trim());
+      if (url.hostname === "localhost") url.hostname = "127.0.0.1";
+      if (!url.port) url.port = "5001";
+      return url.origin; // protocol + host + port
+    } catch {
+      return String(u || "").replace("localhost", "127.0.0.1");
+    }
+  }
+  function toLocalGatewayFromApi(u) {
+    try {
+      const url = new URL(String(u).trim());
+      const host = url.hostname === "localhost" ? "127.0.0.1" : url.hostname;
+      return `${url.protocol}//${host}:8080`;
+    } catch {
+      const s = String(u || "");
+      return s.replace("localhost", "127.0.0.1").replace(/:\d+$/, ":8080");
+    }
+  }
+
+  async function runDiagnostics() {
+    setDiagRunning(true);
+    setDiagResults([]);
+    const results = [];
+
+    const localApiRaw = apiUrl().trim().replace(/\/+$/, "");
+    const localApi = normalizeLocalApiUrl(localApiRaw);
+    const localGateway = toLocalGatewayFromApi(localApi);
+    const currentOrigin = window.location.origin;
+    const originsJson = JSON.stringify([currentOrigin]);
+
+    // Step 1: Check basic API liveness
+    let config = null;
+    try {
+      await fetchWithTimeout(`${localApi}/api/v0/version`, { method: "POST" });
+      results.push({ name: "API Liveness Check", status: "ok", details: `Connected to IPFS API at ${localApi}.` });
+    } catch (err) {
+      const fixCommand =
+`# 1) Ensure your IPFS daemon is running
+ipfs daemon
+
+# 2) Allow your app origin on the API (CORS):
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
+      results.push({
+        name: "API Liveness Check",
+        status: "error",
+        details: `Failed to reach IPFS API at ${localApi}.`,
+        fixCommand
+      });
+      setDiagResults(results);
+      setDiagRunning(false);
+      return;
+    }
+    setDiagResults([...results]);
+
+    // Step 2: Fetch the full configuration (so we can hint fixes if needed)
+    try {
+      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
+      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
+      config = await res.json();
+      results.push({ name: "Fetch Configuration", status: "ok", details: "Retrieved IPFS configuration." });
+    } catch {
+      results.push({
+        name: "Fetch Configuration",
+        status: "error",
+        details: "Could not fetch config. This is a CORS issue on your IPFS API.",
+        fixCommand: `ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
+      });
+      setDiagResults(results);
+      setDiagRunning(false);
+      return;
+    }
+    setDiagResults([...results]);
+
+    // Step 3: Gateway CORS (only needed if app loads directly from gateway)
+    const gwOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
+    if (gwOrigins.includes(currentOrigin) || gwOrigins.includes("*")) {
+      results.push({ name: "Gateway CORS Check", status: "ok", details: `Gateway allows '${currentOrigin}'.` });
+    } else {
+      results.push({
+        name: "Gateway CORS Check",
+        status: "error",
+        details: `CORS origin '${currentOrigin}' is missing on the gateway.`,
+        fixCommand: `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
+      });
+    }
+
+    // Step 4: Use path gateway (avoid subdomain redirect)
+    results.push({
+      name: "Gateway Mode",
+      status: "ok",
+      details: `Using path gateway ${localGateway} (127.0.0.1) to avoid redirect to <cid>.ipfs.localhost.`,
+    });
+    setDiagResults([...results]);
+
+    // Step 5: Simple live fetch from the gateway
+    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
+    if (testCID) {
+      try {
+        const testUrl = `${localGateway}/ipfs/${testCID}`;
+        const r = await fetchWithTimeout(testUrl);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        results.push({ name: "Live Gateway Fetch", status: "ok", details: `Fetched CID from ${localGateway}.` });
+      } catch (err) {
+        // If this fails from HTTPS → HTTP, ensure PNA header is present:
+        // Access-Control-Allow-Private-Network: true (Chrome/Brave preflight). See dev docs.
+        results.push({ name: "Live Gateway Fetch", status: "error", details: `Fetch failed: ${err.message}.` });
+      }
+    } else {
+      results.push({ name: "Live Gateway Fetch", status: "warn", details: "Skipped: ABI CID not found in /info." });
+    }
+
+    setDiagResults(results);
+    setDiagRunning(false);
+  }
+
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      // Important: normalize to 127.0.0.1 so app later uses path gateway
+      await app.enableLocalIpfs(normalizeLocalApiUrl(apiUrl()));
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const statusColorClass = (status) => {
+    if (status === "ok") return "text-emerald-600";
+    if (status === "error") return "text-red-600";
+    return "text-amber-500"; // warn
+  };
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
+
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.localIpfsEnabled()}
+          onInput={(e) => {
+            const checked = e.currentTarget.checked;
+            if (checked) onEnableLocal(); else app.disableLocalIpfs();
+          }}
+        />
+        <span>{t("settings.localIpfs.enableCheckbox")}</span>
+      </label>
+
+      <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
+        <label class="block">
+          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
+          <input
+            class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={apiUrl()}
+            onInput={(e) => {
+              const val = e.currentTarget.value;
+              setApiUrl(val);
+              app.setLocalIpfsApiUrl?.(val);
+            }}
+            placeholder="http://localhost:5001"
+            spellcheck={false}
+          />
+        </label>
+        <div class="flex md:self-end">
+          <Show
+            when={!app.localIpfsEnabled()}
+            fallback={
+              <button
+                class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+                onClick={() => app.disableLocalIpfs()}
+              >
+                {t("settings.localIpfs.disable")}
+              </button>
+            }
+          >
+            <button
+              class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onEnableLocal}
+              disabled={testing()}
+              title={t("settings.localIpfs.testEnable")}
+            >
+              {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
+            </button>
+          </Show>
+        </div>
+      </div>
+
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">
+        {t("settings.localIpfs.status.label")}:{" "}
+        <span
+          class={
+            app.localIpfsStatus() === "ok"
+              ? "text-[hsl(var(--primary))]"
+              : app.localIpfsStatus() === "down"
+              ? "text-[hsl(var(--destructive))]"
+              : "opacity-70"
+          }
+        >
+          {app.localIpfsStatus()}
+        </span>
+        <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+          <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
+        </Show>
+      </div>
+
+      <div class="pt-2 border-t border-[hsl(var(--border))]">
+        <div class="flex items-center justify-between">
+          <h4 class="font-medium">IPFS Node Diagnostics</h4>
+          <button
+            class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+            onClick={runDiagnostics}
+            disabled={diagRunning()}
+          >
+            {diagRunning() ? t("common.loading") : "Run Diagnostics"}
+          </button>
+        </div>
+
+        <Show when={diagResults() && diagResults().length > 0}>
+          <div class="mt-2 space-y-2 text-xs">
+            <For each={diagResults()}>
+              {(result) => (
+                <div class="p-2 rounded bg-[hsl(var(--muted))]">
+                  <div class="flex items-center">
+                    <span class={`font-bold ${statusColorClass(result.status)}`}>{result.status.toUpperCase()}:</span>
+                    <span class="font-semibold ml-2">{result.name}</span>
+                  </div>
+                  <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
+                  <Show when={result.fixCommand}>
+                    <p class="mt-2 font-medium">To fix, run this in your terminal (then restart the daemon):</p>
+                    <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
+{result.fixCommand}
+                    </pre>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+    </section>
+  );
+}
 </file>
 
 <file path="src/components/Header.jsx">
@@ -10559,13 +10623,9 @@ export default function Settings() {
 }
 </file>
 
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-@import "./styles/tabs.css";
-@import "./styles/themed-controls.css";
-@import "./styles/layout.css";
-@import "./public/domain_default/domain.css";
+<file path="src/version.js">
+// src/version.js
+export const APP_VERSION = "0.11";
 </file>
 
 <file path="package.json">
@@ -10612,6 +10672,15 @@ export default function Settings() {
     "vite-plugin-solid": "^2.11.8"
   }
 }
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+@import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
+@import "./styles/layout.css";
+@import "../public/domain_default/domain.css";
 </file>
 
 <file path="src/context/AppContext.jsx">
@@ -11199,7 +11268,7 @@ export default function RightPane({ isOpen, onClose }) {
               <Show when={app.config()?.gear}>
                 <li>
                   <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                     role="button" tabIndex={0}
                     onClick={() => setShowSwitch(true)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
@@ -11207,34 +11276,34 @@ export default function RightPane({ isOpen, onClose }) {
                     {t("rightPane.switch.open")}
                   </div>
                 </li>
-
-                {/* DevDocs (before Settings) */}
-                <li>
-                  <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => { navigate("/docs"); onClose(); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
-                    aria-label={t("docs.nav")}
-                    title={t("docs.nav")}
-                  >
-                    {t("docs.nav")}
-                  </div>
-                </li>
-
-
-
-                <li>
-                  <div
-                    class="px-2 py-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => { navigate("/settings"); onClose(); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
-                  >
-                    {t("rightPane.settings")}
-                  </div>
-                </li>
               </Show>
+
+              <li>
+                <div
+                  class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => { navigate("/docs"); onClose(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+
+
+              <li>
+                <div
+                  class="px-2 py-0 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => { navigate("/settings"); onClose(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+
             </ul>
           </nav>
 
