@@ -2,7 +2,7 @@
 // Compact, AA‑legible verification badge. Sizing & color are controlled by parent.
 export default function VerifiedBadge(props) {
     return (
-        <svg  {...props} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
+        <svg {...props} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1" fill="currentColor">
             <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
             <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
             <g id="SVGRepo_iconCarrier">

@@ -1,31 +1,52 @@
 // src/components/feed/PostInfo.jsx
+import { Show, createMemo } from "solid-js";
+import { formatUnits } from "viem";
+import { useApp } from "../../context/AppContext.jsx";
 import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
 import PostTime from "../ui/PostTime.jsx";
+import PostReactions from "../ui/PostReactions.jsx";
 
-// A placeholder for the reactions block
-function PostReactions(props) {
-  // TODO: Implement reactions logic
-  return <div class="text-xs">❤️ 12</div>;
-}
-
-// A placeholder for the comments count
 function PostComments(props) {
-  // TODO: Implement comments logic
-  return <div class="text-xs">💬 5</div>;
+  const count = () => props.item?._raw?.total_childs || 0;
+  return (
+    <Show when={count() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>💬</span>
+        <span>{count()}</span>
+      </div>
+    </Show>
+  );
 }
 
-// A placeholder for the rewards block
 function PostRewards(props) {
-  // TODO: Implement rewards logic
+  const amount = createMemo(() => {
+    const rawAmount = props.item?._raw?.fund?.total_author_share;
+    if (!rawAmount) return 0;
+    const formatted = formatUnits(BigInt(rawAmount), 18);
+    return parseFloat(formatted);
+  });
+
+  const localizedAmount = createMemo(() => {
+    // Access the lang prop to ensure this memo re-runs on language change
+    const currentLang = props.lang();
+    return amount().toLocaleString(currentLang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  });
+
   return (
-    <div class="flex items-center gap-1 text-xs">
-      <span>1,234</span>
-      <SavvaTokenIcon class="w-3.5 h-3.5" />
-    </div>
+    <Show when={amount() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>{localizedAmount()}</span>
+        <SavvaTokenIcon class="w-3.5 h-3.5" />
+      </div>
+    </Show>
   );
 }
 
 export default function PostInfo(props) {
+  const { lang } = useApp();
   const isListMode = () => props.mode === 'list';
 
   return (
@@ -34,7 +55,7 @@ export default function PostInfo(props) {
       <PostReactions item={props.item} />
       <PostComments item={props.item} />
       <div class="ml-auto">
-        <PostRewards item={props.item} />
+        <PostRewards item={props.item} lang={lang} />
       </div>
     </div>
   );
