@@ -8,13 +8,13 @@ import { useHashRouter } from "./routing/hashRouter";
 import { useApp } from "./context/AppContext.jsx";
 import Toaster from "./components/Toaster";
 import MainView from "./components/main/MainView";
-import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import DomainCssLoader from "./theme/DomainCssLoader.jsx";
 import FaviconLoader from "./theme/FaviconLoader.jsx";
 import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
 import WsConnector from "./net/WsConnector.jsx";
 import ConnectionError from "./components/main/ConnectionError.jsx"; // Import the new component
 import Spinner from "./components/ui/Spinner.jsx"; // Import a spinner for loading state
+import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);

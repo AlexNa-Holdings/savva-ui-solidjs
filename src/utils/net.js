@@ -1,5 +1,4 @@
 // src/utils/net.js
-// ^^^ one single source of truth
 export async function fetchWithTimeout(
   url,
   { timeoutMs = 7000, method = "GET", headers, signal, body } = {}
@@ -18,7 +17,8 @@ export async function fetchWithTimeout(
       headers,
       body,
       signal: controller.signal,
-      cache: "no-store",
+      // Change 'no-store' to 'force-cache' for aggressive caching of immutable assets.
+      cache: "force-cache",
     });
   } finally {
     clearTimeout(timer);

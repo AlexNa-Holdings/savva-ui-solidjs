@@ -45,12 +45,15 @@ export default function NewTab(props) {
   };
   const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
 
+  // Create a key that changes when either the domain or category changes.
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
+
   async function fetchPage(page, pageSize) {
     const limit = pageSize;
     const offset = (page - 1) * pageSize;
     try {
       if (!contentList) return [];
-      const params = { domain: domainName(), limit, offset, lang: lang() };
+      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
       const cat = category();
       if (cat && cat !== "ALL") {
         params.category = `${lang()}:${cat}`;
@@ -92,7 +95,7 @@ export default function NewTab(props) {
         mode={viewMode()}
         fetchPage={fetchPage}
         pageSize={12}
-        resetOn={category()}
+        resetOn={feedResetKey()}
         isRailVisible={props.isRailVisible}
       />
     </section>

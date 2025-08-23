@@ -13,9 +13,41 @@ function normalizeInput(input) {
   return s;
 }
 
-// FIXED: This helper function was missing, causing the ReferenceError.
-function normalizeGatewayBase(s) {
-  return String(s || "").trim();
+function buildUrl(baseGateway, cidPath) {
+  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
+  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
+  if (!base || !path) return "";
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
+  return prefix + path;
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) return { res, url, gateway: gw };
+
+      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
+      httpError.url = url;
+      httpError.status = res.status; // Attach status for later inspection
+      errors.push(httpError);
+
+    } catch (e) {
+      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
+      networkError.url = url;
+      errors.push(networkError);
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  // If ANY error was a 404, it's likely a bad CID. Flag it.
+  if (errors.some(e => e.status === 404)) {
+      err.is404 = true;
+  }
+  throw err;
 }
 
 async function fetchIpfs(input, opts = {}) {
@@ -46,33 +78,25 @@ async function getArrayBuffer(input, opts) {
   return { data: await response.arrayBuffer(), url, gateway };
 }
 
-
-// --- New Smart Fetching Logic ---
-
 async function fetchBest(app, ipfsPath, options = {}) {
   const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
   const cidPath = normalizeInput(ipfsPath);
   let gatewaysToTry = [];
   
-  // -- MODIFICATION START --
-  let effectiveTimeout = timeoutMs; // Default timeout
+  let effectiveTimeout = timeoutMs;
 
-  // 1. If local IPFS is enabled, use it exclusively with a longer timeout.
   if (app.localIpfsEnabled() && app.localIpfsGateway()) {
     gatewaysToTry = [app.localIpfsGateway()];
-    effectiveTimeout = 30000; // 30 seconds for local gateway
+    effectiveTimeout = 30000;
   } else {
-    // 2. Otherwise, combine post-specific gateways with system-wide remote gateways.
     const systemGateways = app.remoteIpfsGateways() || [];
     gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
   }
-  // -- MODIFICATION END --
 
   if (gatewaysToTry.length === 0) {
     throw new Error("No IPFS gateways available to try.");
   }
 
-  // Use the new effectiveTimeout when calling the helper
   return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
 }
 
@@ -84,60 +108,14 @@ async function getJSONBest(app, ipfsPath, options = {}) {
   return { data: await response.json(), url, gateway };
 }
 
-function buildUrl(baseGateway, cidPath) {
-  // This restored logic correctly handles gateways that may or may not include /ipfs
-  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
-  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
-
-  if (!base || !path) return "";
-
-  // Check if the gateway already ends with /ipfs
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
-
-  return prefix + path;
-}
-
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) return { res, url, gateway: gw };
-
-      // --- MODIFICATION START ---
-      // Create a detailed error object and add the 'url' to it.
-      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
-      httpError.url = url; 
-      errors.push(httpError);
-      // --- MODIFICATION END ---
-
-    } catch (e) {
-      // --- MODIFICATION START ---
-      // Also add the 'url' to network/timeout errors.
-      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
-      networkError.url = url;
-      errors.push(networkError);
-      // --- MODIFICATION END ---
-    }
-  }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  throw err;
-}
-
 export const ipfs = {
-  // Original methods
   fetch: fetchIpfs,
   getJSON,
   getText,
   getBlob,
   getArrayBuffer,
-  // New, smarter methods
   fetchBest,
   getJSONBest,
-  // Exported utils
   normalizeInput,
   buildUrl,
 };

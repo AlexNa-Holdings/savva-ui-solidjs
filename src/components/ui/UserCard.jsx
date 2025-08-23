@@ -16,8 +16,10 @@ export default function UserCard(props) {
 
     return (
         <Show when={author()}>
-            <div class="flex items-center gap-2 w-full h-10">
-                <div class="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+            {/* Reduced height from h-10 to h-8 */}
+            <div class="flex items-center gap-2 w-full h-8">
+                {/* Reduced avatar size from w-8 h-8 to w-7 h-7 */}
+                <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
                     <Show
                         when={author().avatar}
                         fallback={<UnknownUserIcon class="w-full h-full object-cover" />}

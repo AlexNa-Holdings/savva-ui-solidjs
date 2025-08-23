@@ -24,6 +24,11 @@ const SHOW_KEYS_KEY = "i18n_show_keys";
 
 let i18nSingleton;
 
+// !!!!! special comment to include the keys generated automatically
+// !!!!! Do not edit this section manually
+// t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
+// t("tabs.title.new") t("tabs.title.for-you")
+
 // Domain dictionaries loaded from assets/config.yaml
 const [domainDicts, setDomainDicts] = createSignal({});
 
@@ -85,8 +90,13 @@ export function useI18n() {
       try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch {}
     }
 
-    const t = (key) => {
-      const base = resolveKey(lang(), key);
+    const t = (key, params) => {
+      let base = resolveKey(lang(), key);
+      if (params) {
+        for (const [paramKey, paramValue] of Object.entries(params)) {
+          base = base.replace(`{${paramKey}}`, String(paramValue));
+        }
+      }
       return showKeys() ? `${base} [${key}]` : base;
     };
 
