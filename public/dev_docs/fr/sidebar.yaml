@@ -1,0 +1,15 @@
+sections:
+  - title: Commencer
+    items:
+      - label: Aperçu
+        file: index.md
+      - label: Configuration
+        file: getting-started.md
+  - title: Concepts de base
+    items:
+      - label: Aperçu
+        file: core-concepts/index.md
+      - label: Initialisation de l'application et connexion au backend
+        file: core-concepts/app-init.md
+      - label: Travailler avec les domaines
+        file: core-concepts/domain.md

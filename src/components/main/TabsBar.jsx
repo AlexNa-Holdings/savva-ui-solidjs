@@ -53,9 +53,10 @@ function iconFromSpec(spec) {
 
 export default function TabsBar() {
   const app = useApp();
-  const { t, domainAssetsConfig, selectedDomain } = app;
+  const { t, domainAssetsConfig, selectedDomain, setLastTabRoute } = app;
   const { lang } = useI18n();
   const { route } = useHashRouter();
+  
 
   const domainName = createMemo(() => {
     const d = selectedDomain?.();
@@ -126,12 +127,17 @@ export default function TabsBar() {
 
     if (key && hasKey(key)) {
       const match = list.find((t) => slug(t.id) === key) || list.find((t) => slug(t.type) === key);
-      if (match && selectedId() !== match.id) setSelectedId(match.id);
+      if (match && selectedId() !== match.id) {
+        setSelectedId(match.id);
+        setLastTabRoute(route()); // Save current tab route
+      }
     } else if (!selectedId() || !list.some((t) => t.id === selectedId())) {
       const first = list[0];
+      const defaultPath = pathFor(first.type || first.id);
       batch(() => {
         setSelectedId(first.id);
-        navigate(pathFor(first.type || first.id), { replace: true });
+        navigate(defaultPath, { replace: true });
+        setLastTabRoute(defaultPath); // Save default tab route
       });
     }
   });
@@ -140,13 +146,13 @@ export default function TabsBar() {
     const list = tabsRaw() || [];
     const entry = list.find((t) => t.id === nextId);
     if (!entry) return;
+    const want = pathFor(entry.type || entry.id);
+    setLastTabRoute(want); // Save new tab route on change
     batch(() => {
       setSelectedId(nextId);
-      const want = pathFor(entry.type || entry.id);
       if (route() !== want) navigate(want);
     });
   }
-
   return (
     <section class="w-full" >
       {/* changed: let outer Container control width; keep full width here */}

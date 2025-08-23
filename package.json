@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "release": "node scripts/release.mjs",
-    "i18n": "node scripts/i18n.mjs"
+    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
   },
   "dependencies": {
     "@shikijs/themes": "^3.11.0",

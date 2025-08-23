@@ -2,8 +2,22 @@
 import { createSignal } from "solid-js";
 import en from "./en";
 import ru from "./ru";
+import sr from "./sr";
+import ua from "./ua";
+import fr from "./fr";
 
-const DICTS = { en, ru };
+// Used by the Lang selector for labels
+export const LANG_INFO = {
+  en: { code: "EN", name: "English" },
+  ru: { code: "RU", name: "Русский" },
+  fr: { code: "FR", name: "Français" },
+  ua: { code: "UA", name: "Українська" },
+  sr: { code: "SR", name: "Српски" },
+};
+
+// All built-in application dictionaries. The keys must match LANG_INFO.
+const APP_DICTS = { en, ru, fr, ua, sr };
+
 const DEFAULT_LANG = "en";
 const LANG_KEY = "lang";
 const SHOW_KEYS_KEY = "i18n_show_keys";
@@ -25,20 +39,12 @@ function resolveKey(lang, key) {
   const fromDomain = d[lang]?.[key];
   if (fromDomain != null) return fromDomain;
 
-  const fromApp = DICTS[lang]?.[key];
+  const fromApp = APP_DICTS[lang]?.[key];
   if (fromApp != null) return fromApp;
 
-  if (DICTS[DEFAULT_LANG]?.[key] != null) return DICTS[DEFAULT_LANG][key];
+  if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
   return `[${key}]`;
 }
-
-// Used by the Lang selector for labels
-export const LANG_INFO = {
-  en: { code: "EN", name: "English" },
-  ru: { code: "RU", name: "Русский" },
-  fr: { code: "FR", name: "Français" },
-  ua: { code: "UA", name: "Українська" },
-};
 
 export function useI18n() {
   if (!i18nSingleton) {
@@ -94,7 +100,7 @@ export function useI18n() {
 
     // Expose union of built‑ins + domain dicts (useful for tooling/UI)
     const available = () => {
-      const builtin = Object.keys(DICTS);
+      const builtin = Object.keys(APP_DICTS);
       const domain = Object.keys(domainDicts());
       return Array.from(new Set([...builtin, ...domain]));
     };

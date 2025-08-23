@@ -1,0 +1,15 @@
+sections:
+  - title: Початок роботи
+    items:
+      - label: Огляд
+        file: index.md
+      - label: Налаштування
+        file: getting-started.md
+  - title: Основні концепції
+    items:
+      - label: Огляд
+        file: core-concepts/index.md
+      - label: Ініціалізація додатку та підключення до бекенду
+        file: core-concepts/app-init.md
+      - label: Робота з доменами
+        file: core-concepts/domain.md

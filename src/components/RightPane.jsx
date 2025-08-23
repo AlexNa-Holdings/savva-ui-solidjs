@@ -32,7 +32,7 @@ export default function RightPane({ isOpen, onClose }) {
   return (
     <>
       <div
-        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-30 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
         onClick={handlePanelClick}
         data-testid="right-pane"
         style="border-left: 1px solid hsl(var(--border));"

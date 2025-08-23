@@ -1,29 +1,27 @@
-// src/components/ui/ToMainPageButton.jsx
-import { useHashRouter } from "../../routing/hashRouter";
+// src/components/ui/ClosePageButton.jsx
 import { useApp } from "../../context/AppContext.jsx";
+import { useHashRouter } from "../../routing/hashRouter";
 
 /**
- * Close (Go to main page) floating button.
- * - Fixed position (does not scroll)
- * - Sits below the header; tweak offsetTop if your header height changes
- * - Nice SVG cross; themable via current text color
- *
- * Props:
- *   title?: string         // tooltip/aria label (defaults to i18n Back)
- *   offsetTop?: number     // px from top viewport (default 56)
+ * Close (go to main tabs view) floating button.
  */
-export default function ToMainPageButton({ title, offsetTop = 56 }) {
+export default function ClosePageButton({ title, offsetTop = 56 }) {
+  const app = useApp();
   const { navigate } = useHashRouter();
-  const { t } = useApp();
-  const label = title || t("settings.back"); // reuse existing i18n key
+  const { t } = app;
+  const label = title || t("settings.back");
+
+  const closeAndReturn = () => {
+    navigate(app.lastTabRoute() || "/");
+  };
 
   return (
     <button
       type="button"
-      onClick={() => navigate("/")}
+      onClick={closeAndReturn}
       aria-label={label}
       title={label}
-      class="fixed right-3 z-50 p-2 rounded-full
+      class="fixed right-3 z-20 p-2 rounded-full
              bg-[hsl(var(--background))]/70
              hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] 
              shadow-sm transition-colors"

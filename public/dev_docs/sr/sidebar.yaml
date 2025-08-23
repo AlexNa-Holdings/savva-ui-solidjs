@@ -1,0 +1,15 @@
+sections:
+  - title: Uvod
+    items:
+      - label: Pregled
+        file: index.md
+      - label: Podešavanje
+        file: getting-started.md
+  - title: Osnovni koncepti
+    items:
+      - label: Pregled
+        file: core-concepts/index.md
+      - label: Inicijalizacija aplikacije i povezivanje sa backend-om
+        file: core-concepts/app-init.md
+      - label: Rad sa domenima
+        file: core-concepts/domain.md

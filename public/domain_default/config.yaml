@@ -19,9 +19,7 @@ favicon:
       content: '#ffffff'
 GA_tag: G-XDSTY1ND4P
 modules:
-  staker_levels: modules/staker_levels.yaml
   content_lists: modules/content_lists.yaml
-  bun_reasons: modules/bun_reasons.yaml
   categories: modules/categories.yaml
   tabs: modules/tabs.yaml
 default_locale: en

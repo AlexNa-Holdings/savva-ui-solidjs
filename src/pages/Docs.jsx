@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext.jsx";
 import { useHashRouter } from "../routing/hashRouter";
 import DocsIndex from "../components/docs/DocsIndex.jsx";
 import DocsContent from "../components/docs/DocsContent.jsx";
-import ToMainPageButton from "../components/ui/ToMainPageButton.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
 
 const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
 const fileFromRoute = (route) => {
@@ -23,7 +23,7 @@ export default function Docs() {
   return (
     <div class="sv-container sv-container--no-gutter">
       <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
-      <ToMainPageButton />
+      <ClosePageButton />
         {/* Left sidebar */}
         <aside class="min-w-0">
           <div>

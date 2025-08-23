@@ -21,7 +21,7 @@ const ASSETS_ENV_KEY = "domain_assets_env";
 
 function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
 function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
-function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch {} }
+function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { } }
 
 export function AppProvider(props) {
   const i18n = useI18n();
@@ -32,6 +32,7 @@ export function AppProvider(props) {
   const [error, setError] = Solid.createSignal(null);
   const [loading, setLoading] = Solid.createSignal(true);
   const [lastUpdatedAt, setLastUpdatedAt] = Solid.createSignal(null);
+  const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
 
   const [assetsEnv, setAssetsEnvState] = Solid.createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
   function setAssetsEnv(next) {
@@ -51,7 +52,7 @@ export function AppProvider(props) {
     const data = await fetchInfo(nextCfg);
     setInfo(data);
     setLastUpdatedAt(Date.now());
-    try { configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" }); } catch {}
+    try { configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" }); } catch { }
   }
 
   async function init() {
@@ -83,7 +84,7 @@ export function AppProvider(props) {
       } else {
         setConfig(next);
         setLastUpdatedAt(Date.now());
-        try { configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" }); } catch {}
+        try { configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" }); } catch { }
       }
       saveOverride(next);
     } catch (e) {
@@ -98,7 +99,7 @@ export function AppProvider(props) {
     setConfig(next);
     saveOverride(next);
     setLastUpdatedAt(Date.now());
-    try { configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" }); } catch {}
+    try { configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" }); } catch { }
   }
 
   async function clearConnectOverride() { saveOverride(null); await init(); }
@@ -282,6 +283,7 @@ export function AppProvider(props) {
     reload: init, updateConnect, clearConnectOverride, setDomain, ensureWalletOnDesiredChain,
     t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
     showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys, i18nAvailable: i18n.available,
+    lastTabRoute, setLastTabRoute,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

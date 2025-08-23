@@ -1,3 +1,4 @@
+// LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { fetchWithTimeout } from "../../utils/net.js";
@@ -27,7 +28,7 @@ export default function LocalIpfsSection() {
       const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
       if (!res.ok) throw new Error(`API responded with status ${res.status}`);
       config = await res.json();
-      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok", { url: localApi }) });
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok") });
     } catch (err) {
       const originsJson = JSON.stringify([currentOrigin]);
       const fixCommand = 
@@ -39,7 +40,7 @@ ipfs daemon
 # 3. ${t("ipfs.diag.fix.cors")}
 ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
 
-      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error", { url: localApi }), fixCommand: fixCommand });
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error"), fixCommand: fixCommand });
       setDiagResults(results);
       setDiagRunning(false);
       return;
@@ -49,14 +50,14 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
     // Step 2: Analyze Gateway CORS Configuration
     const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
     if (gatewayOrigins.includes(currentOrigin) || gatewayOrigins.includes("*")) {
-      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok", { origin: currentOrigin }) });
+      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok") });
     } else {
       const newOriginsList = [...new Set([currentOrigin, ...gatewayOrigins])];
       const fixCommand = `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${JSON.stringify(newOriginsList)}'`;
       results.push({
         name: t("ipfs.diag.cors.name"),
         status: "error",
-        details: t("ipfs.diag.cors.error", { origin: currentOrigin }),
+        details: t("ipfs.diag.cors.error"),
         fixCommand: fixCommand
       });
     }
@@ -67,9 +68,9 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
       try {
         const testUrl = `${localGateway}/ipfs/${testCID}`;
         await fetchWithTimeout(testUrl);
-        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok", { url: localGateway }) });
+        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok") });
       } catch (err) {
-        results.push({ name: t("ipfs.diag.fetch.name"), status: "error", details: t("ipfs.diag.fetch.errorFirewall", { error: err.message }) });
+        results.push({ name: t("ipfs.diag.fetch.name"), status: "error", details: t("ipfs.diag.fetch.errorFirewall") });
       }
     } else {
       results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
@@ -134,39 +135,42 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
                 <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
             </Show>
         </div>
-        <div class="pt-2 border-t border-[hsl(var(--border))]">
-            <div class="flex items-center justify-between">
-                <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
-                <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
-                    onClick={runDiagnostics}
-                    disabled={diagRunning()}>
-                    {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
-                </button>
-            </div>
-            <Show when={diagResults() && diagResults().length > 0}>
-                <div class="mt-2 space-y-2 text-xs">
-                    <For each={diagResults()}>
-                        {(result) => (
-                            <div class="p-2 rounded bg-[hsl(var(--muted))]">
-                                <div class="flex items-center">
-                                    <span class={`font-bold ${statusColorClass(result.status)}`}>
-                                        {result.status.toUpperCase()}:
-                                    </span>
-                                    <span class="font-semibold ml-2">{result.name}</span>
-                                </div>
-                                <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
-                                <Show when={result.fixCommand}>
-                                    <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
-                                    <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
-                                        {result.fixCommand}
-                                    </pre>
-                                </Show>
-                            </div>
-                        )}
-                    </For>
+
+        <Show when={app.localIpfsEnabled()}>
+            <div class="pt-2 border-t border-[hsl(var(--border))]">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
+                    <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+                        onClick={runDiagnostics}
+                        disabled={diagRunning()}>
+                        {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
+                    </button>
                 </div>
-            </Show>
-        </div>
+                <Show when={diagResults() && diagResults().length > 0}>
+                    <div class="mt-2 space-y-2 text-xs">
+                        <For each={diagResults()}>
+                            {(result) => (
+                                <div class="p-2 rounded bg-[hsl(var(--muted))]">
+                                    <div class="flex items-center">
+                                        <span class={`font-bold ${statusColorClass(result.status)}`}>
+                                            {result.status.toUpperCase()}:
+                                        </span>
+                                        <span class="font-semibold ml-2">{result.name}</span>
+                                    </div>
+                                    <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
+                                    <Show when={result.fixCommand}>
+                                        <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
+                                        <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
+                                            {result.fixCommand}
+                                        </pre>
+                                    </Show>
+                                </div>
+                            )}
+                        </For>
+                    </div>
+                </Show>
+            </div>
+        </Show>
     </section>
   );
 }
