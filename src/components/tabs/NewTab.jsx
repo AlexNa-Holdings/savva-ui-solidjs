@@ -24,7 +24,7 @@ function useDomainCategories(app) {
   return cats;
 }
 
-export default function NewTab() {
+export default function NewTab(props) {
   const app = useApp();
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
@@ -32,8 +32,11 @@ export default function NewTab() {
   const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
 
   createEffect(() => {
-    void app.lang?.();
-    setCategory("ALL");
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
   });
 
   const domainName = () => {
@@ -49,25 +52,26 @@ export default function NewTab() {
       if (!contentList) return [];
       const params = { domain: domainName(), limit, offset, lang: lang() };
       const cat = category();
-      if (cat && cat !== "ALL") params.category = cat;
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
       const res = await contentList(params);
       const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-
-      return arr.map((it, i) => {
-        if (page === 1 && i === 0) {
-          console.log("Using real data from backend:", it);
-        }
-        return {
-          id: it?.savva_cid || it?.savvaCID || it?.id || `content_${page}_${i}`,
-          text: it?.text_preview || it?.textPreview || it?.title || "",
-          _raw: it,
-        };
-      });
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
     } catch (err) {
       console.error("fetchPage error:", err);
       return [];
     }
   }
+
+    // --- DEBUG LOG ---
+  createEffect(() => {
+    console.log(`[DEBUG in NewTab] Received props.isRailVisible:`, props.isRailVisible);
+  });
+  // --- END DEBUG LOG ---
 
   return (
     <section class="w-full">
@@ -90,7 +94,13 @@ export default function NewTab() {
           </Show>
         </div>
       </div>
-      <ContentFeed mode={viewMode()} fetchPage={fetchPage} pageSize={12} />
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={category()}
+        isRailVisible={props.isRailVisible}
+      />
     </section>
   );
 }

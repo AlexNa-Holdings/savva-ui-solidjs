@@ -1,5 +1,5 @@
 // src/components/feed/ContentFeed.jsx
-import { createSignal, onCleanup, onMount, For, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import PostListView from "./PostListView.jsx";
 
@@ -26,35 +26,39 @@ export default function ContentFeed(props) {
 
   onMount(() => {
     loadMore();
-
     const handleScroll = () => {
       const scrollThreshold = 600;
       const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
       if (scrolledToBottom) loadMore();
     };
-    
     let timeoutId = null;
     const throttledHandleScroll = () => {
       if (timeoutId === null) {
-        timeoutId = setTimeout(() => {
-          handleScroll();
-          timeoutId = null;
-        }, 200);
+        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
       }
     };
-
     window.addEventListener('scroll', throttledHandleScroll, { passive: true });
-
     onCleanup(() => {
       window.removeEventListener('scroll', throttledHandleScroll);
       if (timeoutId) clearTimeout(timeoutId);
     });
   });
 
+  createEffect(on(() => props.resetOn, () => {
+    setItems([]);
+    setPage(0);
+    setHasMore(true);
+    setLoading(false);
+    queueMicrotask(loadMore);
+  }, { defer: true }));
+
   return (
     <div class="w-full">
-      <PostListView items={items()} mode={props.mode} />
-      
+      <PostListView
+        items={items()}
+        mode={props.mode}
+        isRailVisible={props.isRailVisible}
+      />
       <Show when={loading()}>
         <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
       </Show>

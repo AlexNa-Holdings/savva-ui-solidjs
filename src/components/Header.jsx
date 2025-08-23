@@ -74,7 +74,7 @@ export default function Header({ onTogglePane }) {
       class="
         sticky top-0 z-10
         bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
-        border-b shadow-sm
+        shadow-sm
       "
     >
       <Container>

@@ -27,7 +27,7 @@ tabs:
           count: 7
   - type: new
     right_panel:
-      available: true
+      available: false
       blocks:
         - type: content_List
           list_name: main
