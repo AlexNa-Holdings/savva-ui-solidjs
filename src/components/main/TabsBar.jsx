@@ -7,6 +7,7 @@ import { useHashRouter, navigate } from "../../routing/hashRouter";
 import Tabs from "../ui/Tabs.jsx";
 import { getTabComponent } from "../tabs";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";
+import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
 
 const slug = (s) => String(s || "").trim().toLowerCase();
 const firstSeg = (path) => {
@@ -108,24 +109,15 @@ export default function TabsBar() {
   function handleTabChange(nextId) {
     const entry = (tabsRaw() || []).find((t) => t.id === nextId);
     if (!entry) return;
-    const want = pathFor(entry.type || entry.id);
-    setLastTabRoute(want);
-    batch(() => {
-      setSelectedId(nextId);
-      if (route() !== want) navigate(want);
-    });
+    const newPath = pathFor(entry.type || entry.id);
+    if (route() !== newPath) {
+      navigate(newPath);
+    }
   }
 
-  // --- Simplified Render Logic ---
   const activeTab = createMemo(() => (tabsRaw() || []).find(t => t.id === selectedId()));
   const rightPanelConfig = createMemo(() => activeTab()?._raw?.right_panel);
   const isRailVisible = createMemo(() => rightPanelConfig()?.available);
-
-    // --- DEBUG LOG ---
-  createEffect(() => {
-    console.log(`[DEBUG in TabsBar] isRailVisible changed to:`, isRailVisible());
-  });
-  // --- END DEBUG LOG ---
 
   return (
     <section class="w-full">
@@ -135,20 +127,15 @@ export default function TabsBar() {
         </Show>
 
         <div class="tabs_panel">
-          <Show when={activeTab()}>
+          <Show when={activeTab()} keyed>
             {(tab) => {
-              const Comp = getTabComponent(tab().type);
-              const title = t(`tabs.title.${slug(tab().type)}`) || t("main.tabs.untitled");
+              const Comp = getTabComponent(tab.type);
+              const title = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
 
               return (
                 <RightRailLayout rightPanelConfig={rightPanelConfig()}>
-                  <Show when={Comp} fallback={
-                    <>
-                      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h3>
-                      <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("main.tabs.empty")}</p>
-                    </>
-                  }>
-                    <Comp title={title} tab={tab()} isRailVisible={isRailVisible()} />
+                  <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
+                    <Comp title={title} tab={tab} isRailVisible={isRailVisible()} />
                   </Show>
                 </RightRailLayout>
               );

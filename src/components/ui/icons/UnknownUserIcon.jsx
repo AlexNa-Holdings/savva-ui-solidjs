@@ -1,7 +1,13 @@
 // src/components/ui/icons/UnknownUserIcon.jsx
 export default function UnknownUserIcon(props) {
   return (
-    <svg viewBox="0 0 250 250" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <svg
+      viewBox="0 0 250 250"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid slice"
+      {...props}
+    >
       <mask id="mask_unknown_user" mask-type="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="250" height="250">
         <circle cx="125" cy="125" r="125" fill="white" />
       </mask>

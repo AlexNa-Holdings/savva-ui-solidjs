@@ -20,6 +20,7 @@ export default function PostCard(props) {
   const app = useApp();
   const author = () => props.item._raw?.author;
   const content = () => props.item._raw?.savva_content;
+  const isListMode = () => props.mode === 'list';
   
   const displayImageSrc = createMemo(() => {
     return content()?.thumbnail || author()?.avatar;
@@ -33,39 +34,75 @@ export default function PostCard(props) {
     return getLocalizedField(content()?.locales, "text_preview", app.lang());
   });
 
-  return (
-    <article class="flex flex-col rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-      <div class="aspect-video w-full overflow-hidden rounded-t-lg border-b border-[hsl(var(--border))]">
-        <Show
-          when={displayImageSrc()}
-          fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-        >
-          {(cid) => <IpfsImage src={cid()} />}
+  const articleClasses = createMemo(() => {
+    const base = "rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex overflow-hidden";
+    // In list mode, set a fixed height for the card.
+    return isListMode() ? `${base} flex-row h-36` : `${base} flex-col`;
+  });
+
+  const imageContainerClasses = createMemo(() => {
+    return isListMode()
+      // In list mode, height is 100% of the card, and width is derived from the aspect ratio.
+      ? "h-full shrink-0 aspect-video border-l border-[hsl(var(--border))]"
+      : "aspect-video w-full border-b border-[hsl(var(--border))]";
+  });
+
+  const contentContainerClasses = createMemo(() => {
+    return isListMode()
+      ? "p-3 flex-1 flex flex-col min-w-0"
+      : "px-3 pb-3 flex-1 flex flex-col";
+  });
+
+  const ImageBlock = () => (
+    <div class={imageContainerClasses()}>
+      <Show
+        when={displayImageSrc()}
+        fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+      >
+        {(cid) => <IpfsImage src={cid()} />}
+      </Show>
+    </div>
+  );
+
+  const ContentBlock = () => (
+    <div class={contentContainerClasses()}>
+      <div classList={{ 'pt-2': !isListMode() }}>
+        <UserCard author={author()} />
+      </div>
+      
+      <div class="space-y-1 mt-2">
+        <Show when={title()}>
+          <h4 class="font-semibold line-clamp-2 text-sm text-[hsl(var(--foreground))]">
+            {title()}
+          </h4>
+        </Show>
+        <Show when={textPreview()}>
+          <p class="text-xs leading-snug text-[hsl(var(--muted-foreground))] line-clamp-3">
+            {textPreview()}
+          </p>
         </Show>
       </div>
 
-      <div class="px-3 pb-3 flex-1 flex flex-col">
-        <div class="pt-2">
-            <UserCard author={author()} />
-        </div>
-        
-        <div class="space-y-1 mt-2">
-          <Show when={title()}>
-            <h4 class="font-semibold line-clamp-2 text-sm text-[hsl(var(--foreground))]">
-              {title()}
-            </h4>
-          </Show>
-          <Show when={textPreview()}>
-            <p class="text-xs leading-snug text-[hsl(var(--muted-foreground))] line-clamp-3">
-              {textPreview()}
-            </p>
-          </Show>
-        </div>
-
-        <div class="mt-auto pt-2 text-xs text-[hsl(var(--muted-foreground))] border-t border-[hsl(var(--border))]">
-          — Posted just now
-        </div>
+      <div class="mt-auto pt-2 text-xs text-[hsl(var(--muted-foreground))] border-t border-[hsl(var(--border))]">
+        — Posted just now
       </div>
+    </div>
+  );
+
+  return (
+    <article class={articleClasses()}>
+      <Show
+        when={isListMode()}
+        fallback={
+          <>
+            <ImageBlock />
+            <ContentBlock />
+          </>
+        }
+      >
+        <ContentBlock />
+        <ImageBlock />
+      </Show>
     </article>
   );
 }

@@ -247,141 +247,6 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/layout/RightRail.jsx">
-// src/components/layout/RightRail.jsx
-import { For, Switch, Match } from "solid-js";
-import HtmlBlock from "../widgets/HtmlBlock.jsx";
-import ContentListBlock from "../widgets/ContentListBlock.jsx";
-
-export default function RightRail(props) {
-  const blocks = () => props.config?.blocks || [];
-
-  return (
-    <For each={blocks()}>
-      {(block, i) => (
-        <div classList={{ "border-t border-[hsl(var(--border))]": i() > 0 }}>
-          <Switch>
-            <Match when={block.type === 'html'}>
-              <HtmlBlock block={block} />
-            </Match>
-            <Match when={block.type === 'content_List'}>
-              <ContentListBlock block={block} />
-            </Match>
-          </Switch>
-        </div>
-      )}
-    </For>
-  );
-}
-</file>
-
-<file path="src/components/widgets/ContentListBlock.jsx">
-// src/components/widgets/ContentListBlock.jsx
-import { createMemo, createResource } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader.js";
-
-/**
- * Selects the best title string from a locale object.
- * Logic: current lang -> '*' -> 'en' -> first available.
- */
-function getLocalizedTitle(titleData, currentLang) {
-    if (!titleData || typeof titleData !== 'object') return "";
-    
-    // 1. Current language
-    if (titleData[currentLang]) return titleData[currentLang];
-    // 2. Wildcard fallback
-    if (titleData['*']) return titleData['*'];
-    // 3. English fallback
-    if (titleData.en) return titleData.en;
-    // 4. First available fallback
-    const firstKey = Object.keys(titleData)[0];
-    return firstKey ? titleData[firstKey] : "";
-}
-
-export default function ContentListBlock(props) {
-  const app = useApp();
-
-  // 1. Get the path to the content_lists module from the main domain config.
-  const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
-
-  // 2. Fetch and parse the content_lists module file.
-  const [contentListModule] = createResource(modulePath, async (path) => {
-    if (!path) return null;
-    try {
-      return await loadAssetResource(app, path, { type: 'yaml' });
-    } catch (e) {
-      console.error(`Failed to load content list module from ${path}`, e);
-      return null;
-    }
-  });
-  
-  // 3. Find the specific list definition using the list_name from props.
-  const listDefinition = createMemo(() => {
-    const listName = props.block?.list_name;
-    if (!listName) return null;
-    return contentListModule()?.list?.[listName] || null;
-  });
-
-  // 4. Extract the localized title from the definition.
-  const title = createMemo(() => {
-    const def = listDefinition();
-    return getLocalizedTitle(def?.title, app.lang());
-  });
-
-  return (
-    <div class="p-3">
-      <h4 class="font-semibold text-sm mb-2">{title() || props.block?.list_name}</h4>
-      <div class="text-xs text-[hsl(var(--muted-foreground))]">
-        Content feed placeholder...
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/widgets/HtmlBlock.jsx">
-// src/components/widgets/HtmlBlock.jsx
-import { createMemo, createResource } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-
-/**
- * Selects the best path from a block's locale object.
- * Logic: current lang -> '*' -> 'en' -> first available.
- */
-function getLocalizedPath(block, currentLang) {
-  if (!block || typeof block !== 'object') return null;
-  
-  if (block[currentLang]) return block[currentLang];
-  if (block['*']) return block['*'];
-  if (block.en) return block.en;
-  
-  // Fallback to the first key that isn't 'type'
-  const fallbackKey = Object.keys(block).find(k => k !== 'type');
-  return fallbackKey ? block[fallbackKey] : null;
-}
-
-export default function HtmlBlock(props) {
-  const app = useApp();
-  const path = createMemo(() => getLocalizedPath(props.block, app.lang()));
-  
-  const [htmlContent] = createResource(path, async (p) => {
-    if (!p) return "";
-    try {
-      return await loadAssetResource(app, p, { type: 'text' });
-    } catch (e) {
-      console.error(`Failed to load HTML block from ${p}`, e);
-      return `<p class="text-red-500">Error loading content.</p>`;
-    }
-  });
-
-  return (
-    <div class="p-3 text-sm space-y-2" innerHTML={htmlContent() || ""} />
-  );
-}
-</file>
-
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 540 879.4">
@@ -3403,39 +3268,38 @@ export default function PostCard(props) {
 }
 </file>
 
-<file path="src/components/feed/PostListView.jsx">
-// src/components/feed/PostListView.jsx
-import { For, createMemo } from "solid-js";
-import PostCard from "./PostCard.jsx";
-
-export default function PostListView(props) {
-  const mode = () => (props.mode === "grid" ? "grid" : "list");
-
-  // This memo now builds a more responsive grid class
-  const gridClass = createMemo(() => {
-    const base = "grid gap-3 grid-cols-1 sm:grid-cols-2";
-    
-    // When right rail is visible, use a 2-column layout on large screens.
-    // When hidden, expand to a 3 or 4-column layout.
-    return props.isRailVisible
-      ? `${base} lg:grid-cols-2 xl:grid-cols-3`
-      : `${base} lg:grid-cols-3 xl:grid-cols-4`;
-  });
-
-  return (
-    <div class={mode() === "grid" ? gridClass() : "flex flex-col gap-3"}>
-      <For each={props.items}>
-        {(item) => <PostCard item={item} />}
-      </For>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/layout/Container.jsx">
 // src/components/layout/Container.jsx
 export default function Container(props) {
   return <div class={`sv-container ${props.class || ""}`}>{props.children}</div>;
+}
+</file>
+
+<file path="src/components/layout/RightRail.jsx">
+// src/components/layout/RightRail.jsx
+import { For, Switch, Match } from "solid-js";
+import HtmlBlock from "../widgets/HtmlBlock.jsx";
+import ContentListBlock from "../widgets/ContentListBlock.jsx";
+
+export default function RightRail(props) {
+  const blocks = () => props.config?.blocks || [];
+
+  return (
+    <For each={blocks()}>
+      {(block, i) => (
+        <div classList={{ "border-t border-[hsl(var(--border))]": i() > 0 }}>
+          <Switch>
+            <Match when={block.type === 'html'}>
+              <HtmlBlock block={block} />
+            </Match>
+            <Match when={block.type === 'content_List'}>
+              <ContentListBlock block={block} />
+            </Match>
+          </Switch>
+        </div>
+      )}
+    </For>
+  );
 }
 </file>
 
@@ -4305,6 +4169,113 @@ export default function UserCard(props) {
             </div>
         </Show>
     );
+}
+</file>
+
+<file path="src/components/widgets/ContentListBlock.jsx">
+// src/components/widgets/ContentListBlock.jsx
+import { createMemo, createResource } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader.js";
+
+/**
+ * Selects the best title string from a locale object.
+ * Logic: current lang -> '*' -> 'en' -> first available.
+ */
+function getLocalizedTitle(titleData, currentLang) {
+    if (!titleData || typeof titleData !== 'object') return "";
+    
+    // 1. Current language
+    if (titleData[currentLang]) return titleData[currentLang];
+    // 2. Wildcard fallback
+    if (titleData['*']) return titleData['*'];
+    // 3. English fallback
+    if (titleData.en) return titleData.en;
+    // 4. First available fallback
+    const firstKey = Object.keys(titleData)[0];
+    return firstKey ? titleData[firstKey] : "";
+}
+
+export default function ContentListBlock(props) {
+  const app = useApp();
+
+  // 1. Get the path to the content_lists module from the main domain config.
+  const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
+
+  // 2. Fetch and parse the content_lists module file.
+  const [contentListModule] = createResource(modulePath, async (path) => {
+    if (!path) return null;
+    try {
+      return await loadAssetResource(app, path, { type: 'yaml' });
+    } catch (e) {
+      console.error(`Failed to load content list module from ${path}`, e);
+      return null;
+    }
+  });
+  
+  // 3. Find the specific list definition using the list_name from props.
+  const listDefinition = createMemo(() => {
+    const listName = props.block?.list_name;
+    if (!listName) return null;
+    return contentListModule()?.list?.[listName] || null;
+  });
+
+  // 4. Extract the localized title from the definition.
+  const title = createMemo(() => {
+    const def = listDefinition();
+    return getLocalizedTitle(def?.title, app.lang());
+  });
+
+  return (
+    <div class="p-3">
+      <h4 class="font-semibold text-sm mb-2">{title() || props.block?.list_name}</h4>
+      <div class="text-xs text-[hsl(var(--muted-foreground))]">
+        Content feed placeholder...
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/widgets/HtmlBlock.jsx">
+// src/components/widgets/HtmlBlock.jsx
+import { createMemo, createResource } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+
+/**
+ * Selects the best path from a block's locale object.
+ * Logic: current lang -> '*' -> 'en' -> first available.
+ */
+function getLocalizedPath(block, currentLang) {
+  if (!block || typeof block !== 'object') return null;
+  
+  if (block[currentLang]) return block[currentLang];
+  if (block['*']) return block['*'];
+  if (block.en) return block.en;
+  
+  // Fallback to the first key that isn't 'type'
+  const fallbackKey = Object.keys(block).find(k => k !== 'type');
+  return fallbackKey ? block[fallbackKey] : null;
+}
+
+export default function HtmlBlock(props) {
+  const app = useApp();
+  const path = createMemo(() => getLocalizedPath(props.block, app.lang()));
+  
+  const [htmlContent] = createResource(path, async (p) => {
+    if (!p) return "";
+    try {
+      return await loadAssetResource(app, p, { type: 'text' });
+    } catch (e) {
+      console.error(`Failed to load HTML block from ${p}`, e);
+      return `<p class="text-red-500">Error loading content.</p>`;
+    }
+  });
+
+  return (
+    <div class="p-3 text-sm space-y-2" innerHTML={htmlContent() || ""} />
+  );
 }
 </file>
 
@@ -5548,51 +5519,6 @@ sections:
         file: core-concepts/domain.md
 </file>
 
-<file path="public/domain_default/modules/tabs.yaml">
-tabs:
-  - type: leaders
-    right_panel:
-      available: true
-      blocks:
-        - type: html
-          en: /html/info_block_en.html
-          ru: /html/info_block_ru.html
-          ua: /html/info_block_ua.html
-          fr: /html/info_block_fr.html
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: actual
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: comments
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: new
-    right_panel:
-      available: false
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: for-you
-    private: true
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-</file>
-
 <file path="public/domain_default/config.yaml">
 logo:
   light: images/logo_light.png
@@ -6242,6 +6168,31 @@ export default function MarkdownView(props) {
 }
 </file>
 
+<file path="src/components/feed/PostListView.jsx">
+// src/components/feed/PostListView.jsx
+import { For, createMemo, createEffect } from "solid-js";
+import PostCard from "./PostCard.jsx";
+
+export default function PostListView(props) {
+  const mode = () => (props.mode === "grid" ? "grid" : "list");
+
+  const gridClass = createMemo(() => {
+    const base = "grid gap-3 grid-cols-1 sm:grid-cols-2";
+    return props.isRailVisible
+      ? `${base} lg:grid-cols-3 xl:grid-cols-3`
+      : `${base} lg:grid-cols-4 xl:grid-cols-4`;
+  });
+
+  return (
+    <div class={mode() === "grid" ? gridClass() : "flex flex-col gap-3"}>
+      <For each={props.items}>
+        {(item) => <PostCard item={item} />}
+      </For>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -6419,41 +6370,6 @@ const REGISTRY = {
 export function getTabComponent(type) {
   const key = String(type || "").toLowerCase();
   return REGISTRY[key] || null;
-}
-</file>
-
-<file path="src/components/tabs/RightRailLayout.jsx">
-// src/components/tabs/RightRailLayout.jsx
-import { Show } from "solid-js";
-import RightRail from "../layout/RightRail.jsx";
-
-const HEADER_H = 48;
-
-export default function RightRailLayout(props) {
-  return (
-    <section
-      class="w-full"
-      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
-    >
-      <Show
-        when={props.rightPanelConfig?.available}
-        fallback={
-          // When the right panel is unavailable, render content in a single column.
-          <div>{props.children}</div>
-        }
-      >
-        {/* When the right panel is available, render the two-column grid. */}
-        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
-          <div>{props.children}</div>
-          <aside class="hidden md:block sticky top-16">
-            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-              <RightRail config={props.rightPanelConfig} />
-            </div>
-          </aside>
-        </div>
-      </Show>
-    </section>
-  );
 }
 </file>
 
@@ -7472,6 +7388,51 @@ That’s it! 🎉 You’re ready to start working with the **SAVVA Platform**.
 ```
 </file>
 
+<file path="public/domain_default/modules/tabs.yaml">
+tabs:
+  - type: leaders
+    right_panel:
+      available: true
+      blocks:
+        - type: html
+          en: /html/info_block_en.html
+          ru: /html/info_block_ru.html
+          ua: /html/info_block_ua.html
+          fr: /html/info_block_fr.html
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: actual
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: comments
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: new
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: for-you
+    private: true
+    right_panel:
+      available: true
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+</file>
+
 <file path="public/default_connect.yaml">
 domain: savva.app
 backendLink: https://ui.savva.app/api/
@@ -7759,74 +7720,6 @@ async function translateTo(langCode, englishPairs) {
 });
 </file>
 
-<file path="src/components/feed/ContentFeed.jsx">
-// src/components/feed/ContentFeed.jsx
-import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import PostListView from "./PostListView.jsx";
-
-export default function ContentFeed(props) {
-  const { t } = useApp();
-  const [items, setItems] = createSignal([]);
-  const [page, setPage] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
-
-  async function loadMore() {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-    try {
-      const nextPage = page() + 1;
-      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
-      if (!chunk.length) setHasMore(false);
-      setItems((prev) => prev.concat(chunk));
-      setPage(nextPage);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(() => {
-    loadMore();
-    const handleScroll = () => {
-      const scrollThreshold = 600;
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (scrolledToBottom) loadMore();
-    };
-    let timeoutId = null;
-    const throttledHandleScroll = () => {
-      if (timeoutId === null) {
-        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
-      }
-    };
-    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
-    onCleanup(() => {
-      window.removeEventListener('scroll', throttledHandleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    });
-  });
-
-  // This effect will reset the feed when the category changes.
-  createEffect(on(() => props.resetOn, () => {
-    // Using on() with defer: true ensures this only runs on changes, not on initial render.
-    setItems([]);
-    setPage(0);
-    setHasMore(true);
-    setLoading(false); // Ensure loading is reset
-    queueMicrotask(loadMore); // Fetch new data after state updates
-  }, { defer: true }));
-
-  return (
-    <div class="w-full">
-      <PostListView items={items()} mode={props.mode} />
-      <Show when={loading()}>
-        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/main/MainView.jsx">
 // src/components/main/MainView.jsx
 import { createMemo, Show } from "solid-js";
@@ -7864,6 +7757,41 @@ export default function MainView() {
         </Show>
       </div>
     </Container>
+  );
+}
+</file>
+
+<file path="src/components/tabs/RightRailLayout.jsx">
+// src/components/tabs/RightRailLayout.jsx
+import { Show } from "solid-js";
+import RightRail from "../layout/RightRail.jsx";
+
+const HEADER_H = 48;
+
+export default function RightRailLayout(props) {
+  return (
+    <section
+      class="w-full"
+      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
+    >
+      <Show
+        when={props.rightPanelConfig?.available}
+        fallback={
+          // When the right panel is unavailable, render content in a single column.
+          <div>{props.children}</div>
+        }
+      >
+        {/* When the right panel is available, render the two-column grid. */}
+        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
+          <div>{props.children}</div>
+          <aside class="hidden md:block sticky top-16">
+            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+              <RightRail config={props.rightPanelConfig} />
+            </div>
+          </aside>
+        </div>
+      </Show>
+    </section>
   );
 }
 </file>
@@ -8599,6 +8527,76 @@ export default {
 }
 </file>
 
+<file path="src/components/feed/ContentFeed.jsx">
+// src/components/feed/ContentFeed.jsx
+import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import PostListView from "./PostListView.jsx";
+
+export default function ContentFeed(props) {
+  const { t } = useApp();
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    try {
+      const nextPage = page() + 1;
+      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
+      if (!chunk.length) setHasMore(false);
+      setItems((prev) => prev.concat(chunk));
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(() => {
+    loadMore();
+    const handleScroll = () => {
+      const scrollThreshold = 600;
+      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
+      if (scrolledToBottom) loadMore();
+    };
+    let timeoutId = null;
+    const throttledHandleScroll = () => {
+      if (timeoutId === null) {
+        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
+      }
+    };
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+    onCleanup(() => {
+      window.removeEventListener('scroll', throttledHandleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  });
+
+  createEffect(on(() => props.resetOn, () => {
+    setItems([]);
+    setPage(0);
+    setHasMore(true);
+    setLoading(false);
+    queueMicrotask(loadMore);
+  }, { defer: true }));
+
+  return (
+    <div class="w-full">
+      <PostListView
+        items={items()}
+        mode={props.mode}
+        isRailVisible={props.isRailVisible}
+      />
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/Tabs.jsx">
 // src/components/ui/Tabs.jsx
 import { For, createSignal, onMount, onCleanup } from "solid-js";
@@ -8961,19 +8959,16 @@ function useDomainCategories(app) {
   return cats;
 }
 
-export default function NewTab() {
+export default function NewTab(props) {
   const app = useApp();
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
   const categoriesRes = useDomainCategories(app);
   const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
 
-  // This effect now preserves the selection if the category still exists in the new list.
   createEffect(() => {
     const newList = categoriesRes();
     const currentSelection = category();
-
-    // Reset to "ALL" only if the new list has loaded and the current selection is no longer valid.
     if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
       setCategory("ALL");
     }
@@ -9449,183 +9444,6 @@ html.dark .sv-docs code[data-theme*=" "] span {
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
-<file path="src/components/Header.jsx">
-// File: src/components/Header.jsx
-import { Show, createSignal, onMount } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import {
-  connectWallet,
-  walletAccount,
-  walletChainId,
-  isWalletAvailable,
-  eagerConnect,
-} from "../blockchain/wallet";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-import Container from "./layout/Container";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const [copyState, setCopyState] = createSignal("");
-  const [eagerDone, setEagerDone] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatched = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  onMount(async () => {
-    if (isWalletAvailable()) {
-      await eagerConnect();
-    }
-    setEagerDone(true);
-  });
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) {
-        try { await app.ensureWalletOnDesiredChain(); } catch {}
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(walletAccount());
-      setCopyState("copied");
-      setTimeout(() => setCopyState(""), 1200);
-    } catch {}
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  const chainLogoSrc = () => {
-    const id = desiredId();
-    return id ? getChainLogo(id) : null;
-  };
-
-  return (
-    <header
-      class="
-        sticky top-0 z-10
-        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
-        shadow-sm
-      "
-    >
-      <Container>
-        <div class="h-12 px-2 flex items-center justify-between">
-          {/* Left: brand */}
-          <div class="flex items-center">
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-          </div>
-
-          {/* Right: wallet + menu */}
-          <div class="flex items-center gap-2">
-            <Show
-              when={walletAccount()}
-              fallback={
-                <Show when={eagerDone() && isWalletAvailable()}>
-                  <button
-                    class="
-                      px-3 py-1 rounded
-                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
-                      hover:opacity-90
-                    "
-                    onClick={onConnect}
-                    title={app.t("wallet.connect")}
-                    aria-label={app.t("wallet.connect")}
-                  >
-                    {app.t("wallet.connect")}
-                  </button>
-                </Show>
-              }
-            >
-              <div class="flex items-center gap-2">
-                <button
-                  class="
-                    px-2 py-1 rounded
-                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
-                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
-                  "
-                  onClick={copyAddress}
-                  title={app.t("wallet.copyAddress")}
-                  aria-label={app.t("wallet.copyAddress")}
-                >
-                  {shortAddr(walletAccount())}
-                </button>
-
-                <Show
-                  when={!mismatched()}
-                  fallback={
-                    <button
-                      class="
-                        px-2 py-1 rounded
-                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
-                        hover:opacity-90
-                      "
-                      onClick={onSwitchChain}
-                      title={app.t("wallet.changeChain")}
-                      aria-label={app.t("wallet.changeChain")}
-                    >
-                      {app.t("wallet.changeChain")}
-                    </button>
-                  }
-                >
-                  <Show when={chainLogoSrc()}>
-                    <img
-                      src={chainLogoSrc()}
-                      alt="chain"
-                      class="w-5 h-5"
-                      title={app.t("wallet.onRequiredNetwork")}
-                    />
-                  </Show>
-                </Show>
-
-                <Show when={copyState() === "copied"}>
-                  <span class="text-xs text-[hsl(var(--primary))]">{app.t("wallet.copied")}</span>
-                </Show>
-              </div>
-            </Show>
-
-            <button
-              class="
-                p-1 rounded transition
-                text-[hsl(var(--muted-foreground))]
-                hover:bg-[hsl(var(--muted))]
-              "
-              onClick={onTogglePane}
-              aria-label={app.t("menu.open")}
-              title={app.t("menu.open")}
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </Container>
-    </header>
-  );
-}
-</file>
-
 <file path="src/components/settings/LocalIpfsSection.jsx">
 // LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
@@ -9801,6 +9619,183 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
             </div>
         </Show>
     </section>
+  );
+}
+</file>
+
+<file path="src/components/Header.jsx">
+// File: src/components/Header.jsx
+import { Show, createSignal, onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import {
+  connectWallet,
+  walletAccount,
+  walletChainId,
+  isWalletAvailable,
+  eagerConnect,
+} from "../blockchain/wallet";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const [copyState, setCopyState] = createSignal("");
+  const [eagerDone, setEagerDone] = createSignal(false);
+
+  const desiredId = () => app.desiredChainId();
+  const mismatched = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  onMount(async () => {
+    if (isWalletAvailable()) {
+      await eagerConnect();
+    }
+    setEagerDone(true);
+  });
+
+  async function onConnect() {
+    try {
+      await connectWallet();
+      if (desiredId()) {
+        try { await app.ensureWalletOnDesiredChain(); } catch {}
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+      setCopyState("copied");
+      setTimeout(() => setCopyState(""), 1200);
+    } catch {}
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  const chainLogoSrc = () => {
+    const id = desiredId();
+    return id ? getChainLogo(id) : null;
+  };
+
+  return (
+    <header
+      class="
+        sticky top-0 z-10
+        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
+        shadow-sm
+      "
+    >
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          {/* Left: brand */}
+          <div class="flex items-center">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+          </div>
+
+          {/* Right: wallet + menu */}
+          <div class="flex items-center gap-2">
+            <Show
+              when={walletAccount()}
+              fallback={
+                <Show when={eagerDone() && isWalletAvailable()}>
+                  <button
+                    class="
+                      px-3 py-1 rounded
+                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
+                      hover:opacity-90
+                    "
+                    onClick={onConnect}
+                    title={app.t("wallet.connect")}
+                    aria-label={app.t("wallet.connect")}
+                  >
+                    {app.t("wallet.connect")}
+                  </button>
+                </Show>
+              }
+            >
+              <div class="flex items-center gap-2">
+                <button
+                  class="
+                    px-2 py-1 rounded
+                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
+                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
+                  "
+                  onClick={copyAddress}
+                  title={app.t("wallet.copyAddress")}
+                  aria-label={app.t("wallet.copyAddress")}
+                >
+                  {shortAddr(walletAccount())}
+                </button>
+
+                <Show
+                  when={!mismatched()}
+                  fallback={
+                    <button
+                      class="
+                        px-2 py-1 rounded
+                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
+                        hover:opacity-90
+                      "
+                      onClick={onSwitchChain}
+                      title={app.t("wallet.changeChain")}
+                      aria-label={app.t("wallet.changeChain")}
+                    >
+                      {app.t("wallet.changeChain")}
+                    </button>
+                  }
+                >
+                  <Show when={chainLogoSrc()}>
+                    <img
+                      src={chainLogoSrc()}
+                      alt="chain"
+                      class="w-5 h-5"
+                      title={app.t("wallet.onRequiredNetwork")}
+                    />
+                  </Show>
+                </Show>
+
+                <Show when={copyState() === "copied"}>
+                  <span class="text-xs text-[hsl(var(--primary))]">{app.t("wallet.copied")}</span>
+                </Show>
+              </div>
+            </Show>
+
+            <button
+              class="
+                p-1 rounded transition
+                text-[hsl(var(--muted-foreground))]
+                hover:bg-[hsl(var(--muted))]
+              "
+              onClick={onTogglePane}
+              aria-label={app.t("menu.open")}
+              title={app.t("menu.open")}
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
   );
 }
 </file>
@@ -10189,6 +10184,153 @@ export default function Settings() {
 }
 </file>
 
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "default.avatar": "Аватар",
+  "default.user": "Пользователь",
+  "docs.article": "Статья документации",
+  "docs.copied": "Скопировано в буфер обмена!",
+  "docs.copy": "Копировать",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+  "error.connection.title": "Ошибка подключения",
+  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
+  "error.ws.title": "Ошибка подключения",
+  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
+  "ipfs.diag.cors.name": "Проверка CORS шлюза",
+  "ipfs.diag.cors.ok": "CORS настроен правильно.",
+  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
+  "ipfs.diag.fetch.name": "Получение из живого шлюза",
+  "ipfs.diag.fetch.ok": "Запрос успешен.",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
+  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
+  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
+  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
+  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
+  "ipfs.diag.liveness.error": "Узел не отвечает.",
+  "ipfs.diag.liveness.name": "Проверка работоспособности API",
+  "ipfs.diag.liveness.ok": "Узел работает.",
+  "ipfs.diag.run": "Запустить диагностику",
+  "ipfs.diag.title": "Диагностика узла IPFS",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.group": "Просмотреть группу",
+  "newTab.view.list": "Список",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.clear": "Очистить лог",
+  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
+  "settings.developer.debug.copy": "Скопировать лог",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
+  "stakerLevels.clam": "Моллюск",
+  "stakerLevels.dolphin": "Дельфин",
+  "stakerLevels.fish": "Рыба",
+  "stakerLevels.guest": "Гость",
+  "stakerLevels.orca": "Косатка",
+  "stakerLevels.seahorse": "Морской конек",
+  "stakerLevels.shark": "Акула",
+  "stakerLevels.shrimp": "Креветка",
+  "stakerLevels.stingray": "Скат",
+  "stakerLevels.whale": "Кит",
+  "tabs.aria": "Вкладки раздела",
+  "tabs.title.actual": "Актуально",
+  "tabs.title.comments": "Комментарии",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лидеры",
+  "tabs.title.new": "Новый",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copied": "Скопировано",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети"
+};
+</file>
+
+<file path="src/version.js">
+// src/version.js
+export const APP_VERSION = "0.101";
+</file>
+
 <file path="src/components/main/TabsBar.jsx">
 // src/components/main/TabsBar.jsx
 import { createResource, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
@@ -10345,153 +10487,6 @@ export default function TabsBar() {
     </section>
   );
 }
-</file>
-
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "default.avatar": "Аватар",
-  "default.user": "Пользователь",
-  "docs.article": "Статья документации",
-  "docs.copied": "Скопировано в буфер обмена!",
-  "docs.copy": "Копировать",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
-  "error.connection.retry": "Обновить страницу",
-  "error.connection.title": "Ошибка подключения",
-  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
-  "error.ws.title": "Ошибка подключения",
-  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
-  "ipfs.diag.cors.name": "Проверка CORS шлюза",
-  "ipfs.diag.cors.ok": "CORS настроен правильно.",
-  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
-  "ipfs.diag.fetch.name": "Получение из живого шлюза",
-  "ipfs.diag.fetch.ok": "Запрос успешен.",
-  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
-  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
-  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
-  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
-  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
-  "ipfs.diag.liveness.error": "Узел не отвечает.",
-  "ipfs.diag.liveness.name": "Проверка работоспособности API",
-  "ipfs.diag.liveness.ok": "Узел работает.",
-  "ipfs.diag.run": "Запустить диагностику",
-  "ipfs.diag.title": "Диагностика узла IPFS",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.group": "Просмотреть группу",
-  "newTab.view.list": "Список",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.clear": "Очистить лог",
-  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
-  "settings.developer.debug.copy": "Скопировать лог",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
-  "stakerLevels.clam": "Моллюск",
-  "stakerLevels.dolphin": "Дельфин",
-  "stakerLevels.fish": "Рыба",
-  "stakerLevels.guest": "Гость",
-  "stakerLevels.orca": "Косатка",
-  "stakerLevels.seahorse": "Морской конек",
-  "stakerLevels.shark": "Акула",
-  "stakerLevels.shrimp": "Креветка",
-  "stakerLevels.stingray": "Скат",
-  "stakerLevels.whale": "Кит",
-  "tabs.aria": "Вкладки раздела",
-  "tabs.title.actual": "Актуально",
-  "tabs.title.comments": "Комментарии",
-  "tabs.title.for-you": "Для вас",
-  "tabs.title.leaders": "Лидеры",
-  "tabs.title.new": "Новый",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copied": "Скопировано",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
-};
-</file>
-
-<file path="src/version.js">
-// src/version.js
-export const APP_VERSION = "0.101";
 </file>
 
 <file path="src/context/AppContext.jsx">

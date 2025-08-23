@@ -67,12 +67,6 @@ export default function NewTab(props) {
     }
   }
 
-    // --- DEBUG LOG ---
-  createEffect(() => {
-    console.log(`[DEBUG in NewTab] Received props.isRailVisible:`, props.isRailVisible);
-  });
-  // --- END DEBUG LOG ---
-
   return (
     <section class="w-full">
       <div class="mb-3 flex items-center gap-3">

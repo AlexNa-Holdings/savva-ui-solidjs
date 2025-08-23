@@ -1,5 +1,4 @@
 // src/components/ui/IpfsImage.jsx
-
 import { createSignal, createEffect, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { ipfs } from "../../ipfs/index.js";
@@ -29,13 +28,10 @@ export default function IpfsImage(props) {
       const { url } = await ipfs.fetchBest(app, props.src);
       setImageUrl(url);
     } catch (e) {
-      // --- MODIFICATION START ---
-      // Removed the `if` condition to ensure the toast appears for ALL failures.
       pushErrorToast(e, {
-        context: "IPFS image failed to load.", // Made the message more general
+        context: "IPFS image failed to load.",
         cid: props.src,
       });
-      // --- MODIFICATION END ---
       
       console.error(`[IpfsImage] All gateways failed for ${props.src}:`, e.causes || e);
       setError(true);
@@ -55,7 +51,7 @@ export default function IpfsImage(props) {
         <img
           src={imageUrl()}
           alt={props.alt || "IPFS Image"}
-          class="w-full h-full object-cover"
+          class="absolute inset-0 w-full h-full object-cover"
         />
       </Show>
       <Show when={!loading() && error()}>
