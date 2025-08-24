@@ -29,30 +29,30 @@ let i18nSingleton;
 // t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
 // t("tabs.title.new") t("tabs.title.for-you")
 
-// Domain dictionaries loaded from assets/config.yaml
-const [domainDicts, setDomainDicts] = createSignal({});
-
 function normalizeLang(code) {
   const s = String(code || "").trim().toLowerCase();
   const [base] = s.split(/[-_]/); // "en-US" -> "en"
   return base || DEFAULT_LANG;
 }
 
-// Keep domain → app → EN fallback order
-function resolveKey(lang, key) {
-  const d = domainDicts();
-  const fromDomain = d[lang]?.[key];
-  if (fromDomain != null) return fromDomain;
-
-  const fromApp = APP_DICTS[lang]?.[key];
-  if (fromApp != null) return fromApp;
-
-  if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
-  return `[${key}]`;
-}
-
 export function useI18n() {
   if (!i18nSingleton) {
+    // --- FIX: Moved the signal from the top level into this initialization block ---
+    const [domainDicts, setDomainDicts] = createSignal({});
+
+    // Keep domain → app → EN fallback order
+    const resolveKey = (lang, key) => {
+      const d = domainDicts();
+      const fromDomain = d[lang]?.[key];
+      if (fromDomain != null) return fromDomain;
+
+      const fromApp = APP_DICTS[lang]?.[key];
+      if (fromApp != null) return fromApp;
+
+      if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
+      return `[${key}]`;
+    }
+
     const readInitialLang = () => {
       try {
         const v = localStorage.getItem(LANG_KEY);
@@ -121,7 +121,7 @@ export function useI18n() {
       setLang,
       showKeys,
       setShowKeys,
-      available,                 // dynamic list now
+      available,
       setDomainDictionaries: (d) => setDomainDicts(d || {}),
     };
   }

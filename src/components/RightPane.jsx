@@ -1,3 +1,4 @@
+// src/components/RightPane.jsx
 import { createSignal, Show, createMemo, createEffect } from "solid-js";
 import { navigate } from "../routing/hashRouter";
 import { useApp } from "../context/AppContext.jsx";
@@ -46,18 +47,7 @@ export default function RightPane({ isOpen, onClose }) {
                 <li><LangSelector codes={domainLangCodes()} /></li>
               </Show>
 
-              <li>
-                <div
-                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => { navigate("/docs"); onClose(); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/docs"); onClose(); } }}
-                  aria-label={t("docs.nav")}
-                  title={t("docs.nav")}
-                >
-                  {t("docs.nav")}
-                </div>
-              </li>
+              {/* Gear settings link */}
               <Show when={app.config()?.gear}>
                 <li>
                   <div
@@ -70,12 +60,38 @@ export default function RightPane({ isOpen, onClose }) {
                   </div>
                 </li>
               </Show>
+
+              {/* Documentation link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    // --- MODIFICATION: Save scroll position ---
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/docs"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+              {/* Settings link */}
               <li>
                 <div
                   class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                   role="button" tabIndex={0}
-                  onClick={() => { navigate("/settings"); onClose(); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate("/settings"); onClose(); } }}
+                  onClick={() => {
+                    // --- MODIFICATION: Save scroll position ---
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/settings"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
                 >
                   {t("rightPane.settings")}
                 </div>

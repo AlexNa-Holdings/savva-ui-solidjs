@@ -1,5 +1,5 @@
 // src/context/useAppAuth.js
-import { createSignal } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import { getWsClient, getWsApi } from "../net/wsRuntime.js";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { httpBase } from "../net/endpoints.js";
@@ -10,29 +10,31 @@ const AUTH_USER_KEY = "savva_auth_user";
 export function useAppAuth() {
   const [authorizedUser, setAuthorizedUser] = createSignal(null);
 
+  onMount(() => {
+    try {
+      const savedUser = localStorage.getItem(AUTH_USER_KEY);
+      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
+    } catch (e) {
+      console.error("Failed to load authorized user:", e);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+  });
+
   async function login(coreUserData) {
     if (!coreUserData || !coreUserData.address) return;
-
     setAuthorizedUser(coreUserData);
     try {
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
-    } catch (e) {
-      console.error("Failed to save core user data:", e);
-    }
-
-    // The wsCall will use the newly authenticated connection (via cookie).
-    try {
       const checksummedAccount = toChecksumAddress(coreUserData.address);
       const userProfile = await getWsApi().call('get-user', {
         domain: coreUserData.domain,
         user_addr: checksummedAccount,
       });
-
       const fullUserData = { ...coreUserData, ...userProfile };
       setAuthorizedUser(fullUserData);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
     } catch (e) {
-      console.error("Failed to fetch user profile after login:", e);
+      console.error("Failed to fetch/save user profile after login:", e);
       pushErrorToast(e, { context: "Profile fetch failed" });
     }
   }
@@ -55,15 +57,6 @@ export function useAppAuth() {
   function handleAuthError() {
     console.warn("Authorization error detected, logging out.");
     logout();
-  }
-  
-  // Load user from storage on initialization.
-  try {
-    const savedUser = localStorage.getItem(AUTH_USER_KEY);
-    if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
-  } catch (e) {
-    console.error("Failed to load authorized user:", e);
-    localStorage.removeItem(AUTH_USER_KEY);
   }
 
   return { authorizedUser, login, logout, handleAuthError };

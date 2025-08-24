@@ -7,6 +7,7 @@ import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import PostInfo from "./PostInfo.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
+import { navigate } from "../../routing/hashRouter";
 
 function getLocalizedField(locales, fieldName, currentLang) {
   if (!locales || typeof locales !== 'object') return "";
@@ -38,6 +39,26 @@ export default function PostCard(props) {
     return getLocalizedField(content()?.locales, "text_preview", app.lang());
   });
 
+  const handleCardClick = (e) => {
+    if (e.target.closest('.user-card-container')) {
+      return;
+    }
+    e.preventDefault();
+    const postId = props.item?.id; 
+    if (postId) {
+      // --- MODIFICATION: Save scroll position before navigating ---
+      app.setSavedScrollY(window.scrollY);
+      navigate(`/post/${postId}`);
+    } else {
+      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
+    }
+  };
+
+  const handleUserClick = (e) => {
+    e.stopPropagation();
+    console.log("User card clicked, navigating to profile for:", author()?.address);
+  };
+
   const articleClasses = createMemo(() => {
     const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
     return isListMode() ? `${base} flex-row h-40` : `${base} flex-col`;
@@ -47,7 +68,7 @@ export default function PostCard(props) {
     const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
     return `relative shrink-0 ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
   });
-
+  
   const ImageBlock = () => {
     const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
     return (
@@ -57,8 +78,7 @@ export default function PostCard(props) {
           class={roundingClass}
           fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
         />
-        
-         <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
+        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
           <div class="absolute bottom-2 right-0 z-10">
             <PostFundBadge amount={fund()?.amount} />
           </div>
@@ -92,25 +112,20 @@ export default function PostCard(props) {
           </p>
         </Show>
       </div>
-      
-      <div class="mt-1">
+      <div class="mt-1 user-card-container" onClick={handleUserClick}>
         <UserCard author={author()} />
       </div>
-
       <PostInfo item={props.item} mode={props.mode} />
     </div>
   );
 
   return (
-    <article class={articleClasses()}>
+    <article class={articleClasses()} onClick={handleCardClick} style={{ cursor: 'pointer' }}>
       <Show when={props.item._raw?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
           <NftBadge />
         </div>
       </Show>
-
-
-
       <Show
         when={isListMode()}
         fallback={

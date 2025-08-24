@@ -1,5 +1,5 @@
 // src/components/main/TabsBar.jsx
-import { createResource, Show, createMemo, createSignal, createEffect, batch } from "solid-js";
+import { createResource, Show, createMemo, createSignal, createEffect, batch, For } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { useI18n } from "../../i18n/useI18n";
 import { loadAssetResource } from "../../utils/assetLoader";
@@ -52,7 +52,7 @@ function iconFromSpec(spec) {
 
 export default function TabsBar() {
   const app = useApp();
-  const { t, domainAssetsConfig, selectedDomain, setLastTabRoute } = app;
+  const { t, domainAssetsConfig, setLastTabRoute } = app;
   const { lang } = useI18n();
   const { route } = useHashRouter();
 
@@ -96,13 +96,20 @@ export default function TabsBar() {
         setLastTabRoute(route());
       }
     } else {
-      const first = list[0];
-      const defaultPath = pathFor(first.type || first.id);
-      batch(() => {
-        setSelectedId(first.id);
-        navigate(defaultPath, { replace: true });
-        setLastTabRoute(defaultPath);
-      });
+      const r = route();
+      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs");
+      
+      if (isPageRoute) {
+        setSelectedId("");
+      } else {
+        const first = list[0];
+        const defaultPath = pathFor(first.type || first.id);
+        batch(() => {
+          setSelectedId(first.id);
+          navigate(defaultPath, { replace: true });
+          setLastTabRoute(defaultPath);
+        });
+      }
     }
   });
 
@@ -114,11 +121,7 @@ export default function TabsBar() {
       navigate(newPath);
     }
   }
-
-  const activeTab = createMemo(() => (tabsRaw() || []).find(t => t.id === selectedId()));
-  const rightPanelConfig = createMemo(() => activeTab()?._raw?.right_panel);
-  const isRailVisible = createMemo(() => rightPanelConfig()?.available);
-
+  
   return (
     <section class="w-full">
       <div class="sv-container sv-container--no-gutter">
@@ -127,20 +130,25 @@ export default function TabsBar() {
         </Show>
 
         <div class="tabs_panel">
-          <Show when={activeTab()} keyed>
+          {/* --- FIX: Render all tabs and use `display` to show the active one --- */}
+          <For each={tabsRaw()}>
             {(tab) => {
               const Comp = getTabComponent(tab.type);
               const title = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
+              const rightPanelConfig = tab._raw?.right_panel;
+              const isRailVisible = rightPanelConfig?.available;
 
               return (
-                <RightRailLayout rightPanelConfig={rightPanelConfig()}>
-                  <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
-                    <Comp title={title} tab={tab} isRailVisible={isRailVisible()} />
-                  </Show>
-                </RightRailLayout>
+                <div style={{ display: tab.id === selectedId() ? 'block' : 'none' }}>
+                  <RightRailLayout rightPanelConfig={rightPanelConfig}>
+                    <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
+                      <Comp title={title} tab={tab} isRailVisible={isRailVisible} />
+                    </Show>
+                  </RightRailLayout>
+                </div>
               );
             }}
-          </Show>
+          </For>
         </div>
       </div>
     </section>

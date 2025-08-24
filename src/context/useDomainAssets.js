@@ -76,9 +76,8 @@ export function useDomainAssets(app) {
   });
 
   createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
-
-  // MODIFICATION: This effect now correctly depends on the selected domain name.
-  createEffect(on([() => app.info(), () => app.selectedDomainName()], () => {
+  
+  createEffect(on([app.info, app.selectedDomainName, assetsEnv], () => {
     if (app.info()) {
       refreshDomainAssets();
     }

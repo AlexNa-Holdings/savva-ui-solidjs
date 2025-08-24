@@ -24,7 +24,8 @@ export default {
   "docs.section": "Section",
   "docs.sidebar.empty": "No docs yet. Add sidebar.yaml under dev_docs/<lang>/",
   "docs.title": "Developer Docs",
-  "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
+  "error.connection.message":
+    "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
   "error.connection.retry": "Refresh Page",
   "error.connection.title": "Connection Failed",
   "error.ws.message": "Unable to connect. Please try again.",
@@ -35,16 +36,27 @@ export default {
   "ipfs.diag.fetch.errorFirewall": "Fetch failed due to firewall.",
   "ipfs.diag.fetch.name": "Live Gateway Fetch",
   "ipfs.diag.fetch.ok": "Fetch successful.",
-  "ipfs.diag.fetch.warnSkipped": "Skipped: ABI CID not found in /info response.",
-  "ipfs.diag.fix.browser": "If it's running, check your browser. For Brave, disable Shields for this site. For other browsers like Chrome, you may need to 'Allow Insecure content' in Site Settings.",
-  "ipfs.diag.fix.cors": "If it still fails, run this command to fix the API CORS policy:",
-  "ipfs.diag.fix.daemon": "First, ensure your IPFS daemon is running in a terminal:",
-  "ipfs.diag.fix.title": "To fix, run this in your terminal (then restart the daemon):",
+  "ipfs.diag.fetch.warnSkipped":
+    "Skipped: ABI CID not found in /info response.",
+  "ipfs.diag.fix.browser":
+    "If it's running, check your browser. For Brave, disable Shields for this site. For other browsers like Chrome, you may need to 'Allow Insecure content' in Site Settings.",
+  "ipfs.diag.fix.cors":
+    "If it still fails, run this command to fix the API CORS policy:",
+  "ipfs.diag.fix.daemon":
+    "First, ensure your IPFS daemon is running in a terminal:",
+  "ipfs.diag.fix.title":
+    "To fix, run this in your terminal (then restart the daemon):",
   "ipfs.diag.liveness.error": "Node is not responding.",
   "ipfs.diag.liveness.name": "API Liveness Check",
   "ipfs.diag.liveness.ok": "Node is live.",
   "ipfs.diag.run": "Run Diagnostics",
   "ipfs.diag.title": "IPFS Node Diagnostics",
+  "ipfs.diag.fix.gatewayTitle":
+    "Your Gateway config is likely preventing the browser from fetching. Try one of these commands:",
+  "ipfs.diag.fix.gatewaySingleOrigin":
+    "Option 1 (Recommended): Allow only the current origin.",
+  "ipfs.diag.fix.gatewayWildcard":
+    "Option 2 (Easier for Dev): Allow any origin. Use with caution on public nodes.",
   "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",
@@ -55,20 +67,24 @@ export default {
   "newTab.view.list": "List View",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
-  "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.backend.help":
+    "The app will fetch /info from this URL to list supported domains.",
   "rightPane.switch.backend.label": "Backend URL",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.label": "Domain",
   "rightPane.switch.domain.website": "Website",
-  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.noDomains":
+    "Backend returned no domains. You can still apply, but the domain will be empty.",
   "rightPane.switch.open": "Switch backend / domain",
   "rightPane.switch.reload": "Load domains",
   "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
   "rightPane.switch.reset": "Reset to defaults",
-  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
+  "rightPane.switch.reset.title":
+    "Clear local override and reload defaults from default_connect.yaml",
   "rightPane.switch.title": "Switch backend / domain",
   "rightPane.switch.validation.domain": "Domain cannot be empty.",
-  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
+  "rightPane.switch.validation.protocol":
+    "Backend URL must start with http:// or https://",
   "rightPane.theme": "Theme",
   "settings.back": "Back",
   "settings.dev.assets.baseUrl": "Assets base URL",
@@ -83,7 +99,8 @@ export default {
   "settings.dev.assets.diagnostics.hasLocales": "Has locales",
   "settings.dev.assets.diagnostics.hasLogos": "Has logos",
   "settings.dev.assets.diagnostics.hasTabs": "Has tabs",
-  "settings.dev.assets.diagnostics.noteNetwork": "Check your network connection.",
+  "settings.dev.assets.diagnostics.noteNetwork":
+    "Check your network connection.",
   "settings.dev.assets.diagnostics.primary": "Primary config",
   "settings.dev.assets.diagnostics.run": "Run diagnostics",
   "settings.dev.assets.diagnostics.sampleFetches": "Sample fetches",
@@ -143,5 +160,5 @@ export default {
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
 };

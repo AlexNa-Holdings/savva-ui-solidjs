@@ -1,4 +1,5 @@
-import { createSignal, onCleanup, onMount } from "solid-js";
+// src/routing/hashRouter.js
+import { createSignal } from "solid-js";
 
 function readHashPath() {
   const raw = window.location.hash || "";
@@ -8,7 +9,12 @@ function readHashPath() {
 const [route, setRoute] = createSignal(readHashPath());
 
 function setFromHash() {
-  setRoute(readHashPath());
+  const newPath = readHashPath();
+  setRoute(newPath);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("hashchange", setFromHash);
 }
 
 export function navigate(path, { replace = false } = {}) {
@@ -18,11 +24,5 @@ export function navigate(path, { replace = false } = {}) {
 }
 
 export function useHashRouter() {
-  onMount(() => {
-    window.addEventListener("hashchange", setFromHash);
-  });
-  onCleanup(() => {
-    window.removeEventListener("hashchange", setFromHash);
-  });
   return { route, navigate };
 }

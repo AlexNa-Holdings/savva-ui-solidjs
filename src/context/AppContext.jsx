@@ -8,20 +8,23 @@ import { useAppAuth } from "./useAppAuth.js";
 import { useAppConnection } from "./useAppConnection.js";
 import { useDomainAssets } from "./useDomainAssets.js";
 import { pushToast, pushErrorToast } from "../components/ui/toast.js";
+import { useHashRouter } from "../routing/hashRouter.js";
 
 const AppContext = Solid.createContext();
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 export function AppProvider(props) {
-  // 1. Initialize core hooks and simple state
   const i18n = useI18n();
   const auth = useAppAuth();
-  const conn = useAppConnection(auth);
+  const conn = useAppConnection();
   const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
+  
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
+  const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
 
-  // 2. Create memos that depend on the core hooks
+  // --- MODIFICATION: The effect that automatically saved scroll position has been removed ---
+  
   const supportedDomains = Solid.createMemo(() => {
     const list = conn.info()?.domains || [];
     return [...new Set(list.map(d => (typeof d === "string" ? d : d?.name)).filter(Boolean))]
@@ -37,40 +40,34 @@ export function AppProvider(props) {
   });
   
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
+  const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
 
-  // 3. Initialize the assets hook, passing the memos it depends on
-  const assets = useDomainAssets({ 
-    info: conn.info, 
-    selectedDomainName: selectedDomainName, 
-    i18n: i18n 
-  });
-
-  // 4. Create final memos and effects
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
   async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
-
+  
   const remoteIpfsGateways = Solid.createMemo(() => (conn.info()?.ipfs_gateways || []).map(g => g.trim().endsWith("/") ? g : `${g}/`));
   const activeIpfsGateways = Solid.createMemo(() => (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) ? [ipfs.localIpfsGateway()] : remoteIpfsGateways());
-
+  
   Solid.createEffect(() => {
-    const user = auth.authorizedUser();
-    if (user && conn.config() && user.domain !== conn.config().domain) {
+    if (auth.authorizedUser() && conn.config() && auth.authorizedUser().domain !== conn.config().domain) {
       auth.logout();
       pushToast({ type: 'info', message: 'Logged out due to domain change.' });
     }
   });
 
-  // 5. Compose the final value for the context provider
   const value = {
     ...conn, ...auth, ...assets, ...ipfs,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
     showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,
     lastTabRoute, setLastTabRoute,
+    savedScrollY, setSavedScrollY,
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
+    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
+    clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

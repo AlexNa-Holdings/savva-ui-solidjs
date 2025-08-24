@@ -1,4 +1,4 @@
-// LocalIpfsSection.jsx
+// src/components/settings/LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { fetchWithTimeout } from "../../utils/net.js";
@@ -70,7 +70,29 @@ ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`
         await fetchWithTimeout(testUrl);
         results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok") });
       } catch (err) {
-        results.push({ name: t("ipfs.diag.fetch.name"), status: "error", details: t("ipfs.diag.fetch.errorFirewall") });
+        // MODIFICATION START
+        const singleOriginJson = JSON.stringify([currentOrigin]);
+        const wildcardOriginJson = JSON.stringify(['*']);
+
+        const fixCommand = 
+`# ${t("ipfs.diag.fix.gatewayTitle")}
+
+# ${t("ipfs.diag.fix.gatewaySingleOrigin")}
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${singleOriginJson}'
+
+# --- OR ---
+
+# ${t("ipfs.diag.fix.gatewayWildcard")}
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOriginJson}'
+`;
+
+        results.push({
+          name: t("ipfs.diag.fetch.name"),
+          status: "error",
+          details: t("ipfs.diag.fetch.errorFirewall"),
+          fixCommand: fixCommand
+        });
+        // MODIFICATION END
       }
     } else {
       results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
