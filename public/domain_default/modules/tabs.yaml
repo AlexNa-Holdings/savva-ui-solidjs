@@ -13,14 +13,14 @@ tabs:
           count: 7
   - type: actual
     right_panel:
-      available: true
+      available: false
       blocks:
         - type: content_List
           list_name: main
           count: 7
   - type: comments
     right_panel:
-      available: true
+      available: false
       blocks:
         - type: content_List
           list_name: main
@@ -35,7 +35,7 @@ tabs:
   - type: for-you
     private: true
     right_panel:
-      available: true
+      available: false
       blocks:
         - type: content_List
           list_name: main
