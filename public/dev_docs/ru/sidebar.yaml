@@ -9,7 +9,9 @@ sections:
     items:
       - label: Обзор
         file: core-concepts/index.md
-      - label: Инициализация приложения и подключение к бэкенду
+      - label: Инициализация приложения и подключение к серверу
         file: core-concepts/app-init.md
       - label: Работа с доменами
         file: core-concepts/domain.md
+      - label: Аутентификация
+        file: core-concepts/auth.md

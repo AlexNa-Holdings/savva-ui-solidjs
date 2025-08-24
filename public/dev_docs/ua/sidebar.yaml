@@ -13,3 +13,5 @@ sections:
         file: core-concepts/app-init.md
       - label: Робота з доменами
         file: core-concepts/domain.md
+      - label: Аутентифікація
+        file: core-concepts/auth.md

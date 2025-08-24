@@ -45,7 +45,6 @@ export default {
   "ipfs.diag.liveness.ok": "Node is live.",
   "ipfs.diag.run": "Run Diagnostics",
   "ipfs.diag.title": "IPFS Node Diagnostics",
-  "ipfs.imageNotAvailable": "Image not available",
   "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",
@@ -137,16 +136,12 @@ export default {
   "time.minute.plural": "{n} minutes ago",
   "time.minute.singular": "{n} minute ago",
   "time.now": "Now",
+  "timeFrame.${frame}": "Time Frame: {frame}",
   "ui.mode.dark": "Dark mode",
   "ui.mode.light": "Light mode",
   "ui.toTop": "Back to Top",
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
-  "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network",
-    "timeFrame.all": "All Time",
-  "timeFrame.month": "Month",
-  "timeFrame.week": "Week",
-  "timeFrame.year": "Year"
+  "wallet.onRequiredNetwork": "On required network"
 };

@@ -45,7 +45,6 @@ export default {
   "ipfs.diag.liveness.ok": "Le nœud est actif.",
   "ipfs.diag.run": "Exécuter les diagnostics",
   "ipfs.diag.title": "Diagnostics du nœud IPFS",
-  "ipfs.imageNotAvailable": "Image non disponible",
   "main.tabs.empty": "Cet onglet est vide pour l'instant.",
   "main.tabs.loading": "Chargement des onglets…",
   "main.tabs.untitled": "Sans titre",
@@ -137,12 +136,12 @@ export default {
   "time.minute.plural": "il y a {n} minutes",
   "time.minute.singular": "il y a {n} minute",
   "time.now": "Maintenant",
+  "timeFrame.${frame}": "Période : {frame}",
   "ui.mode.dark": "Mode sombre",
   "ui.mode.light": "Mode clair",
   "ui.toTop": "Retour en haut",
   "wallet.changeChain": "Changer de réseau",
   "wallet.connect": "Connecter le portefeuille",
-  "wallet.copied": "Copié",
   "wallet.copyAddress": "Copier l'adresse",
   "wallet.onRequiredNetwork": "Sur le réseau requis"
 };

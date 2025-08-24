@@ -45,7 +45,6 @@ export default {
   "ipfs.diag.liveness.ok": "Узел работает.",
   "ipfs.diag.run": "Запустить диагностику",
   "ipfs.diag.title": "Диагностика узла IPFS",
-  "ipfs.imageNotAvailable": "Изображение недоступно",
   "main.tabs.empty": "Эта вкладка пока пуста.",
   "main.tabs.loading": "Загрузка вкладок…",
   "main.tabs.untitled": "Без названия",
@@ -137,12 +136,12 @@ export default {
   "time.minute.plural": "{n} минут назад",
   "time.minute.singular": "{n} минуту назад",
   "time.now": "Сейчас",
+  "timeFrame.${frame}": "Период: {frame}",
   "ui.mode.dark": "Тёмная тема",
   "ui.mode.light": "Светлая тема",
   "ui.toTop": "Наверх",
   "wallet.changeChain": "Сменить сеть",
   "wallet.connect": "Подключить кошелек",
-  "wallet.copied": "Скопировано",
   "wallet.copyAddress": "Скопировать адрес",
   "wallet.onRequiredNetwork": "В требуемой сети"
 };

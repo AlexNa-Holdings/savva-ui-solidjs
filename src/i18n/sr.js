@@ -45,7 +45,6 @@ export default {
   "ipfs.diag.liveness.ok": "Čvor je aktivan.",
   "ipfs.diag.run": "Pokreni dijagnostiku",
   "ipfs.diag.title": "IPFS Dijagnostika čvora",
-  "ipfs.imageNotAvailable": "Slika nije dostupna",
   "main.tabs.empty": "Ovaj tab je trenutno prazan.",
   "main.tabs.loading": "Učitavanje tabova…",
   "main.tabs.untitled": "Bez naslova",
@@ -137,12 +136,12 @@ export default {
   "time.minute.plural": "pre {n} minuta",
   "time.minute.singular": "pre {n} minut",
   "time.now": "Sada",
+  "timeFrame.${frame}": "Vremenski okvir: {frame}",
   "ui.mode.dark": "Tamni režim",
   "ui.mode.light": "Svetli režim",
   "ui.toTop": "Nazad na vrh",
   "wallet.changeChain": "Promeni mrežu",
   "wallet.connect": "Poveži novčanik",
-  "wallet.copied": "Kopirano",
   "wallet.copyAddress": "Kopiraj adresu",
   "wallet.onRequiredNetwork": "Na potrebnoj mreži"
 };

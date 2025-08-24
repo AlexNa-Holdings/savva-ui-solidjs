@@ -45,7 +45,6 @@ export default {
   "ipfs.diag.liveness.ok": "Вузол активний.",
   "ipfs.diag.run": "Запустити діагностику",
   "ipfs.diag.title": "Діагностика вузла IPFS",
-  "ipfs.imageNotAvailable": "Зображення недоступне",
   "main.tabs.empty": "Ця вкладка поки що порожня.",
   "main.tabs.loading": "Завантаження вкладок…",
   "main.tabs.untitled": "Без назви",
@@ -137,12 +136,12 @@ export default {
   "time.minute.plural": "__N__ хвилин тому",
   "time.minute.singular": "__N__ хвилину тому",
   "time.now": "Зараз",
+  "timeFrame.${frame}": "Часовий проміжок: {frame}",
   "ui.mode.dark": "Темний режим",
   "ui.mode.light": "Світлий режим",
   "ui.toTop": "Назад до верху",
   "wallet.changeChain": "Змінити мережу",
   "wallet.connect": "Підключити гаманець",
-  "wallet.copied": "Скопійовано",
   "wallet.copyAddress": "Копіювати адресу",
   "wallet.onRequiredNetwork": "На потрібній мережі"
 };
