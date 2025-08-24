@@ -7,7 +7,7 @@ import PostTime from "../ui/PostTime.jsx";
 import PostReactions from "../ui/PostReactions.jsx";
 
 function PostComments(props) {
-  const count = () => props.item?._raw?.total_childs || 0;
+  const count = () => props.item?._raw?.total_childs || props.item?.total_childs || 0;
   return (
     <Show when={count() > 0}>
       <div class="flex items-center gap-1 text-xs">
@@ -20,14 +20,13 @@ function PostComments(props) {
 
 function PostRewards(props) {
   const amount = createMemo(() => {
-    const rawAmount = props.item?._raw?.fund?.total_author_share;
+    const rawAmount = props.item?._raw?.fund?.total_author_share || props.item?.fund?.total_author_share;
     if (!rawAmount) return 0;
     const formatted = formatUnits(BigInt(rawAmount), 18);
     return parseFloat(formatted);
   });
 
   const localizedAmount = createMemo(() => {
-    // Access the lang prop to ensure this memo re-runs on language change
     const currentLang = props.lang();
     return amount().toLocaleString(currentLang, {
       minimumFractionDigits: 2,
@@ -48,13 +47,18 @@ function PostRewards(props) {
 export default function PostInfo(props) {
   const { lang } = useApp();
   const isListMode = () => props.mode === 'list';
+  const postData = createMemo(() => props.item?._raw || props.item || {});
 
   return (
-    <div class={`pt-2 flex items-center border-t border-[hsl(var(--border))] ${isListMode() ? 'gap-2' : 'gap-4'}`}>
-      <PostTime timestamp={props.item?._raw?.effective_time} format="short" />
+    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+      <PostTime 
+        timestamp={postData().effective_time} 
+        format={props.timeFormat || "short"} 
+      />
       <PostReactions item={props.item} />
       <PostComments item={props.item} />
-      <div class="ml-auto">
+      {/* --- MODIFICATION: Rewards alignment is now conditional --- */}
+      <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
         <PostRewards item={props.item} lang={lang} />
       </div>
     </div>

@@ -9,7 +9,9 @@ const REACTION_TYPES = [
 
 export default function PostReactions(props) {
   const reactionsWithCount = createMemo(() => {
-    const counts = props.item?._raw?.reactions || [];
+    // --- MODIFICATION: Check for reactions in both possible locations ---
+    const counts = props.item?._raw?.reactions || props.item?.reactions || [];
+    
     return REACTION_TYPES.map((type, i) => ({
       type,
       count: counts[i] || 0,
@@ -17,7 +19,8 @@ export default function PostReactions(props) {
   });
 
   const totalReactions = createMemo(() => {
-    return (props.item?._raw?.reactions || []).reduce((sum, count) => sum + (count || 0), 0);
+    const counts = props.item?._raw?.reactions || props.item?.reactions || [];
+    return counts.reduce((sum, count) => sum + (count || 0), 0);
   });
 
   return (
