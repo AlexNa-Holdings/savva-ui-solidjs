@@ -5,6 +5,7 @@ import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import PostInfo from "./PostInfo.jsx";
+import NftBadge from "../ui/icons/NftBadge.jsx";
 
 function getLocalizedField(locales, fieldName, currentLang) {
   if (!locales || typeof locales !== 'object') return "";
@@ -36,19 +37,17 @@ export default function PostCard(props) {
   });
 
   const articleClasses = createMemo(() => {
-    const base = "rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex overflow-hidden";
+    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
     return isListMode() ? `${base} flex-row h-40` : `${base} flex-col`;
   });
 
   const imageContainerClasses = createMemo(() => {
-    return isListMode()
-      ? "h-full shrink-0 aspect-video border-l border-[hsl(var(--border))]"
-      : "aspect-video w-full border-b border-[hsl(var(--border))]";
+    const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    return `shrink-0 ${listModeRounding} overflow-hidden ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
   });
 
   const contentContainerClasses = createMemo(() => {
     return isListMode()
-      // Reduced vertical padding from p-3 to py-2
       ? "px-3 py-2 flex-1 flex flex-col min-w-0"
       : "px-3 pb-3 flex-1 flex flex-col";
   });
@@ -64,7 +63,7 @@ export default function PostCard(props) {
         when={displayImageSrc()}
         fallback={<UnknownUserIcon class="absolute inset-0 w-full h-full" />}
       >
-        {(cid) => <IpfsImage src={cid()} />}
+        {(cid) => <IpfsImage src={cid()} class="w-full h-full" />}
       </Show>
     </div>
   );
@@ -94,6 +93,13 @@ export default function PostCard(props) {
 
   return (
     <article class={articleClasses()}>
+      {/* MODIFICATION: The badge is now shown only if nft.owner is null or empty. */}
+      <Show when={props.item._raw?.nft?.owner}>
+        <div class="absolute -top-2 -right-2 z-10">
+          <NftBadge />
+        </div>
+      </Show>
+
       <Show
         when={isListMode()}
         fallback={

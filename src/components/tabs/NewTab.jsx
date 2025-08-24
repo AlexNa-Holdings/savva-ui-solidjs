@@ -4,6 +4,7 @@ import ContentFeed from "../feed/ContentFeed.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -45,7 +46,6 @@ export default function NewTab(props) {
   };
   const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
 
-  // Create a key that changes when either the domain or category changes.
   const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
 
   async function fetchPage(page, pageSize) {
@@ -58,6 +58,13 @@ export default function NewTab(props) {
       if (cat && cat !== "ALL") {
         params.category = `${lang()}:${cat}`;
       }
+      
+      const user = app.authorizedUser();
+      if (user?.address) {
+        // MODIFICATION: Changed parameter name to `my_addr` as requested.
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
       const res = await contentList(params);
       const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
       return arr.map((it) => ({
