@@ -27,7 +27,7 @@
   }
   50% {
     /* MODIFICATION: Increased jump from -15% to -25% */
-    transform: translateY(-25%);
+    transform: translateY(-50%);
   }
 }
 

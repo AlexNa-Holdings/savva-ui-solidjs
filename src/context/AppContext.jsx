@@ -14,14 +14,14 @@ const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 export function AppProvider(props) {
+  // 1. Initialize core hooks and simple state
   const i18n = useI18n();
   const auth = useAppAuth();
   const conn = useAppConnection(auth);
-  const assets = useDomainAssets({ ...conn, ...auth, i18n });
   const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
-  
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
 
+  // 2. Create memos that depend on the core hooks
   const supportedDomains = Solid.createMemo(() => {
     const list = conn.info()?.domains || [];
     return [...new Set(list.map(d => (typeof d === "string" ? d : d?.name)).filter(Boolean))]
@@ -38,6 +38,14 @@ export function AppProvider(props) {
   
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
 
+  // 3. Initialize the assets hook, passing the memos it depends on
+  const assets = useDomainAssets({ 
+    info: conn.info, 
+    selectedDomainName: selectedDomainName, 
+    i18n: i18n 
+  });
+
+  // 4. Create final memos and effects
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
   async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
@@ -53,6 +61,7 @@ export function AppProvider(props) {
     }
   });
 
+  // 5. Compose the final value for the context provider
   const value = {
     ...conn, ...auth, ...assets, ...ipfs,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,

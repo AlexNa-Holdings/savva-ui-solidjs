@@ -1,5 +1,5 @@
 // src/context/useDomainAssets.js
-import { createSignal, createMemo, createResource, createEffect } from "solid-js";
+import { createSignal, createMemo, createResource, createEffect, on } from "solid-js";
 import { parse } from "yaml";
 import { fetchWithTimeout } from "../utils/net.js";
 import { loadAssetResource } from "../utils/assetLoader.js";
@@ -77,9 +77,12 @@ export function useDomainAssets(app) {
 
   createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
 
-  createEffect(() => {
-    if (app.info()) refreshDomainAssets();
-  });
+  // MODIFICATION: This effect now correctly depends on the selected domain name.
+  createEffect(on([() => app.info(), () => app.selectedDomainName()], () => {
+    if (app.info()) {
+      refreshDomainAssets();
+    }
+  }));
 
   return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl };
 }

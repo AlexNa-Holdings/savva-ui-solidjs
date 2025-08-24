@@ -144,5 +144,9 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copied": "Copied",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "timeFrame.all": "All Time",
+  "timeFrame.month": "Month",
+  "timeFrame.week": "Week",
+  "timeFrame.year": "Year"
 };
