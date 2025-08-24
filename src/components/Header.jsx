@@ -1,4 +1,4 @@
-// File: src/components/Header.jsx
+// src/components/Header.jsx
 import { Show, createSignal, onMount } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import {
@@ -11,6 +11,7 @@ import {
 import { getChainLogo } from "../blockchain/chainLogos";
 import BrandLogo from "./ui/BrandLogo.jsx";
 import Container from "./layout/Container";
+import AuthorizedUser from "./auth/AuthorizedUser.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -19,7 +20,6 @@ function shortAddr(addr) {
 
 export default function Header({ onTogglePane }) {
   const app = useApp();
-  const [copyState, setCopyState] = createSignal("");
   const [eagerDone, setEagerDone] = createSignal(false);
 
   const desiredId = () => app.desiredChainId();
@@ -49,10 +49,11 @@ export default function Header({ onTogglePane }) {
 
   async function copyAddress() {
     try {
+      // The text is still copied, but no visual indicator will be shown.
       await navigator.clipboard.writeText(walletAccount());
-      setCopyState("copied");
-      setTimeout(() => setCopyState(""), 1200);
-    } catch {}
+    } catch (e) {
+      console.error("Failed to copy address:", e);
+    }
   }
 
   async function onSwitchChain() {
@@ -84,15 +85,18 @@ export default function Header({ onTogglePane }) {
             <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
           </div>
 
-          {/* Right: wallet + menu */}
-          <div class="flex items-center gap-2">
+          {/* Right: wallet + auth + menu */}
+          <div class="flex items-center gap-3">
+
+            <AuthorizedUser />
+            
             <Show
               when={walletAccount()}
               fallback={
                 <Show when={eagerDone() && isWalletAvailable()}>
                   <button
                     class="
-                      px-3 py-1 rounded
+                      px-3 py-1.5 text-sm rounded
                       bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
                       hover:opacity-90
                     "
@@ -144,10 +148,6 @@ export default function Header({ onTogglePane }) {
                       title={app.t("wallet.onRequiredNetwork")}
                     />
                   </Show>
-                </Show>
-
-                <Show when={copyState() === "copied"}>
-                  <span class="text-xs text-[hsl(var(--primary))]">{app.t("wallet.copied")}</span>
                 </Show>
               </div>
             </Show>

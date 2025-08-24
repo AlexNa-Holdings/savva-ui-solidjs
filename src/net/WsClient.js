@@ -2,7 +2,6 @@
 import { dbg } from "../utils/debug";
 import { wsUrl as endpointsWsUrl } from "./endpoints";
 
-
 /**
  * Pure WebSocket transport.
  * Request:  { id: number, type: string, data: any }
@@ -14,8 +13,9 @@ export default class WsClient {
     this._url = url || "";
     this._protocols = protocols || undefined;
     this._ws = null;
+    this._manualClose = false;
 
-    this._status = "idle";                // idle | connecting | open | closed
+    this._status = "idle"; // idle | connecting | open | closed
     this._attempt = 0;
     this._shouldReconnect = true;
     this._reconnectTid = null;
@@ -24,7 +24,7 @@ export default class WsClient {
     this._heartbeatMs = 25_000;
 
     this._sendQueue = [];
-    this._pending = new Map();            // id (string) -> { resolve, reject, timer }
+    this._pending = new Map(); // id (string) -> { resolve, reject, timer }
     this._nextId = 1;
 
     this._listeners = new Map();
@@ -45,7 +45,11 @@ export default class WsClient {
     this._shouldReconnect = false;
     this._clearReconnect();
     this._stopHeartbeat();
-    if (this._ws) { try { this._ws.close(); } catch {} }
+    if (this._ws) {
+      try {
+        this._ws.close();
+      } catch {}
+    }
     this._ws = null;
     if (typeof window !== "undefined") {
       window.removeEventListener("online", this._onOnline);
@@ -54,9 +58,15 @@ export default class WsClient {
     this._emit("status", "closed");
   }
 
-  url()     { return this._url; }
-  status()  { return this._status; }
-  attempt() { return this._attempt; }
+  url() {
+    return this._url;
+  }
+  status() {
+    return this._status;
+  }
+  attempt() {
+    return this._attempt;
+  }
 
   setUrl(nextUrl) {
     const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
@@ -70,11 +80,17 @@ export default class WsClient {
     dbg.log("ws", "URL updated", { url: u });
   }
 
-  setAutoReconnect(on) { this._shouldReconnect = !!on; }
+  setAutoReconnect(on) {
+    this._shouldReconnect = !!on;
+  }
 
   connect() {
     if (!this._url) return;
-    if (this._ws && (this._ws.readyState === WebSocket.OPEN || this._ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this._ws &&
+      (this._ws.readyState === WebSocket.OPEN ||
+        this._ws.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
     this._clearReconnect();
@@ -107,7 +123,10 @@ export default class WsClient {
         this._setStatus("closed");
         this._emit("close", ev);
         this._failInflight(new Error("WS closed"));
-        if (this._shouldReconnect) this._scheduleReconnect();
+        if (this._shouldReconnect && !this._manualClose) {
+          this._scheduleReconnect();
+        }
+        this._manualClose = false; // Reset the flag after handling the close event.
       });
     } catch (e) {
       dbg.error("ws", "Connect exception", e);
@@ -119,16 +138,23 @@ export default class WsClient {
   reconnect(reason = "manual") {
     dbg.log("ws", "Reconnecting…", { reason });
     this._clearReconnect();
-    try { this._ws && this._ws.close(); } catch {}
+    if (this._ws) {
+      this._manualClose = true; 
+      try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
+    }
     this._ws = null;
+    this._failInflight(new Error("WS reconnected"));
     this.connect();
   }
 
   close() {
+    this._manualClose = true;
     this._clearReconnect();
     this._stopHeartbeat();
     this._shouldReconnect = false;
-    try { this._ws && this._ws.close(1000, "client-close"); } catch {}
+    try {
+      this._ws && this._ws.close(1000, "client-close");
+    } catch {}
     this._ws = null;
     this._setStatus("closed");
     this._failInflight(new Error("WS closed by client"));
@@ -139,7 +165,9 @@ export default class WsClient {
     if (open) this._ws.send(data);
     else this._sendQueue.push(data);
   }
-  sendJson(obj) { this.send(JSON.stringify(obj)); }
+  sendJson(obj) {
+    this.send(JSON.stringify(obj));
+  }
 
   /** Backend dialect:
    * send: { id: number, name: "<handler>", data: {...} }
@@ -159,7 +187,11 @@ export default class WsClient {
       }, timeoutMs);
 
       this._pending.set(callId, { resolve, reject, timer });
-      this.sendJson({ id: numericId, type: String(method), data: params || {} });
+      this.sendJson({
+        id: numericId,
+        type: String(method),
+        data: params || {},
+      });
     });
   }
 
@@ -178,12 +210,23 @@ export default class WsClient {
   }
 
   // ─── internals ────────────────────────────────────────────────────────────────
-  _setStatus(s) { if (this._status !== s) { this._status = s; this._emit("status", s); } }
+  _setStatus(s) {
+    if (this._status !== s) {
+      this._status = s;
+      this._emit("status", s);
+    }
+  }
 
   _emit(type, payload) {
     const set = this._listeners.get(type);
     if (!set || set.size === 0) return;
-    for (const fn of Array.from(set)) { try { fn(payload); } catch (e) { dbg.error("ws", "listener error", e); } }
+    for (const fn of Array.from(set)) {
+      try {
+        fn(payload);
+      } catch (e) {
+        dbg.error("ws", "listener error", e);
+      }
+    }
   }
 
   _onMessage(ev) {
@@ -206,9 +249,15 @@ export default class WsClient {
             return;
           }
 
-          if ("data" in obj) { entry.resolve(obj.data); return; }
+          if ("data" in obj) {
+            entry.resolve(obj.data);
+            return;
+          }
           // if backend someday returns {result: ...}, accept that too
-          if ("result" in obj) { entry.resolve(obj.result); return; }
+          if ("result" in obj) {
+            entry.resolve(obj.result);
+            return;
+          }
 
           entry.resolve(obj);
           return;
@@ -234,7 +283,9 @@ export default class WsClient {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
     while (this._sendQueue.length) {
       const item = this._sendQueue.shift();
-      try { this._ws.send(item); } catch {}
+      try {
+        this._ws.send(item);
+      } catch {}
     }
   }
 
@@ -250,7 +301,12 @@ export default class WsClient {
       }, this._heartbeatMs);
     }
   }
-  _stopHeartbeat() { if (this._heartbeatTid) { clearInterval(this._heartbeatTid); this._heartbeatTid = null; } }
+  _stopHeartbeat() {
+    if (this._heartbeatTid) {
+      clearInterval(this._heartbeatTid);
+      this._heartbeatTid = null;
+    }
+  }
 
   _scheduleReconnect() {
     if (!this._shouldReconnect) return;
@@ -258,17 +314,27 @@ export default class WsClient {
     const base = 300 * Math.pow(2, this._attempt - 1);
     const jitter = Math.floor(Math.random() * 400);
     const delay = Math.min(10_000, base + jitter);
-    dbg.log("ws", "Reconnect scheduled", { inMs: delay, attempt: this._attempt });
+    dbg.log("ws", "Reconnect scheduled", {
+      inMs: delay,
+      attempt: this._attempt,
+    });
     this._clearReconnect();
     this._reconnectTid = setTimeout(() => this.connect(), delay);
   }
-  _clearReconnect() { if (this._reconnectTid) { clearTimeout(this._reconnectTid); this._reconnectTid = null; } }
+  _clearReconnect() {
+    if (this._reconnectTid) {
+      clearTimeout(this._reconnectTid);
+      this._reconnectTid = null;
+    }
+  }
 
   _failInflight(err) {
     if (!this._pending.size) return;
     for (const [, entry] of this._pending) {
       clearTimeout(entry.timer);
-      try { entry.reject(err); } catch {}
+      try {
+        entry.reject(err);
+      } catch {}
     }
     this._pending.clear();
   }

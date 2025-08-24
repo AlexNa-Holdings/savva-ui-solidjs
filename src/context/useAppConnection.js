@@ -1,0 +1,91 @@
+// src/context/useAppConnection.js
+import { createSignal, onMount } from "solid-js";
+import { parse } from "yaml";
+import { configureEndpoints, httpBase } from "../net/endpoints";
+import { pushErrorToast } from "../components/ui/toast.js";
+
+function ensureSlash(s) { if (!s) return ""; return s.endsWith("/") ? s : s + "/"; }
+const OVERRIDE_KEY = "connect_override";
+
+function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
+function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
+function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { } }
+
+export function useAppConnection(auth) {
+  const [config, setConfig] = createSignal(null);
+  const [info, setInfo] = createSignal(null);
+  const [error, setError] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = createSignal(null);
+
+  async function fetchInfo(cfg) {
+    const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+    return await res.json();
+  }
+
+  async function applyConfig(nextCfg) {
+    setConfig(nextCfg);
+    const data = await fetchInfo(nextCfg);
+    setInfo(data);
+    setLastUpdatedAt(Date.now());
+    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
+  }
+
+  async function init() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
+      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
+      const data = parse(await res.text()) || {};
+      if (!data.backendLink) throw new Error("Missing backendLink in config");
+
+      const baseCfg = { domain: data.domain || "", backendLink: ensureSlash(data.backendLink), gear: !!data.gear };
+      const merged = { ...baseCfg, ...loadOverride() };
+      await applyConfig(merged);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(init);
+
+  async function updateConnect(partial) {
+    try {
+      setLoading(true); setError(null);
+      const cur = config() || {};
+      const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
+      if (next.backendLink !== cur.backendLink) {
+        await applyConfig(next);
+      } else {
+        setConfig(next);
+        setLastUpdatedAt(Date.now());
+        configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+      }
+      saveOverride(next);
+    } catch (e) {
+      setError(e);
+      pushErrorToast(e, { op: "updateConnect" });
+    } finally { setLoading(false); }
+  }
+
+  function setDomain(nextDomain) {
+    const cur = config() || {};
+    const next = { ...cur, domain: nextDomain || "" };
+    setConfig(next);
+    saveOverride(next);
+    setLastUpdatedAt(Date.now());
+    configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+  }
+
+  async function clearConnectOverride() {
+    auth.logout();
+    saveOverride(null);
+    await init();
+  }
+
+  return { config, info, error, loading, lastUpdatedAt, init, updateConnect, clearConnectOverride, setDomain };
+}
