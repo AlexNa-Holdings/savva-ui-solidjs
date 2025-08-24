@@ -2,6 +2,7 @@
 import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import PostListView from "./PostListView.jsx";
+import { dbg } from "../../utils/debug.js";
 
 export default function ContentFeed(props) {
   const { t } = useApp();
@@ -15,7 +16,9 @@ export default function ContentFeed(props) {
     setLoading(true);
     try {
       const nextPage = page() + 1;
+      dbg.log("ContentFeed", "loadMore → page", nextPage);
       const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
+      dbg.log("ContentFeed", "page result length", chunk.length);
       if (!chunk.length) setHasMore(false);
       setItems((prev) => prev.concat(chunk));
       setPage(nextPage);
@@ -25,6 +28,8 @@ export default function ContentFeed(props) {
   }
 
   onMount(() => {
+    // --- DEBUG: Log when the component mounts using dbg ---
+    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
     loadMore();
     const handleScroll = () => {
       const scrollThreshold = 600;

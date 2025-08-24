@@ -23,7 +23,17 @@ export function AppProvider(props) {
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
 
-  // --- MODIFICATION: The effect that automatically saved scroll position has been removed ---
+  const { route } = useHashRouter();
+  Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
+    if (!prevRoute) return;
+    
+    const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
+    const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
+
+    if (isCurrentlyOnMainFeed && isNavigatingToPage) {
+      setSavedScrollY(window.scrollY);
+    }
+  }, { defer: true }));
   
   const supportedDomains = Solid.createMemo(() => {
     const list = conn.info()?.domains || [];
@@ -66,7 +76,8 @@ export function AppProvider(props) {
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
-    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
+    // --- MODIFICATION: Removed the redundant logout call from setDomain ---
+    setDomain: conn.setDomain,
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
   };
 

@@ -4,25 +4,30 @@ import { useApp } from "../../context/AppContext";
 import TabsBar from "./TabsBar";
 import Container from "../layout/Container";
 import ToTopButton from "../ui/ToTopButton";
+import { dbg } from "../../utils/debug.js";
 
 export default function MainView() {
-  const { t, selectedDomain, domainAssetsConfig } = useApp();
+  const { t, selectedDomain, domainAssetsConfig, domainAssetsSource, loading } = useApp();
 
-  // reactive domain name
   const domainName = createMemo(() => {
     const d = selectedDomain?.();
     return !d ? "" : typeof d === "string" ? d : d.name || "";
   });
 
-  // localized title (not rendered here but kept ready)
   const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
 
-  // change key when domain or assets pack changes to remount children
   const revision = createMemo(() => {
+    if (loading()) return null;
+
+    const source = domainAssetsSource?.();
     const cfg = domainAssetsConfig?.();
     const cid = cfg?.assets_cid || cfg?.cid || "";
     const tabs = cfg?.modules?.tabs || "";
-    return `${domainName()}|${cid}|${tabs}`;
+    
+    const key = `${domainName()}|${source}|${cid}|${tabs}`;
+    // --- DEBUG: Log the revision key using dbg ---
+    dbg.log('MainView', `Revision key updated to: ${key}`);
+    return key;
   });
 
   return (

@@ -143,7 +143,7 @@ export default class WsClient {
       try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
     }
     this._ws = null;
-    this._failInflight(new Error("WS reconnected"));
+    
     this.connect();
   }
 

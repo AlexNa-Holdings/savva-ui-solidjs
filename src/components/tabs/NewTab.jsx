@@ -5,6 +5,8 @@ import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
+import { dbg } from "../../utils/debug.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -52,19 +54,29 @@ export default function NewTab(props) {
     const limit = pageSize;
     const offset = (page - 1) * pageSize;
     try {
-      if (!contentList) return [];
+      dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
+
+      dbg.log("NewTab", `fetchPage(page=${page}) pre-wait, ws=${app.wsStatus?.()}`);
+      await whenWsOpen();
+      dbg.log("NewTab", "after whenWsOpen");
+
+
+      if (!contentList) {
+        dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
+        return [];
+      }
       const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
       const cat = category();
       if (cat && cat !== "ALL") {
         params.category = `${lang()}:${cat}`;
       }
-      
+
       const user = app.authorizedUser();
       if (user?.address) {
-        // MODIFICATION: Changed parameter name to `my_addr` as requested.
         params.my_addr = toChecksumAddress(user.address);
       }
 
+      dbg.log('NewTab', 'Fetching with params:', params);
       const res = await contentList(params);
       const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
       return arr.map((it) => ({
@@ -72,7 +84,7 @@ export default function NewTab(props) {
         _raw: it,
       }));
     } catch (err) {
-      console.error("fetchPage error:", err);
+      dbg.error('NewTab', "fetchPage error:", err);
       return [];
     }
   }

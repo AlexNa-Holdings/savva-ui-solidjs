@@ -41,7 +41,8 @@ export function useAppAuth() {
 
   async function logout() {
     try {
-      await fetch(`${httpBase()}logout`, { method: 'POST', credentials: 'include' });
+      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
+      await fetch(`${httpBase()}logout`, { credentials: 'include' });
     } catch (e) {
       console.error("Logout API call failed, proceeding with client-side logout.", e);
     }

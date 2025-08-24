@@ -150,24 +150,28 @@ export default function SwitchConnectDialog(props) {
     setLocalError("");
     setApplying(true);
     try {
-      const url = (backendUrl() || "").trim();
-      const chosen = (domain() || "").trim();
-      const u = new URL(url);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-      if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
+      const newUrl = (backendUrl() || "").trim();
+      const chosenDomain = (domain() || "").trim();
+      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
 
-      // Configure once for the new selection
-      configureEndpoints({ backendLink: url, domain: chosen, lang: app.lang ? app.lang() : "en" });
+      const oldBackendBase = httpBase();
+      const newBackendBase = new URL(newUrl);
+      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
+      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
 
-      if (typeof props.onApply === "function") {
-        await props.onApply({ backendLink: httpBase(), domain: chosen });
+      // --- MODIFICATION START: Logout from the OLD backend first ---
+      if (isSwitchingBackends) {
+        await app.logout?.();
       }
+      // --- MODIFICATION END ---
+
+      // Now, proceed with switching to the new backend
+      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
 
       await app.updateConnect?.({ backendLink: httpBase() });
-      await app.setDomain?.(chosen);
+      await app.setDomain?.(chosenDomain);
       await app.refreshDomainAssets?.();
 
-      // Nudge WS to new URL immediately (no waiting for mounts)
       if (app.ws) {
         app.ws.setUrl(wsUrl());
         app.ws.reconnect("switch-backend");

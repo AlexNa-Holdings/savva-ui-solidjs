@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -55,6 +56,7 @@ export default function LeadersTab(props) {
     const limit = pageSize;
     const offset = (page - 1) * pageSize;
     try {
+      await whenWsOpen();
       if (!contentList) return [];
       const params = {
         domain: domainName(),

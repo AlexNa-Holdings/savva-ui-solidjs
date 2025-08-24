@@ -297,89 +297,6 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/pages/PostPage.jsx">
-// src/pages/PostPage.jsx
-import { createMemo, createResource, Show, Match, Switch } from "solid-js";
-import { useHashRouter } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton";
-import Spinner from "../components/ui/Spinner.jsx";
-import { toChecksumAddress } from "../blockchain/utils.js";
-
-// Extracts SAVVA_ID from '/post/SAVVA_ID'
-const getPostId = (route) => route().split('/')[2] || "";
-
-// Fetches a single post by its savva_cid
-async function fetchPost(params) {
-  const { savvaId, app, lang } = params;
-  if (!savvaId || !app.wsMethod) return null;
-
-  const contentGet = app.wsMethod("content-get");
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    savva_cid: savvaId,
-    lang: lang,
-  };
-  
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-
-  return await contentGet(requestParams);
-}
-
-export default function PostPage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-  const savvaId = createMemo(() => getPostId(route));
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-
-  const [post] = createResource(
-    () => ({ savvaId: savvaId(), app, lang: lang() }), // Dependencies for the fetcher
-    fetchPost
-  );
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto">
-      <ClosePageButton />
-      
-      <Switch>
-        <Match when={post.loading}>
-          <div class="flex justify-center items-center h-64">
-            <Spinner class="w-8 h-8" />
-          </div>
-        </Match>
-        <Match when={post.error}>
-          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error.message}</p>
-          </div>
-        </Match>
-        <Match when={post()}>
-          <article class="space-y-4">
-            {/* TODO: Create and use smaller components for a clean structure.
-              For example:
-              - <PostHeader author={post().author} timestamp={post().effective_time} />
-              - <PostBody content={post().savva_content} />
-              - <PostActions post={post()} />
-            */}
-            <h2 class="text-2xl font-bold">{post().savva_content?.locales?.[lang()]?.title || "..."}</h2>
-            <div>
-              <p>{post().savva_content?.locales?.[lang()]?.text_preview || "..."}</p>
-            </div>
-            <pre class="text-xs p-2 bg-[hsl(var(--muted))] rounded overflow-x-auto">
-              {JSON.stringify(post(), null, 2)}
-            </pre>
-          </article>
-        </Match>
-      </Switch>
-    </main>
-  );
-}
-</file>
-
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 540 879.4">
@@ -17125,46 +17042,6 @@ export default function PostFundBadge(props) {
 }
 </file>
 
-<file path="src/components/ui/PostReactions.jsx">
-// src/components/ui/PostReactions.jsx
-import { For, createMemo, Show } from "solid-js";
-import ReactionIcon from "./icons/ReactionIcon.jsx";
-
-const REACTION_TYPES = [
-  "like", "super", "ha_ha", "sad", "angry", 
-  "wow", "trophy", "hot", "clap", "dislike"
-];
-
-export default function PostReactions(props) {
-  const reactionsWithCount = createMemo(() => {
-    const counts = props.item?._raw?.reactions || [];
-    return REACTION_TYPES.map((type, i) => ({
-      type,
-      count: counts[i] || 0,
-    })).filter(r => r.count > 0);
-  });
-
-  const totalReactions = createMemo(() => {
-    return (props.item?._raw?.reactions || []).reduce((sum, count) => sum + (count || 0), 0);
-  });
-
-  return (
-    <Show when={totalReactions() > 0}>
-      <div class="flex items-center text-xs">
-        <div class="flex items-center">
-          <For each={reactionsWithCount()}>
-            {(reaction) => <ReactionIcon type={reaction.type} />}
-          </For>
-        </div>
-        <Show when={totalReactions() > 1}>
-          <div class=" ml-0">{totalReactions()}</div>
-        </Show>
-      </div>
-    </Show>
-  );
-}
-</file>
-
 <file path="src/components/ui/PostTime.jsx">
 // src/components/ui/PostTime.jsx
 import { createMemo } from "solid-js";
@@ -17636,161 +17513,6 @@ export default function RightPaneFooter() {
 }
 </file>
 
-<file path="src/context/useAppAuth.js">
-// src/context/useAppAuth.js
-import { createSignal, onMount } from "solid-js";
-import { getWsClient, getWsApi } from "../net/wsRuntime.js";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast } from "../components/ui/toast.js";
-
-const AUTH_USER_KEY = "savva_auth_user";
-
-export function useAppAuth() {
-  const [authorizedUser, setAuthorizedUser] = createSignal(null);
-
-  onMount(() => {
-    try {
-      const savedUser = localStorage.getItem(AUTH_USER_KEY);
-      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
-    } catch (e) {
-      console.error("Failed to load authorized user:", e);
-      localStorage.removeItem(AUTH_USER_KEY);
-    }
-  });
-
-  async function login(coreUserData) {
-    if (!coreUserData || !coreUserData.address) return;
-    setAuthorizedUser(coreUserData);
-    try {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
-      const checksummedAccount = toChecksumAddress(coreUserData.address);
-      const userProfile = await getWsApi().call('get-user', {
-        domain: coreUserData.domain,
-        user_addr: checksummedAccount,
-      });
-      const fullUserData = { ...coreUserData, ...userProfile };
-      setAuthorizedUser(fullUserData);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
-    } catch (e) {
-      console.error("Failed to fetch/save user profile after login:", e);
-      pushErrorToast(e, { context: "Profile fetch failed" });
-    }
-  }
-
-  async function logout() {
-    try {
-      await fetch(`${httpBase()}logout`, { method: 'POST', credentials: 'include' });
-    } catch (e) {
-      console.error("Logout API call failed, proceeding with client-side logout.", e);
-    }
-    setAuthorizedUser(null);
-    try {
-      localStorage.removeItem(AUTH_USER_KEY);
-    } catch (e) {
-      console.error("Failed to clear authorized user:", e);
-    }
-    getWsClient()?.reconnect('user-logged-out');
-  }
-
-  function handleAuthError() {
-    console.warn("Authorization error detected, logging out.");
-    logout();
-  }
-
-  return { authorizedUser, login, logout, handleAuthError };
-}
-</file>
-
-<file path="src/context/useAppConnection.js">
-// src/context/useAppConnection.js
-import { createSignal, onMount } from "solid-js";
-import { parse } from "yaml";
-import { configureEndpoints } from "../net/endpoints";
-import { pushErrorToast } from "../components/ui/toast.js";
-
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-const OVERRIDE_KEY = "connect_override";
-
-function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
-function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
-function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { } }
-
-export function useAppConnection() {
-  const [config, setConfig] = createSignal(null);
-  const [info, setInfo] = createSignal(null);
-  const [error, setError] = createSignal(null);
-  const [loading, setLoading] = createSignal(true);
-  
-  async function fetchInfo(cfg) {
-    const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-    return await res.json();
-  }
-
-  async function applyConfig(nextCfg) {
-    setConfig(nextCfg);
-    const data = await fetchInfo(nextCfg);
-    setInfo(data);
-    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
-  }
-
-  async function init() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
-      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
-      const data = parse(await res.text()) || {};
-      if (!data.backendLink) throw new Error("Missing backendLink in config");
-
-      const baseCfg = { domain: data.domain || "", backendLink: ensureSlash(data.backendLink), gear: !!data.gear };
-      const merged = { ...baseCfg, ...loadOverride() };
-      await applyConfig(merged);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(init);
-
-  async function updateConnect(partial) {
-    try {
-      setLoading(true); setError(null);
-      const cur = config() || {};
-      const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
-      if (next.backendLink !== cur.backendLink) {
-        await applyConfig(next);
-      } else {
-        setConfig(next);
-        configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
-      }
-      saveOverride(next);
-    } catch (e) {
-      setError(e);
-      pushErrorToast(e, { op: "updateConnect" });
-    } finally { setLoading(false); }
-  }
-
-  function setDomain(nextDomain) {
-    const cur = config() || {};
-    const next = { ...cur, domain: nextDomain || "" };
-    setConfig(next);
-    saveOverride(next);
-    configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
-  }
-
-  async function clearConnectOverride() {
-    saveOverride(null);
-    await init();
-  }
-
-  return { config, info, error, loading, init, updateConnect, clearConnectOverride, setDomain };
-}
-</file>
-
 <file path="src/hooks/useLocalIpfs.js">
 // src/hooks/useLocalIpfs.js
 import { createSignal, onCleanup } from "solid-js";
@@ -17954,7 +17676,7 @@ export function createWsBus({ replay = 0 } = {}) {
 </file>
 
 <file path="src/net/wsRuntime.js">
-// File: src/net/wsRuntime.js
+// src/net/wsRuntime.js
 import WsClient from "./WsClient";
 import { wsUrl } from "./endpoints";
 import { createWsBus } from "./wsBus";
@@ -17966,28 +17688,22 @@ let _bus = null;
 let _api = null;
 let _started = false;
 
-// Initialize once; safe to call multiple times.
 export function ensureWsStarted(reason = "init") {
   if (!_client) {
     _client = new WsClient();
     _bus = createWsBus({ replay: 32 });
     _api = createWsApi(_client);
-
-    // Wire incoming notifications to the bus
     _client.on("message", (obj) => {
       const t = obj && (obj.type || obj.event);
       if (t) _bus.emit(String(t), obj);
     });
   }
-
-  // Always pull the canonical URL from endpoints
-  _client.setUrl(); // zero-arg; reads from endpoints
+  _client.setUrl();
   const url = _client.url();
   if (!url) {
     dbg.warn("ws", "No WS URL configured");
     return { client: _client, bus: _bus, api: _api };
   }
-
   if (_client.status() !== "open" && !_started) {
     _client.connect();
     _started = true;
@@ -17996,7 +17712,6 @@ export function ensureWsStarted(reason = "init") {
   return { client: _client, bus: _bus, api: _api };
 }
 
-// React to backend/domain changes from endpoints
 function onEndpointsUpdate() {
   if (!_client) return;
   const prev = _client.url();
@@ -18012,8 +17727,6 @@ function onEndpointsUpdate() {
 
 if (typeof window !== "undefined") {
   window.addEventListener("savva:endpoints-updated", onEndpointsUpdate);
-
-  // Dev aid: expose runtime for quick poking
   window.__ws = {
     get client() { return _client; },
     get bus() { return _bus; },
@@ -18026,6 +17739,18 @@ export function getWsClient() { return ensureWsStarted().client; }
 export function getWsApi()    { return ensureWsStarted().api; }
 export function onAlert(type, fn){ return ensureWsStarted().bus.on(type, fn); }
 export function offAlert(type, fn){ return ensureWsStarted().bus.off(type, fn); }
+
+// --- MODIFICATION: Add new helper function ---
+export function whenWsOpen() {
+  const ws = getWsClient();
+  if (ws.status() === 'open') return Promise.resolve();
+  return new Promise(resolve => {
+    const off = onAlert('open', () => {
+      off();
+      resolve();
+    });
+  });
+}
 </file>
 
 <file path="src/net/wsUrl.js">
@@ -18044,37 +17769,6 @@ export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
   }
   u.search = params.toString() ? `?${params.toString()}` : "";
   return u.toString();
-}
-</file>
-
-<file path="src/routing/hashRouter.js">
-// src/routing/hashRouter.js
-import { createSignal } from "solid-js";
-
-function readHashPath() {
-  const raw = window.location.hash || "";
-  return raw.replace(/^#/, "") || "/";
-}
-
-const [route, setRoute] = createSignal(readHashPath());
-
-function setFromHash() {
-  const newPath = readHashPath();
-  setRoute(newPath);
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("hashchange", setFromHash);
-}
-
-export function navigate(path, { replace = false } = {}) {
-  const target = path.startsWith("#") ? path : `#${path}`;
-  if (replace) window.location.replace(target);
-  else window.location.hash = path.startsWith("#") ? path.slice(1) : path;
-}
-
-export function useHashRouter() {
-  return { route, navigate };
 }
 </file>
 
@@ -19297,71 +18991,6 @@ export default function MarkdownView(props) {
 }
 </file>
 
-<file path="src/components/feed/PostInfo.jsx">
-// src/components/feed/PostInfo.jsx
-import { Show, createMemo } from "solid-js";
-import { formatUnits } from "viem";
-import { useApp } from "../../context/AppContext.jsx";
-import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
-import PostTime from "../ui/PostTime.jsx";
-import PostReactions from "../ui/PostReactions.jsx";
-
-function PostComments(props) {
-  const count = () => props.item?._raw?.total_childs || 0;
-  return (
-    <Show when={count() > 0}>
-      <div class="flex items-center gap-1 text-xs">
-        <span>💬</span>
-        <span>{count()}</span>
-      </div>
-    </Show>
-  );
-}
-
-function PostRewards(props) {
-  const amount = createMemo(() => {
-    const rawAmount = props.item?._raw?.fund?.total_author_share;
-    if (!rawAmount) return 0;
-    const formatted = formatUnits(BigInt(rawAmount), 18);
-    return parseFloat(formatted);
-  });
-
-  const localizedAmount = createMemo(() => {
-    // Access the lang prop to ensure this memo re-runs on language change
-    const currentLang = props.lang();
-    return amount().toLocaleString(currentLang, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  });
-
-  return (
-    <Show when={amount() > 0}>
-      <div class="flex items-center gap-1 text-xs">
-        <span>{localizedAmount()}</span>
-        <SavvaTokenIcon class="w-3.5 h-3.5" />
-      </div>
-    </Show>
-  );
-}
-
-export default function PostInfo(props) {
-  const { lang } = useApp();
-  const isListMode = () => props.mode === 'list';
-
-  return (
-    <div class={`pt-2 flex items-center border-t border-[hsl(var(--border))] ${isListMode() ? 'gap-2' : 'gap-4'}`}>
-      <PostTime timestamp={props.item?._raw?.effective_time} format="short" />
-      <PostReactions item={props.item} />
-      <PostComments item={props.item} />
-      <div class="ml-auto">
-        <PostRewards item={props.item} lang={lang} />
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -19760,6 +19389,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -19810,6 +19440,7 @@ export default function LeadersTab(props) {
     const limit = pageSize;
     const offset = (page - 1) * pageSize;
     try {
+      await whenWsOpen();
       if (!contentList) return [];
       const params = {
         domain: domainName(),
@@ -19898,42 +19529,45 @@ export default function LeadersTab(props) {
 }
 </file>
 
-<file path="src/components/ui/LangSelector.jsx">
-// src/components/ui/LangSelector.jsx
-import { For } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { LANG_INFO } from "../../i18n/useI18n";
+<file path="src/components/ui/PostReactions.jsx">
+// src/components/ui/PostReactions.jsx
+import { For, createMemo, Show } from "solid-js";
+import ReactionIcon from "./icons/ReactionIcon.jsx";
 
-export default function LangSelector(props) {
-  const app = useApp();
+const REACTION_TYPES = [
+  "like", "super", "ha_ha", "sad", "angry", 
+  "wow", "trophy", "hot", "clap", "dislike"
+];
 
-  // The component now receives the list of codes directly.
-  const codes = () => props.codes || [];
-  const value = () => (props.value || app.lang?.() || "").toLowerCase();
-  const onChange = (code) => (props.onChange ? props.onChange(code) : app.setLang?.(code));
+export default function PostReactions(props) {
+  const reactionsWithCount = createMemo(() => {
+    // --- MODIFICATION: Check for reactions in both possible locations ---
+    const counts = props.item?._raw?.reactions || props.item?.reactions || [];
+    
+    return REACTION_TYPES.map((type, i) => ({
+      type,
+      count: counts[i] || 0,
+    })).filter(r => r.count > 0);
+  });
+
+  const totalReactions = createMemo(() => {
+    const counts = props.item?._raw?.reactions || props.item?.reactions || [];
+    return counts.reduce((sum, count) => sum + (count || 0), 0);
+  });
 
   return (
-    <div class={`themed-segment ${props.class || ""}`} role="radiogroup" aria-label={app.t("rightPane.language")}>
-      <For each={codes()}>
-        {(code) => {
-          const c = String(code).toLowerCase();
-          const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
-          const active = () => value() === c;
-          return (
-            <button
-              type="button"
-              class={`themed-pill ${active() ? "is-active" : ""}`}
-              role="radio"
-              aria-checked={active()}
-              onClick={() => onChange(c)}
-              title={info.name}
-            >
-              {info.code}
-            </button>
-          );
-        }}
-      </For>
-    </div>
+    <Show when={totalReactions() > 0}>
+      <div class="flex items-center text-xs">
+        <div class="flex items-center">
+          <For each={reactionsWithCount()}>
+            {(reaction) => <ReactionIcon type={reaction.type} />}
+          </For>
+        </div>
+        <Show when={totalReactions() > 1}>
+          <div class=" ml-0">{totalReactions()}</div>
+        </Show>
+      </div>
+    </Show>
   );
 }
 </file>
@@ -20179,93 +19813,159 @@ export default function ViewModeToggle(props) {
 export { viewMode, setViewMode };
 </file>
 
-<file path="src/context/useDomainAssets.js">
-// src/context/useDomainAssets.js
-import { createSignal, createMemo, createResource, createEffect, on } from "solid-js";
+<file path="src/context/useAppAuth.js">
+// src/context/useAppAuth.js
+import { createSignal, onMount } from "solid-js";
+import { getWsClient, getWsApi } from "../net/wsRuntime.js";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast } from "../components/ui/toast.js";
+
+const AUTH_USER_KEY = "savva_auth_user";
+
+export function useAppAuth() {
+  const [authorizedUser, setAuthorizedUser] = createSignal(null);
+
+  onMount(() => {
+    try {
+      const savedUser = localStorage.getItem(AUTH_USER_KEY);
+      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
+    } catch (e) {
+      console.error("Failed to load authorized user:", e);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+  });
+
+  async function login(coreUserData) {
+    if (!coreUserData || !coreUserData.address) return;
+    setAuthorizedUser(coreUserData);
+    try {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
+      const checksummedAccount = toChecksumAddress(coreUserData.address);
+      const userProfile = await getWsApi().call('get-user', {
+        domain: coreUserData.domain,
+        user_addr: checksummedAccount,
+      });
+      const fullUserData = { ...coreUserData, ...userProfile };
+      setAuthorizedUser(fullUserData);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
+    } catch (e) {
+      console.error("Failed to fetch/save user profile after login:", e);
+      pushErrorToast(e, { context: "Profile fetch failed" });
+    }
+  }
+
+  async function logout() {
+    try {
+      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
+      await fetch(`${httpBase()}logout`, { credentials: 'include' });
+    } catch (e) {
+      console.error("Logout API call failed, proceeding with client-side logout.", e);
+    }
+    setAuthorizedUser(null);
+    try {
+      localStorage.removeItem(AUTH_USER_KEY);
+    } catch (e) {
+      console.error("Failed to clear authorized user:", e);
+    }
+    getWsClient()?.reconnect('user-logged-out');
+  }
+
+  function handleAuthError() {
+    console.warn("Authorization error detected, logging out.");
+    logout();
+  }
+
+  return { authorizedUser, login, logout, handleAuthError };
+}
+</file>
+
+<file path="src/context/useAppConnection.js">
+// src/context/useAppConnection.js
+import { createSignal, onMount } from "solid-js";
 import { parse } from "yaml";
-import { fetchWithTimeout } from "../utils/net.js";
-import { loadAssetResource } from "../utils/assetLoader.js";
+import { configureEndpoints } from "../net/endpoints";
+import { pushErrorToast } from "../components/ui/toast.js";
 
-const ASSETS_ENV_KEY = "domain_assets_env";
-const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+const OVERRIDE_KEY = "connect_override";
 
-export function useDomainAssets(app) {
-  const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
-  const [domainAssetsConfig, setDomainAssetsConfig] = createSignal(null);
-  const [domainAssetsSource, setDomainAssetsSource] = createSignal(null);
-  const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
+function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
+function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
+function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { } }
 
-  function setAssetsEnv(next) {
-    const v = next === "test" ? "test" : "prod";
-    localStorage.setItem(ASSETS_ENV_KEY, v);
-    setAssetsEnvState(v);
-  }
-
-  const assetsBaseUrl = createMemo(() => {
-    const info = app.info();
-    if (!info) return "";
-    const base = assetsEnv() === "test" ? info.temp_assets_url : info.assets_url;
-    return base?.endsWith("/") ? base : (base || "") + "/";
-  });
-
-  const domainAssetsPrefixActive = createMemo(() => domainAssetsPrefix() || DEFAULT_DOMAIN_ASSETS_PREFIX);
-
-  function assetUrl(relPath) {
-    const rel = String(relPath || "").replace(/^\/+/, "");
-    return (domainAssetsPrefixActive() || "") + rel;
-  }
-
-  async function refreshDomainAssets() {
-    const base = assetsBaseUrl();
-    const domain = app.selectedDomainName();
-    const computed = base && domain ? `${base}${domain}/` : "";
-
-    async function tryLoad(prefix) {
-      if (!prefix) return null;
-      try {
-        const res = await fetchWithTimeout(`${prefix}config.yaml`, { timeoutMs: 8000, cache: "no-store" });
-        return res.ok ? (parse(await res.text()) || {}) : null;
-      } catch { return null; }
-    }
-
-    let cfg = await tryLoad(computed);
-    if (cfg) {
-      setDomainAssetsPrefix(computed);
-      setDomainAssetsSource("domain");
-    } else {
-      cfg = await tryLoad(DEFAULT_DOMAIN_ASSETS_PREFIX);
-      setDomainAssetsPrefix(DEFAULT_DOMAIN_ASSETS_PREFIX);
-      setDomainAssetsSource(cfg ? "default" : null);
-    }
-    setDomainAssetsConfig(cfg || null);
-  }
-
-  const [domainDictionaries] = createResource(() => {
-    const cfg = domainAssetsConfig();
-    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
-    const items = locales.map(l => ({ code: (l?.code || "").toLowerCase(), path: l?.dictionary || l?.file })).filter(l => l.code && l.path);
-    if (items.length === 0) return null;
-    return { items, rev: `${domainAssetsPrefixActive()}|${cfg.assets_cid || cfg.cid || ""}` };
-  }, async (key) => {
-    if (!key) return {};
-    const dicts = {};
-    for (const { code, path } of key.items) {
-      try {
-        dicts[code] = await loadAssetResource({ assetUrl }, path, { type: "yaml" });
-      } catch { /* ignore */ }
-    }
-    return dicts;
-  });
-
-  createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
+export function useAppConnection() {
+  const [config, setConfig] = createSignal(null);
+  const [info, setInfo] = createSignal(null);
+  const [error, setError] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
   
-  createEffect(on([app.info, app.selectedDomainName, assetsEnv], () => {
-    if (app.info()) {
-      refreshDomainAssets();
-    }
-  }));
+  async function fetchInfo(cfg) {
+    const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+    return await res.json();
+  }
 
-  return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl };
+  async function applyConfig(nextCfg) {
+    setConfig(nextCfg);
+    const data = await fetchInfo(nextCfg);
+    setInfo(data);
+    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
+  }
+
+  async function init() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
+      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
+      const data = parse(await res.text()) || {};
+      if (!data.backendLink) throw new Error("Missing backendLink in config");
+
+      const baseCfg = { domain: data.domain || "", backendLink: ensureSlash(data.backendLink), gear: !!data.gear };
+      const merged = { ...baseCfg, ...loadOverride() };
+      await applyConfig(merged);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(init);
+
+  async function updateConnect(partial) {
+    try {
+      setLoading(true); setError(null);
+      const cur = config() || {};
+      const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
+      if (next.backendLink !== cur.backendLink) {
+        await applyConfig(next);
+      } else {
+        setConfig(next);
+        configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+      }
+      saveOverride(next);
+    } catch (e) {
+      setError(e);
+      pushErrorToast(e, { op: "updateConnect" });
+    } finally { setLoading(false); }
+  }
+
+  function setDomain(nextDomain) {
+    const cur = config() || {};
+    const next = { ...cur, domain: nextDomain || "" };
+    setConfig(next);
+    saveOverride(next);
+    configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+  }
+
+  async function clearConnectOverride() {
+    saveOverride(null);
+    await init();
+  }
+
+  return { config, info, error, loading, init, updateConnect, clearConnectOverride, setDomain };
 }
 </file>
 
@@ -20420,6 +20120,196 @@ export function currentDomain() { return _domain; }
 // src/ws/index.js
 </file>
 
+<file path="src/pages/PostPage.jsx">
+// src/pages/PostPage.jsx
+import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton";
+import Spinner from "../components/ui/Spinner.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UserCard from "../components/ui/UserCard.jsx";
+import PostInfo from "../components/feed/PostInfo.jsx";
+
+const getIdentifier = (route) => route().split('/')[2] || "";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, app, lang } = params;
+  if (!identifier || !app.wsMethod) return null;
+
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    lang: lang,
+    limit: 1,
+  };
+  
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  
+  return arr[0] || null;
+}
+
+export default function PostPage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+  const identifier = createMemo(() => getIdentifier(route));
+  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+
+  const [post] = createResource(
+    () => ({ identifier: identifier(), app, lang: uiLang() }),
+    fetchPostByIdentifier
+  );
+  
+  const [postLang, setPostLang] = createSignal(null);
+
+  createEffect(() => {
+    const p = post();
+    const id = identifier();
+
+    if (p && id.startsWith("0x") && p.short_cid) {
+      const newPath = `/post/${p.short_cid}`;
+      navigate(newPath, { replace: true });
+    }
+  });
+
+  createEffect(() => {
+    const p = post();
+    if (p && !postLang()) {
+      const availableLangs = Object.keys(p.savva_content?.locales || {});
+      if (availableLangs.length === 0) return;
+
+      const currentUiLang = uiLang();
+      let initialLang = availableLangs[0]; 
+
+      if (availableLangs.includes(currentUiLang)) {
+        initialLang = currentUiLang;
+      } else if (availableLangs.includes('en')) {
+        initialLang = 'en';
+      }
+      
+      setPostLang(initialLang);
+    }
+  });
+
+  const title = createMemo(() => post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const text = createMemo(() => post()?.savva_content?.locales?.[postLang()]?.text || "");
+  const thumbnail = createMemo(() => post()?.savva_content?.thumbnail);
+  const availableLocales = createMemo(() => Object.keys(post()?.savva_content?.locales || {}));
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto">
+      <ClosePageButton />
+      
+      <Switch>
+        <Match when={post.loading}>
+          <div class="flex justify-center items-center h-64">
+            <Spinner class="w-8 h-8" />
+          </div>
+        </Match>
+
+        <Match when={post.error}>
+          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
+            <p class="text-sm mt-1">{post.error.message}</p>
+          </div>
+        </Match>
+
+        <Match when={!post.loading && post() === null}>
+          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
+            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
+          </div>
+        </Match>
+
+        <Match when={post()}>
+          <article class="space-y-4">
+            <header class="flex justify-between items-start gap-4">
+              <div class="flex-1 min-w-0 space-y-3">
+                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title()}</h1>
+                <UserCard author={post().author} />
+                <PostInfo 
+                  item={post()} 
+                  hideTopBorder={true} 
+                  timeFormat="long"
+                  rewardsAlign="left" 
+                />
+              </div>
+              
+              {/* --- MODIFICATION: Added flex classes to center children --- */}
+              <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
+                <Show when={thumbnail()}>
+                  <IpfsImage 
+                    src={thumbnail()} 
+                    class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                    alt="Post thumbnail"
+                  />
+                </Show>
+                {/* --- MODIFICATION: Removed the variant prop --- */}
+                <LangSelector 
+                  codes={availableLocales()}
+                  value={postLang()}
+                  onChange={setPostLang}
+                />
+              </div>
+            </header>
+
+            <div class="prose prose-sm md:prose-base max-w-none pt-4 border-t border-[hsl(var(--border))]">
+              <p>{text()}</p>
+            </div>
+          </article>
+        </Match>
+      </Switch>
+    </main>
+  );
+}
+</file>
+
+<file path="src/routing/hashRouter.js">
+// src/routing/hashRouter.js
+import { createSignal } from "solid-js";
+
+function readHashPath() {
+  const raw = window.location.hash || "";
+  return raw.replace(/^#/, "") || "/";
+}
+
+const [route, setRoute] = createSignal(readHashPath());
+
+function setFromHash() {
+  const newPath = readHashPath();
+  setRoute(newPath);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("hashchange", setFromHash);
+}
+
+export function navigate(path, { replace = false } = {}) {
+  const target = path.startsWith("#") ? path : `#${path}`;
+  if (replace) window.location.replace(target);
+  else window.location.hash = path.startsWith("#") ? path.slice(1) : path;
+}
+
+export function useHashRouter() {
+  return { route, navigate };
+}
+</file>
+
 <file path="src/styles/layout.css">
 /* src/styles/layout.css */
 :root {
@@ -20537,93 +20427,6 @@ export default function DomainCssLoader() {
 
   return null;
 }
-</file>
-
-<file path="src/utils/debug.js">
-// src/utils/debug.js
-/* src/utils/debug.js */
-const STORE_KEY = "savva_debug_enabled";
-const MAX_LINES = 4000;
-
-function nowStamp() {
-  const d = new Date();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  const ms = String(d.getMilliseconds()).padStart(3, "0");
-  return `${hh}:${mm}:${ss}.${ms}`;
-}
-
-function safeStr(x) {
-  if (x instanceof Error) return `${x.name}: ${x.message}`;
-  if (typeof x === "string") return x;
-  try { return JSON.stringify(x, null, 2); } catch { return String(x); }
-}
-
-const state = {
-  enabled: (() => { try { return localStorage.getItem(STORE_KEY) === "1"; } catch { return false; } })(),
-  indent: 0,
-  lines: [],
-  listeners: new Set(),
-};
-
-function push(kind, scope, parts) {
-  const pad = "  ".repeat(Math.max(0, state.indent));
-  const text = `[${nowStamp()}]  ${pad}${scope}${parts.length ? " " + parts.map(safeStr).join(" ") : ""}`;
-  state.lines.push(text);
-  if (state.lines.length > MAX_LINES) state.lines.splice(0, state.lines.length - MAX_LINES);
-  state.listeners.forEach((fn) => { try { fn(text, kind, scope); } catch {} });
-  // mirror to console when enabled
-  if (state.enabled) {
-    const c = console[kind] || console.log;
-    c.call(console, `${scope}:`, ...parts);
-  }
-}
-
-export const dbg = {
-  // enable/disable + both property-style and method-style accessors
-  enable(on = true) {
-    state.enabled = !!on;
-    try { localStorage.setItem(STORE_KEY, state.enabled ? "1" : "0"); } catch {}
-    return state.enabled;
-  },
-  enabled() { return !!state.enabled; },     // method, for call-sites that do dbg.enabled()
-  get isEnabled() { return !!state.enabled; },// getter, in case someone reads dbg.isEnabled
-
-  // core logging
-  log(scope, ...args)  { push("log", scope, args); },
-  info(scope, ...args) { push("info", scope, args); },
-  warn(scope, ...args) { push("warn", scope, args); },
-  error(scope, ...args){ push("error", scope, args); },
-
-  // groups (safe even if console.group* is missing)
-  group(label) {
-    push("log", "▶", [label]);
-    if (state.enabled && console.groupCollapsed) console.groupCollapsed(label);
-    state.indent++;
-  },
-  groupEnd() {
-    state.indent = Math.max(0, state.indent - 1);
-    if (state.enabled && console.groupEnd) console.groupEnd();
-  },
-
-  // listeners
-  onChange(fn) { state.listeners.add(fn); return () => state.listeners.delete(fn); },
-
-  // buffer ops
-  clear() { state.lines = []; },
-  entries() { return state.lines.slice(); },
-
-  // text dump helpers used by the UI
-  getText() { return state.lines.join("\n"); },
-  text()    { return state.lines.join("\n"); }, // backwards compat
-  async copy() {
-    try { await navigator.clipboard.writeText(this.getText()); return true; }
-    catch { return false; }
-  },
-};
-
-export default dbg;
 </file>
 
 <file path="src/utils/net.js">
@@ -20838,51 +20641,6 @@ sections:
         file: core-concepts/domain.md
       - label: Authentication
         file: core-concepts/auth.md
-</file>
-
-<file path="public/domain_default/modules/tabs.yaml">
-tabs:
-  - type: leaders
-    right_panel:
-      available: true
-      blocks:
-        - type: html
-          en: /html/info_block_en.html
-          ru: /html/info_block_ru.html
-          ua: /html/info_block_ua.html
-          fr: /html/info_block_fr.html
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: actual
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: comments
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: new
-    right_panel:
-      available: false
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: for-you
-    private: true
-    right_panel:
-      available: true
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
 </file>
 
 <file path="public/default_connect.yaml">
@@ -21172,6 +20930,75 @@ async function translateTo(langCode, englishPairs) {
 });
 </file>
 
+<file path="src/components/feed/PostInfo.jsx">
+// src/components/feed/PostInfo.jsx
+import { Show, createMemo } from "solid-js";
+import { formatUnits } from "viem";
+import { useApp } from "../../context/AppContext.jsx";
+import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
+import PostTime from "../ui/PostTime.jsx";
+import PostReactions from "../ui/PostReactions.jsx";
+
+function PostComments(props) {
+  const count = () => props.item?._raw?.total_childs || props.item?.total_childs || 0;
+  return (
+    <Show when={count() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>💬</span>
+        <span>{count()}</span>
+      </div>
+    </Show>
+  );
+}
+
+function PostRewards(props) {
+  const amount = createMemo(() => {
+    const rawAmount = props.item?._raw?.fund?.total_author_share || props.item?.fund?.total_author_share;
+    if (!rawAmount) return 0;
+    const formatted = formatUnits(BigInt(rawAmount), 18);
+    return parseFloat(formatted);
+  });
+
+  const localizedAmount = createMemo(() => {
+    const currentLang = props.lang();
+    return amount().toLocaleString(currentLang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  });
+
+  return (
+    <Show when={amount() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>{localizedAmount()}</span>
+        <SavvaTokenIcon class="w-3.5 h-3.5" />
+      </div>
+    </Show>
+  );
+}
+
+export default function PostInfo(props) {
+  const { lang } = useApp();
+  const isListMode = () => props.mode === 'list';
+  const postData = createMemo(() => props.item?._raw || props.item || {});
+
+  return (
+    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+      <PostTime 
+        timestamp={postData().effective_time} 
+        format={props.timeFormat || "short"} 
+      />
+      <PostReactions item={props.item} />
+      <PostComments item={props.item} />
+      {/* --- MODIFICATION: Rewards alignment is now conditional --- */}
+      <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
+        <PostRewards item={props.item} lang={lang} />
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/feed/PostListView.jsx">
 // src/components/feed/PostListView.jsx
 import { For, createMemo } from "solid-js";
@@ -21206,25 +21033,30 @@ import { useApp } from "../../context/AppContext";
 import TabsBar from "./TabsBar";
 import Container from "../layout/Container";
 import ToTopButton from "../ui/ToTopButton";
+import { dbg } from "../../utils/debug.js";
 
 export default function MainView() {
-  const { t, selectedDomain, domainAssetsConfig } = useApp();
+  const { t, selectedDomain, domainAssetsConfig, domainAssetsSource, loading } = useApp();
 
-  // reactive domain name
   const domainName = createMemo(() => {
     const d = selectedDomain?.();
     return !d ? "" : typeof d === "string" ? d : d.name || "";
   });
 
-  // localized title (not rendered here but kept ready)
   const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
 
-  // change key when domain or assets pack changes to remount children
   const revision = createMemo(() => {
+    if (loading()) return null;
+
+    const source = domainAssetsSource?.();
     const cfg = domainAssetsConfig?.();
     const cid = cfg?.assets_cid || cfg?.cid || "";
     const tabs = cfg?.modules?.tabs || "";
-    return `${domainName()}|${cid}|${tabs}`;
+    
+    const key = `${domainName()}|${source}|${cid}|${tabs}`;
+    // --- DEBUG: Log the revision key using dbg ---
+    dbg.log('MainView', `Revision key updated to: ${key}`);
+    return key;
   });
 
   return (
@@ -21480,6 +21312,57 @@ export default function BrandLogo(props) {
 }
 </file>
 
+<file path="src/components/ui/LangSelector.jsx">
+// src/components/ui/LangSelector.jsx
+import { For, Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { LANG_INFO } from "../../i18n/useI18n";
+
+export default function LangSelector(props) {
+  const app = useApp();
+  const codes = createMemo(() => props.codes || []);
+  const value = () => (props.value || app.lang?.() || "").toLowerCase();
+  const onChange = (code) => (props.onChange ? props.onChange(code) : app.setLang?.(code));
+  
+  const isStretch = () => props.variant === 'stretch';
+
+  return (
+    <Show when={codes().length > 1}>
+      <div 
+        classList={{
+          'themed-segment': !isStretch(),
+          // --- MODIFICATION: Use CSS Grid for the stretch variant ---
+          'grid w-full grid-cols-4 gap-1 p-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]': isStretch(),
+        }}
+        class={props.class || ""} 
+        role="group" // Changed from radiogroup for better semantics with multiple rows
+        aria-label={app.t("rightPane.language")}
+      >
+        <For each={codes()}>
+          {(code) => {
+            const c = String(code).toLowerCase();
+            const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
+            const active = () => value() === c;
+            return (
+              <button
+                type="button"
+                // No flex-1 needed for grid layout
+                class={`themed-pill ${active() ? "is-active" : ""}`}
+                aria-pressed={active()}
+                onClick={() => onChange(c)}
+                title={info.name}
+              >
+                {info.code}
+              </button>
+            );
+          }}
+        </For>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/components/Toaster.jsx">
 // src/components/Toaster.jsx
 import { For, Show } from "solid-js";
@@ -21567,6 +21450,96 @@ export default function Toaster() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="src/context/useDomainAssets.js">
+// src/context/useDomainAssets.js
+import { createSignal, createMemo, createResource, createEffect, on } from "solid-js";
+import { parse } from "yaml";
+import { fetchWithTimeout } from "../utils/net.js";
+import { loadAssetResource } from "../utils/assetLoader.js";
+
+const ASSETS_ENV_KEY = "domain_assets_env";
+const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
+
+export function useDomainAssets(app) {
+  const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
+  const [domainAssetsConfig, setDomainAssetsConfig] = createSignal(null);
+  const [domainAssetsSource, setDomainAssetsSource] = createSignal(null);
+  const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
+
+  function setAssetsEnv(next) {
+    const v = next === "test" ? "test" : "prod";
+    localStorage.setItem(ASSETS_ENV_KEY, v);
+    setAssetsEnvState(v);
+  }
+
+  const assetsBaseUrl = createMemo(() => {
+    const info = app.info();
+    if (!info) return "";
+    const base = assetsEnv() === "test" ? info.temp_assets_url : info.assets_url;
+    return base?.endsWith("/") ? base : (base || "") + "/";
+  });
+
+  const domainAssetsPrefixActive = createMemo(() => domainAssetsPrefix() || DEFAULT_DOMAIN_ASSETS_PREFIX);
+
+  function assetUrl(relPath) {
+    const rel = String(relPath || "").replace(/^\/+/, "");
+    return (domainAssetsPrefixActive() || "") + rel;
+  }
+
+  async function refreshDomainAssets() {
+    const base = assetsBaseUrl();
+    const domain = app.selectedDomainName();
+    const computed = base && domain ? `${base}${domain}/` : "";
+
+    async function tryLoad(prefix) {
+      if (!prefix) return null;
+      try {
+        const res = await fetchWithTimeout(`${prefix}config.yaml`, { timeoutMs: 8000, cache: "no-store" });
+        return res.ok ? (parse(await res.text()) || {}) : null;
+      } catch { return null; }
+    }
+
+    let cfg = await tryLoad(computed);
+    if (cfg) {
+      setDomainAssetsPrefix(computed);
+      setDomainAssetsSource("domain");
+    } else {
+      cfg = await tryLoad(DEFAULT_DOMAIN_ASSETS_PREFIX);
+      setDomainAssetsPrefix(DEFAULT_DOMAIN_ASSETS_PREFIX);
+      setDomainAssetsSource(cfg ? "default" : null);
+    }
+    setDomainAssetsConfig(cfg || null);
+  }
+
+  const [domainDictionaries] = createResource(() => {
+    const cfg = domainAssetsConfig();
+    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
+    const items = locales.map(l => ({ code: (l?.code || "").toLowerCase(), path: l?.dictionary || l?.file })).filter(l => l.code && l.path);
+    if (items.length === 0) return null;
+    return { items, rev: `${domainAssetsPrefixActive()}|${cfg.assets_cid || cfg.cid || ""}` };
+  }, async (key) => {
+    if (!key) return {};
+    const dicts = {};
+    for (const { code, path } of key.items) {
+      try {
+        dicts[code] = await loadAssetResource({ assetUrl }, path, { type: "yaml" });
+      } catch { /* ignore */ }
+    }
+    return dicts;
+  });
+
+  createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
+  
+  createEffect(on([app.info, app.selectedDomainName, assetsEnv], () => {
+    if (app.info()) {
+      refreshDomainAssets();
+    }
+  }));
+
+  return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl };
 }
 </file>
 
@@ -22240,7 +22213,7 @@ export default class WsClient {
       try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
     }
     this._ws = null;
-    this._failInflight(new Error("WS reconnected"));
+    
     this.connect();
   }
 
@@ -22625,59 +22598,42 @@ export async function assessAssets(p) {
 }
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="en">
+<file path="src/utils/debug.js">
+// src/utils/debug.js
+const STORE_KEY = "savva_debug_enabled";
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAVVA · SolidJS</title>
+const state = {
+  enabled: (() => { try { return localStorage.getItem(STORE_KEY) === "1"; } catch { return false; } })(),
+};
 
-  <!-- Preload theme to avoid flash -->
-  <script>
-    (function () {
-      try {
-        const saved = localStorage.getItem("theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved || (systemDark ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", theme === "dark");
-      } catch { }
-    })();
-  </script>
+function logWithScope(method, scope, args) {
+  if (!state.enabled) return;
+  const c = console[method] || console.log;
+  c.call(console, `${scope}:`, ...args);
+}
 
-  <script>
-    (function () {
-      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
-      if (!location.hash) {
-        let path = location.pathname;
-        let newHash = "";
+export const dbg = {
+  enable(on = true) {
+    state.enabled = !!on;
+    try { localStorage.setItem(STORE_KEY, state.enabled ? "1" : "0"); } catch {}
+    return state.enabled;
+  },
+  enabled: () => !!state.enabled,
 
-        // NEW: Check for legacy /content/ URL
-        if (path.startsWith("/content/")) {
-          const savvaId = path.substring("/content/".length);
-          newHash = "#/post/" + savvaId;
-        } else if (path !== "/") {
-          newHash = "#" + path + location.search;
-        }
+  log(scope, ...args)  { logWithScope("log", scope, args); },
+  info(scope, ...args) { logWithScope("info", scope, args); },
+  warn(scope, ...args) { logWithScope("warn", scope, args); },
+  error(scope, ...args){ logWithScope("error", scope, args); },
 
-        if (newHash) {
-          history.replaceState(null, "", "/" + newHash);
-        }
-      }
-    })();
-  </script>
+  group(label) {
+    if (state.enabled && console.groupCollapsed) console.groupCollapsed(label);
+  },
+  groupEnd() {
+    if (state.enabled && console.groupEnd) console.groupEnd();
+  },
+};
 
-
-  <!-- Load app after theme class is set -->
-  <script type="module" src="/src/index.jsx"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-</body>
-
-</html>
+export default dbg;
 </file>
 
 <file path="tailwind.config.js">
@@ -22688,6 +22644,51 @@ export default {
   theme: { extend: {} },
   plugins: [],
 };
+</file>
+
+<file path="public/domain_default/modules/tabs.yaml">
+tabs:
+  - type: leaders
+    right_panel:
+      available: true
+      blocks:
+        - type: html
+          en: /html/info_block_en.html
+          ru: /html/info_block_ru.html
+          ua: /html/info_block_ua.html
+          fr: /html/info_block_fr.html
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: actual
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: comments
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: new
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: for-you
+    private: true
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
 </file>
 
 <file path="public/domain_default/domain.css">
@@ -22767,6 +22768,7 @@ export default {
 import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import PostListView from "./PostListView.jsx";
+import { dbg } from "../../utils/debug.js";
 
 export default function ContentFeed(props) {
   const { t } = useApp();
@@ -22790,6 +22792,8 @@ export default function ContentFeed(props) {
   }
 
   onMount(() => {
+    // --- DEBUG: Log when the component mounts using dbg ---
+    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
     loadMore();
     const handleScroll = () => {
       const scrollThreshold = 600;
@@ -23151,6 +23155,61 @@ export default function Docs() {
 }
 </file>
 
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVVA · SolidJS</title>
+
+  <!-- Preload theme to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      } catch { }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
+      if (!location.hash) {
+        let path = location.pathname;
+        let newHash = "";
+
+        // NEW: Check for legacy /content/ URL
+        if (path.startsWith("/content/")) {
+          const savvaId = path.substring("/content/".length);
+          newHash = "#/post/" + savvaId;
+        } else if (path !== "/") {
+          newHash = "#" + path + location.search;
+        }
+
+        if (newHash) {
+          history.replaceState(null, "", "/" + newHash);
+        }
+      }
+    })();
+  </script>
+
+
+  <!-- Load app after theme class is set -->
+  <script type="module" src="/src/index.jsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
+</file>
+
 <file path="src/index.jsx">
 // src/index.jsx
 import { render } from "solid-js/web";
@@ -23216,7 +23275,8 @@ export default function PostCard(props) {
     e.preventDefault();
     const postId = props.item?.id; 
     if (postId) {
-      // app.setSavedScrollY(window.scrollY); // <<< This line is now removed
+      // --- MODIFICATION: Save scroll position before navigating ---
+      app.setSavedScrollY(window.scrollY);
       navigate(`/post/${postId}`);
     } else {
       console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
@@ -23314,21 +23374,12 @@ export default function PostCard(props) {
 
 <file path="src/components/settings/DeveloperSection.jsx">
 // src/components/settings/DeveloperSection.jsx
-/* src/components/settings/DeveloperSection.jsx */
-import { Show, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug";
 
 export default function DeveloperSection() {
   const app = useApp();
   const { t } = app;
-  const [copied, setCopied] = createSignal(false);
-
-  async function copyLog() {
-    const ok = await dbg.copy();
-    setCopied(ok);
-    setTimeout(() => setCopied(false), 1500);
-  }
 
   return (
     <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
@@ -23353,25 +23404,6 @@ export default function DeveloperSection() {
         />
         <span>{t("settings.developer.debug.enable")}</span>
       </label>
-
-      <div class="flex gap-2">
-        <button
-          class="px-3 py-1 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-          onClick={copyLog}
-        >
-          {t("settings.developer.debug.copy")}
-        </button>
-        <button
-          class="px-3 py-1 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-          onClick={() => dbg.clear()}
-        >
-          {t("settings.developer.debug.clear")}
-        </button>
-      </div>
-
-      <Show when={copied()}>
-        <div class="text-xs text-[hsl(var(--primary))]">{t("settings.developer.debug.copied")}</div>
-      </Show>
     </section>
   );
 }
@@ -23918,6 +23950,413 @@ html.dark .sv-docs code[data-theme*=" "] span {
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
+<file path="src/components/tabs/NewTab.jsx">
+// src/components/tabs/NewTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { dbg } from "../../utils/debug.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+export default function NewTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
+
+      await whenWsOpen();
+
+      if (!contentList) {
+        dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
+        return [];
+      }
+      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      dbg.log('NewTab', 'Fetching with params:', params);
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      dbg.error('NewTab', "fetchPage error:", err);
+      return [];
+    }
+  }
+
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={category()}
+            onInput={(e) => setCategory(e.currentTarget.value)}
+            aria-label={app.t("newTab.category")}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+            </For>
+          </select>
+          <Show when={categoriesRes.loading}>
+            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+          </Show>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/SwitchConnectDialog.jsx">
+// File: src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
+import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
+
+function isAbortError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  if (e?.name === "AbortError") return true;
+  if (e?.code === 20) return true;
+  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
+  return false;
+}
+
+async function fetchInfoJSON(backendLink, { signal } = {}) {
+  const base = httpBase(backendLink);
+  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+  return await res.json();
+}
+
+export default function SwitchConnectDialog(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains] = createSignal([]); // [{ name }]
+  const [fetching, setFetching] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
+  const [localError, setLocalError] = createSignal("");
+
+  let aborter;
+
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
+  });
+
+  createEffect(async () => {
+    if (!props.open) return;
+
+    setLocalError("");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
+    setDomains([]);
+
+    aborter?.abort();
+    aborter = new AbortController();
+    setFetching(true);
+
+    try {
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
+        const resolved =
+          normalized.find((d) => eq(d.name, wanted)) ||
+          normalized.find((d) => eq(d.name, domain())) ||
+          normalized[0];
+
+        const name = resolved.name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  });
+
+  onCleanup(() => aborter?.abort());
+
+  async function handleReload() {
+    setLocalError("");
+
+    // Normalize the user-entered backend URL (candidate) without touching global config.
+    let candidate = (backendUrl() || "").trim();
+    try {
+      const u = new URL(candidate);
+      if (!/^https?:$/.test(u.protocol)) {
+        throw new Error(t("rightPane.switch.validation.protocol"));
+      }
+      // Ensure trailing slash for consistent "base + 'info'" concatenation.
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
+      candidate = u.toString();
+    } catch (e) {
+      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    setFetching(true);
+    aborter?.abort();
+    aborter = new AbortController();
+
+    try {
+      // Probe the candidate backend’s /info to list available domains.
+      const res = await fetch(candidate + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        // Try to keep current/wanted domain if present; otherwise pick the first.
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
+        const keep =
+          normalized.find((d) => eq(d.name, prefer)) ||
+          normalized.find((d) => eq(d.name, domain()));
+        const name = keep?.name || normalized[0].name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function onApply() {
+    setLocalError("");
+    setApplying(true);
+    try {
+      const newUrl = (backendUrl() || "").trim();
+      const chosenDomain = (domain() || "").trim();
+      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
+
+      const oldBackendBase = httpBase();
+      const newBackendBase = new URL(newUrl);
+      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
+      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
+
+      // --- MODIFICATION START: Logout from the OLD backend first ---
+      if (isSwitchingBackends) {
+        await app.logout?.();
+      }
+      // --- MODIFICATION END ---
+
+      // Now, proceed with switching to the new backend
+      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
+
+      await app.updateConnect?.({ backendLink: httpBase() });
+      await app.setDomain?.(chosenDomain);
+      await app.refreshDomainAssets?.();
+
+      if (app.ws) {
+        app.ws.setUrl(wsUrl());
+        app.ws.reconnect("switch-backend");
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+      setApplying(false);
+      return;
+    }
+
+    setApplying(false);
+    try { aborter?.abort(); } catch { }
+    props.onClose?.();
+  }
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
+            {t("rightPane.switch.title")}
+          </h3>
+
+          <label class="block mb-3">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
+            <div class="mt-1 flex gap-2">
+              <input
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                value={backendUrl()}
+                onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                placeholder={t("rightPane.switch.backend.placeholder")}
+                spellcheck={false}
+              />
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                onClick={handleReload}
+                disabled={fetching()}
+                title={t("rightPane.switch.reload.title")}
+              >
+                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+              </button>
+            </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
+          </label>
+
+          <label class="block mb-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
+          </label>
+          <select
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
+            value={domain()}
+            onChange={(e) => setDomain(e.currentTarget.value)}
+            disabled={fetching() || domains().length === 0}
+          >
+            {domains().map((d) => (
+              <option value={d.name} selected={eq(d.name, domain())}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <Show when={selectedDomainObj()}>
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+              <Show when={selectedDomainObj().website}>
+                <div>
+                  {t("rightPane.switch.domain.website")}:{" "}
+                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                    {selectedDomainObj().website}
+                  </a>
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={localError() || props.error}>
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
+              {t("common.error")}: {localError() || props.error?.message}
+            </p>
+          </Show>
+
+          <div class="mt-4 flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              onClick={props.onReset}
+              title={t("rightPane.switch.reset.title")}
+            >
+              {t("rightPane.switch.reset")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onApply}
+              disabled={props.loading || fetching() || applying()}
+            >
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/components/settings/LocalIpfsSection.jsx">
 // src/components/settings/LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
@@ -24115,401 +24554,6 @@ ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOr
             </div>
         </Show>
     </section>
-  );
-}
-</file>
-
-<file path="src/components/tabs/NewTab.jsx">
-// src/components/tabs/NewTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-export default function NewTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      if (!contentList) return [];
-      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-      
-      const user = app.authorizedUser();
-      if (user?.address) {
-        // MODIFICATION: Changed parameter name to `my_addr` as requested.
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      console.error("fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
-          </Show>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-      />
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/SwitchConnectDialog.jsx">
-// File: src/components/SwitchConnectDialog.jsx
-import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext";
-import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
-
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
-
-function isAbortError(e) {
-  const msg = String(e?.message || e || "").toLowerCase();
-  if (e?.name === "AbortError") return true;
-  if (e?.code === 20) return true;
-  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
-  return false;
-}
-
-async function fetchInfoJSON(backendLink, { signal } = {}) {
-  const base = httpBase(backendLink);
-  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
-  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-  return await res.json();
-}
-
-export default function SwitchConnectDialog(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
-  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
-  const [domains, setDomains] = createSignal([]); // [{ name }]
-  const [fetching, setFetching] = createSignal(false);
-  const [applying, setApplying] = createSignal(false);
-  const [localError, setLocalError] = createSignal("");
-
-  let aborter;
-
-  const selectedDomainObj = createMemo(() => {
-    const cur = (domain() || "").trim().toLowerCase();
-    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
-  });
-
-  createEffect(async () => {
-    if (!props.open) return;
-
-    setLocalError("");
-    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
-    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
-    setDomains([]);
-
-    aborter?.abort();
-    aborter = new AbortController();
-    setFetching(true);
-
-    try {
-      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
-      const u = new URL(initialUrl);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-
-      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
-        const resolved =
-          normalized.find((d) => eq(d.name, wanted)) ||
-          normalized.find((d) => eq(d.name, domain())) ||
-          normalized[0];
-
-        const name = resolved.name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  });
-
-  onCleanup(() => aborter?.abort());
-
-  async function handleReload() {
-    setLocalError("");
-
-    // Normalize the user-entered backend URL (candidate) without touching global config.
-    let candidate = (backendUrl() || "").trim();
-    try {
-      const u = new URL(candidate);
-      if (!/^https?:$/.test(u.protocol)) {
-        throw new Error(t("rightPane.switch.validation.protocol"));
-      }
-      // Ensure trailing slash for consistent "base + 'info'" concatenation.
-      if (!u.pathname.endsWith("/")) u.pathname += "/";
-      candidate = u.toString();
-    } catch (e) {
-      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
-      return;
-    }
-
-    setFetching(true);
-    aborter?.abort();
-    aborter = new AbortController();
-
-    try {
-      // Probe the candidate backend’s /info to list available domains.
-      const res = await fetch(candidate + "info", {
-        headers: { Accept: "application/json" },
-        signal: aborter.signal,
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-      const info = await res.json();
-
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        // Try to keep current/wanted domain if present; otherwise pick the first.
-        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
-        const keep =
-          normalized.find((d) => eq(d.name, prefer)) ||
-          normalized.find((d) => eq(d.name, domain()));
-        const name = keep?.name || normalized[0].name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function onApply() {
-    setLocalError("");
-    setApplying(true);
-    try {
-      const url = (backendUrl() || "").trim();
-      const chosen = (domain() || "").trim();
-      const u = new URL(url);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-      if (!chosen) throw new Error(t("rightPane.switch.validation.domain"));
-
-      // Configure once for the new selection
-      configureEndpoints({ backendLink: url, domain: chosen, lang: app.lang ? app.lang() : "en" });
-
-      if (typeof props.onApply === "function") {
-        await props.onApply({ backendLink: httpBase(), domain: chosen });
-      }
-
-      await app.updateConnect?.({ backendLink: httpBase() });
-      await app.setDomain?.(chosen);
-      await app.refreshDomainAssets?.();
-
-      // Nudge WS to new URL immediately (no waiting for mounts)
-      if (app.ws) {
-        app.ws.setUrl(wsUrl());
-        app.ws.reconnect("switch-backend");
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-      setApplying(false);
-      return;
-    }
-
-    setApplying(false);
-    try { aborter?.abort(); } catch { }
-    props.onClose?.();
-  }
-
-  return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 z-40 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-
-        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-3">
-            {t("rightPane.switch.title")}
-          </h3>
-
-          <label class="block mb-3">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
-            <div class="mt-1 flex gap-2">
-              <input
-                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                value={backendUrl()}
-                onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder={t("rightPane.switch.backend.placeholder")}
-                spellcheck={false}
-              />
-              <button
-                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
-                onClick={handleReload}
-                disabled={fetching()}
-                title={t("rightPane.switch.reload.title")}
-              >
-                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
-              </button>
-            </div>
-            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
-          </label>
-
-          <label class="block mb-1">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
-          </label>
-          <select
-            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name} selected={eq(d.name, domain())}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-
-          <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-              <Show when={selectedDomainObj().website}>
-                <div>
-                  {t("rightPane.switch.domain.website")}:{" "}
-                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
-                    {selectedDomainObj().website}
-                  </a>
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
-              {t("common.error")}: {localError() || props.error?.message}
-            </p>
-          </Show>
-
-          <div class="mt-4 flex gap-2 justify-end">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              onClick={props.onReset}
-              title={t("rightPane.switch.reset.title")}
-            >
-              {t("rightPane.switch.reset")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onApply}
-              disabled={props.loading || fetching() || applying()}
-            >
-              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
   );
 }
 </file>
@@ -24810,6 +24854,156 @@ export default function Settings() {
 export const APP_VERSION = "0.102";
 </file>
 
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "default.avatar": "Аватар",
+  "default.user": "Пользователь",
+  "docs.article": "Статья документации",
+  "docs.copied": "Скопировано в буфер обмена!",
+  "docs.copy": "Копировать",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+  "error.connection.title": "Ошибка подключения",
+  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
+  "error.ws.title": "Ошибка подключения",
+  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
+  "ipfs.diag.cors.name": "Проверка CORS шлюза",
+  "ipfs.diag.cors.ok": "CORS настроен правильно.",
+  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
+  "ipfs.diag.fetch.name": "Получение из живого шлюза",
+  "ipfs.diag.fetch.ok": "Запрос успешен.",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
+  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
+  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
+  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
+  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
+  "ipfs.diag.liveness.error": "Узел не отвечает.",
+  "ipfs.diag.liveness.name": "Проверка работоспособности API",
+  "ipfs.diag.liveness.ok": "Узел работает.",
+  "ipfs.diag.run": "Запустить диагностику",
+  "ipfs.diag.title": "Диагностика узла IPFS",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.group": "Просмотреть группу",
+  "newTab.view.list": "Список",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.clear": "Очистить лог",
+  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
+  "settings.developer.debug.copy": "Скопировать лог",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
+  "stakerLevels.clam": "Моллюск",
+  "stakerLevels.dolphin": "Дельфин",
+  "stakerLevels.fish": "Рыба",
+  "stakerLevels.guest": "Гость",
+  "stakerLevels.orca": "Косатка",
+  "stakerLevels.seahorse": "Морской конек",
+  "stakerLevels.shark": "Акула",
+  "stakerLevels.shrimp": "Креветка",
+  "stakerLevels.stingray": "Скат",
+  "stakerLevels.whale": "Кит",
+  "tabs.aria": "Вкладки раздела",
+  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
+  "tabs.title.actual": "Текущие",
+  "tabs.title.comments": "Комментарии",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лидеры",
+  "tabs.title.new": "Новые",
+  "time.day.plural": "{n} дней назад",
+  "time.day.singular": "{n} день назад",
+  "time.hour.plural": "{n} часов назад",
+  "time.hour.singular": "{n} час назад",
+  "time.minute.plural": "{n} минут назад",
+  "time.minute.singular": "{n} минуту назад",
+  "time.now": "Сейчас",
+  "timeFrame.${frame}": "Период: {frame}",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети"
+};
+</file>
+
 <file path="src/components/main/TabsBar.jsx">
 // src/components/main/TabsBar.jsx
 import { createResource, Show, createMemo, createSignal, createEffect, batch, For } from "solid-js";
@@ -24969,156 +25163,6 @@ export default function TabsBar() {
 }
 </file>
 
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "default.avatar": "Аватар",
-  "default.user": "Пользователь",
-  "docs.article": "Статья документации",
-  "docs.copied": "Скопировано в буфер обмена!",
-  "docs.copy": "Копировать",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
-  "error.connection.retry": "Обновить страницу",
-  "error.connection.title": "Ошибка подключения",
-  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
-  "error.ws.title": "Ошибка подключения",
-  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
-  "ipfs.diag.cors.name": "Проверка CORS шлюза",
-  "ipfs.diag.cors.ok": "CORS настроен правильно.",
-  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
-  "ipfs.diag.fetch.name": "Получение из живого шлюза",
-  "ipfs.diag.fetch.ok": "Запрос успешен.",
-  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
-  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
-  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
-  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
-  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
-  "ipfs.diag.liveness.error": "Узел не отвечает.",
-  "ipfs.diag.liveness.name": "Проверка работоспособности API",
-  "ipfs.diag.liveness.ok": "Узел работает.",
-  "ipfs.diag.run": "Запустить диагностику",
-  "ipfs.diag.title": "Диагностика узла IPFS",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.group": "Просмотреть группу",
-  "newTab.view.list": "Список",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.clear": "Очистить лог",
-  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
-  "settings.developer.debug.copy": "Скопировать лог",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
-  "stakerLevels.clam": "Моллюск",
-  "stakerLevels.dolphin": "Дельфин",
-  "stakerLevels.fish": "Рыба",
-  "stakerLevels.guest": "Гость",
-  "stakerLevels.orca": "Косатка",
-  "stakerLevels.seahorse": "Морской конек",
-  "stakerLevels.shark": "Акула",
-  "stakerLevels.shrimp": "Креветка",
-  "stakerLevels.stingray": "Скат",
-  "stakerLevels.whale": "Кит",
-  "tabs.aria": "Вкладки раздела",
-  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
-  "tabs.title.actual": "Текущие",
-  "tabs.title.comments": "Комментарии",
-  "tabs.title.for-you": "Для вас",
-  "tabs.title.leaders": "Лидеры",
-  "tabs.title.new": "Новые",
-  "time.day.plural": "{n} дней назад",
-  "time.day.singular": "{n} день назад",
-  "time.hour.plural": "{n} часов назад",
-  "time.hour.singular": "{n} час назад",
-  "time.minute.plural": "{n} минут назад",
-  "time.minute.singular": "{n} минуту назад",
-  "time.now": "Сейчас",
-  "timeFrame.${frame}": "Период: {frame}",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
-};
-</file>
-
 <file path="src/components/RightPane.jsx">
 // src/components/RightPane.jsx
 import { createSignal, Show, createMemo, createEffect } from "solid-js";
@@ -25189,7 +25233,8 @@ export default function RightPane({ isOpen, onClose }) {
                   class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                   role="button" tabIndex={0}
                   onClick={() => {
-                    // app.setSavedScrollY(window.scrollY); // <<< This line is now removed
+                    // --- MODIFICATION: Save scroll position ---
+                    app.setSavedScrollY(window.scrollY);
                     navigate("/docs"); 
                     onClose(); 
                   }}
@@ -25207,7 +25252,8 @@ export default function RightPane({ isOpen, onClose }) {
                   class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
                   role="button" tabIndex={0}
                   onClick={() => {
-                    // app.setSavedScrollY(window.scrollY); // <<< This line is now removed
+                    // --- MODIFICATION: Save scroll position ---
+                    app.setSavedScrollY(window.scrollY);
                     navigate("/settings"); 
                     onClose(); 
                   }}
@@ -25277,9 +25323,11 @@ export function AppProvider(props) {
   const { route } = useHashRouter();
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
-    const isLeavingMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
-    const isGoingToPage = /^\/(post|settings|docs)/.test(nextRoute);
-    if (isLeavingMainFeed && isGoingToPage) {
+    
+    const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
+    const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
+
+    if (isCurrentlyOnMainFeed && isNavigatingToPage) {
       setSavedScrollY(window.scrollY);
     }
   }, { defer: true }));
@@ -25325,7 +25373,8 @@ export function AppProvider(props) {
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
-    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
+    // --- MODIFICATION: Removed the redundant logout call from setDomain ---
+    setDomain: conn.setDomain,
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
   };
 
@@ -25558,10 +25607,11 @@ export default function App() {
 
   createEffect(on(currentView, (view) => {
     if (view === 'main') {
-      // Use a timeout to ensure the scroll happens after the DOM update
-      setTimeout(() => {
-        window.scrollTo(0, app.savedScrollY ? app.savedScrollY() : 0);
-      }, 0);
+      requestAnimationFrame(() => {
+        const y = app.savedScrollY();
+        console.log(`%c[App.jsx] Restoring scroll position to: ${y}`, 'color: green; font-weight: bold;');
+        window.scrollTo(0, y);
+      });
     }
   }));
 
