@@ -20,5 +20,20 @@
   overflow: hidden;
 }
 
+/* Animation for the post fund badge */
+@keyframes bounce-short {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    /* MODIFICATION: Increased jump from -15% to -25% */
+    transform: translateY(-25%);
+  }
+}
+
+.animate-bounce-short {
+  animation: bounce-short 0.3s ease-in-out;
+}
+
 
 

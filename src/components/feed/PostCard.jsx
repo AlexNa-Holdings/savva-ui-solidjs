@@ -6,6 +6,7 @@ import UserCard from "../ui/UserCard.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import PostInfo from "./PostInfo.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
+import PostFundBadge from "../ui/PostFundBadge.jsx";
 
 function getLocalizedField(locales, fieldName, currentLang) {
   if (!locales || typeof locales !== 'object') return "";
@@ -22,6 +23,7 @@ export default function PostCard(props) {
   const app = useApp();
   const author = () => props.item._raw?.author;
   const content = () => props.item._raw?.savva_content;
+  const fund = () => props.item._raw?.fund;
   const isListMode = () => props.mode === 'list';
   
   const displayImageSrc = createMemo(() => {
@@ -43,8 +45,27 @@ export default function PostCard(props) {
 
   const imageContainerClasses = createMemo(() => {
     const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
-    return `shrink-0 ${listModeRounding} overflow-hidden ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
+    return `relative shrink-0 ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
   });
+
+  const ImageBlock = () => {
+    const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    return (
+      <div class={imageContainerClasses()}>
+        <IpfsImage
+          src={displayImageSrc()}
+          class={roundingClass}
+          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
+        />
+        
+         <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
+          <div class="absolute bottom-2 right-0 z-10">
+            <PostFundBadge amount={fund()?.amount} />
+          </div>
+        </Show>
+      </div>
+    );
+  };
 
   const contentContainerClasses = createMemo(() => {
     return isListMode()
@@ -56,17 +77,6 @@ export default function PostCard(props) {
     const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
     return isListMode() ? `${base} line-clamp-2` : `${base} line-clamp-3`;
   });
-
-  const ImageBlock = () => (
-    <div class={imageContainerClasses()}>
-      <Show
-        when={displayImageSrc()}
-        fallback={<UnknownUserIcon class="absolute inset-0 w-full h-full" />}
-      >
-        {(cid) => <IpfsImage src={cid()} class="w-full h-full" />}
-      </Show>
-    </div>
-  );
 
   const ContentBlock = () => (
     <div class={contentContainerClasses()}>
@@ -93,12 +103,13 @@ export default function PostCard(props) {
 
   return (
     <article class={articleClasses()}>
-      {/* MODIFICATION: The badge is now shown only if nft.owner is null or empty. */}
       <Show when={props.item._raw?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
           <NftBadge />
         </div>
       </Show>
+
+
 
       <Show
         when={isListMode()}
