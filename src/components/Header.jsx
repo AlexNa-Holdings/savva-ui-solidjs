@@ -12,6 +12,7 @@ import { getChainLogo } from "../blockchain/chainLogos";
 import BrandLogo from "./ui/BrandLogo.jsx";
 import Container from "./layout/Container";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
+import NewPostButton from "./main/NewPostButton.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -87,13 +88,15 @@ export default function Header({ onTogglePane }) {
       <Container>
         <div class="h-12 px-2 flex items-center justify-between">
           {/* Left: brand */}
-          <div class="flex items-center">
+          <div class="flex items-center gap-4">
             <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
           </div>
 
           {/* Right: wallet + auth + menu */}
           <div class="flex items-center gap-3">
-
+            <Show when={app.authorizedUser()}>
+              <NewPostButton />
+            </Show>
             <AuthorizedUser />
             
             <Show

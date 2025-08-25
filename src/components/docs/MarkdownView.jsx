@@ -40,22 +40,20 @@ export default function MarkdownView(props) {
         import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
       ]);
 
-      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => { /* ... */ });
+      // Allow specific tags and attributes for media players
+      DOMPurify.default.addHook("uponSanitizeElement", (node, data) => {
+        if (data.tagName === 'iframe' || data.tagName === 'video' || data.tagName === 'audio') {
+            if(!node.hasAttribute('src')) node.remove();
+        }
+      });
 
       const processor = unified()
         .use(remarkParse)
         .use(remarkBreaks)
         .use(remarkFrontmatter, ["yaml", "toml"])
         .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true });
-
-      if (props.rehypePlugins) {
-        for (const plugin of props.rehypePlugins) {
-          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
-        }
-      }
-      
-      processor
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeMediaPlayers) // Our new media plugin
         .use(rehypeSlug)
         .use(rehypeAutolinkHeadings, { behavior: "wrap" })
         .use(rehypePrettyCode, {
@@ -63,14 +61,18 @@ export default function MarkdownView(props) {
           theme: { light: "github-light", dark: "github-dark" },
         })
         .use(rehypeCopyButton)
-        .use(rehypeMediaPlayers)
         .use(rehypeStringify, { allowDangerousHtml: true });
       
       const file = await processor.process(String(props.markdown || ""));
       const rawHtml = String(file);
+      
       const safe = DOMPurify.default.sanitize(rawHtml, {
         ADD_TAGS: ["iframe", "video", "audio"],
-        ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style"],
+        ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style", "src"],
+        // Allow specific youtube domain for iframes
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        FORBID_TAGS: [],
+        FORBID_ATTR: []
       });
 
       if (!disposed) setHtml(safe);
@@ -91,9 +93,35 @@ export default function MarkdownView(props) {
     }
   }
 
-  function copy(text) { /* ... */ }
-  function onClick(e) { /* ... */ }
-  function relabelButtons() { /* ... */ }
+  function copy(text) {
+    if (!text) return;
+    try {
+      navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.error("Failed to copy text:", e);
+    }
+  }
+
+  function onClick(e) {
+    const btn = e.target.closest(".sv-copy-btn");
+    if (!btn) return;
+    const pre = btn.closest("pre");
+    if (!pre) return;
+    
+    // Select the code content, excluding the button itself
+    const codeNode = pre.querySelector("code");
+    if (codeNode) {
+      copy(codeNode.innerText);
+      btn.textContent = t("clipboard.copied");
+      setTimeout(() => { btn.textContent = t("clipboard.copy"); }, 2000);
+    }
+  }
+
+  function relabelButtons() {
+    if (!container) return;
+    const buttons = container.querySelectorAll(".sv-copy-btn");
+    buttons.forEach(btn => { btn.textContent = t("clipboard.copy"); });
+  }
   
   onMount(() => {
     renderMd().then(() => relabelButtons());

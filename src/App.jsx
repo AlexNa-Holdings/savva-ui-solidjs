@@ -16,6 +16,7 @@ import ConnectionError from "./components/main/ConnectionError.jsx";
 import Spinner from "./components/ui/Spinner.jsx";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import PostPage from "./pages/PostPage";
+import EditorPage from "./pages/EditorPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -27,6 +28,7 @@ export default function App() {
     if (r.startsWith("/post/")) return "post";
     if (r.startsWith("/settings")) return "settings";
     if (r.startsWith("/docs")) return "docs";
+    if (r.startsWith("/editor/")) return "editor";
     return "main";
   });
 
@@ -45,7 +47,7 @@ export default function App() {
       if (e.key !== "Escape") return;
       
       const view = currentView();
-      if (view === 'post' || view === 'settings' || view === 'docs') {
+      if (view !== 'main') {
         navigate(app.lastTabRoute() || "/");
         return; 
       }
@@ -90,17 +92,15 @@ export default function App() {
           <Show when={domainRevision()} keyed>
             <>
               <Header onTogglePane={togglePane} />
-              <div style={{ display: currentView() === "main" ? "block" : "none" }}>
-                <MainView />
-              </div>
+              <Switch>
+                <Match when={currentView() === 'main'}><MainView /></Match>
+                <Match when={currentView() === 'post'}><PostPage /></Match>
+                <Match when={currentView() === 'settings'}><Settings /></Match>
+                <Match when={currentView() === 'docs'}><Docs /></Match>
+                <Match when={currentView() === 'editor'}><EditorPage /></Match>
+              </Switch>
             </>
           </Show>
-
-          <Switch>
-            <Match when={currentView() === 'post'}><PostPage /></Match>
-            <Match when={currentView() === 'settings'}><Settings /></Match>
-            <Match when={currentView() === 'docs'}><Docs /></Match>
-          </Switch>
           
           <RightPane isOpen={isPaneOpen} onClose={togglePane} />
           <Toaster />
