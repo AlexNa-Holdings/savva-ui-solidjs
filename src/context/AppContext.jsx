@@ -26,10 +26,8 @@ export function AppProvider(props) {
   const { route } = useHashRouter();
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
-    
     const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
     const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
-
     if (isCurrentlyOnMainFeed && isNavigatingToPage) {
       setSavedScrollY(window.scrollY);
     }
@@ -51,6 +49,20 @@ export function AppProvider(props) {
   
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
+
+  // --- MODIFICATION: New effect to update the document title ---
+  Solid.createEffect(() => {
+    const cfg = assets.domainAssetsConfig();
+    const lang = i18n.lang();
+    if (!cfg) return;
+
+    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+    const currentLocale = locales.find(l => l.code === lang) || locales.find(l => l.code === 'en') || locales[0];
+    
+    if (currentLocale?.title) {
+      document.title = currentLocale.title;
+    }
+  });
 
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
@@ -76,8 +88,7 @@ export function AppProvider(props) {
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
-    // --- MODIFICATION: Removed the redundant logout call from setDomain ---
-    setDomain: conn.setDomain,
+    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
   };
 

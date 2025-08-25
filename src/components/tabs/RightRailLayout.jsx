@@ -21,7 +21,7 @@ export default function RightRailLayout(props) {
         <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
           <div>{props.children}</div>
           <aside class="hidden md:block sticky top-16">
-            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+            <div class="space-y-4">
               <RightRail config={props.rightPanelConfig} />
             </div>
           </aside>

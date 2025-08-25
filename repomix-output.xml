@@ -55,6 +55,7 @@ public/
         auth.md
         domain.md
         index.md
+        showing-posts.md
       getting-started.md
       index.md
       sidebar.yaml
@@ -64,6 +65,7 @@ public/
         auth.md
         domain.md
         index.md
+        showing-posts.md
       .i18n-docs-state.json
       getting-started.md
       index.md
@@ -74,6 +76,7 @@ public/
         auth.md
         domain.md
         index.md
+        showing-posts.md
       .i18n-docs-state.json
       getting-started.md
       index.md
@@ -84,6 +87,7 @@ public/
         auth.md
         domain.md
         index.md
+        showing-posts.md
       .i18n-docs-state.json
       getting-started.md
       index.md
@@ -94,6 +98,7 @@ public/
         auth.md
         domain.md
         index.md
+        showing-posts.md
       .i18n-docs-state.json
       getting-started.md
       index.md
@@ -183,7 +188,9 @@ src/
       MainView.jsx
       TabsBar.jsx
     post/
+      ChapterPager.jsx
       ChapterSelector.jsx
+      PostTags.jsx
     settings/
       Assets.jsx
       DeveloperSection.jsx
@@ -210,6 +217,7 @@ src/
         VerifiedBadge.jsx
       BrandLogo.jsx
       ClosePageButton.jsx
+      ContextMenu.jsx
       IpfsImage.jsx
       LangSelector.jsx
       PostFundBadge.jsx
@@ -299,32 +307,21 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/post/ChapterSelector.jsx">
-// src/components/post/ChapterSelector.jsx
+<file path="src/components/ui/ContextMenu.jsx">
+// src/components/ui/ContextMenu.jsx
 import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
 
-function TocIcon(props) {
+function MoreIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M4 6h16M4 12h16M4 18h16" />
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="currentColor">
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
     </svg>
   );
 }
 
-export default function ChapterSelector(props) {
-  const { t } = useApp();
+export default function ContextMenu(props) {
   const [isOpen, setIsOpen] = createSignal(false);
-  let containerRef; 
-
-  const chapters = () => props.chapters || [];
-  const selectedIndex = () => props.selectedIndex;
-
-  const selectedChapter = () => {
-    const idx = selectedIndex();
-    const list = chapters();
-    return idx >= 0 && idx < list.length ? list[idx] : null;
-  };
+  let containerRef;
 
   const handleClickOutside = (event) => {
     if (containerRef && !containerRef.contains(event.target)) {
@@ -335,47 +332,47 @@ export default function ChapterSelector(props) {
   onMount(() => document.addEventListener("mousedown", handleClickOutside));
   onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
 
+  const handleItemClick = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    item.onClick?.();
+    setIsOpen(false);
+  };
+
   return (
-    <div class="flex items-center gap-3" ref={containerRef}>
-      <Show when={selectedChapter()?.title}>
-        <span class="font-semibold text-sm">{selectedChapter().title}</span>
+    <div class="absolute bottom-1 right-1 z-20" ref={containerRef}>
+      <button
+        class="p-1 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(!isOpen());
+        }}
+        aria-haspopup="true"
+        aria-expanded={isOpen()}
+      >
+        <MoreIcon />
+      </button>
+
+      <Show when={isOpen()}>
+        <div class="absolute bottom-full right-0 mb-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5">
+          <ul class="py-1" role="menu">
+            <For each={props.items}>
+              {(item) => (
+                <li>
+                  <a
+                    href="#"
+                    class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+                    onClick={(e) => handleItemClick(e, item)}
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
       </Show>
-
-      <div class="relative">
-        <button
-          class="p-2 rounded-full hover:bg-[hsl(var(--accent))]"
-          onClick={() => setIsOpen(!isOpen())}
-          aria-haspopup="true"
-          aria-expanded={isOpen()}
-          title={t("post.chapters.title")}
-        >
-          <TocIcon />
-        </button>
-
-        <Show when={isOpen()}>
-          <div class="absolute top-full right-0 mt-2 w-64 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-20">
-            <ul class="py-1" role="menu">
-              <For each={chapters()}>
-                {(chapter, i) => (
-                  <li>
-                    <a
-                      href="#"
-                      class={`block w-full text-left px-4 py-2 text-sm ${selectedIndex() === i() ? 'bg-[hsl(var(--accent))]' : 'hover:bg-[hsl(var(--accent))]'}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        props.onSelect?.(i());
-                        setIsOpen(false);
-                      }}
-                    >
-                      {chapter.title}
-                    </a>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-        </Show>
-      </div>
     </div>
   );
 }
@@ -902,6 +899,165 @@ What we’ll cover:
 - How domain assets are resolved and when the default pack is used
 </file>
 
+<file path="public/dev_docs/en/core-concepts/showing-posts.md">
+# Showing Posts
+
+Displaying a SAVVA post is a two-step process. First, you fetch a list of post metadata objects from the SAVVA backend. Second, you use the IPFS information from that metadata to fetch the actual content (like the title, text, and images) from the decentralized network.
+
+---
+
+## Step 1: Fetch Post Metadata from the Backend
+
+The primary way to get a list of posts is through the `content-list` WebSocket method. It's a flexible endpoint that supports pagination, sorting, and filtering.
+
+### Calling `content-list`
+
+You call the method with parameters specifying which content you need. Here's a typical example:
+
+```javascript
+// Example call using the app's wsMethod helper
+const posts = await app.wsMethod("content-list")({
+  domain: "savva.app",      // The domain to fetch posts from
+  limit: 12,                // Number of items per page
+  offset: 0,                // Start at the first item (for pagination)
+  lang: "en",               // Preferred language for any returned metadata
+  order_by: "fund_amount",  // Sort by total funds received
+  content_type: "post",     // We only want posts
+  category: "en:SAVVA Talk" // Optional: filter by a specific category
+});
+```
+
+### The Post Object Structure
+
+The `content-list` method returns an array of post objects. Each object contains all the on-chain metadata and pointers needed to fetch the full content.
+
+Here is an example of a single post object returned from the backend:
+
+```json
+{
+  "author": {
+    "address": "0x1234...",
+    "avatar": "Qm...",
+    "name": "alexna",
+    "display_name": "Alex Na",
+    "staked": "5000000000000000000000"
+  },
+  "category": "en:SAVVA Talk",
+  "domain": "savva.app",
+  "effective_time": "2025-08-20T10:30:00Z",
+  "fund": {
+    "amount": "125000000000000000000",
+    "round_time": 1672531200,
+    "total_author_share": "100000000000000000000"
+  },
+  "ipfs": "bafybeig.../info.yaml",
+  "data_cid": "bafybeig...",
+  "reactions": [10, 2, 0, 1],
+  "savva_cid": "0x01701...cfa2",
+  "short_cid": "aBcDeF1",
+  "tags": ["decentralization", "social"],
+  "savva_content": {
+    "locales": {
+      "en": {
+        "text_preview": "This is a short preview of the post content...",
+        "title": "My First Post on SAVVA"
+      },
+      "ru": {
+        "text_preview": "Это короткий анонс содержания поста...",
+        "title": "Мой первый пост на SAVVA"
+      }
+    },
+    "thumbnail": "thumbnail.jpg"
+  }
+}
+```
+
+### Key Fields Explained
+
+* **author**: Profile information of the post's author, including their staked amount.
+* **savva\_cid / short\_cid**: Unique identifiers for the post. The `savva_cid` is the full on-chain ID, while the `short_cid` is a user-friendly alternative. Use these to build URLs (e.g., `/post/<short_cid>`).
+* **ipfs & data\_cid**: Crucial pointers to the content on IPFS. See the next section for how to use them.
+* **savva\_content**: Metadata object directly from the backend cache. It contains a `locales` object with pre-fetched titles and previews, which is perfect for rendering post cards in a feed without needing to fetch from IPFS first.
+* **fund**: Information about the post's funding pool.
+* **reactions**: An array representing the counts for different reaction types (like, super, etc.).
+
+---
+
+## Step 2: Resolve Full Content from IPFS
+
+While `savva_content` is useful for previews, you need to fetch from IPFS to get the full post body, chapters, and other assets.
+
+### Finding the Descriptor and Data Folder
+
+The `ipfs` and `data_cid` fields work together to tell you where everything is. There are two scenarios:
+
+1. **`data_cid` is present**:
+
+   * `ipfs` is the direct path to the descriptor file (e.g., `bafy.../info.yaml`).
+   * `data_cid` is the CID of the folder containing all post assets (images, markdown files, etc.). This is your content base.
+
+2. **`data_cid` is NOT present (legacy format)**:
+
+   * `ipfs` is the CID of the folder containing all post assets.
+   * The descriptor file is assumed to be at a standard path: `<ipfs>/info.yaml`.
+
+The application logic should determine the descriptor path and the content base CID based on these rules.
+
+### The Post Descriptor (`info.yaml`)
+
+The descriptor is a YAML file that defines the full structure of the post, including all its language variations and chapters.
+
+#### Example `info.yaml`
+
+```yaml
+# Example info.yaml for a multi-language, multi-chapter post
+
+thumbnail: assets/post_thumbnail.png
+
+locales:
+  en:
+    title: "Understanding Decentralized Systems"
+    text_preview: "A deep dive into the core concepts of decentralization..."
+    tags: ["blockchain", "systems", "web3"]
+    categories: ["Technology"]
+    # The main content, can be inline or a path
+    data_path: content/en/main.md
+    chapters:
+      - title: "What is a Blockchain?"
+        data_path: content/en/chapter1.md
+      - title: "IPFS and Content Addressing"
+        data_path: content/en/chapter2.md
+  
+  ru:
+    title: "Понимание децентрализованных систем"
+    text_preview: "Глубокое погружение в основные концепции децентрализации..."
+    tags: ["блокчейн", "системы", "web3"]
+    categories: ["Технологии"]
+    data_path: content/ru/main.md
+    chapters:
+      - title: "Что такое блокчейн?"
+        data_path: content/ru/chapter1.md
+      - title: "IPFS и контентная адресация"
+        data_path: content/ru/chapter2.md
+```
+
+### Key Descriptor Fields
+
+* **thumbnail**: Relative path to the post's main image, resolved against the content base CID.
+* **locales**: Object where each key is a language code (e.g., `en`, `ru`).
+* **title / text\_preview / tags / categories**: Language-specific metadata.
+* **data\_path**: Relative path to the main Markdown content for that language.
+* **chapters**: Array of chapter objects, each with its own title and `data_path`.
+
+To get the full content of a chapter, you combine the content base CID with the `data_path` from the descriptor. For example, to fetch the English version of Chapter 1, you would request:
+
+```
+<content_base_cid>/content/en/chapter1.md
+```
+
+from an IPFS gateway.
+</file>
+
 <file path="public/dev_docs/fr/core-concepts/app-init.md">
 # Initialisation de l'application et connexion au backend
 
@@ -1374,6 +1530,165 @@ Ce que nous allons aborder :
 - Comment l'application démarre et trouve le bon backend et domaine
 - Comment `/info` influence le comportement à l'exécution (domaines, ID de chaîne, passerelles IPFS, actifs)
 - Comment les actifs de domaine sont résolus et quand le pack par défaut est utilisé
+</file>
+
+<file path="public/dev_docs/fr/core-concepts/showing-posts.md">
+# Affichage des Publications
+
+Afficher un post SAVVA est un processus en deux étapes. Tout d'abord, vous récupérez une liste d'objets de métadonnées de post depuis le backend SAVVA. Ensuite, vous utilisez les informations IPFS de ces métadonnées pour récupérer le contenu réel (comme le titre, le texte et les images) depuis le réseau décentralisé.
+
+---
+
+## Étape 1 : Récupérer les Métadonnées des Posts depuis le Backend
+
+Le moyen principal d'obtenir une liste de posts est via la méthode WebSocket `content-list`. C'est un point de terminaison flexible qui prend en charge la pagination, le tri et le filtrage.
+
+### Appel de `content-list`
+
+Vous appelez la méthode avec des paramètres spécifiant quel contenu vous avez besoin. Voici un exemple typique :
+
+```javascript
+// Exemple d'appel utilisant l'assistant wsMethod de l'application
+const posts = await app.wsMethod("content-list")({
+  domain: "savva.app",      // Le domaine pour récupérer les posts
+  limit: 12,                // Nombre d'éléments par page
+  offset: 0,                // Commencer au premier élément (pour la pagination)
+  lang: "en",               // Langue préférée pour toute métadonnée retournée
+  order_by: "fund_amount",  // Trier par le montant total des fonds reçus
+  content_type: "post",     // Nous voulons uniquement des posts
+  category: "en:SAVVA Talk" // Optionnel : filtrer par une catégorie spécifique
+});
+```
+
+### La Structure de l'Objet Post
+
+La méthode `content-list` retourne un tableau d'objets de post. Chaque objet contient toutes les métadonnées on-chain et les pointeurs nécessaires pour récupérer le contenu complet.
+
+Voici un exemple d'un seul objet post retourné par le backend :
+
+```json
+{
+  "author": {
+    "address": "0x1234...",
+    "avatar": "Qm...",
+    "name": "alexna",
+    "display_name": "Alex Na",
+    "staked": "5000000000000000000000"
+  },
+  "category": "en:SAVVA Talk",
+  "domain": "savva.app",
+  "effective_time": "2025-08-20T10:30:00Z",
+  "fund": {
+    "amount": "125000000000000000000",
+    "round_time": 1672531200,
+    "total_author_share": "100000000000000000000"
+  },
+  "ipfs": "bafybeig.../info.yaml",
+  "data_cid": "bafybeig...",
+  "reactions": [10, 2, 0, 1],
+  "savva_cid": "0x01701...cfa2",
+  "short_cid": "aBcDeF1",
+  "tags": ["décentralisation", "social"],
+  "savva_content": {
+    "locales": {
+      "en": {
+        "text_preview": "Ceci est un court aperçu du contenu du post...",
+        "title": "Mon Premier Post sur SAVVA"
+      },
+      "ru": {
+        "text_preview": "Это короткий анонс содержания поста...",
+        "title": "Мой первый пост на SAVVA"
+      }
+    },
+    "thumbnail": "thumbnail.jpg"
+  }
+}
+```
+
+### Explication des Champs Clés
+
+* **author** : Informations de profil de l'auteur du post, y compris son montant misé.
+* **savva\_cid / short\_cid** : Identifiants uniques pour le post. Le `savva_cid` est l'ID complet on-chain, tandis que le `short_cid` est une alternative conviviale. Utilisez-les pour construire des URLs (par exemple, `/post/<short_cid>`).
+* **ipfs & data\_cid** : Pointeurs cruciaux vers le contenu sur IPFS. Consultez la section suivante pour savoir comment les utiliser.
+* **savva\_content** : Objet de métadonnées directement du cache backend. Il contient un objet `locales` avec des titres et des aperçus pré-récupérés, ce qui est parfait pour rendre des cartes de post dans un fil sans avoir besoin de récupérer d'abord depuis IPFS.
+* **fund** : Informations sur le pool de financement du post.
+* **reactions** : Un tableau représentant les comptes pour différents types de réactions (j'aime, super, etc.).
+
+---
+
+## Étape 2 : Résoudre le Contenu Complet depuis IPFS
+
+Bien que `savva_content` soit utile pour les aperçus, vous devez récupérer depuis IPFS pour obtenir le corps complet du post, les chapitres et d'autres actifs.
+
+### Trouver le Descripteur et le Dossier de Données
+
+Les champs `ipfs` et `data_cid` fonctionnent ensemble pour vous indiquer où tout se trouve. Il y a deux scénarios :
+
+1. **`data_cid` est présent** :
+
+   * `ipfs` est le chemin direct vers le fichier descripteur (par exemple, `bafy.../info.yaml`).
+   * `data_cid` est le CID du dossier contenant tous les actifs du post (images, fichiers markdown, etc.). C'est votre base de contenu.
+
+2. **`data_cid` n'est PAS présent (format hérité)** :
+
+   * `ipfs` est le CID du dossier contenant tous les actifs du post.
+   * Le fichier descripteur est supposé être à un chemin standard : `<ipfs>/info.yaml`.
+
+La logique de l'application doit déterminer le chemin du descripteur et le CID de la base de contenu en fonction de ces règles.
+
+### Le Descripteur de Post (`info.yaml`)
+
+Le descripteur est un fichier YAML qui définit la structure complète du post, y compris toutes ses variations linguistiques et chapitres.
+
+#### Exemple `info.yaml`
+
+```yaml
+# Exemple info.yaml pour un post multilingue et multi-chapitre
+
+thumbnail: assets/post_thumbnail.png
+
+locales:
+  en:
+    title: "Comprendre les Systèmes Décentralisés"
+    text_preview: "Une plongée approfondie dans les concepts fondamentaux de la décentralisation..."
+    tags: ["blockchain", "systèmes", "web3"]
+    categories: ["Technologie"]
+    # Le contenu principal, peut être en ligne ou un chemin
+    data_path: content/en/main.md
+    chapters:
+      - title: "Qu'est-ce qu'une Blockchain ?"
+        data_path: content/en/chapter1.md
+      - title: "IPFS et l'Adressage de Contenu"
+        data_path: content/en/chapter2.md
+  
+  ru:
+    title: "Понимание децентрализованных систем"
+    text_preview: "Глубокое погружение в основные концепции децентрализации..."
+    tags: ["блокчейн", "системы", "web3"]
+    categories: ["Технологии"]
+    data_path: content/ru/main.md
+    chapters:
+      - title: "Что такое блокчейн?"
+        data_path: content/ru/chapter1.md
+      - title: "IPFS и контентная адресация"
+        data_path: content/ru/chapter2.md
+```
+
+### Champs Clés du Descripteur
+
+* **thumbnail** : Chemin relatif vers l'image principale du post, résolu par rapport au CID de la base de contenu.
+* **locales** : Objet où chaque clé est un code de langue (par exemple, `en`, `ru`).
+* **title / text\_preview / tags / categories** : Métadonnées spécifiques à la langue.
+* **data\_path** : Chemin relatif vers le contenu principal en Markdown pour cette langue.
+* **chapters** : Tableau d'objets de chapitre, chacun avec son propre titre et `data_path`.
+
+Pour obtenir le contenu complet d'un chapitre, vous combinez le CID de la base de contenu avec le `data_path` du descripteur. Par exemple, pour récupérer la version anglaise du Chapitre 1, vous demanderiez :
+
+```
+<content_base_cid>/content/en/chapter1.md
+```
+
+depuis une passerelle IPFS.
 </file>
 
 <file path="public/dev_docs/fr/getting-started.md">
@@ -1993,6 +2308,165 @@ tabs:
 - Как разрешаются активы домена и когда используется пакет по умолчанию
 </file>
 
+<file path="public/dev_docs/ru/core-concepts/showing-posts.md">
+# Показ постов
+
+Отображение поста SAVVA — это процесс из двух этапов. Сначала вы получаете список объектов метаданных постов из бэкенда SAVVA. Затем вы используете информацию IPFS из этих метаданных, чтобы получить фактическое содержание (например, заголовок, текст и изображения) из децентрализованной сети.
+
+---
+
+## Шаг 1: Получение метаданных поста из бэкенда
+
+Основной способ получить список постов — это метод WebSocket `content-list`. Это гибкая конечная точка, которая поддерживает пагинацию, сортировку и фильтрацию.
+
+### Вызов `content-list`
+
+Вы вызываете метод с параметрами, указывающими, какой контент вам нужен. Вот типичный пример:
+
+```javascript
+// Пример вызова с использованием вспомогательного метода wsMethod приложения
+const posts = await app.wsMethod("content-list")({
+  domain: "savva.app",      // Домен для получения постов
+  limit: 12,                // Количество элементов на странице
+  offset: 0,                // Начать с первого элемента (для пагинации)
+  lang: "en",               // Предпочтительный язык для любых возвращаемых метаданных
+  order_by: "fund_amount",  // Сортировать по общей сумме полученных средств
+  content_type: "post",     // Мы хотим только посты
+  category: "en:SAVVA Talk" // Необязательно: фильтровать по конкретной категории
+});
+```
+
+### Структура объекта поста
+
+Метод `content-list` возвращает массив объектов постов. Каждый объект содержит всю необходимую информацию о метаданных и указатели для получения полного содержания.
+
+Вот пример одного объекта поста, возвращенного из бэкенда:
+
+```json
+{
+  "author": {
+    "address": "0x1234...",
+    "avatar": "Qm...",
+    "name": "alexna",
+    "display_name": "Alex Na",
+    "staked": "5000000000000000000000"
+  },
+  "category": "en:SAVVA Talk",
+  "domain": "savva.app",
+  "effective_time": "2025-08-20T10:30:00Z",
+  "fund": {
+    "amount": "125000000000000000000",
+    "round_time": 1672531200,
+    "total_author_share": "100000000000000000000"
+  },
+  "ipfs": "bafybeig.../info.yaml",
+  "data_cid": "bafybeig...",
+  "reactions": [10, 2, 0, 1],
+  "savva_cid": "0x01701...cfa2",
+  "short_cid": "aBcDeF1",
+  "tags": ["децентрализация", "социальные"],
+  "savva_content": {
+    "locales": {
+      "en": {
+        "text_preview": "This is a short preview of the post content...",
+        "title": "My First Post on SAVVA"
+      },
+      "ru": {
+        "text_preview": "Это короткий анонс содержания поста...",
+        "title": "Мой первый пост на SAVVA"
+      }
+    },
+    "thumbnail": "thumbnail.jpg"
+  }
+}
+```
+
+### Объяснение ключевых полей
+
+* **author**: Информация о профиле автора поста, включая его ставку.
+* **savva\_cid / short\_cid**: Уникальные идентификаторы поста. `savva_cid` — это полный идентификатор в цепочке, в то время как `short_cid` — это удобный для пользователя альтернативный вариант. Используйте их для построения URL (например, `/post/<short_cid>`).
+* **ipfs & data\_cid**: Ключевые указатели на контент в IPFS. Смотрите следующий раздел о том, как их использовать.
+* **savva\_content**: Объект метаданных, полученный непосредственно из кэша бэкенда. Он содержит объект `locales` с предварительно загруженными заголовками и анонсами, что идеально подходит для отображения карточек постов в ленте без необходимости предварительно загружать из IPFS.
+* **fund**: Информация о фонде поста.
+* **reactions**: Массив, представляющий количество различных типов реакций (лайк, супер и т.д.).
+
+---
+
+## Шаг 2: Получение полного контента из IPFS
+
+Хотя `savva_content` полезен для предварительного просмотра, вам нужно получить данные из IPFS, чтобы получить полный текст поста, главы и другие ресурсы.
+
+### Поиск дескриптора и папки данных
+
+Поля `ipfs` и `data_cid` работают вместе, чтобы указать, где находится все. Есть два сценария:
+
+1. **`data_cid` присутствует**:
+
+   * `ipfs` — это прямой путь к файлу дескриптора (например, `bafy.../info.yaml`).
+   * `data_cid` — это CID папки, содержащей все ресурсы поста (изображения, файлы markdown и т.д.). Это ваша база контента.
+
+2. **`data_cid` НЕ присутствует (наследуемый формат)**:
+
+   * `ipfs` — это CID папки, содержащей все ресурсы поста.
+   * Предполагается, что файл дескриптора находится по стандартному пути: `<ipfs>/info.yaml`.
+
+Логика приложения должна определять путь к дескриптору и CID базы контента на основе этих правил.
+
+### Дескриптор поста (`info.yaml`)
+
+Дескриптор — это файл YAML, который определяет полную структуру поста, включая все его языковые варианты и главы.
+
+#### Пример `info.yaml`
+
+```yaml
+# Пример info.yaml для многоязычного поста с несколькими главами
+
+thumbnail: assets/post_thumbnail.png
+
+locales:
+  en:
+    title: "Understanding Decentralized Systems"
+    text_preview: "A deep dive into the core concepts of decentralization..."
+    tags: ["blockchain", "systems", "web3"]
+    categories: ["Technology"]
+    # Основной контент, может быть встроенным или по пути
+    data_path: content/en/main.md
+    chapters:
+      - title: "What is a Blockchain?"
+        data_path: content/en/chapter1.md
+      - title: "IPFS and Content Addressing"
+        data_path: content/en/chapter2.md
+  
+  ru:
+    title: "Понимание децентрализованных систем"
+    text_preview: "Глубокое погружение в основные концепции децентрализации..."
+    tags: ["блокчейн", "системы", "web3"]
+    categories: ["Технологии"]
+    data_path: content/ru/main.md
+    chapters:
+      - title: "Что такое блокчейн?"
+        data_path: content/ru/chapter1.md
+      - title: "IPFS и контентная адресация"
+        data_path: content/ru/chapter2.md
+```
+
+### Ключевые поля дескриптора
+
+* **thumbnail**: Относительный путь к главному изображению поста, разрешенному относительно базы контента CID.
+* **locales**: Объект, где каждый ключ — это код языка (например, `en`, `ru`).
+* **title / text\_preview / tags / categories**: Метаданные, специфичные для языка.
+* **data\_path**: Относительный путь к основному контенту Markdown для этого языка.
+* **chapters**: Массив объектов глав, каждая из которых имеет свой заголовок и `data_path`.
+
+Чтобы получить полный контент главы, вы комбинируете базу контента CID с `data_path` из дескриптора. Например, чтобы получить английскую версию Главы 1, вы бы запросили:
+
+```
+<content_base_cid>/content/en/chapter1.md
+```
+
+из шлюза IPFS.
+</file>
+
 <file path="public/dev_docs/ru/getting-started.md">
 # Начало работы
 
@@ -2607,6 +3081,165 @@ Ovaj deo pokriva osnovnu arhitekturu SAVVA SolidJS aplikacije: kako se povezuje 
 - Kako se aplikacija pokreće i pronalazi odgovarajući backend i domen
 - Kako `/info` upravlja ponašanjem u vreme izvođenja (domeni, ID lanca, IPFS prolazi, resursi)
 - Kako se rešavaju resursi domena i kada se koristi podrazumevani paket
+</file>
+
+<file path="public/dev_docs/sr/core-concepts/showing-posts.md">
+# Prikazivanje Postova
+
+Prikazivanje SAVVA posta je proces u dva koraka. Prvo, preuzimate listu objekata metapodataka postova sa SAVVA backend-a. Drugo, koristite IPFS informacije iz tih metapodataka da preuzmete stvarni sadržaj (kao što su naslov, tekst i slike) sa decentralizovane mreže.
+
+---
+
+## Korak 1: Preuzimanje Metapodataka Posta sa Backend-a
+
+Primarni način da dobijete listu postova je putem `content-list` WebSocket metode. To je fleksibilna tačka pristupa koja podržava paginaciju, sortiranje i filtriranje.
+
+### Pozivanje `content-list`
+
+Pozivate metodu sa parametrima koji određuju koji sadržaj vam je potreban. Evo tipičnog primera:
+
+```javascript
+// Primer poziva koristeći wsMethod pomoćnu funkciju aplikacije
+const posts = await app.wsMethod("content-list")({
+  domain: "savva.app",      // Domen sa kojeg se preuzimaju postovi
+  limit: 12,                // Broj stavki po stranici
+  offset: 0,                // Počnite od prve stavke (za paginaciju)
+  lang: "en",               // Preferirani jezik za sve vraćene metapodatke
+  order_by: "fund_amount",  // Sortiraj po ukupnim primljenim sredstvima
+  content_type: "post",     // Želimo samo postove
+  category: "en:SAVVA Talk" // Opcionalno: filtriraj po specifičnoj kategoriji
+});
+```
+
+### Struktura Objekta Posta
+
+`content-list` metoda vraća niz objekata postova. Svaki objekat sadrži sve on-chain metapodatke i pokazivače potrebne za preuzimanje celog sadržaja.
+
+Evo primera jednog objekta posta koji se vraća sa backend-a:
+
+```json
+{
+  "author": {
+    "address": "0x1234...",
+    "avatar": "Qm...",
+    "name": "alexna",
+    "display_name": "Alex Na",
+    "staked": "5000000000000000000000"
+  },
+  "category": "en:SAVVA Talk",
+  "domain": "savva.app",
+  "effective_time": "2025-08-20T10:30:00Z",
+  "fund": {
+    "amount": "125000000000000000000",
+    "round_time": 1672531200,
+    "total_author_share": "100000000000000000000"
+  },
+  "ipfs": "bafybeig.../info.yaml",
+  "data_cid": "bafybeig...",
+  "reactions": [10, 2, 0, 1],
+  "savva_cid": "0x01701...cfa2",
+  "short_cid": "aBcDeF1",
+  "tags": ["decentralization", "social"],
+  "savva_content": {
+    "locales": {
+      "en": {
+        "text_preview": "This is a short preview of the post content...",
+        "title": "My First Post on SAVVA"
+      },
+      "ru": {
+        "text_preview": "Это короткий анонс содержания поста...",
+        "title": "Мой первый пост на SAVVA"
+      }
+    },
+    "thumbnail": "thumbnail.jpg"
+  }
+}
+```
+
+### Objašnjenje Ključnih Polja
+
+* **author**: Informacije o profilu autora posta, uključujući njihov ulog.
+* **savva\_cid / short\_cid**: Jedinstveni identifikatori za post. `savva_cid` je puni on-chain ID, dok je `short_cid` korisnički prijateljska alternativa. Koristite ih za izgradnju URL-ova (npr., `/post/<short_cid>`).
+* **ipfs & data\_cid**: Ključni pokazivači na sadržaj na IPFS-u. Pogledajte sledeći odeljak za to kako ih koristiti.
+* **savva\_content**: Objekat metapodataka direktno iz backend keša. Sadrži objekat `locales` sa unapred preuzetim naslovima i pregledima, što je savršeno za prikazivanje post kartica u feed-u bez potrebe da se prvo preuzima sa IPFS-a.
+* **fund**: Informacije o fondu za finansiranje posta.
+* **reactions**: Niz koji predstavlja brojeve za različite tipove reakcija (sviđa mi se, super, itd.).
+
+---
+
+## Korak 2: Rešavanje Celog Sadržaja sa IPFS-a
+
+Dok je `savva_content` koristan za preglede, morate preuzeti sa IPFS-a da biste dobili ceo tekst posta, poglavlja i druge resurse.
+
+### Pronalaženje Deskriptora i Foldera sa Podacima
+
+Polja `ipfs` i `data_cid` rade zajedno da vam kažu gde se sve nalazi. Postoje dva scenarija:
+
+1. **`data_cid` je prisutan**:
+
+   * `ipfs` je direktan put do deskriptorskog fajla (npr., `bafy.../info.yaml`).
+   * `data_cid` je CID foldera koji sadrži sve resurse posta (slike, markdown fajlove, itd.). Ovo je vaša osnovna sadržina.
+
+2. **`data_cid` NISU prisutni (legacy format)**:
+
+   * `ipfs` je CID foldera koji sadrži sve resurse posta.
+   * Pretpostavlja se da je deskriptorski fajl na standardnoj putanji: `<ipfs>/info.yaml`.
+
+Logika aplikacije treba da odredi putanju deskriptora i CID osnovnog sadržaja na osnovu ovih pravila.
+
+### Deskriptor Posta (`info.yaml`)
+
+Deskriptor je YAML fajl koji definiše punu strukturu posta, uključujući sve njegove jezičke varijacije i poglavlja.
+
+#### Primer `info.yaml`
+
+```yaml
+# Primer info.yaml za post sa više jezika i više poglavlja
+
+thumbnail: assets/post_thumbnail.png
+
+locales:
+  en:
+    title: "Understanding Decentralized Systems"
+    text_preview: "A deep dive into the core concepts of decentralization..."
+    tags: ["blockchain", "systems", "web3"]
+    categories: ["Technology"]
+    # Glavni sadržaj, može biti inline ili putanja
+    data_path: content/en/main.md
+    chapters:
+      - title: "What is a Blockchain?"
+        data_path: content/en/chapter1.md
+      - title: "IPFS and Content Addressing"
+        data_path: content/en/chapter2.md
+  
+  ru:
+    title: "Понимание децентрализованных систем"
+    text_preview: "Глубокое погружение в основные концепции децентрализации..."
+    tags: ["блокчейн", "системы", "web3"]
+    categories: ["Технологии"]
+    data_path: content/ru/main.md
+    chapters:
+      - title: "Что такое блокчейн?"
+        data_path: content/ru/chapter1.md
+      - title: "IPFS и контентная адресация"
+        data_path: content/ru/chapter2.md
+```
+
+### Ključna Polja Deskriptora
+
+* **thumbnail**: Relativna putanja do glavne slike posta, rešena u odnosu na osnovni CID sadržaja.
+* **locales**: Objekat gde je svaki ključ jezički kod (npr., `en`, `ru`).
+* **title / text\_preview / tags / categories**: Metapodaci specifični za jezik.
+* **data\_path**: Relativna putanja do glavnog Markdown sadržaja za taj jezik.
+* **chapters**: Niz objekata poglavlja, svaki sa svojim naslovom i `data_path`.
+
+Da biste dobili ceo sadržaj poglavlja, kombinujete osnovni CID sadržaja sa `data_path` iz deskriptora. Na primer, da biste preuzeli englesku verziju Poglavlja 1, tražili biste:
+
+```
+<content_base_cid>/content/en/chapter1.md
+```
+
+sa IPFS gateway-a.
 </file>
 
 <file path="public/dev_docs/sr/getting-started.md">
@@ -3224,6 +3857,165 @@ tabs:
 - Як програма завантажується та знаходить правильний бекенд і домен
 - Як `/info` визначає поведінку під час виконання (домени, ID ланцюга, шлюзи IPFS, активи)
 - Як вирішуються активи домену та коли використовується стандартний пакет
+</file>
+
+<file path="public/dev_docs/ua/core-concepts/showing-posts.md">
+# Відображення Постів
+
+Відображення поста SAVVA є процесом, що складається з двох етапів. Спочатку ви отримуєте список об'єктів метаданих постів з бекенду SAVVA. Потім ви використовуєте інформацію IPFS з цих метаданих, щоб отримати фактичний контент (такі як заголовок, текст та зображення) з децентралізованої мережі.
+
+---
+
+## Крок 1: Отримання Метаданих Постів з Бекенду
+
+Основний спосіб отримати список постів - це метод WebSocket `content-list`. Це гнучка точка доступу, яка підтримує пагінацію, сортування та фільтрацію.
+
+### Виклик `content-list`
+
+Ви викликаєте метод з параметрами, що вказують, який контент вам потрібен. Ось типовий приклад:
+
+```javascript
+// Приклад виклику з використанням допоміжного методу wsMethod програми
+const posts = await app.wsMethod("content-list")({
+  domain: "savva.app",      // Домен для отримання постів
+  limit: 12,                // Кількість елементів на сторінці
+  offset: 0,                // Почати з першого елемента (для пагінації)
+  lang: "en",               // Бажана мова для будь-яких повернених метаданих
+  order_by: "fund_amount",  // Сортувати за загальною сумою отриманих коштів
+  content_type: "post",     // Ми хочемо лише пости
+  category: "en:SAVVA Talk" // Необов'язково: фільтрувати за конкретною категорією
+});
+```
+
+### Структура Об'єкта Поста
+
+Метод `content-list` повертає масив об'єктів постів. Кожен об'єкт містить усі метадані на ланцюзі та вказівники, необхідні для отримання повного контенту.
+
+Ось приклад одного об'єкта поста, повернутого з бекенду:
+
+```json
+{
+  "author": {
+    "address": "0x1234...",
+    "avatar": "Qm...",
+    "name": "alexna",
+    "display_name": "Alex Na",
+    "staked": "5000000000000000000000"
+  },
+  "category": "en:SAVVA Talk",
+  "domain": "savva.app",
+  "effective_time": "2025-08-20T10:30:00Z",
+  "fund": {
+    "amount": "125000000000000000000",
+    "round_time": 1672531200,
+    "total_author_share": "100000000000000000000"
+  },
+  "ipfs": "bafybeig.../info.yaml",
+  "data_cid": "bafybeig...",
+  "reactions": [10, 2, 0, 1],
+  "savva_cid": "0x01701...cfa2",
+  "short_cid": "aBcDeF1",
+  "tags": ["decentralization", "social"],
+  "savva_content": {
+    "locales": {
+      "en": {
+        "text_preview": "This is a short preview of the post content...",
+        "title": "My First Post on SAVVA"
+      },
+      "ru": {
+        "text_preview": "Это короткий анонс содержания поста...",
+        "title": "Мой первый пост на SAVVA"
+      }
+    },
+    "thumbnail": "thumbnail.jpg"
+  }
+}
+```
+
+### Пояснення Ключових Полів
+
+* **author**: Інформація профілю автора поста, включаючи їхню суму стейку.
+* **savva\_cid / short\_cid**: Унікальні ідентифікатори поста. `savva_cid` - це повний ідентифікатор на ланцюзі, тоді як `short_cid` - це зручна альтернатива. Використовуйте їх для побудови URL (наприклад, `/post/<short_cid>`).
+* **ipfs & data\_cid**: Важливі вказівники на контент в IPFS. Дивіться наступний розділ, щоб дізнатися, як їх використовувати.
+* **savva\_content**: Об'єкт метаданих безпосередньо з кешу бекенду. Він містить об'єкт `locales` з попередньо завантаженими заголовками та анонсами, що ідеально підходить для відображення карток постів у стрічці без необхідності спочатку отримувати з IPFS.
+* **fund**: Інформація про фонд поста.
+* **reactions**: Масив, що представляє кількість різних типів реакцій (подобається, супер тощо).
+
+---
+
+## Крок 2: Отримання Повного Контенту з IPFS
+
+Хоча `savva_content` корисний для попереднього перегляду, вам потрібно отримати з IPFS, щоб отримати повний текст поста, глави та інші активи.
+
+### Знаходження Описника та Папки Даних
+
+Поля `ipfs` та `data_cid` працюють разом, щоб вказати, де все знаходиться. Є два сценарії:
+
+1. **`data_cid` присутній**:
+
+   * `ipfs` - це прямий шлях до файлу описника (наприклад, `bafy.../info.yaml`).
+   * `data_cid` - це CID папки, що містить усі активи поста (зображення, markdown файли тощо). Це ваша базова частина контенту.
+
+2. **`data_cid` НЕ присутній (старий формат)**:
+
+   * `ipfs` - це CID папки, що містить усі активи поста.
+   * Файл описника вважається розташованим за стандартним шляхом: `<ipfs>/info.yaml`.
+
+Логіка програми повинна визначити шлях до описника та CID бази контенту на основі цих правил.
+
+### Описник Поста (`info.yaml`)
+
+Описник - це YAML файл, який визначає повну структуру поста, включаючи всі його мовні варіації та глави.
+
+#### Приклад `info.yaml`
+
+```yaml
+# Приклад info.yaml для багатомовного, багатоглавного поста
+
+thumbnail: assets/post_thumbnail.png
+
+locales:
+  en:
+    title: "Understanding Decentralized Systems"
+    text_preview: "A deep dive into the core concepts of decentralization..."
+    tags: ["blockchain", "systems", "web3"]
+    categories: ["Technology"]
+    # Основний контент, може бути вбудованим або шляхом
+    data_path: content/en/main.md
+    chapters:
+      - title: "What is a Blockchain?"
+        data_path: content/en/chapter1.md
+      - title: "IPFS and Content Addressing"
+        data_path: content/en/chapter2.md
+  
+  ru:
+    title: "Понимание децентрализованных систем"
+    text_preview: "Глубокое погружение в основные концепции децентрализации..."
+    tags: ["блокчейн", "системы", "web3"]
+    categories: ["Технологии"]
+    data_path: content/ru/main.md
+    chapters:
+      - title: "Что такое блокчейн?"
+        data_path: content/ru/chapter1.md
+      - title: "IPFS и контентная адресация"
+        data_path: content/ru/chapter2.md
+```
+
+### Ключові Поля Описника
+
+* **thumbnail**: Відносний шлях до основного зображення поста, вирішеного відносно бази контенту CID.
+* **locales**: Об'єкт, де кожен ключ - це код мови (наприклад, `en`, `ru`).
+* **title / text\_preview / tags / categories**: Метадані, специфічні для мови.
+* **data\_path**: Відносний шлях до основного Markdown контенту для цієї мови.
+* **chapters**: Масив об'єктів глав, кожен з яких має свій заголовок та `data_path`.
+
+Щоб отримати повний контент глави, ви поєднуєте базу контенту CID з `data_path` з описника. Наприклад, щоб отримати англійську версію Глави 1, ви б запитали:
+
+```
+<content_base_cid>/content/en/chapter1.md
+```
+
+з шлюзу IPFS.
 </file>
 
 <file path="public/dev_docs/ua/getting-started.md">
@@ -16650,6 +17442,226 @@ export default function ConnectionError(props) {
 }
 </file>
 
+<file path="src/components/post/ChapterPager.jsx">
+// src/components/post/ChapterPager.jsx
+import { createMemo, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function ChapterPager(props) {
+  const { t } = useApp();
+
+  const nav = createMemo(() => {
+    const list = props.chapters || [];
+    const idx = props.currentIndex;
+    if (idx < 0 || list.length === 0) return { prev: null, next: null };
+    
+    const prev = list[idx - 1] ? { ...list[idx - 1], index: idx - 1 } : null;
+    const next = list[idx + 1] ? { ...list[idx + 1], index: idx + 1 } : null;
+    
+    return { prev, next };
+  });
+  
+  const go = (index) => props.onSelect?.(index);
+
+  return (
+    <Show when={nav().prev || nav().next}>
+      <nav class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-stretch justify-between gap-3 text-sm">
+        {/* Prev (left) */}
+        <div class="min-w-0 flex-1">
+          <Show when={nav().prev}>
+            {(p) => (
+              <button
+                type="button"
+                class="w-full rounded-md px-3 py-2 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] text-left"
+                onClick={() => go(p().index)}
+                aria-label={t("docs.prev")}
+                title={p().title}
+              >
+                <div class="flex items-start gap-2">
+                  <span aria-hidden="true">←</span>
+                  <div class="min-w-0">
+                    <div class="font-medium whitespace-normal break-words leading-snug">
+                      {p().index > 0 ? `${p().index}. ${p().title}` : p().title}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            )}
+          </Show>
+        </div>
+
+        {/* Next (right) */}
+        <div class="min-w-0 flex-1 text-right">
+          <Show when={nav().next}>
+            {(n) => (
+              <button
+                type="button"
+                class="w-full rounded-md px-3 py-2 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))]"
+                onClick={() => go(n().index)}
+                aria-label={t("docs.next")}
+                title={n().title}
+              >
+                <div class="flex items-start gap-2 justify-end">
+                  <div class="min-w-0">
+                    <div class="font-medium whitespace-normal break-words leading-snug text-right">
+                      {n().index > 0 ? `${n().index}. ${n().title}` : n().title}
+                    </div>
+                  </div>
+                  <span aria-hidden="true">→</span>
+                </div>
+              </button>
+            )}
+          </Show>
+        </div>
+      </nav>
+    </Show>
+  );
+}
+</file>
+
+<file path="src/components/post/ChapterSelector.jsx">
+// src/components/post/ChapterSelector.jsx
+import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+function TocIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+export default function ChapterSelector(props) {
+  const { t } = useApp();
+  const [isOpen, setIsOpen] = createSignal(false);
+  let containerRef; 
+
+  const chapters = () => props.chapters || [];
+  const selectedIndex = () => props.selectedIndex;
+
+  const selectedChapter = () => {
+    const idx = selectedIndex();
+    const list = chapters();
+    return idx >= 0 && idx < list.length ? list[idx] : null;
+  };
+  
+  const displayedTitle = () => {
+    const chapter = selectedChapter();
+    if (!chapter) return "";
+    const idx = selectedIndex();
+    return idx > 0 ? `${idx}. ${chapter.title}` : chapter.title;
+  };
+
+  const handleClickOutside = (event) => {
+    if (containerRef && !containerRef.contains(event.target)) {
+      setIsOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  return (
+    <div class="relative" ref={containerRef}>
+      <button
+        class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[hsl(var(--accent))]"
+        onClick={() => setIsOpen(!isOpen())}
+        aria-haspopup="true"
+        aria-expanded={isOpen()}
+        title={t("post.chapters.title")}
+      >
+        <Show when={selectedChapter()?.title} fallback={<span>{t("post.chapters.title")}</span>}>
+          <span class="font-semibold text-sm">{displayedTitle()}</span>
+        </Show>
+        <TocIcon class="w-5 h-5" />
+      </button>
+
+      <Show when={isOpen()}>
+        <div class="absolute top-full right-0 mt-2 w-64 max-h-[22rem] overflow-y-auto rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-20">
+          <ul class="py-1" role="menu">
+            <For each={chapters()}>
+              {(chapter, i) => (
+                <li>
+                  <a
+                    href="#"
+                    class={`block w-full text-left px-4 py-2 text-sm truncate ${selectedIndex() === i() ? 'bg-[hsl(var(--accent))]' : 'hover:bg-[hsl(var(--accent))]'}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      props.onSelect?.(i());
+                      setIsOpen(false);
+                    }}
+                    title={chapter.title}
+                  >
+                    {i() > 0 ? `${i()}. ${chapter.title}` : chapter.title}
+                  </a>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/post/PostTags.jsx">
+// src/components/post/PostTags.jsx
+import { createMemo, For, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+// A reusable pill component for consistent styling
+function TagPill(props) {
+    return (
+        <div class="px-2.5 py-1 rounded-md bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs font-medium">
+            {props.children}
+        </div>
+    );
+}
+
+export default function PostTags(props) {
+    const { lang } = useApp();
+
+    const localizedContent = createMemo(() => {
+        const currentLang = lang();
+        const locales = props.postData?.savva_content?.locales;
+        if (!locales) return null;
+        
+        // Use the current language, fallback to English, or the first available locale
+        const firstLocaleKey = Object.keys(locales)[0];
+        return locales[currentLang] || locales.en || (firstLocaleKey ? locales[firstLocaleKey] : null);
+    });
+
+    // Categories are an array from the localized content
+    const categories = createMemo(() => {
+        const content = localizedContent();
+        const cats = content?.categories;
+        return Array.isArray(cats) ? cats : [];
+    });
+
+    // Tags are also an array from the localized content
+    const tags = createMemo(() => {
+        const content = localizedContent();
+        const t = content?.tags;
+        return Array.isArray(t) ? t : [];
+    });
+
+    return (
+        <Show when={categories().length > 0 || tags().length > 0}>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+                <For each={categories()}>
+                    {(category) => <TagPill>{category}</TagPill>}
+                </For>
+                <For each={tags()}>
+                    {(tag) => <TagPill>#{tag}</TagPill>}
+                </For>
+            </div>
+        </Show>
+    );
+}
+</file>
+
 <file path="src/components/tabs/CommentsTab.jsx">
 // src/components/tabs/CommentsTab.jsx
 import TabPanelScaffold from "./TabPanelScaffold";
@@ -17460,35 +18472,58 @@ export default function ToTopButton(props) {
 
 <file path="src/components/widgets/ContentListBlock.jsx">
 // src/components/widgets/ContentListBlock.jsx
-import { createMemo, createResource } from "solid-js";
+import { createMemo, createResource, For, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader.js";
+import { loadAssetResource } from "../../utils/assetLoader";
+import PostCard from "../feed/PostCard.jsx";
+import Spinner from "../ui/Spinner.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
 
-/**
- * Selects the best title string from a locale object.
- * Logic: current lang -> '*' -> 'en' -> first available.
- */
 function getLocalizedTitle(titleData, currentLang) {
     if (!titleData || typeof titleData !== 'object') return "";
-    
-    // 1. Current language
     if (titleData[currentLang]) return titleData[currentLang];
-    // 2. Wildcard fallback
     if (titleData['*']) return titleData['*'];
-    // 3. English fallback
     if (titleData.en) return titleData.en;
-    // 4. First available fallback
     const firstKey = Object.keys(titleData)[0];
     return firstKey ? titleData[firstKey] : "";
 }
 
+async function fetchListContent(params) {
+  const { app, listName, count, lang } = params;
+  if (!app.wsMethod || !listName) return [];
+  
+  const getList = app.wsMethod("get-list");
+  
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    list_name: listName,
+    limit: count || 5,
+    offset: 0,
+    lang: lang,
+  };
+
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  try {
+    const res = await getList(requestParams);
+    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+    return arr.map((it) => ({
+      id: it?.savva_cid || it?.savvaCID || it?.id,
+      _raw: it,
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch content list '${listName}':`, err);
+    return { error: err.message }; 
+  }
+}
+
 export default function ContentListBlock(props) {
   const app = useApp();
-
-  // 1. Get the path to the content_lists module from the main domain config.
   const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
 
-  // 2. Fetch and parse the content_lists module file.
   const [contentListModule] = createResource(modulePath, async (path) => {
     if (!path) return null;
     try {
@@ -17499,24 +18534,44 @@ export default function ContentListBlock(props) {
     }
   });
   
-  // 3. Find the specific list definition using the list_name from props.
   const listDefinition = createMemo(() => {
     const listName = props.block?.list_name;
     if (!listName) return null;
     return contentListModule()?.list?.[listName] || null;
   });
 
-  // 4. Extract the localized title from the definition.
   const title = createMemo(() => {
     const def = listDefinition();
     return getLocalizedTitle(def?.title, app.lang());
   });
 
+  const [listData] = createResource(() => ({
+    app: app,
+    listName: props.block?.list_name,
+    count: props.block?.count,
+    lang: app.lang()
+  }), fetchListContent);
+
   return (
     <div class="p-3">
       <h4 class="font-semibold text-sm mb-2">{title() || props.block?.list_name}</h4>
-      <div class="text-xs text-[hsl(var(--muted-foreground))]">
-        Content feed placeholder...
+      <div class="space-y-3">
+        <Show when={listData.loading}>
+          <div class="flex justify-center items-center h-24">
+            <Spinner />
+          </div>
+        </Show>
+        <Show when={listData.error}>
+          <p class="text-xs text-[hsl(var(--destructive))]">
+            {app.t("common.error")}: {listData.error}
+          </p>
+        </Show>
+        <Show when={!listData.loading && !listData.error && listData()?.length > 0}>
+          <For each={listData()}>
+            {/* --- MODIFICATION: Using list mode with the new compact prop --- */}
+            {(item) => <PostCard item={item} mode="list" compact={true} />}
+          </For>
+        </Show>
       </div>
     </div>
   );
@@ -18172,134 +19227,6 @@ Here you’ll find:
 - Best practices for extending and integrating the platform.
 
 If you are a developer exploring SAVVA, this is the place to start. 🚀
-</file>
-
-<file path="public/dev_docs/fr/.i18n-docs-state.json">
-{
-  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
-  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
-  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
-  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
-  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "f1c6ed17a074938c9271cd58f01ab56869b047dfa1233412fe156b2022063331",
-  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2"
-}
-</file>
-
-<file path="public/dev_docs/fr/sidebar.yaml">
-sections:
-  - title: Commencer
-    items:
-      - label: Aperçu
-        file: index.md
-      - label: Configuration
-        file: getting-started.md
-  - title: Concepts de base
-    items:
-      - label: Aperçu
-        file: core-concepts/index.md
-      - label: Initialisation de l'application et connexion au backend
-        file: core-concepts/app-init.md
-      - label: Travailler avec des domaines
-        file: core-concepts/domain.md
-      - label: Authentification
-        file: core-concepts/auth.md
-</file>
-
-<file path="public/dev_docs/ru/.i18n-docs-state.json">
-{
-  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
-  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
-  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
-  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
-  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "f1c6ed17a074938c9271cd58f01ab56869b047dfa1233412fe156b2022063331",
-  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2"
-}
-</file>
-
-<file path="public/dev_docs/ru/sidebar.yaml">
-sections:
-  - title: Начало работы
-    items:
-      - label: Обзор
-        file: index.md
-      - label: Настройка
-        file: getting-started.md
-  - title: Основные концепции
-    items:
-      - label: Обзор
-        file: core-concepts/index.md
-      - label: Инициализация приложения и подключение к серверу
-        file: core-concepts/app-init.md
-      - label: Работа с доменами
-        file: core-concepts/domain.md
-      - label: Аутентификация
-        file: core-concepts/auth.md
-</file>
-
-<file path="public/dev_docs/sr/.i18n-docs-state.json">
-{
-  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
-  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
-  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
-  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
-  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "f1c6ed17a074938c9271cd58f01ab56869b047dfa1233412fe156b2022063331",
-  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2"
-}
-</file>
-
-<file path="public/dev_docs/sr/sidebar.yaml">
-sections:
-  - title: Uvod
-    items:
-      - label: Pregled
-        file: index.md
-      - label: Podešavanje
-        file: getting-started.md
-  - title: Osnovni koncepti
-    items:
-      - label: Pregled
-        file: core-concepts/index.md
-      - label: Inicijalizacija aplikacije i povezivanje sa backend-om
-        file: core-concepts/app-init.md
-      - label: Rad sa domenima
-        file: core-concepts/domain.md
-      - label: Autentifikacija
-        file: core-concepts/auth.md
-</file>
-
-<file path="public/dev_docs/ua/.i18n-docs-state.json">
-{
-  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
-  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
-  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
-  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
-  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "f1c6ed17a074938c9271cd58f01ab56869b047dfa1233412fe156b2022063331",
-  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2"
-}
-</file>
-
-<file path="public/dev_docs/ua/sidebar.yaml">
-sections:
-  - title: Початок роботи
-    items:
-      - label: Огляд
-        file: index.md
-      - label: Налаштування
-        file: getting-started.md
-  - title: Основні концепції
-    items:
-      - label: Огляд
-        file: core-concepts/index.md
-      - label: Ініціалізація додатку та підключення до бекенду
-        file: core-concepts/app-init.md
-      - label: Робота з доменами
-        file: core-concepts/domain.md
-      - label: Аутентифікація
-        file: core-concepts/auth.md
 </file>
 
 <file path="public/domain_default/config.yaml">
@@ -19326,7 +20253,7 @@ export function pushErrorToast(err, context = {}) {
 
 <file path="src/components/ui/UserCard.jsx">
 // src/components/ui/UserCard.jsx
-import { Show } from "solid-js";
+import { Show, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "./IpfsImage.jsx";
 import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
@@ -19337,36 +20264,44 @@ function isVerified(a) {
     return Boolean(a && a.name);
 }
 
+// --- MODIFICATION: New helper function to shorten the address ---
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
 export default function UserCard(props) {
     const { t } = useApp();
     const author = () => props.author || {};
 
+    const hasName = createMemo(() => author().name || author().display_name);
+
     return (
         <Show when={author()}>
-            {/* Reduced height from h-10 to h-8 */}
-            <div class="flex items-center gap-2 w-full h-8">
-                {/* Reduced avatar size from w-8 h-8 to w-7 h-7 */}
-                <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-                    <Show
-                        when={author().avatar}
-                        fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-                    >
-                        <IpfsImage
-                            src={author().avatar}
-                            alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
-                            class="w-full h-full object-cover"
-                        />
-                    </Show>
-                </div>
+            <div class={`flex items-center gap-2 w-full ${props.compact ? 'h-auto' : 'h-8'}`}>
+                <Show when={!props.compact}>
+                    <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+                        <Show
+                            when={author().avatar}
+                            fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+                        >
+                            <IpfsImage
+                                src={author().avatar}
+                                alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
+                                class="w-full h-full object-cover"
+                            />
+                        </Show>
+                    </div>
+                </Show>
 
                 <div class="min-w-0 flex-1">
-                    <Show when={author().display_name}>
+                    <Show when={author().display_name && !props.compact}>
                         <div class="text-xs truncate text-[hsl(var(--foreground))]">
                             {author().display_name}
                         </div>
                     </Show>
 
-                    <div class="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] min-w-0">
+                    <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
                         <Show when={author().name}>
                             <div class="min-w-0 flex items-center">
                                 <span class="truncate uppercase font-semibold">{author().name}</span>
@@ -19375,10 +20310,15 @@ export default function UserCard(props) {
                                 </Show>
                             </div>
                         </Show>
+                        
+                        {/* --- MODIFICATION: Show address as a fallback --- */}
+                        <Show when={!hasName() && author().address}>
+                            <span class="font-mono">{shortAddr(author().address)}</span>
+                        </Show>
 
                         <StakerLevelIcon
                             staked={author().staked}
-                            class="w-6 h-6 shrink-0 text-[hsl(var(--muted-foreground))]"
+                            class={`${props.compact ? 'w-4 h-4' : 'w-6 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
                         />
                     </div>
                 </div>
@@ -20176,26 +21116,144 @@ That’s it! 🎉 You’re ready to start working with the **SAVVA Platform**.
 ```
 </file>
 
-<file path="public/dev_docs/en/sidebar.yaml">
-# public/dev_docs/en/sidebar.yaml
-sections:
-  - title: Getting Started
-    items:
-      - label: Overview
-        file: index.md
-      - label: Setup
-        file: getting-started.md
+<file path="public/dev_docs/fr/.i18n-docs-state.json">
+{
+  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
+  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
+  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
+  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
+  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
+  "sidebar.yaml": "8103a530fb79585972d77624473d472bd486c8a2928f923bf42ea1f69f1d8875",
+  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
+  "core-concepts/showing-posts.md": "b7f4ff82f3a451ee433ce5a2c506563878b81ff448a300a2e3747f0dd91bdf47"
+}
+</file>
 
-  - title: Core Concepts
+<file path="public/dev_docs/fr/sidebar.yaml">
+sections:
+  - title: Commencer
     items:
-      - label: Overview
+      - label: Aperçu
+        file: index.md
+      - label: Configuration
+        file: getting-started.md
+  - title: Concepts de base
+    items:
+      - label: Aperçu
         file: core-concepts/index.md
-      - label: App initialization & backend connect
+      - label: Initialisation de l'application et connexion au backend
         file: core-concepts/app-init.md
-      - label: Working with domains
+      - label: Travailler avec les domaines
         file: core-concepts/domain.md
-      - label: Authentication
+      - label: Authentification
         file: core-concepts/auth.md
+      - label: Affichage des publications
+        file: core-concepts/showing-posts.md
+</file>
+
+<file path="public/dev_docs/ru/.i18n-docs-state.json">
+{
+  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
+  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
+  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
+  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
+  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
+  "sidebar.yaml": "8103a530fb79585972d77624473d472bd486c8a2928f923bf42ea1f69f1d8875",
+  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
+  "core-concepts/showing-posts.md": "b7f4ff82f3a451ee433ce5a2c506563878b81ff448a300a2e3747f0dd91bdf47"
+}
+</file>
+
+<file path="public/dev_docs/ru/sidebar.yaml">
+sections:
+  - title: Начало работы
+    items:
+      - label: Обзор
+        file: index.md
+      - label: Настройка
+        file: getting-started.md
+  - title: Основные концепции
+    items:
+      - label: Обзор
+        file: core-concepts/index.md
+      - label: Инициализация приложения и подключение к бэкенду
+        file: core-concepts/app-init.md
+      - label: Работа с доменами
+        file: core-concepts/domain.md
+      - label: Аутентификация
+        file: core-concepts/auth.md
+      - label: Показ постов
+        file: core-concepts/showing-posts.md
+</file>
+
+<file path="public/dev_docs/sr/.i18n-docs-state.json">
+{
+  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
+  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
+  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
+  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
+  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
+  "sidebar.yaml": "8103a530fb79585972d77624473d472bd486c8a2928f923bf42ea1f69f1d8875",
+  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
+  "core-concepts/showing-posts.md": "b7f4ff82f3a451ee433ce5a2c506563878b81ff448a300a2e3747f0dd91bdf47"
+}
+</file>
+
+<file path="public/dev_docs/sr/sidebar.yaml">
+sections:
+  - title: Uvod
+    items:
+      - label: Pregled
+        file: index.md
+      - label: Podešavanje
+        file: getting-started.md
+  - title: Osnovni koncepti
+    items:
+      - label: Pregled
+        file: core-concepts/index.md
+      - label: Inicijalizacija aplikacije i povezivanje sa backend-om
+        file: core-concepts/app-init.md
+      - label: Rad sa domenima
+        file: core-concepts/domain.md
+      - label: Autentifikacija
+        file: core-concepts/auth.md
+      - label: Prikazivanje postova
+        file: core-concepts/showing-posts.md
+</file>
+
+<file path="public/dev_docs/ua/.i18n-docs-state.json">
+{
+  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
+  "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
+  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
+  "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
+  "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
+  "sidebar.yaml": "8103a530fb79585972d77624473d472bd486c8a2928f923bf42ea1f69f1d8875",
+  "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
+  "core-concepts/showing-posts.md": "b7f4ff82f3a451ee433ce5a2c506563878b81ff448a300a2e3747f0dd91bdf47"
+}
+</file>
+
+<file path="public/dev_docs/ua/sidebar.yaml">
+sections:
+  - title: Початок роботи
+    items:
+      - label: Огляд
+        file: index.md
+      - label: Налаштування
+        file: getting-started.md
+  - title: Основні концепції
+    items:
+      - label: Огляд
+        file: core-concepts/index.md
+      - label: Ініціалізація додатку та підключення до бекенду
+        file: core-concepts/app-init.md
+      - label: Робота з доменами
+        file: core-concepts/domain.md
+      - label: Аутентифікація
+        file: core-concepts/auth.md
+      - label: Показ постів
+        file: core-concepts/showing-posts.md
 </file>
 
 <file path="public/default_connect.yaml">
@@ -20483,126 +21541,6 @@ async function translateTo(langCode, englishPairs) {
   console.error(err);
   process.exit(1);
 });
-</file>
-
-<file path="src/components/docs/MarkdownView.jsx">
-// src/components/docs/MarkdownView.jsx
-import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug.js";
-
-function rehypeCopyButton() {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      visit(tree, "element", (node) => {
-        if (node.tagName !== "pre") return;
-        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
-        node.children.push({
-          type: "element", tagName: "button",
-          properties: { className: ["sv-copy-btn"], type: "button" },
-          children: [{ type: "text", value: "Copy" }],
-        });
-      });
-      return tree;
-    });
-}
-
-export default function MarkdownView(props) {
-  const { t } = useApp();
-  const [html, setHtml] = createSignal("");
-  let disposed = false;
-  let container;
-
-  async function renderMd() {
-    try {
-      const [
-        { unified }, { default: remarkParse }, { default: remarkGfm }, 
-        { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
-        { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
-        { default: rehypeStringify }, DOMPurify,
-      ] = await Promise.all([
-        import("unified"), import("remark-parse"), import("remark-gfm"),
-        import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
-        import("rehype-autolink-headings"), import("rehype-pretty-code"),
-        import("rehype-stringify"), import("dompurify"),
-      ]);
-
-      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => { /* ... */ });
-
-      const processor = unified()
-        .use(remarkParse)
-        .use(remarkFrontmatter, ["yaml", "toml"])
-        .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true });
-
-      if (props.rehypePlugins) {
-        for (const plugin of props.rehypePlugins) {
-          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
-        }
-      }
-      
-      processor
-        .use(rehypeSlug)
-        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
-        .use(rehypePrettyCode, {
-          keepBackground: true,
-          theme: { light: "github-light", dark: "github-dark" },
-        })
-        .use(rehypeCopyButton)
-        .use(rehypeStringify, { allowDangerousHtml: true });
-      
-      const file = await processor.process(String(props.markdown || ""));
-      const rawHtml = String(file);
-      const safe = DOMPurify.default.sanitize(rawHtml, { /* ... */ });
-
-      if (!disposed) setHtml(safe);
-    } catch (err) {
-      // --- MODIFICATION: Improved error logging and display ---
-      dbg.error("MarkdownView", "Markdown rendering failed:", err);
-      const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      
-      const errorHtml = `
-        <div style="color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive)); padding: 1rem; border-radius: 0.5rem;">
-          <strong>Markdown Rendering Error:</strong>
-          <pre style="margin-top: 0.5rem; white-space: pre-wrap;">${safeErr}</pre>
-          <hr style="margin: 1rem 0;" />
-          <strong>Original Content:</strong>
-          <pre style="white-space: pre-wrap;">${safeMd}</pre>
-        </div>`;
-      if (!disposed) setHtml(errorHtml);
-    }
-  }
-
-  function copy(text) { /* ... */ }
-  function onClick(e) { /* ... */ }
-  function relabelButtons() { /* ... */ }
-  
-  onMount(() => {
-    renderMd().then(() => relabelButtons());
-    container?.addEventListener("click", onClick);
-  });
-
-  createEffect(on(() => props.markdown, (md, prevMd) => {
-    if (md !== prevMd && prevMd !== undefined) {
-      renderMd().then(() => relabelButtons());
-    }
-  }, { defer: true }));
-
-  onCleanup(() => {
-    disposed = true;
-    container?.removeEventListener("click", onClick);
-  });
-
-  return (
-    <article
-      ref={(el) => (container = el)}
-      class="sv-docs prose prose-sm md:prose-base max-w-none"
-      innerHTML={html()}
-      aria-label={t("docs.article")}
-    />
-  );
-}
 </file>
 
 <file path="src/components/feed/PostInfo.jsx">
@@ -21461,456 +22399,6 @@ export function useTheme() {
 }
 </file>
 
-<file path="src/i18n/fr.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Version",
-  "brand.name": "SAVVA",
-  "categories.all": "Toutes les catégories",
-  "common.apply": "Appliquer",
-  "common.applying": "Application…",
-  "common.cancel": "Annuler",
-  "common.checking": "Vérification…",
-  "common.error": "Erreur",
-  "common.exists": "Existe",
-  "common.fail": "Échouer",
-  "common.loading": "Chargement…",
-  "common.notFound": "Non trouvé",
-  "common.ok": "OK",
-  "default.avatar": "Avatar",
-  "default.user": "Utilisateur",
-  "docs.article": "Article de documentation",
-  "docs.copied": "Copié",
-  "docs.copy": "Copier",
-  "docs.nav": "Docs Développeur",
-  "docs.next": "Suivant",
-  "docs.prev": "Précédent",
-  "docs.section": "Section",
-  "docs.sidebar.empty": "Pas encore de docs. Ajoutez sidebar.yaml sous dev_docs/<lang>/",
-  "docs.title": "Documentation développeur",
-  "error.connection.message": "L'application n'a pas pu se connecter au serveur backend. Il est peut-être temporairement hors ligne. Veuillez réessayer plus tard.",
-  "error.connection.retry": "Rafraîchir la page",
-  "error.connection.title": "Échec de la connexion",
-  "error.ws.message": "Impossible de se connecter. Veuillez réessayer.",
-  "error.ws.title": "Erreur de connexion",
-  "ipfs.diag.cors.error": "Problème de configuration CORS.",
-  "ipfs.diag.cors.name": "Vérification CORS de la passerelle",
-  "ipfs.diag.cors.ok": "CORS est configuré correctement.",
-  "ipfs.diag.fetch.errorFirewall": "Échec de la récupération en raison d'un pare-feu.",
-  "ipfs.diag.fetch.name": "Récupération de la passerelle en direct",
-  "ipfs.diag.fetch.ok": "Récupération réussie.",
-  "ipfs.diag.fetch.warnSkipped": "Ignoré : ABI CID non trouvé dans la réponse /info.",
-  "ipfs.diag.fix.browser": "S'il fonctionne, vérifiez votre navigateur. Pour Brave, désactivez les boucliers pour ce site. Pour d'autres navigateurs comme Chrome, vous devrez peut-être 'Autoriser le contenu non sécurisé' dans les paramètres du site.",
-  "ipfs.diag.fix.cors": "S'il échoue toujours, exécutez cette commande pour corriger la politique CORS de l'API :",
-  "ipfs.diag.fix.daemon": "Tout d'abord, assurez-vous que votre démon IPFS fonctionne dans un terminal :",
-  "ipfs.diag.fix.title": "Pour corriger, exécutez ceci dans votre terminal (puis redémarrez le démon) :",
-  "ipfs.diag.liveness.error": "Le nœud ne répond pas.",
-  "ipfs.diag.liveness.name": "Vérification de la vivacité de l'API",
-  "ipfs.diag.liveness.ok": "Le nœud est actif.",
-  "ipfs.diag.run": "Exécuter les diagnostics",
-  "ipfs.diag.title": "Diagnostics du nœud IPFS",
-  "main.tabs.empty": "Cet onglet est vide pour l'instant.",
-  "main.tabs.loading": "Chargement des onglets…",
-  "main.tabs.untitled": "Sans titre",
-  "menu.open": "Ouvrir le menu",
-  "newTab.category": "Catégorie",
-  "newTab.view.grid": "Vue en grille",
-  "newTab.view.group": "Groupe de vue",
-  "newTab.view.list": "Vue en liste",
-  "rightPane.language": "Langue",
-  "rightPane.settings": "Paramètres",
-  "rightPane.switch.backend.help": "L'application récupérera /info depuis cette URL pour lister les domaines pris en charge.",
-  "rightPane.switch.backend.label": "URL du backend",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Domaine",
-  "rightPane.switch.domain.website": "Site Web",
-  "rightPane.switch.noDomains": "Le backend n'a retourné aucun domaine. Vous pouvez toujours postuler, mais le domaine sera vide.",
-  "rightPane.switch.open": "Changer de backend / domaine",
-  "rightPane.switch.reload": "Charger les domaines",
-  "rightPane.switch.reload.title": "Récupérer /info et rafraîchir la liste des domaines",
-  "rightPane.switch.reset": "Réinitialiser aux valeurs par défaut",
-  "rightPane.switch.reset.title": "Effacer la surcharge locale et recharger les valeurs par défaut depuis default_connect.yaml",
-  "rightPane.switch.title": "Changer de backend / domaine",
-  "rightPane.switch.validation.domain": "Le domaine ne peut pas être vide.",
-  "rightPane.switch.validation.protocol": "L'URL du backend doit commencer par http:// ou https://",
-  "rightPane.theme": "Thème",
-  "settings.back": "Retour",
-  "settings.dev.assets.baseUrl": "URL de base des actifs",
-  "settings.dev.assets.configUrl": "URL de configuration",
-  "settings.dev.assets.configUrl.computed": "URL calculée",
-  "settings.dev.assets.configUrl.open": "Ouvrir l'URL de configuration",
-  "settings.dev.assets.diagnostics.default": "Configuration par défaut",
-  "settings.dev.assets.diagnostics.error": "Erreur de diagnostic",
-  "settings.dev.assets.diagnostics.hasCategories": "A des catégories",
-  "settings.dev.assets.diagnostics.hasConfig": "A une configuration",
-  "settings.dev.assets.diagnostics.hasFavicon": "Favicon détecté",
-  "settings.dev.assets.diagnostics.hasLocales": "A des locales",
-  "settings.dev.assets.diagnostics.hasLogos": "A des logos",
-  "settings.dev.assets.diagnostics.hasTabs": "A des onglets",
-  "settings.dev.assets.diagnostics.noteNetwork": "Vérifiez votre connexion réseau.",
-  "settings.dev.assets.diagnostics.primary": "Configuration principale",
-  "settings.dev.assets.diagnostics.run": "Exécuter les diagnostics",
-  "settings.dev.assets.diagnostics.sampleFetches": "Exemples de récupérations",
-  "settings.dev.assets.diagnostics.title": "Diagnostics des actifs",
-  "settings.dev.assets.domain": "Domaine",
-  "settings.dev.assets.env": "Environnement",
-  "settings.dev.assets.env.prod": "Production",
-  "settings.dev.assets.env.test": "Test",
-  "settings.dev.assets.prefix.active": "Préfixe actif",
-  "settings.dev.assets.prefix.computed": "Préfixe calculé",
-  "settings.dev.assets.source": "Source",
-  "settings.dev.assets.title": "Actifs",
-  "settings.developer.debug.clear": "Effacer le journal",
-  "settings.developer.debug.copied": "Journal copié dans le presse-papiers",
-  "settings.developer.debug.copy": "Copier le journal",
-  "settings.developer.debug.enable": "Activer la journalisation de débogage",
-  "settings.developer.showKeys": "Afficher les clés API",
-  "settings.developer.title": "Paramètres du développeur",
-  "settings.ipfs.localDisabled": "IPFS local désactivé",
-  "settings.localIpfs.apiUrl.label": "URL API IPFS local",
-  "settings.localIpfs.disable": "Désactiver",
-  "settings.localIpfs.enableCheckbox": "Utiliser le nœud IPFS local",
-  "settings.localIpfs.gateway.label": "Passerelle",
-  "settings.localIpfs.status.label": "Statut",
-  "settings.localIpfs.testEnable": "Tester et activer",
-  "settings.localIpfs.title": "IPFS local",
-  "settings.title": "Paramètres",
-  "stakerLevels.${l.key}": "Niveau de Staker {l.key}",
-  "stakerLevels.clam": "Palourde",
-  "stakerLevels.dolphin": "Dauphin",
-  "stakerLevels.fish": "Poisson",
-  "stakerLevels.guest": "Invité",
-  "stakerLevels.orca": "Orque",
-  "stakerLevels.seahorse": "Hippocampe",
-  "stakerLevels.shark": "Requin",
-  "stakerLevels.shrimp": "Crevette",
-  "stakerLevels.stingray": "Raie",
-  "stakerLevels.whale": "Baleine",
-  "tabs.aria": "Onglets de section",
-  "tabs.title.${slug(tab.type)}": "Onglet : {tab.type}",
-  "tabs.title.actual": "Actuel",
-  "tabs.title.comments": "Commentaires",
-  "tabs.title.for-you": "Pour Vous",
-  "tabs.title.leaders": "Leaders",
-  "tabs.title.new": "Nouveau",
-  "time.day.plural": "il y a {n} jours",
-  "time.day.singular": "il y a {n} jour",
-  "time.hour.plural": "il y a {n} heures",
-  "time.hour.singular": "il y a {n} heure",
-  "time.minute.plural": "il y a {n} minutes",
-  "time.minute.singular": "il y a {n} minute",
-  "time.now": "Maintenant",
-  "timeFrame.${frame}": "Période : {frame}",
-  "ui.mode.dark": "Mode sombre",
-  "ui.mode.light": "Mode clair",
-  "ui.toTop": "Retour en haut",
-  "wallet.changeChain": "Changer de réseau",
-  "wallet.connect": "Connecter le portefeuille",
-  "wallet.copyAddress": "Copier l'adresse",
-  "wallet.onRequiredNetwork": "Sur le réseau requis"
-};
-</file>
-
-<file path="src/i18n/sr.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Verzija",
-  "brand.name": "SAVVA",
-  "categories.all": "Sve kategorije",
-  "common.apply": "Primeni",
-  "common.applying": "Primena…",
-  "common.cancel": "Otkaži",
-  "common.checking": "Proveravam…",
-  "common.error": "Greška",
-  "common.exists": "Postoji",
-  "common.fail": "Neuspeh",
-  "common.loading": "Učitavanje…",
-  "common.notFound": "Nije pronađeno",
-  "common.ok": "U redu",
-  "default.avatar": "Avatar",
-  "default.user": "Korisnik",
-  "docs.article": "Dokumentacioni članak",
-  "docs.copied": "Kopirano",
-  "docs.copy": "Kopiraj",
-  "docs.nav": "Dokumentacija za programere",
-  "docs.next": "Sledeće",
-  "docs.prev": "Prethodno",
-  "docs.section": "Sekcija",
-  "docs.sidebar.empty": "Još nema dokumenata. Dodajte sidebar.yaml pod dev_docs/<lang>/",
-  "docs.title": "Dokumentacija za programere",
-  "error.connection.message": "Aplikacija nije mogla da se poveže sa backend serverom. Možda je privremeno van mreže. Pokušajte ponovo kasnije.",
-  "error.connection.retry": "Osveži stranicu",
-  "error.connection.title": "Neuspešna konekcija",
-  "error.ws.message": "Nije moguće povezati se. Pokušajte ponovo.",
-  "error.ws.title": "Greška u vezi",
-  "ipfs.diag.cors.error": "Problem sa CORS konfiguracijom.",
-  "ipfs.diag.cors.name": "Provera CORS-a na gateway-u",
-  "ipfs.diag.cors.ok": "CORS je ispravno konfigurisan.",
-  "ipfs.diag.fetch.errorFirewall": "Preuzimanje nije uspelo zbog vatrozida.",
-  "ipfs.diag.fetch.name": "Preuzimanje sa aktivnog gateway-a",
-  "ipfs.diag.fetch.ok": "Preuzimanje uspešno.",
-  "ipfs.diag.fetch.warnSkipped": "Preskočeno: ABI CID nije pronađen u /info odgovoru.",
-  "ipfs.diag.fix.browser": "Ako radi, proverite vaš pregledač. Za Brave, onemogućite Shields za ovu stranicu. Za druge pregledače kao što je Chrome, možda ćete morati da 'Dozvolite nesiguran sadržaj' u podešavanjima stranice.",
-  "ipfs.diag.fix.cors": "Ako i dalje ne radi, pokrenite ovu komandu da popravite CORS politiku API-ja:",
-  "ipfs.diag.fix.daemon": "Prvo, proverite da li vaš IPFS demon radi u terminalu:",
-  "ipfs.diag.fix.title": "Da biste popravili, pokrenite ovo u vašem terminalu (zatim restartujte demon):",
-  "ipfs.diag.liveness.error": "Čvor ne odgovara.",
-  "ipfs.diag.liveness.name": "Provera aktivnog API-ja",
-  "ipfs.diag.liveness.ok": "Čvor je aktivan.",
-  "ipfs.diag.run": "Pokreni dijagnostiku",
-  "ipfs.diag.title": "IPFS Dijagnostika čvora",
-  "main.tabs.empty": "Ovaj tab je trenutno prazan.",
-  "main.tabs.loading": "Učitavanje tabova…",
-  "main.tabs.untitled": "Bez naslova",
-  "menu.open": "Otvorite meni",
-  "newTab.category": "Kategorija",
-  "newTab.view.grid": "Mrežni prikaz",
-  "newTab.view.group": "Grupni prikaz",
-  "newTab.view.list": "Lista",
-  "rightPane.language": "Jezik",
-  "rightPane.settings": "Podešavanja",
-  "rightPane.switch.backend.help": "Aplikacija će preuzeti /info sa ove URL adrese da bi prikazala podržane domene.",
-  "rightPane.switch.backend.label": "Backend URL",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Domen",
-  "rightPane.switch.domain.website": "Vebsajt",
-  "rightPane.switch.noDomains": "Backend nije vratio nijedan domen. Možete se prijaviti, ali domen će biti prazan.",
-  "rightPane.switch.open": "Promeni backend / domen",
-  "rightPane.switch.reload": "Učitaj domene",
-  "rightPane.switch.reload.title": "Preuzmi /info i osveži listu domena",
-  "rightPane.switch.reset": "Vrati na podrazumevano",
-  "rightPane.switch.reset.title": "Obriši lokalne izmene i ponovo učitaj podrazumevane vrednosti iz default_connect.yaml",
-  "rightPane.switch.title": "Promeni backend / domen",
-  "rightPane.switch.validation.domain": "Domen ne može biti prazan.",
-  "rightPane.switch.validation.protocol": "Backend URL mora početi sa http:// ili https://",
-  "rightPane.theme": "Tema",
-  "settings.back": "Nazad",
-  "settings.dev.assets.baseUrl": "Osnovni URL resursa",
-  "settings.dev.assets.configUrl": "Config URL",
-  "settings.dev.assets.configUrl.computed": "Izračunati URL",
-  "settings.dev.assets.configUrl.open": "Otvorite Config URL",
-  "settings.dev.assets.diagnostics.default": "Podrazumevana konfiguracija",
-  "settings.dev.assets.diagnostics.error": "Greška u dijagnostici",
-  "settings.dev.assets.diagnostics.hasCategories": "Ima kategorije",
-  "settings.dev.assets.diagnostics.hasConfig": "Ima konfiguraciju",
-  "settings.dev.assets.diagnostics.hasFavicon": "Favicon otkriven",
-  "settings.dev.assets.diagnostics.hasLocales": "Ima jezike",
-  "settings.dev.assets.diagnostics.hasLogos": "Ima logotipe",
-  "settings.dev.assets.diagnostics.hasTabs": "Ima kartice",
-  "settings.dev.assets.diagnostics.noteNetwork": "Proverite vašu mrežnu konekciju.",
-  "settings.dev.assets.diagnostics.primary": "Primarna konfiguracija",
-  "settings.dev.assets.diagnostics.run": "Pokreni dijagnostiku",
-  "settings.dev.assets.diagnostics.sampleFetches": "Uzorci preuzimanja",
-  "settings.dev.assets.diagnostics.title": "Dijagnostika resursa",
-  "settings.dev.assets.domain": "Domen",
-  "settings.dev.assets.env": "Okruženje",
-  "settings.dev.assets.env.prod": "Proizvodnja",
-  "settings.dev.assets.env.test": "Test",
-  "settings.dev.assets.prefix.active": "Aktivni prefiks",
-  "settings.dev.assets.prefix.computed": "Izračunati prefiks",
-  "settings.dev.assets.source": "Izvor",
-  "settings.dev.assets.title": "Resursi",
-  "settings.developer.debug.clear": "Obriši log",
-  "settings.developer.debug.copied": "Log kopiran u međuspremnik",
-  "settings.developer.debug.copy": "Kopiraj log",
-  "settings.developer.debug.enable": "Omogući logovanje grešaka",
-  "settings.developer.showKeys": "Prikaži API ključeve",
-  "settings.developer.title": "Podešavanja za programere",
-  "settings.ipfs.localDisabled": "Lokalni IPFS onemogućen",
-  "settings.localIpfs.apiUrl.label": "Lokalni IPFS API URL",
-  "settings.localIpfs.disable": "Onemogući",
-  "settings.localIpfs.enableCheckbox": "Koristi lokalni IPFS čvor",
-  "settings.localIpfs.gateway.label": "Gateway",
-  "settings.localIpfs.status.label": "Status",
-  "settings.localIpfs.testEnable": "Testiraj i omogući",
-  "settings.localIpfs.title": "Lokalni IPFS",
-  "settings.title": "Podešavanja",
-  "stakerLevels.${l.key}": "Nivo stakera {l.key}",
-  "stakerLevels.clam": "Školjka",
-  "stakerLevels.dolphin": "Delfin",
-  "stakerLevels.fish": "Riba",
-  "stakerLevels.guest": "Gost",
-  "stakerLevels.orca": "Orka",
-  "stakerLevels.seahorse": "Morski konjić",
-  "stakerLevels.shark": "Ajkula",
-  "stakerLevels.shrimp": "Krevetica",
-  "stakerLevels.stingray": "Raža",
-  "stakerLevels.whale": "Kit",
-  "tabs.aria": "Kartice sekcija",
-  "tabs.title.${slug(tab.type)}": "Kartica: {tab.type}",
-  "tabs.title.actual": "Trenutno",
-  "tabs.title.comments": "Komentari",
-  "tabs.title.for-you": "Za Vas",
-  "tabs.title.leaders": "Lideri",
-  "tabs.title.new": "Novi",
-  "time.day.plural": "pre {n} dana",
-  "time.day.singular": "pre {n} dan",
-  "time.hour.plural": "pre {n} sati",
-  "time.hour.singular": "pre {n} sat",
-  "time.minute.plural": "pre {n} minuta",
-  "time.minute.singular": "pre {n} minut",
-  "time.now": "Sada",
-  "timeFrame.${frame}": "Vremenski okvir: {frame}",
-  "ui.mode.dark": "Tamni režim",
-  "ui.mode.light": "Svetli režim",
-  "ui.toTop": "Nazad na vrh",
-  "wallet.changeChain": "Promeni mrežu",
-  "wallet.connect": "Poveži novčanik",
-  "wallet.copyAddress": "Kopiraj adresu",
-  "wallet.onRequiredNetwork": "Na potrebnoj mreži"
-};
-</file>
-
-<file path="src/i18n/ua.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версія",
-  "brand.name": "SAVVA",
-  "categories.all": "Всі категорії",
-  "common.apply": "Застосувати",
-  "common.applying": "Застосування…",
-  "common.cancel": "Скасувати",
-  "common.checking": "Перевірка…",
-  "common.error": "Помилка",
-  "common.exists": "Існує",
-  "common.fail": "Не вдалося",
-  "common.loading": "Завантаження…",
-  "common.notFound": "Не знайдено",
-  "common.ok": "Гаразд",
-  "default.avatar": "Аватар",
-  "default.user": "Користувач",
-  "docs.article": "Стаття документації",
-  "docs.copied": "Скопійовано",
-  "docs.copy": "Копіювати",
-  "docs.nav": "Документація для розробників",
-  "docs.next": "Наступний",
-  "docs.prev": "Попередній",
-  "docs.section": "Розділ",
-  "docs.sidebar.empty": "Документації ще немає. Додайте sidebar.yaml під dev_docs/<lang>/",
-  "docs.title": "Документація для розробників",
-  "error.connection.message": "Додаток не зміг підключитися до сервера бекенду. Він може бути тимчасово недоступний. Спробуйте ще раз пізніше.",
-  "error.connection.retry": "Оновити сторінку",
-  "error.connection.title": "Не вдалося підключитися",
-  "error.ws.message": "Не вдалося підключитися. Будь ласка, спробуйте ще раз.",
-  "error.ws.title": "Помилка з'єднання",
-  "ipfs.diag.cors.error": "Проблема з конфігурацією CORS.",
-  "ipfs.diag.cors.name": "Перевірка CORS шлюзу",
-  "ipfs.diag.cors.ok": "CORS налаштовано правильно.",
-  "ipfs.diag.fetch.errorFirewall": "Запит не вдався через брандмауер.",
-  "ipfs.diag.fetch.name": "Запит до живого шлюзу",
-  "ipfs.diag.fetch.ok": "Запит успішний.",
-  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не знайдено у відповіді /info.",
-  "ipfs.diag.fix.browser": "Якщо він працює, перевірте ваш браузер. Для Brave вимкніть Shields для цього сайту. Для інших браузерів, таких як Chrome, можливо, вам потрібно 'Дозволити небезпечний контент' у налаштуваннях сайту.",
-  "ipfs.diag.fix.cors": "Якщо все ще не вдається, виконайте цю команду, щоб виправити політику CORS API:",
-  "ipfs.diag.fix.daemon": "Спочатку переконайтеся, що ваш IPFS демон працює в терміналі:",
-  "ipfs.diag.fix.title": "Щоб виправити, виконайте це у вашому терміналі (потім перезапустіть демон):",
-  "ipfs.diag.liveness.error": "Вузол не відповідає.",
-  "ipfs.diag.liveness.name": "Перевірка активності API",
-  "ipfs.diag.liveness.ok": "Вузол активний.",
-  "ipfs.diag.run": "Запустити діагностику",
-  "ipfs.diag.title": "Діагностика вузла IPFS",
-  "main.tabs.empty": "Ця вкладка поки що порожня.",
-  "main.tabs.loading": "Завантаження вкладок…",
-  "main.tabs.untitled": "Без назви",
-  "menu.open": "Відкрити меню",
-  "newTab.category": "Категорія",
-  "newTab.view.grid": "Сітка перегляду",
-  "newTab.view.group": "Група перегляду",
-  "newTab.view.list": "Список перегляду",
-  "rightPane.language": "Мова",
-  "rightPane.settings": "Налаштування",
-  "rightPane.switch.backend.help": "Додаток отримає /info з цього URL, щоб перерахувати підтримувані домени.",
-  "rightPane.switch.backend.label": "URL бекенду",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бекенд не повернув доменів. Ви все ще можете подати заявку, але домен буде порожнім.",
-  "rightPane.switch.open": "Переключити бекенд / домен",
-  "rightPane.switch.reload": "Завантажити домени",
-  "rightPane.switch.reload.title": "Отримати /info та оновити список доменів",
-  "rightPane.switch.reset": "Скинути до значень за замовчуванням",
-  "rightPane.switch.reset.title": "Очистити локальне переопределення та перезавантажити значення за замовчуванням з default_connect.yaml",
-  "rightPane.switch.title": "Переключити бекенд / домен",
-  "rightPane.switch.validation.domain": "Домен не може бути порожнім.",
-  "rightPane.switch.validation.protocol": "URL бекенду має починатися з http:// або https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.dev.assets.baseUrl": "Базовий URL активів",
-  "settings.dev.assets.configUrl": "URL конфігурації",
-  "settings.dev.assets.configUrl.computed": "Обчислений URL",
-  "settings.dev.assets.configUrl.open": "Відкрити URL конфігурації",
-  "settings.dev.assets.diagnostics.default": "Конфігурація за замовчуванням",
-  "settings.dev.assets.diagnostics.error": "Помилка діагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Є категорії",
-  "settings.dev.assets.diagnostics.hasConfig": "Є конфігурація",
-  "settings.dev.assets.diagnostics.hasFavicon": "Виявлено фавікон",
-  "settings.dev.assets.diagnostics.hasLocales": "Є локалі",
-  "settings.dev.assets.diagnostics.hasLogos": "Є логотипи",
-  "settings.dev.assets.diagnostics.hasTabs": "Є вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Перевірте ваше мережеве з'єднання.",
-  "settings.dev.assets.diagnostics.primary": "Основна конфігурація",
-  "settings.dev.assets.diagnostics.run": "Запустити діагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Приклад запитів",
-  "settings.dev.assets.diagnostics.title": "Діагностика активів",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Середовище",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активний префікс",
-  "settings.dev.assets.prefix.computed": "Обчислений префікс",
-  "settings.dev.assets.source": "Джерело",
-  "settings.dev.assets.title": "Активи",
-  "settings.developer.debug.clear": "Очистити журнал",
-  "settings.developer.debug.copied": "Журнал скопійовано в буфер обміну",
-  "settings.developer.debug.copy": "Скопіювати журнал",
-  "settings.developer.debug.enable": "Увімкнути журнал налагодження",
-  "settings.developer.showKeys": "Показати API ключі",
-  "settings.developer.title": "Налаштування розробника",
-  "settings.ipfs.localDisabled": "Локальний IPFS вимкнено",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Вимкнути",
-  "settings.localIpfs.enableCheckbox": "Використовувати локальний вузол IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Перевірити та увімкнути",
-  "settings.localIpfs.title": "Локальний IPFS",
-  "settings.title": "Налаштування",
-  "stakerLevels.${l.key}": "Рівень стейкера {l.key}",
-  "stakerLevels.clam": "Молюск",
-  "stakerLevels.dolphin": "Дельфін",
-  "stakerLevels.fish": "Риба",
-  "stakerLevels.guest": "Гість",
-  "stakerLevels.orca": "Косатка",
-  "stakerLevels.seahorse": "Морський кінь",
-  "stakerLevels.shark": "Акула",
-  "stakerLevels.shrimp": "Креветка",
-  "stakerLevels.stingray": "Скат",
-  "stakerLevels.whale": "Кит",
-  "tabs.aria": "Вкладки розділів",
-  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
-  "tabs.title.actual": "Поточні",
-  "tabs.title.comments": "Коментарі",
-  "tabs.title.for-you": "Для вас",
-  "tabs.title.leaders": "Лідери",
-  "tabs.title.new": "Нові",
-  "time.day.plural": "__N__ днів тому",
-  "time.day.singular": "__N__ день тому",
-  "time.hour.plural": "__N__ годин тому",
-  "time.hour.singular": "__N__ годину тому",
-  "time.minute.plural": "__N__ хвилин тому",
-  "time.minute.singular": "__N__ хвилину тому",
-  "time.now": "Зараз",
-  "timeFrame.${frame}": "Часовий проміжок: {frame}",
-  "ui.mode.dark": "Темний режим",
-  "ui.mode.light": "Світлий режим",
-  "ui.toTop": "Назад до верху",
-  "wallet.changeChain": "Змінити мережу",
-  "wallet.connect": "Підключити гаманець",
-  "wallet.copyAddress": "Копіювати адресу",
-  "wallet.onRequiredNetwork": "На потрібній мережі"
-};
-</file>
-
 <file path="src/net/WsConnector.jsx">
 // src/net/WsConnector.jsx
 import { onMount, onCleanup, createSignal } from "solid-js";
@@ -22146,6 +22634,30 @@ export default {
 };
 </file>
 
+<file path="public/dev_docs/en/sidebar.yaml">
+# public/dev_docs/en/sidebar.yaml
+sections:
+  - title: Getting Started
+    items:
+      - label: Overview
+        file: index.md
+      - label: Setup
+        file: getting-started.md
+
+  - title: Core Concepts
+    items:
+      - label: Overview
+        file: core-concepts/index.md
+      - label: App initialization & backend connect
+        file: core-concepts/app-init.md
+      - label: Working with domains
+        file: core-concepts/domain.md
+      - label: Authentication
+        file: core-concepts/auth.md
+      - label: Showing Posts
+        file: core-concepts/showing-posts.md
+</file>
+
 <file path="public/domain_default/modules/tabs.yaml">
 tabs:
   - type: leaders
@@ -22263,6 +22775,127 @@ tabs:
 }
 </file>
 
+<file path="src/components/docs/MarkdownView.jsx">
+// src/components/docs/MarkdownView.jsx
+import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug.js";
+
+function rehypeCopyButton() {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      visit(tree, "element", (node) => {
+        if (node.tagName !== "pre") return;
+        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
+        node.children.push({
+          type: "element", tagName: "button",
+          properties: { className: ["sv-copy-btn"], type: "button" },
+          children: [{ type: "text", value: "Copy" }],
+        });
+      });
+      return tree;
+    });
+}
+
+export default function MarkdownView(props) {
+  const { t } = useApp();
+  const [html, setHtml] = createSignal("");
+  let disposed = false;
+  let container;
+
+  async function renderMd() {
+    try {
+      const [
+        { unified }, { default: remarkParse }, { default: remarkGfm }, 
+        { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
+        { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
+        { default: rehypeStringify }, DOMPurify, { default: remarkBreaks },
+      ] = await Promise.all([
+        import("unified"), import("remark-parse"), import("remark-gfm"),
+        import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
+        import("rehype-autolink-headings"), import("rehype-pretty-code"),
+        import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
+      ]);
+
+      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => { /* ... */ });
+
+      const processor = unified()
+        .use(remarkParse)
+        .use(remarkBreaks)
+        .use(remarkFrontmatter, ["yaml", "toml"])
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true });
+
+      if (props.rehypePlugins) {
+        for (const plugin of props.rehypePlugins) {
+          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
+        }
+      }
+      
+      processor
+        .use(rehypeSlug)
+        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
+        .use(rehypePrettyCode, {
+          keepBackground: true,
+          theme: { light: "github-light", dark: "github-dark" },
+        })
+        .use(rehypeCopyButton)
+        .use(rehypeStringify, { allowDangerousHtml: true });
+      
+      const file = await processor.process(String(props.markdown || ""));
+      const rawHtml = String(file);
+      const safe = DOMPurify.default.sanitize(rawHtml, { /* ... */ });
+
+      if (!disposed) setHtml(safe);
+    } catch (err) {
+      // --- MODIFICATION: Improved error logging and display ---
+      dbg.error("MarkdownView", "Markdown rendering failed:", err);
+      const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      
+      const errorHtml = `
+        <div style="color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive)); padding: 1rem; border-radius: 0.5rem;">
+          <strong>Markdown Rendering Error:</strong>
+          <pre style="margin-top: 0.5rem; white-space: pre-wrap;">${safeErr}</pre>
+          <hr style="margin: 1rem 0;" />
+          <strong>Original Content:</strong>
+          <pre style="white-space: pre-wrap;">${safeMd}</pre>
+        </div>`;
+      if (!disposed) setHtml(errorHtml);
+    }
+  }
+
+  function copy(text) { /* ... */ }
+  function onClick(e) { /* ... */ }
+  function relabelButtons() { /* ... */ }
+  
+  onMount(() => {
+    renderMd().then(() => relabelButtons());
+    container?.addEventListener("click", onClick);
+  });
+
+  createEffect(on(() => props.markdown, (md, prevMd) => {
+    if (md !== prevMd && prevMd !== undefined) {
+      renderMd().then(() => relabelButtons());
+    }
+  }, { defer: true }));
+
+  onCleanup(() => {
+    disposed = true;
+    container?.removeEventListener("click", onClick);
+  });
+
+  return (
+    <article
+      ref={(el) => (container = el)}
+      class="sv-docs prose prose-sm md:prose-base max-w-none"
+      innerHTML={html()}
+      aria-label={t("docs.article")}
+    />
+  );
+}
+</file>
+
 <file path="src/components/main/MainView.jsx">
 // src/components/main/MainView.jsx
 import { createMemo, Show } from "solid-js";
@@ -22270,7 +22903,6 @@ import { useApp } from "../../context/AppContext";
 import TabsBar from "./TabsBar";
 import Container from "../layout/Container";
 import ToTopButton from "../ui/ToTopButton";
-import { dbg } from "../../utils/debug.js";
 
 export default function MainView() {
   const { t, selectedDomain, domainAssetsConfig, domainAssetsSource, loading } = useApp();
@@ -22280,20 +22912,18 @@ export default function MainView() {
     return !d ? "" : typeof d === "string" ? d : d.name || "";
   });
 
-  const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
-
+  // --- MODIFICATION: Make the revision key more robust to prevent race conditions ---
   const revision = createMemo(() => {
+    // Don't try to render if the app is in a top-level loading state.
     if (loading()) return null;
 
+    // The key now includes the source, ensuring it only changes AFTER asset loading is complete.
     const source = domainAssetsSource?.();
     const cfg = domainAssetsConfig?.();
     const cid = cfg?.assets_cid || cfg?.cid || "";
     const tabs = cfg?.modules?.tabs || "";
     
-    const key = `${domainName()}|${source}|${cid}|${tabs}`;
-    // --- DEBUG: Log the revision key using dbg ---
-    dbg.log('MainView', `Revision key updated to: ${key}`);
-    return key;
+    return `${domainName()}|${source}|${cid}|${tabs}`;
   });
 
   return (
@@ -22455,6 +23085,459 @@ export default function Tabs(props) {
     </ul>
   );
 }
+</file>
+
+<file path="src/i18n/fr.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Version",
+  "brand.name": "SAVVA",
+  "categories.all": "Toutes les catégories",
+  "common.apply": "Appliquer",
+  "common.applying": "Application…",
+  "common.cancel": "Annuler",
+  "common.checking": "Vérification…",
+  "common.error": "Erreur",
+  "common.exists": "Existe",
+  "common.fail": "Échouer",
+  "common.loading": "Chargement…",
+  "common.notFound": "Non trouvé",
+  "common.ok": "OK",
+  "default.avatar": "Avatar",
+  "default.user": "Utilisateur",
+  "docs.article": "Article de documentation",
+  "docs.nav": "Docs Développeur",
+  "docs.next": "Suivant",
+  "docs.prev": "Précédent",
+  "docs.section": "Section",
+  "docs.sidebar.empty": "Pas encore de docs. Ajoutez sidebar.yaml sous dev_docs/<lang>/",
+  "docs.title": "Documentation développeur",
+  "error.connection.message": "L'application n'a pas pu se connecter au serveur backend. Il est peut-être temporairement hors ligne. Veuillez réessayer plus tard.",
+  "error.connection.retry": "Rafraîchir la page",
+  "error.connection.title": "Échec de la connexion",
+  "error.ws.message": "Impossible de se connecter. Veuillez réessayer.",
+  "error.ws.title": "Erreur de connexion",
+  "ipfs.diag.cors.error": "Problème de configuration CORS.",
+  "ipfs.diag.cors.name": "Vérification CORS de la passerelle",
+  "ipfs.diag.cors.ok": "CORS est configuré correctement.",
+  "ipfs.diag.fetch.errorFirewall": "Échec de la récupération en raison d'un pare-feu.",
+  "ipfs.diag.fetch.name": "Récupération de la passerelle en direct",
+  "ipfs.diag.fetch.ok": "Récupération réussie.",
+  "ipfs.diag.fetch.warnSkipped": "Ignoré : ABI CID non trouvé dans la réponse /info.",
+  "ipfs.diag.fix.browser": "S'il fonctionne, vérifiez votre navigateur. Pour Brave, désactivez les boucliers pour ce site. Pour d'autres navigateurs comme Chrome, vous devrez peut-être 'Autoriser le contenu non sécurisé' dans les paramètres du site.",
+  "ipfs.diag.fix.cors": "S'il échoue toujours, exécutez cette commande pour corriger la politique CORS de l'API :",
+  "ipfs.diag.fix.daemon": "Tout d'abord, assurez-vous que votre démon IPFS fonctionne dans un terminal :",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Option 1 (Recommandée) : Autoriser uniquement l'origine actuelle.",
+  "ipfs.diag.fix.gatewayTitle": "Votre configuration de passerelle empêche probablement le navigateur de récupérer. Essayez l'une de ces commandes :",
+  "ipfs.diag.fix.gatewayWildcard": "Option 2 (Plus facile pour les développeurs) : Autoriser n'importe quelle origine. À utiliser avec prudence sur les nœuds publics.",
+  "ipfs.diag.fix.title": "Pour corriger, exécutez ceci dans votre terminal (puis redémarrez le démon) :",
+  "ipfs.diag.liveness.error": "Le nœud ne répond pas.",
+  "ipfs.diag.liveness.name": "Vérification de la vivacité de l'API",
+  "ipfs.diag.liveness.ok": "Le nœud est actif.",
+  "ipfs.diag.run": "Exécuter les diagnostics",
+  "ipfs.diag.title": "Diagnostics du nœud IPFS",
+  "main.tabs.empty": "Cet onglet est vide pour l'instant.",
+  "main.tabs.loading": "Chargement des onglets…",
+  "main.tabs.untitled": "Sans titre",
+  "menu.open": "Ouvrir le menu",
+  "newTab.category": "Catégorie",
+  "newTab.view.grid": "Vue en grille",
+  "newTab.view.group": "Groupe de vue",
+  "newTab.view.list": "Vue en liste",
+  "post.chapters.prologue": "Prologue",
+  "post.chapters.title": "Table des matières",
+  "post.notFound.message": "La publication que vous recherchez n'existe pas ou a été supprimée.",
+  "post.notFound.title": "Publication non trouvée",
+  "rightPane.language": "Langue",
+  "rightPane.settings": "Paramètres",
+  "rightPane.switch.backend.help": "L'application récupérera /info depuis cette URL pour lister les domaines pris en charge.",
+  "rightPane.switch.backend.label": "URL du backend",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Domaine",
+  "rightPane.switch.domain.website": "Site Web",
+  "rightPane.switch.noDomains": "Le backend n'a retourné aucun domaine. Vous pouvez toujours postuler, mais le domaine sera vide.",
+  "rightPane.switch.open": "Changer de backend / domaine",
+  "rightPane.switch.reload": "Charger les domaines",
+  "rightPane.switch.reload.title": "Récupérer /info et rafraîchir la liste des domaines",
+  "rightPane.switch.reset": "Réinitialiser aux valeurs par défaut",
+  "rightPane.switch.reset.title": "Effacer la surcharge locale et recharger les valeurs par défaut depuis default_connect.yaml",
+  "rightPane.switch.title": "Changer de backend / domaine",
+  "rightPane.switch.validation.protocol": "L'URL du backend doit commencer par http:// ou https://",
+  "rightPane.theme": "Thème",
+  "settings.back": "Retour",
+  "settings.dev.assets.baseUrl": "URL de base des actifs",
+  "settings.dev.assets.configUrl": "URL de configuration",
+  "settings.dev.assets.configUrl.computed": "URL calculée",
+  "settings.dev.assets.configUrl.open": "Ouvrir l'URL de configuration",
+  "settings.dev.assets.diagnostics.default": "Configuration par défaut",
+  "settings.dev.assets.diagnostics.error": "Erreur de diagnostic",
+  "settings.dev.assets.diagnostics.hasCategories": "A des catégories",
+  "settings.dev.assets.diagnostics.hasConfig": "A une configuration",
+  "settings.dev.assets.diagnostics.hasFavicon": "Favicon détecté",
+  "settings.dev.assets.diagnostics.hasLocales": "A des locales",
+  "settings.dev.assets.diagnostics.hasLogos": "A des logos",
+  "settings.dev.assets.diagnostics.hasTabs": "A des onglets",
+  "settings.dev.assets.diagnostics.noteNetwork": "Vérifiez votre connexion réseau.",
+  "settings.dev.assets.diagnostics.primary": "Configuration principale",
+  "settings.dev.assets.diagnostics.run": "Exécuter les diagnostics",
+  "settings.dev.assets.diagnostics.sampleFetches": "Exemples de récupérations",
+  "settings.dev.assets.diagnostics.title": "Diagnostics des actifs",
+  "settings.dev.assets.domain": "Domaine",
+  "settings.dev.assets.env": "Environnement",
+  "settings.dev.assets.env.prod": "Production",
+  "settings.dev.assets.env.test": "Test",
+  "settings.dev.assets.prefix.active": "Préfixe actif",
+  "settings.dev.assets.prefix.computed": "Préfixe calculé",
+  "settings.dev.assets.source": "Source",
+  "settings.dev.assets.title": "Actifs",
+  "settings.developer.debug.enable": "Activer la journalisation de débogage",
+  "settings.developer.showKeys": "Afficher les clés API",
+  "settings.developer.title": "Paramètres du développeur",
+  "settings.ipfs.localDisabled": "IPFS local désactivé",
+  "settings.localIpfs.apiUrl.label": "URL API IPFS local",
+  "settings.localIpfs.disable": "Désactiver",
+  "settings.localIpfs.enableCheckbox": "Utiliser le nœud IPFS local",
+  "settings.localIpfs.gateway.label": "Passerelle",
+  "settings.localIpfs.status.label": "Statut",
+  "settings.localIpfs.testEnable": "Tester et activer",
+  "settings.localIpfs.title": "IPFS local",
+  "settings.title": "Paramètres",
+  "stakerLevels.${l.key}": "Niveau de Staker {l.key}",
+  "stakerLevels.clam": "Palourde",
+  "stakerLevels.dolphin": "Dauphin",
+  "stakerLevels.fish": "Poisson",
+  "stakerLevels.guest": "Invité",
+  "stakerLevels.orca": "Orque",
+  "stakerLevels.seahorse": "Hippocampe",
+  "stakerLevels.shark": "Requin",
+  "stakerLevels.shrimp": "Crevette",
+  "stakerLevels.stingray": "Raie",
+  "stakerLevels.whale": "Baleine",
+  "tabs.aria": "Onglets de section",
+  "tabs.title.${slug(tab.type)}": "Onglet : {tab.type}",
+  "tabs.title.actual": "Actuel",
+  "tabs.title.comments": "Commentaires",
+  "tabs.title.for-you": "Pour Vous",
+  "tabs.title.leaders": "Leaders",
+  "tabs.title.new": "Nouveau",
+  "time.day.plural": "il y a {n} jours",
+  "time.day.singular": "il y a {n} jour",
+  "time.hour.plural": "il y a {n} heures",
+  "time.hour.singular": "il y a {n} heure",
+  "time.minute.plural": "il y a {n} minutes",
+  "time.minute.singular": "il y a {n} minute",
+  "time.now": "Maintenant",
+  "timeFrame.${frame}": "Période : {frame}",
+  "ui.mode.dark": "Mode sombre",
+  "ui.mode.light": "Mode clair",
+  "ui.toTop": "Retour en haut",
+  "wallet.changeChain": "Changer de réseau",
+  "wallet.connect": "Connecter le portefeuille",
+  "wallet.copyAddress": "Copier l'adresse",
+  "wallet.onRequiredNetwork": "Sur le réseau requis"
+};
+</file>
+
+<file path="src/i18n/sr.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Verzija",
+  "brand.name": "SAVVA",
+  "categories.all": "Sve kategorije",
+  "common.apply": "Primeni",
+  "common.applying": "Primena…",
+  "common.cancel": "Otkaži",
+  "common.checking": "Proveravam…",
+  "common.error": "Greška",
+  "common.exists": "Postoji",
+  "common.fail": "Neuspeh",
+  "common.loading": "Učitavanje…",
+  "common.notFound": "Nije pronađeno",
+  "common.ok": "U redu",
+  "default.avatar": "Avatar",
+  "default.user": "Korisnik",
+  "docs.article": "Dokumentacioni članak",
+  "docs.nav": "Dokumentacija za programere",
+  "docs.next": "Sledeće",
+  "docs.prev": "Prethodno",
+  "docs.section": "Sekcija",
+  "docs.sidebar.empty": "Još nema dokumenata. Dodajte sidebar.yaml pod dev_docs/<lang>/",
+  "docs.title": "Dokumentacija za programere",
+  "error.connection.message": "Aplikacija nije mogla da se poveže sa backend serverom. Možda je privremeno van mreže. Pokušajte ponovo kasnije.",
+  "error.connection.retry": "Osveži stranicu",
+  "error.connection.title": "Neuspešna konekcija",
+  "error.ws.message": "Nije moguće povezati se. Pokušajte ponovo.",
+  "error.ws.title": "Greška u vezi",
+  "ipfs.diag.cors.error": "Problem sa CORS konfiguracijom.",
+  "ipfs.diag.cors.name": "Provera CORS-a na gateway-u",
+  "ipfs.diag.cors.ok": "CORS je ispravno konfigurisan.",
+  "ipfs.diag.fetch.errorFirewall": "Preuzimanje nije uspelo zbog vatrozida.",
+  "ipfs.diag.fetch.name": "Preuzimanje sa aktivnog gateway-a",
+  "ipfs.diag.fetch.ok": "Preuzimanje uspešno.",
+  "ipfs.diag.fetch.warnSkipped": "Preskočeno: ABI CID nije pronađen u /info odgovoru.",
+  "ipfs.diag.fix.browser": "Ako radi, proverite vaš pregledač. Za Brave, onemogućite Shields za ovu stranicu. Za druge pregledače kao što je Chrome, možda ćete morati da 'Dozvolite nesiguran sadržaj' u podešavanjima stranice.",
+  "ipfs.diag.fix.cors": "Ako i dalje ne radi, pokrenite ovu komandu da popravite CORS politiku API-ja:",
+  "ipfs.diag.fix.daemon": "Prvo, proverite da li vaš IPFS demon radi u terminalu:",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Opcija 1 (Preporučeno): Dozvolite samo trenutni izvor.",
+  "ipfs.diag.fix.gatewayTitle": "Vaša konfiguracija gateway-a verovatno sprečava pretraživač da preuzme. Pokušajte sa jednim od ovih komandi:",
+  "ipfs.diag.fix.gatewayWildcard": "Opcija 2 (Lakše za razvoj): Dozvolite bilo koji izvor. Koristite sa oprezom na javnim čvorovima.",
+  "ipfs.diag.fix.title": "Da biste popravili, pokrenite ovo u vašem terminalu (zatim restartujte demon):",
+  "ipfs.diag.liveness.error": "Čvor ne odgovara.",
+  "ipfs.diag.liveness.name": "Provera aktivnog API-ja",
+  "ipfs.diag.liveness.ok": "Čvor je aktivan.",
+  "ipfs.diag.run": "Pokreni dijagnostiku",
+  "ipfs.diag.title": "IPFS Dijagnostika čvora",
+  "main.tabs.empty": "Ovaj tab je trenutno prazan.",
+  "main.tabs.loading": "Učitavanje tabova…",
+  "main.tabs.untitled": "Bez naslova",
+  "menu.open": "Otvorite meni",
+  "newTab.category": "Kategorija",
+  "newTab.view.grid": "Mrežni prikaz",
+  "newTab.view.group": "Grupni prikaz",
+  "newTab.view.list": "Lista",
+  "post.chapters.prologue": "Prolog",
+  "post.chapters.title": "Sadržaj",
+  "post.notFound.message": "Objava koju tražite ne postoji ili je uklonjena.",
+  "post.notFound.title": "Objava nije pronađena",
+  "rightPane.language": "Jezik",
+  "rightPane.settings": "Podešavanja",
+  "rightPane.switch.backend.help": "Aplikacija će preuzeti /info sa ove URL adrese da bi prikazala podržane domene.",
+  "rightPane.switch.backend.label": "Backend URL",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Domen",
+  "rightPane.switch.domain.website": "Vebsajt",
+  "rightPane.switch.noDomains": "Backend nije vratio nijedan domen. Možete se prijaviti, ali domen će biti prazan.",
+  "rightPane.switch.open": "Promeni backend / domen",
+  "rightPane.switch.reload": "Učitaj domene",
+  "rightPane.switch.reload.title": "Preuzmi /info i osveži listu domena",
+  "rightPane.switch.reset": "Vrati na podrazumevano",
+  "rightPane.switch.reset.title": "Obriši lokalne izmene i ponovo učitaj podrazumevane vrednosti iz default_connect.yaml",
+  "rightPane.switch.title": "Promeni backend / domen",
+  "rightPane.switch.validation.protocol": "Backend URL mora početi sa http:// ili https://",
+  "rightPane.theme": "Tema",
+  "settings.back": "Nazad",
+  "settings.dev.assets.baseUrl": "Osnovni URL resursa",
+  "settings.dev.assets.configUrl": "Config URL",
+  "settings.dev.assets.configUrl.computed": "Izračunati URL",
+  "settings.dev.assets.configUrl.open": "Otvorite Config URL",
+  "settings.dev.assets.diagnostics.default": "Podrazumevana konfiguracija",
+  "settings.dev.assets.diagnostics.error": "Greška u dijagnostici",
+  "settings.dev.assets.diagnostics.hasCategories": "Ima kategorije",
+  "settings.dev.assets.diagnostics.hasConfig": "Ima konfiguraciju",
+  "settings.dev.assets.diagnostics.hasFavicon": "Favicon otkriven",
+  "settings.dev.assets.diagnostics.hasLocales": "Ima jezike",
+  "settings.dev.assets.diagnostics.hasLogos": "Ima logotipe",
+  "settings.dev.assets.diagnostics.hasTabs": "Ima kartice",
+  "settings.dev.assets.diagnostics.noteNetwork": "Proverite vašu mrežnu konekciju.",
+  "settings.dev.assets.diagnostics.primary": "Primarna konfiguracija",
+  "settings.dev.assets.diagnostics.run": "Pokreni dijagnostiku",
+  "settings.dev.assets.diagnostics.sampleFetches": "Uzorci preuzimanja",
+  "settings.dev.assets.diagnostics.title": "Dijagnostika resursa",
+  "settings.dev.assets.domain": "Domen",
+  "settings.dev.assets.env": "Okruženje",
+  "settings.dev.assets.env.prod": "Proizvodnja",
+  "settings.dev.assets.env.test": "Test",
+  "settings.dev.assets.prefix.active": "Aktivni prefiks",
+  "settings.dev.assets.prefix.computed": "Izračunati prefiks",
+  "settings.dev.assets.source": "Izvor",
+  "settings.dev.assets.title": "Resursi",
+  "settings.developer.debug.enable": "Omogući logovanje grešaka",
+  "settings.developer.showKeys": "Prikaži API ključeve",
+  "settings.developer.title": "Podešavanja za programere",
+  "settings.ipfs.localDisabled": "Lokalni IPFS onemogućen",
+  "settings.localIpfs.apiUrl.label": "Lokalni IPFS API URL",
+  "settings.localIpfs.disable": "Onemogući",
+  "settings.localIpfs.enableCheckbox": "Koristi lokalni IPFS čvor",
+  "settings.localIpfs.gateway.label": "Gateway",
+  "settings.localIpfs.status.label": "Status",
+  "settings.localIpfs.testEnable": "Testiraj i omogući",
+  "settings.localIpfs.title": "Lokalni IPFS",
+  "settings.title": "Podešavanja",
+  "stakerLevels.${l.key}": "Nivo stakera {l.key}",
+  "stakerLevels.clam": "Školjka",
+  "stakerLevels.dolphin": "Delfin",
+  "stakerLevels.fish": "Riba",
+  "stakerLevels.guest": "Gost",
+  "stakerLevels.orca": "Orka",
+  "stakerLevels.seahorse": "Morski konjić",
+  "stakerLevels.shark": "Ajkula",
+  "stakerLevels.shrimp": "Krevetica",
+  "stakerLevels.stingray": "Raža",
+  "stakerLevels.whale": "Kit",
+  "tabs.aria": "Kartice sekcija",
+  "tabs.title.${slug(tab.type)}": "Kartica: {tab.type}",
+  "tabs.title.actual": "Trenutno",
+  "tabs.title.comments": "Komentari",
+  "tabs.title.for-you": "Za Vas",
+  "tabs.title.leaders": "Lideri",
+  "tabs.title.new": "Novi",
+  "time.day.plural": "pre {n} dana",
+  "time.day.singular": "pre {n} dan",
+  "time.hour.plural": "pre {n} sati",
+  "time.hour.singular": "pre {n} sat",
+  "time.minute.plural": "pre {n} minuta",
+  "time.minute.singular": "pre {n} minut",
+  "time.now": "Sada",
+  "timeFrame.${frame}": "Vremenski okvir: {frame}",
+  "ui.mode.dark": "Tamni režim",
+  "ui.mode.light": "Svetli režim",
+  "ui.toTop": "Nazad na vrh",
+  "wallet.changeChain": "Promeni mrežu",
+  "wallet.connect": "Poveži novčanik",
+  "wallet.copyAddress": "Kopiraj adresu",
+  "wallet.onRequiredNetwork": "Na potrebnoj mreži"
+};
+</file>
+
+<file path="src/i18n/ua.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версія",
+  "brand.name": "SAVVA",
+  "categories.all": "Всі категорії",
+  "common.apply": "Застосувати",
+  "common.applying": "Застосування…",
+  "common.cancel": "Скасувати",
+  "common.checking": "Перевірка…",
+  "common.error": "Помилка",
+  "common.exists": "Існує",
+  "common.fail": "Не вдалося",
+  "common.loading": "Завантаження…",
+  "common.notFound": "Не знайдено",
+  "common.ok": "Гаразд",
+  "default.avatar": "Аватар",
+  "default.user": "Користувач",
+  "docs.article": "Стаття документації",
+  "docs.nav": "Документація для розробників",
+  "docs.next": "Наступний",
+  "docs.prev": "Попередній",
+  "docs.section": "Розділ",
+  "docs.sidebar.empty": "Документації ще немає. Додайте sidebar.yaml під dev_docs/<lang>/",
+  "docs.title": "Документація для розробників",
+  "error.connection.message": "Додаток не зміг підключитися до сервера бекенду. Він може бути тимчасово недоступний. Спробуйте ще раз пізніше.",
+  "error.connection.retry": "Оновити сторінку",
+  "error.connection.title": "Не вдалося підключитися",
+  "error.ws.message": "Не вдалося підключитися. Будь ласка, спробуйте ще раз.",
+  "error.ws.title": "Помилка з'єднання",
+  "ipfs.diag.cors.error": "Проблема з конфігурацією CORS.",
+  "ipfs.diag.cors.name": "Перевірка CORS шлюзу",
+  "ipfs.diag.cors.ok": "CORS налаштовано правильно.",
+  "ipfs.diag.fetch.errorFirewall": "Запит не вдався через брандмауер.",
+  "ipfs.diag.fetch.name": "Запит до живого шлюзу",
+  "ipfs.diag.fetch.ok": "Запит успішний.",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не знайдено у відповіді /info.",
+  "ipfs.diag.fix.browser": "Якщо він працює, перевірте ваш браузер. Для Brave вимкніть Shields для цього сайту. Для інших браузерів, таких як Chrome, можливо, вам потрібно 'Дозволити небезпечний контент' у налаштуваннях сайту.",
+  "ipfs.diag.fix.cors": "Якщо все ще не вдається, виконайте цю команду, щоб виправити політику CORS API:",
+  "ipfs.diag.fix.daemon": "Спочатку переконайтеся, що ваш IPFS демон працює в терміналі:",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Опція 1 (Рекомендується): Дозволити лише поточний походження.",
+  "ipfs.diag.fix.gatewayTitle": "Налаштування вашого шлюзу, ймовірно, заважає браузеру отримати доступ. Спробуйте одну з цих команд:",
+  "ipfs.diag.fix.gatewayWildcard": "Опція 2 (Легше для розробників): Дозволити будь-яке походження. Використовуйте з обережністю на публічних вузлах.",
+  "ipfs.diag.fix.title": "Щоб виправити, виконайте це у вашому терміналі (потім перезапустіть демон):",
+  "ipfs.diag.liveness.error": "Вузол не відповідає.",
+  "ipfs.diag.liveness.name": "Перевірка активності API",
+  "ipfs.diag.liveness.ok": "Вузол активний.",
+  "ipfs.diag.run": "Запустити діагностику",
+  "ipfs.diag.title": "Діагностика вузла IPFS",
+  "main.tabs.empty": "Ця вкладка поки що порожня.",
+  "main.tabs.loading": "Завантаження вкладок…",
+  "main.tabs.untitled": "Без назви",
+  "menu.open": "Відкрити меню",
+  "newTab.category": "Категорія",
+  "newTab.view.grid": "Сітка перегляду",
+  "newTab.view.group": "Група перегляду",
+  "newTab.view.list": "Список перегляду",
+  "post.chapters.prologue": "Пролог",
+  "post.chapters.title": "Зміст",
+  "post.notFound.message": "Пост, який ви шукаєте, не існує або був видалений.",
+  "post.notFound.title": "Пост не знайдено",
+  "rightPane.language": "Мова",
+  "rightPane.settings": "Налаштування",
+  "rightPane.switch.backend.help": "Додаток отримає /info з цього URL, щоб перерахувати підтримувані домени.",
+  "rightPane.switch.backend.label": "URL бекенду",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бекенд не повернув доменів. Ви все ще можете подати заявку, але домен буде порожнім.",
+  "rightPane.switch.open": "Переключити бекенд / домен",
+  "rightPane.switch.reload": "Завантажити домени",
+  "rightPane.switch.reload.title": "Отримати /info та оновити список доменів",
+  "rightPane.switch.reset": "Скинути до значень за замовчуванням",
+  "rightPane.switch.reset.title": "Очистити локальне переопределення та перезавантажити значення за замовчуванням з default_connect.yaml",
+  "rightPane.switch.title": "Переключити бекенд / домен",
+  "rightPane.switch.validation.protocol": "URL бекенду має починатися з http:// або https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовий URL активів",
+  "settings.dev.assets.configUrl": "URL конфігурації",
+  "settings.dev.assets.configUrl.computed": "Обчислений URL",
+  "settings.dev.assets.configUrl.open": "Відкрити URL конфігурації",
+  "settings.dev.assets.diagnostics.default": "Конфігурація за замовчуванням",
+  "settings.dev.assets.diagnostics.error": "Помилка діагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Є категорії",
+  "settings.dev.assets.diagnostics.hasConfig": "Є конфігурація",
+  "settings.dev.assets.diagnostics.hasFavicon": "Виявлено фавікон",
+  "settings.dev.assets.diagnostics.hasLocales": "Є локалі",
+  "settings.dev.assets.diagnostics.hasLogos": "Є логотипи",
+  "settings.dev.assets.diagnostics.hasTabs": "Є вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Перевірте ваше мережеве з'єднання.",
+  "settings.dev.assets.diagnostics.primary": "Основна конфігурація",
+  "settings.dev.assets.diagnostics.run": "Запустити діагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Приклад запитів",
+  "settings.dev.assets.diagnostics.title": "Діагностика активів",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Середовище",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активний префікс",
+  "settings.dev.assets.prefix.computed": "Обчислений префікс",
+  "settings.dev.assets.source": "Джерело",
+  "settings.dev.assets.title": "Активи",
+  "settings.developer.debug.enable": "Увімкнути журнал налагодження",
+  "settings.developer.showKeys": "Показати API ключі",
+  "settings.developer.title": "Налаштування розробника",
+  "settings.ipfs.localDisabled": "Локальний IPFS вимкнено",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Вимкнути",
+  "settings.localIpfs.enableCheckbox": "Використовувати локальний вузол IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Перевірити та увімкнути",
+  "settings.localIpfs.title": "Локальний IPFS",
+  "settings.title": "Налаштування",
+  "stakerLevels.${l.key}": "Рівень стейкера {l.key}",
+  "stakerLevels.clam": "Молюск",
+  "stakerLevels.dolphin": "Дельфін",
+  "stakerLevels.fish": "Риба",
+  "stakerLevels.guest": "Гість",
+  "stakerLevels.orca": "Косатка",
+  "stakerLevels.seahorse": "Морський кінь",
+  "stakerLevels.shark": "Акула",
+  "stakerLevels.shrimp": "Креветка",
+  "stakerLevels.stingray": "Скат",
+  "stakerLevels.whale": "Кит",
+  "tabs.aria": "Вкладки розділів",
+  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
+  "tabs.title.actual": "Поточні",
+  "tabs.title.comments": "Коментарі",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лідери",
+  "tabs.title.new": "Нові",
+  "time.day.plural": "__N__ днів тому",
+  "time.day.singular": "__N__ день тому",
+  "time.hour.plural": "__N__ годин тому",
+  "time.hour.singular": "__N__ годину тому",
+  "time.minute.plural": "__N__ хвилин тому",
+  "time.minute.singular": "__N__ хвилину тому",
+  "time.now": "Зараз",
+  "timeFrame.${frame}": "Часовий проміжок: {frame}",
+  "ui.mode.dark": "Темний режим",
+  "ui.mode.light": "Світлий режим",
+  "ui.toTop": "Назад до верху",
+  "wallet.changeChain": "Змінити мережу",
+  "wallet.connect": "Підключити гаманець",
+  "wallet.copyAddress": "Копіювати адресу",
+  "wallet.onRequiredNetwork": "На потрібній мережі"
+};
 </file>
 
 <file path="src/net/WsClient.js">
@@ -22848,288 +23931,6 @@ export default function Docs() {
 }
 </file>
 
-<file path="src/pages/PostPage.jsx">
-// src/pages/PostPage.jsx
-import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
-import { useHashRouter, navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import { ipfs } from "../ipfs/index.js";
-import { parse } from "yaml";
-import { dbg } from "../utils/debug.js";
-import ClosePageButton from "../components/ui/ClosePageButton";
-import Spinner from "../components/ui/Spinner.jsx";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UserCard from "../components/ui/UserCard.jsx";
-import PostInfo from "../components/feed/PostInfo.jsx";
-import MarkdownView from "../components/docs/MarkdownView.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import ChapterSelector from "../components/post/ChapterSelector.jsx";
-
-function rehypeRewriteLinks(options = {}) {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      if (!options.base) return;
-      const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
-      const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
-      
-      visit(tree, "element", (node) => {
-        if (node.tagName === 'a' || node.tagName === 'img') {
-          const prop = node.tagName === 'a' ? 'href' : 'src';
-          const url = node.properties?.[prop];
-          if (typeof url === 'string' && isRelative(url)) {
-            node.properties[prop] = base + url;
-          }
-        }
-      });
-    });
-}
-
-const getIdentifier = (route) => route().split('/')[2] || "";
-
-async function fetchPostByIdentifier(params) {
-  const { identifier, app, lang } = params;
-  if (!identifier || !app.wsMethod) return null;
-  const contentList = app.wsMethod("content-list");
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    lang: lang,
-    limit: 1,
-  };
-  if (identifier.startsWith("0x")) {
-    requestParams.savva_cid = identifier;
-  } else {
-    requestParams.short_cid = identifier;
-  }
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-  const res = await contentList(requestParams);
-  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-  return arr[0] || null;
-}
-
-async function fetchPostDetails(mainPost, app) {
-  if (!mainPost) return null;
-  let descriptorPath;
-  let dataCidForContent;
-  if (mainPost.data_cid) {
-    descriptorPath = mainPost.ipfs;
-    dataCidForContent = mainPost.data_cid;
-  } else {
-    descriptorPath = `${mainPost.ipfs}/info.yaml`;
-    dataCidForContent = mainPost.ipfs;
-  }
-  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
-  if (!descriptorPath) return { descriptor: null, dataCidForContent };
-  try {
-    const { res } = await ipfs.fetchBest(app, descriptorPath);
-    const text = await res.text();
-    const descriptor = parse(text) || null;
-    return { descriptor, dataCidForContent };
-  } catch (error) {
-    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
-    return { descriptor: { error: error.message }, dataCidForContent };
-  }
-}
-
-async function fetchMainContent(details, app, lang, chapterIndex) {
-  if (!details?.descriptor || !lang) return "";
-
-  const { descriptor, dataCidForContent } = details;
-  const localizedDescriptor = descriptor.locales?.[lang];
-  if (!localizedDescriptor) return "";
-
-  let contentPath;
-  if (chapterIndex === 0) { // Prologue (main content)
-    if (localizedDescriptor.data) return localizedDescriptor.data;
-    if (localizedDescriptor.data_path) {
-      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
-    }
-  } else { // A specific chapter
-    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
-    if (chapter?.data_path) {
-      contentPath = `${dataCidForContent}/${chapter.data_path}`;
-    }
-  }
-
-  if (contentPath) {
-    try {
-      const { res } = await ipfs.fetchBest(app, contentPath);
-      return await res.text();
-    } catch (error) {
-      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
-      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
-    }
-  }
-  
-  return "";
-}
-
-export default function PostPage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-  const identifier = createMemo(() => getIdentifier(route));
-  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-
-  const [post] = createResource(
-    () => ({ identifier: identifier(), app, lang: uiLang() }),
-    fetchPostByIdentifier
-  );
-  
-  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
-  const [postLang, setPostLang] = createSignal(null);
-  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
-
-  const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
-    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
-  );
-
-  createEffect(() => {
-    const p = post();
-    const id = identifier();
-    if (p && id.startsWith("0x") && p.short_cid) {
-      const newPath = `/post/${p.short_cid}`;
-      navigate(newPath, { replace: true });
-    }
-  });
-
-  createEffect(() => {
-    const p = post();
-    if (p && !postLang()) {
-      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
-      if (availableLangs.length === 0) return;
-      const currentUiLang = uiLang();
-      let initialLang = availableLangs[0]; 
-      if (availableLangs.includes(currentUiLang)) {
-        initialLang = currentUiLang;
-      } else if (availableLangs.includes('en')) {
-        initialLang = 'en';
-      }
-      setPostLang(initialLang);
-    }
-  });
-
-  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
-  const thumbnail = createMemo(() => {
-    const d = details();
-    if (!d) return null;
-    const dataCid = d.dataCidForContent;
-    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
-    if (dataCid && thumbnailPath) {
-      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
-    }
-    return null;
-  });
-  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
-  
-  const chapterList = createMemo(() => {
-    const prologue = { title: t("post.chapters.prologue"), data_path: null };
-    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
-    return [prologue, ...chapters];
-  });
-
-  const localizedMainContent = createMemo(() => mainContent());
-  const ipfsBaseUrl = createMemo(() => {
-    const dataCid = details()?.dataCidForContent;
-    if (!dataCid) return "";
-    const gateway = app.activeIpfsGateways()[0] || "http://127.0.0.1:8080/";
-    return `${gateway}ipfs/${dataCid}`;
-  });
-
-  const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
-  ]);
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto">
-      <ClosePageButton />
-      <Switch>
-        <Match when={post.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
-        </Match>
-        <Match when={post.error || details()?.descriptor?.error}>
-          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
-          </div>
-        </Match>
-        <Match when={!post.loading && post() === null}>
-          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
-            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
-            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
-          </div>
-        </Match>
-        <Match when={post()}>
-          <article class="space-y-4">
-            <header class="flex justify-between items-start gap-4">
-              <div class="flex-1 min-w-0 space-y-3">
-                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
-                <UserCard author={post().author} />
-                <PostInfo 
-                  item={post()} 
-                  hideTopBorder={true} 
-                  timeFormat="long"
-                  rewardsAlign="left" 
-                />
-              </div>
-              <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
-                <Show when={thumbnail()}>
-                  {(src) => (
-                    <IpfsImage 
-                      src={src()} 
-                      class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
-                      alt="Post thumbnail"
-                      fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
-                    />
-                  )}
-                </Show>
-                <LangSelector 
-                  codes={availableLocales()}
-                  value={postLang()}
-                  onChange={setPostLang}
-                />
-              </div>
-            </header>
-
-            <div class="pt-4 border-t border-[hsl(var(--border))]">
-              <Show when={(chapterList()?.length || 0) > 1}>
-                <div class="flex justify-end mb-4">
-                  <ChapterSelector 
-                    chapters={chapterList()} 
-                    selectedIndex={selectedChapterIndex()} 
-                    onSelect={setSelectedChapterIndex}
-                  />
-                </div>
-              </Show>
-
-              <Switch>
-                <Match when={details.loading || mainContent.loading}>
-                  <div class="flex justify-center p-8"><Spinner /></div>
-                </Match>
-                <Match when={mainContent.error}>
-                  <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
-                </Match>
-                <Match when={localizedMainContent()}>
-                  <MarkdownView 
-                    markdown={localizedMainContent()} 
-                    rehypePlugins={markdownPlugins()}
-                  />
-                </Match>
-              </Switch>
-            </div>
-          </article>
-        </Match>
-      </Switch>
-    </main>
-  );
-}
-</file>
-
 <file path="index.html">
 <!doctype html>
 <html lang="en">
@@ -23353,6 +24154,336 @@ export const ipfs = {
 };
 </file>
 
+<file path="src/pages/PostPage.jsx">
+// src/pages/PostPage.jsx
+import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { parse } from "yaml";
+import { dbg } from "../utils/debug.js";
+import ClosePageButton from "../components/ui/ClosePageButton";
+import Spinner from "../components/ui/Spinner.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UserCard from "../components/ui/UserCard.jsx";
+import PostInfo from "../components/feed/PostInfo.jsx";
+import MarkdownView from "../components/docs/MarkdownView.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import ChapterSelector from "../components/post/ChapterSelector.jsx";
+import ChapterPager from "../components/post/ChapterPager.jsx";
+import PostTags from "../components/post/PostTags.jsx";
+
+function rehypeRewriteLinks(options = {}) {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      if (!options.base) return;
+      const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+      const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+      
+      visit(tree, "element", (node) => {
+        if (node.tagName === 'a' || node.tagName === 'img') {
+          const prop = node.tagName === 'a' ? 'href' : 'src';
+          const url = node.properties?.[prop];
+          if (typeof url === 'string' && isRelative(url)) {
+            node.properties[prop] = base + url;
+          }
+        }
+      });
+    });
+}
+
+const getIdentifier = (route) => route().split('/')[2] || "";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, domain, app, lang } = params;
+  if (!identifier || !domain || !app.wsMethod) return null;
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: domain,
+    lang: lang,
+    limit: 1,
+  };
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  return arr[0] || null;
+}
+
+async function fetchPostDetails(mainPost, app) {
+  if (!mainPost) return null;
+  let descriptorPath;
+  let dataCidForContent;
+  if (mainPost.data_cid) {
+    descriptorPath = mainPost.ipfs;
+    dataCidForContent = mainPost.data_cid;
+  } else {
+    descriptorPath = `${mainPost.ipfs}/info.yaml`;
+    dataCidForContent = mainPost.ipfs;
+  }
+  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
+  if (!descriptorPath) return { descriptor: null, dataCidForContent };
+  try {
+    const { res } = await ipfs.fetchBest(app, descriptorPath);
+    const text = await res.text();
+    const descriptor = parse(text) || null;
+    return { descriptor, dataCidForContent };
+  } catch (error) {
+    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
+    return { descriptor: { error: error.message }, dataCidForContent };
+  }
+}
+
+async function fetchMainContent(details, app, lang, chapterIndex) {
+  if (!details?.descriptor || !lang) return "";
+
+  const { descriptor, dataCidForContent } = details;
+  const localizedDescriptor = descriptor.locales?.[lang];
+  if (!localizedDescriptor) return "";
+
+  let contentPath;
+  if (chapterIndex === 0) { // Prologue (main content)
+    if (localizedDescriptor.data) return localizedDescriptor.data;
+    if (localizedDescriptor.data_path) {
+      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+    }
+  } else { // A specific chapter
+    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
+    if (chapter?.data_path) {
+      contentPath = `${dataCidForContent}/${chapter.data_path}`;
+    }
+  }
+
+  if (contentPath) {
+    try {
+      const { res } = await ipfs.fetchBest(app, contentPath);
+      return await res.text();
+    } catch (error) {
+      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
+      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
+    }
+  }
+  
+  return "";
+}
+
+export default function PostPage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+  const identifier = createMemo(() => getIdentifier(route));
+  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+
+  const [post] = createResource(
+    () => ({
+      identifier: identifier(),
+      domain: app.selectedDomainName(),
+      app,
+      lang: uiLang()
+    }),
+    fetchPostByIdentifier
+  );
+  
+  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
+  const [postLang, setPostLang] = createSignal(null);
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+
+  const [mainContent] = createResource(
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
+    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
+  );
+
+  createEffect(() => {
+    const p = post();
+    const id = identifier();
+    if (p && id.startsWith("0x") && p.short_cid) {
+      const newPath = `/post/${p.short_cid}`;
+      navigate(newPath, { replace: true });
+    }
+  });
+
+  createEffect(() => {
+    const p = post();
+    if (p && !postLang()) {
+      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
+      if (availableLangs.length === 0) return;
+      const currentUiLang = uiLang();
+      let initialLang = availableLangs[0]; 
+      if (availableLangs.includes(currentUiLang)) {
+        initialLang = currentUiLang;
+      } else if (availableLangs.includes('en')) {
+        initialLang = 'en';
+      }
+      setPostLang(initialLang);
+    }
+  });
+
+  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const thumbnail = createMemo(() => {
+    const d = details();
+    if (!d) return null;
+    const dataCid = d.dataCidForContent;
+    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
+    if (dataCid && thumbnailPath) {
+      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
+    }
+    return null;
+  });
+  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
+  
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue"), data_path: null };
+    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
+    return [prologue, ...chapters];
+  });
+
+  const localizedMainContent = createMemo(() => mainContent());
+  const ipfsBaseUrl = createMemo(() => {
+    const dataCid = details()?.dataCidForContent;
+    if (!dataCid) return "";
+    const gateway = app.activeIpfsGateways()[0] || "http://127.0.0.1:8080/";
+    return `${gateway}ipfs/${dataCid}`;
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
+
+  const RightPanel = () => (
+    <aside class="sticky top-16">
+      <div 
+        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
+        style={{ "max-height": `calc(100vh - 5rem)` }}
+      >
+        <div class="p-4 space-y-3 overflow-y-auto h-full">
+          <h4 class="font-semibold">Right Panel</h4>
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">
+            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
+          </p>
+          <div class="text-xs space-y-2">
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
+            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
+            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
+            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <main class="sv-container p-4">
+      <ClosePageButton />
+      <Switch>
+        <Match when={post.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={post.error || details()?.descriptor?.error}>
+          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
+            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
+          </div>
+        </Match>
+        <Match when={!post.loading && post() === null}>
+          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
+            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
+          </div>
+        </Match>
+        <Match when={post()}>
+          <div class="max-w-5xl mx-auto">
+            <article class="space-y-4">
+              <header class="flex justify-between items-start gap-4">
+                <div class="flex-1 min-w-0 space-y-3">
+                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
+                  <UserCard author={post().author} />
+                  <PostInfo 
+                    item={post()} 
+                    hideTopBorder={true} 
+                    timeFormat="long"
+                    rewardsAlign="left" 
+                  />
+                  <PostTags postData={post()} />
+                </div>
+                <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
+                  <Show when={thumbnail()}>
+                    {(src) => (
+                      <IpfsImage 
+                        src={src()} 
+                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                        alt="Post thumbnail"
+                        fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    )}
+                  </Show>
+                  <LangSelector 
+                    codes={availableLocales()}
+                    value={postLang()}
+                    onChange={setPostLang}
+                  />
+                </div>
+              </header>
+
+              <div class="pt-4 border-t border-[hsl(var(--border))]">
+                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
+                  <div>
+                    <Show when={(chapterList()?.length || 0) > 1}>
+                      <div class="flex justify-end mb-4">
+                        <ChapterSelector 
+                          chapters={chapterList()} 
+                          selectedIndex={selectedChapterIndex()} 
+                          onSelect={setSelectedChapterIndex}
+                        />
+                      </div>
+                    </Show>
+                    <Switch>
+                      <Match when={details.loading || mainContent.loading}>
+                        <div class="flex justify-center p-8"><Spinner /></div>
+                      </Match>
+                      <Match when={mainContent.error}>
+                        <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                      </Match>
+                      <Match when={localizedMainContent()}>
+                        <MarkdownView 
+                          markdown={localizedMainContent()} 
+                          rehypePlugins={markdownPlugins()}
+                        />
+                        <Show when={(chapterList()?.length || 0) > 1}>
+                          <ChapterPager 
+                            chapters={chapterList()}
+                            currentIndex={selectedChapterIndex()}
+                            onSelect={setSelectedChapterIndex}
+                          />
+                        </Show>
+                      </Match>
+                    </Switch>
+                  </div>
+                  <RightPanel />
+                </div>
+              </div>
+            </article>
+          </div>
+        </Match>
+      </Switch>
+    </main>
+  );
+}
+</file>
+
 <file path="src/index.jsx">
 // src/index.jsx
 import { render } from "solid-js/web";
@@ -23371,7 +24502,7 @@ render(() => (
 
 <file path="src/components/feed/PostCard.jsx">
 // src/components/feed/PostCard.jsx
-import { Show, createMemo } from "solid-js";
+import { Show, createMemo, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -23380,6 +24511,19 @@ import PostInfo from "./PostInfo.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
 import { navigate } from "../../routing/hashRouter";
+import ContextMenu from "../ui/ContextMenu.jsx";
+
+function PinIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
+      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+      <g id="SVGRepo_iconCarrier">
+        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
+      </g>
+    </svg>
+  );
+}
 
 function getLocalizedField(locales, fieldName, currentLang) {
   if (!locales || typeof locales !== 'object') return "";
@@ -23398,7 +24542,8 @@ export default function PostCard(props) {
   const content = () => props.item._raw?.savva_content;
   const fund = () => props.item._raw?.fund;
   const isListMode = () => props.mode === 'list';
-  
+  const [isHovered, setIsHovered] = createSignal(false);
+
   const displayImageSrc = createMemo(() => {
     return content()?.thumbnail || author()?.avatar;
   });
@@ -23412,13 +24557,12 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container')) {
+    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.bottom-1.right-1')) {
       return;
     }
     e.preventDefault();
     const postId = props.item?.id; 
     if (postId) {
-      // --- MODIFICATION: Save scroll position before navigating ---
       app.setSavedScrollY(window.scrollY);
       navigate(`/post/${postId}`);
     } else {
@@ -23431,9 +24575,25 @@ export default function PostCard(props) {
     console.log("User card clicked, navigating to profile for:", author()?.address);
   };
 
+  const contextMenuItems = createMemo(() => {
+    const items = [];
+    if (props.item._raw?.pinned) {
+      items.push({ label: "Unpin Post", onClick: () => console.log("Unpin clicked for:", props.item.id) });
+    } else {
+      items.push({ label: "Pin Post", onClick: () => console.log("Pin clicked for:", props.item.id) });
+    }
+    items.push({ label: "Delete Post", onClick: () => console.log("Delete clicked for:", props.item.id) });
+    items.push({ label: "Block Post", onClick: () => console.log("Block Post clicked for:", props.item.id) });
+    items.push({ label: "Block Author", onClick: () => console.log("Block Author clicked for:", props.item.id) });
+    return items;
+  });
+
   const articleClasses = createMemo(() => {
     const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
-    return isListMode() ? `${base} flex-row h-40` : `${base} flex-col`;
+    if (isListMode()) {
+      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
+    }
+    return `${base} flex-col`;
   });
 
   const imageContainerClasses = createMemo(() => {
@@ -23467,37 +24627,61 @@ export default function PostCard(props) {
 
   const textPreviewClasses = createMemo(() => {
     const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
-    return isListMode() ? `${base} line-clamp-2` : `${base} line-clamp-3`;
+    if (isListMode()) {
+      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
+    }
+    return `${base} line-clamp-3`;
   });
 
   const ContentBlock = () => (
     <div class={contentContainerClasses()}>
       <div class="flex-1 space-y-1 min-h-0">
         <Show when={title()}>
-          <h4 class="font-semibold line-clamp-2 text-sm text-[hsl(var(--foreground))]">
+          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
             {title()}
           </h4>
         </Show>
-        <Show when={textPreview()}>
+        <Show when={textPreview() && !props.compact}>
           <p class={textPreviewClasses()}>
             {textPreview()}
           </p>
         </Show>
       </div>
+      
       <div class="mt-1 user-card-container" onClick={handleUserClick}>
-        <UserCard author={author()} />
+        <UserCard author={author()} compact={props.compact} />
       </div>
-      <PostInfo item={props.item} mode={props.mode} />
+
+      <Show when={!props.compact}>
+        <PostInfo item={props.item} mode={props.mode} />
+      </Show>
     </div>
   );
 
   return (
-    <article class={articleClasses()} onClick={handleCardClick} style={{ cursor: 'pointer' }}>
+    <article 
+      class={articleClasses()} 
+      onClick={handleCardClick} 
+      style={{ cursor: 'pointer' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Show when={props.item._raw?.pinned}>
+        <div class="absolute -top-2 -left-2 z-10">
+          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
+        </div>
+      </Show>
+
       <Show when={props.item._raw?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
           <NftBadge />
         </div>
       </Show>
+
+      <Show when={app.authorizedUser()?.isAdmin && isHovered()}>
+        <ContextMenu items={contextMenuItems()} />
+      </Show>
+
       <Show
         when={isListMode()}
         fallback={
@@ -23549,138 +24733,6 @@ export default function DeveloperSection() {
       </label>
     </section>
   );
-}
-</file>
-
-<file path="src/i18n/useI18n.js">
-// src/i18n/useI18n.js
-import { createSignal } from "solid-js";
-import en from "./en";
-import ru from "./ru";
-import sr from "./sr";
-import ua from "./ua";
-import fr from "./fr";
-
-// Used by the Lang selector for labels
-export const LANG_INFO = {
-  en: { code: "EN", name: "English" },
-  ru: { code: "RU", name: "Русский" },
-  fr: { code: "FR", name: "Français" },
-  ua: { code: "UA", name: "Українська" },
-  sr: { code: "SR", name: "Српски" },
-};
-
-// All built-in application dictionaries. The keys must match LANG_INFO.
-const APP_DICTS = { en, ru, fr, ua, sr };
-
-const DEFAULT_LANG = "en";
-const LANG_KEY = "lang";
-const SHOW_KEYS_KEY = "i18n_show_keys";
-
-let i18nSingleton;
-
-// !!!!! special comment to include the keys generated automatically
-// !!!!! Do not edit this section manually
-// t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
-// t("tabs.title.new") t("tabs.title.for-you")
-
-function normalizeLang(code) {
-  const s = String(code || "").trim().toLowerCase();
-  const [base] = s.split(/[-_]/); // "en-US" -> "en"
-  return base || DEFAULT_LANG;
-}
-
-export function useI18n() {
-  if (!i18nSingleton) {
-    // --- FIX: Moved the signal from the top level into this initialization block ---
-    const [domainDicts, setDomainDicts] = createSignal({});
-
-    // Keep domain → app → EN fallback order
-    const resolveKey = (lang, key) => {
-      const d = domainDicts();
-      const fromDomain = d[lang]?.[key];
-      if (fromDomain != null) return fromDomain;
-
-      const fromApp = APP_DICTS[lang]?.[key];
-      if (fromApp != null) return fromApp;
-
-      if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
-      return `[${key}]`;
-    }
-
-    const readInitialLang = () => {
-      try {
-        const v = localStorage.getItem(LANG_KEY);
-        return normalizeLang(v || DEFAULT_LANG);
-      } catch {
-        return DEFAULT_LANG;
-      }
-    };
-    const readInitialShowKeys = () => {
-      try {
-        return localStorage.getItem(SHOW_KEYS_KEY) === "1";
-      } catch {
-        return false;
-      }
-    };
-
-    const [lang, setLangSignal] = createSignal(readInitialLang());
-    const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
-
-    function setLang(next) {
-      const v = normalizeLang(next);
-      setLangSignal(v); // <-- commit to signal (reactivity)
-      try { localStorage.setItem(LANG_KEY, v); } catch {}
-      if (typeof document !== "undefined") {
-        document.documentElement.setAttribute("lang", v);
-      }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("savva:lang", { detail: { lang: v } }));
-      }
-    }
-
-    function setShowKeys(on) {
-      const v = !!on;
-      setShowKeysSignal(v);
-      try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch {}
-    }
-
-    const t = (key, params) => {
-      let base = resolveKey(lang(), key);
-      if (params) {
-        for (const [paramKey, paramValue] of Object.entries(params)) {
-          base = base.replace(`{${paramKey}}`, String(paramValue));
-        }
-      }
-      return showKeys() ? `${base} [${key}]` : base;
-    };
-
-    // Cross‑tab sync
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", (e) => {
-        if (e.key === LANG_KEY && e.newValue) setLangSignal(normalizeLang(e.newValue));
-        if (e.key === SHOW_KEYS_KEY) setShowKeysSignal(e.newValue === "1");
-      });
-    }
-
-    // Expose union of built‑ins + domain dicts (useful for tooling/UI)
-    const available = () => {
-      const builtin = Object.keys(APP_DICTS);
-      const domain = Object.keys(domainDicts());
-      return Array.from(new Set([...builtin, ...domain]));
-    };
-
-    i18nSingleton = {
-      t,
-      lang,
-      setLang,
-      showKeys,
-      setShowKeys,
-      available,
-      setDomainDictionaries: (d) => setDomainDicts(d || {}),
-    };
-  }
-  return i18nSingleton;
 }
 </file>
 
@@ -24091,6 +25143,136 @@ html.dark .sv-docs code[data-theme*=" "] span {
 }
 .sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
+</file>
+
+<file path="src/i18n/useI18n.js">
+// src/i18n/useI18n.js
+import { createSignal } from "solid-js";
+import en from "./en";
+import ru from "./ru";
+import sr from "./sr";
+import ua from "./ua";
+import fr from "./fr";
+
+// Used by the Lang selector for labels
+export const LANG_INFO = {
+  en: { code: "EN", name: "English" },
+  ru: { code: "RU", name: "Русский" },
+  fr: { code: "FR", name: "Français" },
+  ua: { code: "UA", name: "Українська" },
+  sr: { code: "SR", name: "Српски" },
+};
+
+// All built-in application dictionaries. The keys must match LANG_INFO.
+const APP_DICTS = { en, ru, fr, ua, sr };
+
+const DEFAULT_LANG = "en";
+const LANG_KEY = "lang";
+const SHOW_KEYS_KEY = "i18n_show_keys";
+
+let i18nSingleton;
+
+// !!!!! special comment to include the keys generated automatically
+// !!!!! Do not edit this section manually
+// t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
+// t("tabs.title.new") t("tabs.title.for-you")
+
+function normalizeLang(code) {
+  const s = String(code || "").trim().toLowerCase();
+  const [base] = s.split(/[-_]/); // "en-US" -> "en"
+  return base || DEFAULT_LANG;
+}
+
+export function useI18n() {
+  if (!i18nSingleton) {
+    const [domainDicts, setDomainDicts] = createSignal({});
+    const [domainLangCodes, setDomainLangCodes] = createSignal([]);
+
+    const resolveKey = (lang, key) => {
+      const d = domainDicts();
+      const fromDomain = d[lang]?.[key];
+      if (fromDomain != null) return fromDomain;
+
+      const fromApp = APP_DICTS[lang]?.[key];
+      if (fromApp != null) return fromApp;
+
+      if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
+      return `[${key}]`;
+    }
+
+    const readInitialLang = () => {
+      try {
+        const v = localStorage.getItem(LANG_KEY);
+        return normalizeLang(v || DEFAULT_LANG);
+      } catch {
+        return DEFAULT_LANG;
+      }
+    };
+    const readInitialShowKeys = () => {
+      try {
+        return localStorage.getItem(SHOW_KEYS_KEY) === "1";
+      } catch {
+        return false;
+      }
+    };
+
+    const [lang, setLangSignal] = createSignal(readInitialLang());
+    const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
+
+    function setLang(next) {
+      const v = normalizeLang(next);
+      setLangSignal(v);
+      try { localStorage.setItem(LANG_KEY, v); } catch {}
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("lang", v);
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("savva:lang", { detail: { lang: v } }));
+      }
+    }
+
+    function setShowKeys(on) {
+      const v = !!on;
+      setShowKeysSignal(v);
+      try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch {}
+    }
+
+    const t = (key, params) => {
+      let base = resolveKey(lang(), key);
+      if (params) {
+        for (const [paramKey, paramValue] of Object.entries(params)) {
+          base = base.replace(`{${paramKey}}`, String(paramValue));
+        }
+      }
+      return showKeys() ? `${base} [${key}]` : base;
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (e) => {
+        if (e.key === LANG_KEY && e.newValue) setLangSignal(normalizeLang(e.newValue));
+        if (e.key === SHOW_KEYS_KEY) setShowKeysSignal(e.newValue === "1");
+      });
+    }
+
+    const available = () => {
+      const domainCodes = domainLangCodes();
+      if (domainCodes.length > 0) return domainCodes;
+      return Object.keys(APP_DICTS);
+    };
+
+    i18nSingleton = {
+      t,
+      lang,
+      setLang,
+      showKeys,
+      setShowKeys,
+      available,
+      setDomainDictionaries: (d) => setDomainDicts(d || {}),
+      setDomainLangCodes: (codes) => setDomainLangCodes(codes || []),
+    };
+  }
+  return i18nSingleton;
+}
 </file>
 
 <file path="src/components/settings/LocalIpfsSection.jsx">
@@ -24882,52 +26064,6 @@ export default function SwitchConnectDialog(props) {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "release": "node scripts/release.mjs",
-    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
-  },
-  "dependencies": {
-    "@shikijs/themes": "^3.11.0",
-    "@solidjs/router": "^0.15.3",
-    "dompurify": "^3.2.6",
-    "dotenv": "^17.2.1",
-    "js-yaml": "^4.1.0",
-    "marked": "^16.2.0",
-    "openai": "^5.12.2",
-    "rehype-autolink-headings": "^7.1.0",
-    "rehype-pretty-code": "^0.14.1",
-    "rehype-slug": "^6.0.0",
-    "rehype-stringify": "^10.0.1",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2",
-    "shiki": "^3.11.0",
-    "solid-js": "^1.9.8",
-    "unified": "^11.0.5",
-    "viem": "^2.33.3",
-    "yaml": "^2.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
-  }
-}
-</file>
-
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -24954,6 +26090,53 @@ export default function Settings() {
       <DeveloperSection />
     </main>
   );
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "release": "node scripts/release.mjs",
+    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
+  },
+  "dependencies": {
+    "@shikijs/themes": "^3.11.0",
+    "@solidjs/router": "^0.15.3",
+    "dompurify": "^3.2.6",
+    "dotenv": "^17.2.1",
+    "js-yaml": "^4.1.0",
+    "marked": "^16.2.0",
+    "openai": "^5.12.2",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-pretty-code": "^0.14.1",
+    "rehype-slug": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "shiki": "^3.11.0",
+    "solid-js": "^1.9.8",
+    "unified": "^11.0.5",
+    "viem": "^2.33.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
 }
 </file>
 
@@ -24998,157 +26181,7 @@ export default function Settings() {
 
 <file path="src/version.js">
 // src/version.js
-export const APP_VERSION = "0.102";
-</file>
-
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "default.avatar": "Аватар",
-  "default.user": "Пользователь",
-  "docs.article": "Статья документации",
-  "docs.copied": "Скопировано в буфер обмена!",
-  "docs.copy": "Копировать",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
-  "error.connection.retry": "Обновить страницу",
-  "error.connection.title": "Ошибка подключения",
-  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
-  "error.ws.title": "Ошибка подключения",
-  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
-  "ipfs.diag.cors.name": "Проверка CORS шлюза",
-  "ipfs.diag.cors.ok": "CORS настроен правильно.",
-  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
-  "ipfs.diag.fetch.name": "Получение из живого шлюза",
-  "ipfs.diag.fetch.ok": "Запрос успешен.",
-  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
-  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
-  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
-  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
-  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
-  "ipfs.diag.liveness.error": "Узел не отвечает.",
-  "ipfs.diag.liveness.name": "Проверка работоспособности API",
-  "ipfs.diag.liveness.ok": "Узел работает.",
-  "ipfs.diag.run": "Запустить диагностику",
-  "ipfs.diag.title": "Диагностика узла IPFS",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.group": "Просмотреть группу",
-  "newTab.view.list": "Список",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.domain": "Домен не может быть пустым.",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.clear": "Очистить лог",
-  "settings.developer.debug.copied": "Лог скопирован в буфер обмена",
-  "settings.developer.debug.copy": "Скопировать лог",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
-  "stakerLevels.clam": "Моллюск",
-  "stakerLevels.dolphin": "Дельфин",
-  "stakerLevels.fish": "Рыба",
-  "stakerLevels.guest": "Гость",
-  "stakerLevels.orca": "Косатка",
-  "stakerLevels.seahorse": "Морской конек",
-  "stakerLevels.shark": "Акула",
-  "stakerLevels.shrimp": "Креветка",
-  "stakerLevels.stingray": "Скат",
-  "stakerLevels.whale": "Кит",
-  "tabs.aria": "Вкладки раздела",
-  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
-  "tabs.title.actual": "Текущие",
-  "tabs.title.comments": "Комментарии",
-  "tabs.title.for-you": "Для вас",
-  "tabs.title.leaders": "Лидеры",
-  "tabs.title.new": "Новые",
-  "time.day.plural": "{n} дней назад",
-  "time.day.singular": "{n} день назад",
-  "time.hour.plural": "{n} часов назад",
-  "time.hour.singular": "{n} час назад",
-  "time.minute.plural": "{n} минут назад",
-  "time.minute.singular": "{n} минуту назад",
-  "time.now": "Сейчас",
-  "timeFrame.${frame}": "Период: {frame}",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
-};
+export const APP_VERSION = "0.103";
 </file>
 
 <file path="src/components/main/TabsBar.jsx">
@@ -25308,6 +26341,157 @@ export default function TabsBar() {
     </section>
   );
 }
+</file>
+
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "default.avatar": "Аватар",
+  "default.user": "Пользователь",
+  "docs.article": "Статья документации",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+  "error.connection.title": "Ошибка подключения",
+  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
+  "error.ws.title": "Ошибка подключения",
+  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
+  "ipfs.diag.cors.name": "Проверка CORS шлюза",
+  "ipfs.diag.cors.ok": "CORS настроен правильно.",
+  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
+  "ipfs.diag.fetch.name": "Получение из живого шлюза",
+  "ipfs.diag.fetch.ok": "Запрос успешен.",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
+  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
+  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
+  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Вариант 1 (Рекомендуется): Разрешить только текущий источник.",
+  "ipfs.diag.fix.gatewayTitle": "Ваша конфигурация шлюза, вероятно, мешает браузеру получать данные. Попробуйте одну из этих команд:",
+  "ipfs.diag.fix.gatewayWildcard": "Вариант 2 (Проще для разработчиков): Разрешить любой источник. Используйте с осторожностью на публичных узлах.",
+  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
+  "ipfs.diag.liveness.error": "Узел не отвечает.",
+  "ipfs.diag.liveness.name": "Проверка работоспособности API",
+  "ipfs.diag.liveness.ok": "Узел работает.",
+  "ipfs.diag.run": "Запустить диагностику",
+  "ipfs.diag.title": "Диагностика узла IPFS",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.group": "Просмотреть группу",
+  "newTab.view.list": "Список",
+  "post.chapters.prologue": "Пролог",
+  "post.chapters.title": "Содержание",
+  "post.notFound.message": "Пост, который вы ищете, не существует или был удален.",
+  "post.notFound.title": "Пост не найден",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
+  "stakerLevels.clam": "Моллюск",
+  "stakerLevels.dolphin": "Дельфин",
+  "stakerLevels.fish": "Рыба",
+  "stakerLevels.guest": "Гость",
+  "stakerLevels.orca": "Косатка",
+  "stakerLevels.seahorse": "Морской конек",
+  "stakerLevels.shark": "Акула",
+  "stakerLevels.shrimp": "Креветка",
+  "stakerLevels.stingray": "Скат",
+  "stakerLevels.whale": "Кит",
+  "tabs.aria": "Вкладки раздела",
+  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
+  "tabs.title.actual": "Текущие",
+  "tabs.title.comments": "Комментарии",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лидеры",
+  "tabs.title.new": "Новые",
+  "time.day.plural": "{n} дней назад",
+  "time.day.singular": "{n} день назад",
+  "time.hour.plural": "{n} часов назад",
+  "time.hour.singular": "{n} час назад",
+  "time.minute.plural": "{n} минут назад",
+  "time.minute.singular": "{n} минуту назад",
+  "time.now": "Сейчас",
+  "timeFrame.${frame}": "Период: {frame}",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети"
+};
 </file>
 
 <file path="src/components/RightPane.jsx">
@@ -25470,10 +26654,8 @@ export function AppProvider(props) {
   const { route } = useHashRouter();
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
-    
     const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
     const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
-
     if (isCurrentlyOnMainFeed && isNavigatingToPage) {
       setSavedScrollY(window.scrollY);
     }
@@ -25495,6 +26677,20 @@ export function AppProvider(props) {
   
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
+
+  // --- MODIFICATION: New effect to update the document title ---
+  Solid.createEffect(() => {
+    const cfg = assets.domainAssetsConfig();
+    const lang = i18n.lang();
+    if (!cfg) return;
+
+    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+    const currentLocale = locales.find(l => l.code === lang) || locales.find(l => l.code === 'en') || locales[0];
+    
+    if (currentLocale?.title) {
+      document.title = currentLocale.title;
+    }
+  });
 
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
@@ -25520,8 +26716,7 @@ export function AppProvider(props) {
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
-    // --- MODIFICATION: Removed the redundant logout call from setDomain ---
-    setDomain: conn.setDomain,
+    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
   };
 
@@ -25656,16 +26851,13 @@ export default {
   "default.avatar": "avatar",
   "default.user": "user",
   "docs.article": "Documentation article",
-  "docs.copied": "Copied",
-  "docs.copy": "Copy",
   "docs.nav": "Developer Docs",
   "docs.next": "Next",
   "docs.prev": "Previous",
   "docs.section": "Section",
   "docs.sidebar.empty": "No docs yet. Add sidebar.yaml under dev_docs/<lang>/",
   "docs.title": "Developer Docs",
-  "error.connection.message":
-    "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
+  "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
   "error.connection.retry": "Refresh Page",
   "error.connection.title": "Connection Failed",
   "error.ws.message": "Unable to connect. Please try again.",
@@ -25676,27 +26868,19 @@ export default {
   "ipfs.diag.fetch.errorFirewall": "Fetch failed due to firewall.",
   "ipfs.diag.fetch.name": "Live Gateway Fetch",
   "ipfs.diag.fetch.ok": "Fetch successful.",
-  "ipfs.diag.fetch.warnSkipped":
-    "Skipped: ABI CID not found in /info response.",
-  "ipfs.diag.fix.browser":
-    "If it's running, check your browser. For Brave, disable Shields for this site. For other browsers like Chrome, you may need to 'Allow Insecure content' in Site Settings.",
-  "ipfs.diag.fix.cors":
-    "If it still fails, run this command to fix the API CORS policy:",
-  "ipfs.diag.fix.daemon":
-    "First, ensure your IPFS daemon is running in a terminal:",
-  "ipfs.diag.fix.title":
-    "To fix, run this in your terminal (then restart the daemon):",
+  "ipfs.diag.fetch.warnSkipped": "Skipped: ABI CID not found in /info response.",
+  "ipfs.diag.fix.browser": "If it's running, check your browser. For Brave, disable Shields for this site. For other browsers like Chrome, you may need to 'Allow Insecure content' in Site Settings.",
+  "ipfs.diag.fix.cors": "If it still fails, run this command to fix the API CORS policy:",
+  "ipfs.diag.fix.daemon": "First, ensure your IPFS daemon is running in a terminal:",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Option 1 (Recommended): Allow only the current origin.",
+  "ipfs.diag.fix.gatewayTitle": "Your Gateway config is likely preventing the browser from fetching. Try one of these commands:",
+  "ipfs.diag.fix.gatewayWildcard": "Option 2 (Easier for Dev): Allow any origin. Use with caution on public nodes.",
+  "ipfs.diag.fix.title": "To fix, run this in your terminal (then restart the daemon):",
   "ipfs.diag.liveness.error": "Node is not responding.",
   "ipfs.diag.liveness.name": "API Liveness Check",
   "ipfs.diag.liveness.ok": "Node is live.",
   "ipfs.diag.run": "Run Diagnostics",
   "ipfs.diag.title": "IPFS Node Diagnostics",
-  "ipfs.diag.fix.gatewayTitle":
-    "Your Gateway config is likely preventing the browser from fetching. Try one of these commands:",
-  "ipfs.diag.fix.gatewaySingleOrigin":
-    "Option 1 (Recommended): Allow only the current origin.",
-  "ipfs.diag.fix.gatewayWildcard":
-    "Option 2 (Easier for Dev): Allow any origin. Use with caution on public nodes.",
   "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",
@@ -25705,26 +26889,25 @@ export default {
   "newTab.view.grid": "Grid View",
   "newTab.view.group": "View Group",
   "newTab.view.list": "List View",
+  "post.chapters.prologue": "Prologue",
+  "post.chapters.title": "Table of Contents",
+  "post.notFound.message": "The post you're looking for doesn't exist or has been removed.",
+  "post.notFound.title": "Post Not Found",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
-  "rightPane.switch.backend.help":
-    "The app will fetch /info from this URL to list supported domains.",
+  "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
   "rightPane.switch.backend.label": "Backend URL",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.label": "Domain",
   "rightPane.switch.domain.website": "Website",
-  "rightPane.switch.noDomains":
-    "Backend returned no domains. You can still apply, but the domain will be empty.",
+  "rightPane.switch.noDomains": "Backend returned no domains. You can still apply, but the domain will be empty.",
   "rightPane.switch.open": "Switch backend / domain",
   "rightPane.switch.reload": "Load domains",
   "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
   "rightPane.switch.reset": "Reset to defaults",
-  "rightPane.switch.reset.title":
-    "Clear local override and reload defaults from default_connect.yaml",
+  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
   "rightPane.switch.title": "Switch backend / domain",
-  "rightPane.switch.validation.domain": "Domain cannot be empty.",
-  "rightPane.switch.validation.protocol":
-    "Backend URL must start with http:// or https://",
+  "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
   "rightPane.theme": "Theme",
   "settings.back": "Back",
   "settings.dev.assets.baseUrl": "Assets base URL",
@@ -25739,8 +26922,7 @@ export default {
   "settings.dev.assets.diagnostics.hasLocales": "Has locales",
   "settings.dev.assets.diagnostics.hasLogos": "Has logos",
   "settings.dev.assets.diagnostics.hasTabs": "Has tabs",
-  "settings.dev.assets.diagnostics.noteNetwork":
-    "Check your network connection.",
+  "settings.dev.assets.diagnostics.noteNetwork": "Check your network connection.",
   "settings.dev.assets.diagnostics.primary": "Primary config",
   "settings.dev.assets.diagnostics.run": "Run diagnostics",
   "settings.dev.assets.diagnostics.sampleFetches": "Sample fetches",
@@ -25753,9 +26935,6 @@ export default {
   "settings.dev.assets.prefix.computed": "Computed prefix",
   "settings.dev.assets.source": "Source",
   "settings.dev.assets.title": "Assets",
-  "settings.developer.debug.clear": "Clear log",
-  "settings.developer.debug.copied": "Copied log to clipboard",
-  "settings.developer.debug.copy": "Copy log",
   "settings.developer.debug.enable": "Enable debug logging",
   "settings.developer.showKeys": "Show API Keys",
   "settings.developer.title": "Developer Settings",
@@ -25800,9 +26979,7 @@ export default {
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network",
-    "post.chapters.prologue": "Prologue",
-  "post.chapters.title": "Table of Contents",
+  "wallet.onRequiredNetwork": "On required network"
 };
 </file>
 

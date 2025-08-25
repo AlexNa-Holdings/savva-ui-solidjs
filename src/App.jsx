@@ -30,6 +30,16 @@ export default function App() {
     return "main";
   });
 
+  const domainRevision = createMemo(() => {
+    if (app.loading()) return null;
+    const domainName = app.selectedDomainName?.();
+    const source = app.domainAssetsSource?.();
+    const cfg = app.domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const tabsPath = cfg?.modules?.tabs || "";
+    return `${domainName}|${source}|${cid}|${tabsPath}`;
+  });
+
   onMount(() => {
     const handleKeydown = (e) => {
       if (e.key !== "Escape") return;
@@ -76,11 +86,15 @@ export default function App() {
           <FaviconLoader />
           <GoogleAnalyticsLoader />
           <WsConnector />
-          <Header onTogglePane={togglePane} />
           
-          <div style={{ display: currentView() === "main" ? "block" : "none" }}>
-            <MainView />
-          </div>
+          <Show when={domainRevision()} keyed>
+            <>
+              <Header onTogglePane={togglePane} />
+              <div style={{ display: currentView() === "main" ? "block" : "none" }}>
+                <MainView />
+              </div>
+            </>
+          </Show>
 
           <Switch>
             <Match when={currentView() === 'post'}><PostPage /></Match>

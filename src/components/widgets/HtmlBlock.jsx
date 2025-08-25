@@ -34,6 +34,6 @@ export default function HtmlBlock(props) {
   });
 
   return (
-    <div class="p-3 text-sm space-y-2" innerHTML={htmlContent() || ""} />
+    <div class="p-3 text-sm space-y-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]" innerHTML={htmlContent() || ""} />
   );
 }

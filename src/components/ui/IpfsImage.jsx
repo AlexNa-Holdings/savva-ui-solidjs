@@ -2,7 +2,6 @@
 import { createSignal, createEffect, Show, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { ipfs } from "../../ipfs/index.js";
-import { pushErrorToast } from "./toast.js";
 import Spinner from "./Spinner.jsx";
 
 export default function IpfsImage(props) {
@@ -24,10 +23,7 @@ export default function IpfsImage(props) {
       const { url } = await ipfs.fetchBest(app, props.src);
       setImageUrl(url);
     } catch (e) {
-      // Don't show a toast for 404s, just show the fallback.
-      if (!e.is404) {
-        pushErrorToast(e, { context: "IPFS image failed to load", cid: props.src });
-      }
+      // Fallback silently on any error, but keep the log for debugging.
       console.error(`[IpfsImage] All gateways failed for ${props.src}:`, e.causes || e);
     } finally {
       setLoading(false);

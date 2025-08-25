@@ -1,33 +1,56 @@
 // src/components/widgets/ContentListBlock.jsx
-import { createMemo, createResource } from "solid-js";
+import { createMemo, createResource, For, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader.js";
+import { loadAssetResource } from "../../utils/assetLoader";
+import PostCard from "../feed/PostCard.jsx";
+import Spinner from "../ui/Spinner.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
 
-/**
- * Selects the best title string from a locale object.
- * Logic: current lang -> '*' -> 'en' -> first available.
- */
 function getLocalizedTitle(titleData, currentLang) {
     if (!titleData || typeof titleData !== 'object') return "";
-    
-    // 1. Current language
     if (titleData[currentLang]) return titleData[currentLang];
-    // 2. Wildcard fallback
     if (titleData['*']) return titleData['*'];
-    // 3. English fallback
     if (titleData.en) return titleData.en;
-    // 4. First available fallback
     const firstKey = Object.keys(titleData)[0];
     return firstKey ? titleData[firstKey] : "";
 }
 
+async function fetchListContent(params) {
+  const { app, listName, count, lang } = params;
+  if (!app.wsMethod || !listName) return [];
+  
+  const getList = app.wsMethod("get-list");
+  
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    list_name: listName,
+    limit: count || 5,
+    offset: 0,
+    lang: lang,
+  };
+
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  try {
+    const res = await getList(requestParams);
+    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+    return arr.map((it) => ({
+      id: it?.savva_cid || it?.savvaCID || it?.id,
+      _raw: it,
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch content list '${listName}':`, err);
+    return { error: err.message }; 
+  }
+}
+
 export default function ContentListBlock(props) {
   const app = useApp();
-
-  // 1. Get the path to the content_lists module from the main domain config.
   const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
 
-  // 2. Fetch and parse the content_lists module file.
   const [contentListModule] = createResource(modulePath, async (path) => {
     if (!path) return null;
     try {
@@ -38,24 +61,56 @@ export default function ContentListBlock(props) {
     }
   });
   
-  // 3. Find the specific list definition using the list_name from props.
   const listDefinition = createMemo(() => {
     const listName = props.block?.list_name;
     if (!listName) return null;
     return contentListModule()?.list?.[listName] || null;
   });
 
-  // 4. Extract the localized title from the definition.
   const title = createMemo(() => {
     const def = listDefinition();
     return getLocalizedTitle(def?.title, app.lang());
   });
 
+  const [listData] = createResource(() => ({
+    app: app,
+    listName: props.block?.list_name,
+    count: props.block?.count,
+    lang: app.lang()
+  }), fetchListContent);
+
   return (
-    <div class="p-3">
-      <h4 class="font-semibold text-sm mb-2">{title() || props.block?.list_name}</h4>
-      <div class="text-xs text-[hsl(var(--muted-foreground))]">
-        Content feed placeholder...
+    <div class="p-3 rounded-lg" style={{ background: "var(--gradient)" }}>
+      <h4 class="font-semibold text-sm mb-2 text-[hsl(var(--card))]">{title() || props.block?.list_name}</h4>
+      <div class="space-y-3">
+        <Show when={listData.loading}>
+          <div class="flex justify-center items-center h-24">
+            <Spinner />
+          </div>
+        </Show>
+        <Show when={listData.error}>
+          <p class="text-xs text-[hsl(var(--destructive))]">
+            {app.t("common.error")}: {listData.error}
+          </p>
+        </Show>
+        <Show when={!listData.loading && !listData.error && listData()?.length > 0}>
+          <For each={listData()}>
+            {(item) => {
+              const menuItems = item._raw?.pinned
+                ? [{ label: "Unpin Post", onClick: () => console.log("Unpin clicked for:", item.id) }]
+                : [{ label: "Pin Post", onClick: () => console.log("Pin clicked for:", item.id) }];
+              
+              return (
+                <PostCard
+                  item={item}
+                  mode="list"
+                  compact={true}
+                  contextMenuItems={menuItems}
+                />
+              );
+            }}
+          </For>
+        </Show>
       </div>
     </div>
   );
