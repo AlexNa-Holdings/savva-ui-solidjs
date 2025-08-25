@@ -161,4 +161,6 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
   "wallet.onRequiredNetwork": "On required network",
+    "post.chapters.prologue": "Prologue",
+  "post.chapters.title": "Table of Contents",
 };

@@ -84,30 +84,15 @@ async function fetchPostDetails(mainPost, app) {
 }
 
 async function fetchMainContent(details, app, lang) {
-  dbg.log('PostPage', 'fetchMainContent called with details:', { details, lang });
-  if (!details?.descriptor || !lang) {
-    dbg.log('PostPage', 'fetchMainContent: No descriptor or lang, returning empty.');
-    return "";
-  }
-
+  if (!details?.descriptor || !lang) return "";
   const { descriptor, dataCidForContent } = details;
   const localizedDescriptor = descriptor.locales?.[lang];
-
-  if (!localizedDescriptor) {
-    dbg.log('PostPage', `fetchMainContent: No locales found for lang '${lang}'.`);
-    return "";
-  }
-
-  // Case 1: Content is embedded directly in the localized descriptor
+  if (!localizedDescriptor) return "";
   if (localizedDescriptor.data) {
-    dbg.log('PostPage', 'fetchMainContent: Found direct data in localized descriptor.');
     return localizedDescriptor.data;
   }
-
-  // Case 2: Content is in a separate file referenced by a localized data_path
   if (localizedDescriptor.data_path && dataCidForContent) {
     const contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
-    dbg.log('PostPage', 'Fetching main content from localized data_path:', contentPath);
     try {
       const { res } = await ipfs.fetchBest(app, contentPath);
       return await res.text();
@@ -116,8 +101,6 @@ async function fetchMainContent(details, app, lang) {
       return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
     }
   }
-  
-  dbg.log('PostPage', 'fetchMainContent: No "data" or "data_path" in localized descriptor, returning empty.');
   return "";
 }
 
@@ -199,21 +182,18 @@ export default function PostPage() {
         <Match when={post.loading}>
           <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
         </Match>
-
         <Match when={post.error || details()?.descriptor?.error}>
           <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
             <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
             <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
           </div>
         </Match>
-
         <Match when={!post.loading && post() === null}>
           <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
             <h3 class="font-semibold">{t("post.notFound.title")}</h3>
             <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
           </div>
         </Match>
-
         <Match when={post()}>
           <article class="space-y-4">
             <header class="flex justify-between items-start gap-4">
@@ -246,21 +226,32 @@ export default function PostPage() {
               </div>
             </header>
 
-            <div class="pt-4 border-t border-[hsl(var(--border))]">
-              <Switch>
-                <Match when={details.loading || mainContent.loading}>
-                  <div class="flex justify-center p-8"><Spinner /></div>
-                </Match>
-                <Match when={mainContent.error}>
-                  <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
-                </Match>
-                <Match when={localizedMainContent()}>
-                  <MarkdownView 
-                    markdown={localizedMainContent()} 
-                    rehypePlugins={markdownPlugins()}
-                  />
-                </Match>
-              </Switch>
+            {/* --- MODIFICATION: New two-column layout for the body --- */}
+            <div class="flex items-start gap-4 pt-4 border-t border-[hsl(var(--border))]">
+              {/* Left Column: Main Content */}
+              <div class="flex-1 min-w-0">
+                <Switch>
+                  <Match when={details.loading || mainContent.loading}>
+                    <div class="flex justify-center p-8"><Spinner /></div>
+                  </Match>
+                  <Match when={mainContent.error}>
+                    <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                  </Match>
+                  <Match when={localizedMainContent()}>
+                    <MarkdownView 
+                      markdown={localizedMainContent()} 
+                      rehypePlugins={markdownPlugins()}
+                    />
+                  </Match>
+                </Switch>
+              </div>
+
+              {/* Right Column: Placeholder */}
+              <aside class="w-48 flex-shrink-0 space-y-2">
+                <div class="h-64 rounded-md border border-dashed border-[hsl(var(--border))] flex items-center justify-center text-sm text-[hsl(var(--muted-foreground))]">
+                  Right Column
+                </div>
+              </aside>
             </div>
           </article>
         </Match>
