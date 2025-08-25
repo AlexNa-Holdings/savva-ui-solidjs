@@ -15,3 +15,5 @@ sections:
         file: core-concepts/domain.md
       - label: Autentifikacija
         file: core-concepts/auth.md
+      - label: Prikazivanje postova
+        file: core-concepts/showing-posts.md
