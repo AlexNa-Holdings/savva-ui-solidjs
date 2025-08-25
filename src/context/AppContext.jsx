@@ -1,7 +1,7 @@
 // src/context/AppContext.jsx
 import * as Solid from "solid-js";
 import { getChainMeta } from "../blockchain/chains";
-import { switchOrAddChain } from "../blockchain/wallet";
+import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet";
 import { useI18n } from "../i18n/useI18n";
 import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
@@ -9,6 +9,7 @@ import { useAppConnection } from "./useAppConnection.js";
 import { useDomainAssets } from "./useDomainAssets.js";
 import { pushToast, pushErrorToast } from "../components/ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
+import { createWalletClient, custom } from "viem";
 
 const AppContext = Solid.createContext();
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
@@ -50,7 +51,6 @@ export function AppProvider(props) {
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
 
-  // --- MODIFICATION: New effect to update the document title ---
   Solid.createEffect(() => {
     const cfg = assets.domainAssetsConfig();
     const lang = i18n.lang();
@@ -78,6 +78,32 @@ export function AppProvider(props) {
     }
   });
 
+  function getGuardedWalletClient() {
+    const walletAcc = walletAccount();
+    const authorizedAcc = auth.authorizedUser()?.address;
+
+    if (authorizedAcc && walletAcc && walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
+      const errText = i18n.t("wallet.error.addressMismatch");
+      pushErrorToast(new Error(errText));
+      throw new Error(errText);
+    }
+    
+    if (!isWalletAvailable()) {
+      throw new Error("Wallet is not available.");
+    }
+
+    const chain = desiredChain();
+    if (!chain) {
+      throw new Error("Target chain is not configured.");
+    }
+
+    return createWalletClient({
+      chain: chain,
+      account: walletAcc,
+      transport: custom(window.ethereum)
+    });
+  }
+
   const value = {
     ...conn, ...auth, ...assets, ...ipfs,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
@@ -90,6 +116,7 @@ export function AppProvider(props) {
     remoteIpfsGateways, activeIpfsGateways,
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
+    getGuardedWalletClient,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

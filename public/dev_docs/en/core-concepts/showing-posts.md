@@ -1,35 +1,42 @@
 # Showing Posts
 
-Displaying a SAVVA post is a two-step process. First, you fetch a list of post metadata objects from the SAVVA backend. Second, you use the IPFS information from that metadata to fetch the actual content (like the title, text, and images) from the decentralized network.
+Displaying a SAVVA post is a two-step process.
+
+1. Fetch a list of post metadata objects from the SAVVA backend.
+2. Use the IPFS information from that metadata to fetch the actual content (title, text, images, etc.) from the decentralized network.
 
 ---
 
 ## Step 1: Fetch Post Metadata from the Backend
 
-The primary way to get a list of posts is through the `content-list` WebSocket method. It's a flexible endpoint that supports pagination, sorting, and filtering.
+The primary way to get a list of posts is through the **`content-list`** WebSocket method.
+It supports pagination, sorting, and filtering.
 
 ### Calling `content-list`
 
-You call the method with parameters specifying which content you need. Here's a typical example:
+You call the method with parameters specifying which content you need. Example:
 
-```javascript
+```js
 // Example call using the app's wsMethod helper
 const posts = await app.wsMethod("content-list")({
-  domain: "savva.app",      // The domain to fetch posts from
+  domain: "savva.app",      // Domain to fetch posts from
   limit: 12,                // Number of items per page
-  offset: 0,                // Start at the first item (for pagination)
-  lang: "en",               // Preferred language for any returned metadata
+  offset: 0,                // Start index (for pagination)
+  lang: "en",               // Preferred language for metadata
   order_by: "fund_amount",  // Sort by total funds received
   content_type: "post",     // We only want posts
-  category: "en:SAVVA Talk" // Optional: filter by a specific category
+  category: "en:SAVVA Talk" // Optional: filter by category
 });
 ```
 
-### The Post Object Structure
+---
 
-The `content-list` method returns an array of post objects. Each object contains all the on-chain metadata and pointers needed to fetch the full content.
+## The Post Object Structure
 
-Here is an example of a single post object returned from the backend:
+The `content-list` method returns an array of **post objects**.
+Each contains metadata and pointers needed to fetch the full content.
+
+Example:
 
 ```json
 {
@@ -49,12 +56,12 @@ Here is an example of a single post object returned from the backend:
     "total_author_share": "100000000000000000000"
   },
   "ipfs": "bafybeig.../info.yaml",
-  "data_cid": "bafybeig...",
   "reactions": [10, 2, 0, 1],
   "savva_cid": "0x01701...cfa2",
   "short_cid": "aBcDeF1",
   "tags": ["decentralization", "social"],
   "savva_content": {
+    "data_cid": "bafybeig...",
     "locales": {
       "en": {
         "text_preview": "This is a short preview of the post content...",
@@ -72,45 +79,79 @@ Here is an example of a single post object returned from the backend:
 
 ### Key Fields Explained
 
-* **author**: Profile information of the post's author, including their staked amount.
-* **savva\_cid / short\_cid**: Unique identifiers for the post. The `savva_cid` is the full on-chain ID, while the `short_cid` is a user-friendly alternative. Use these to build URLs (e.g., `/post/<short_cid>`).
-* **ipfs & data\_cid**: Crucial pointers to the content on IPFS. See the next section for how to use them.
-* **savva\_content**: Metadata object directly from the backend cache. It contains a `locales` object with pre-fetched titles and previews, which is perfect for rendering post cards in a feed without needing to fetch from IPFS first.
-* **fund**: Information about the post's funding pool.
-* **reactions**: An array representing the counts for different reaction types (like, super, etc.).
+* **author** — profile info of the author (including staked amount).
+* **savva\_cid / short\_cid** — unique IDs. Use them to build URLs (`/post/<short_cid>`).
+* **ipfs / savva\_content.data\_cid** — pointers to IPFS content.
+* **savva\_content** — backend-cached metadata (titles, previews, thumbnails). Great for feed rendering without IPFS fetch.
+* **fund** — post’s funding pool information.
+* **reactions** — array of counts for each reaction type.
 
 ---
 
 ## Step 2: Resolve Full Content from IPFS
 
-While `savva_content` is useful for previews, you need to fetch from IPFS to get the full post body, chapters, and other assets.
+While `savva_content` is useful for previews, full content must be fetched from IPFS (post body, chapters, assets).
 
-### Finding the Descriptor and Data Folder
+### Resolving Content Paths
 
-The `ipfs` and `data_cid` fields work together to tell you where everything is. There are two scenarios:
+The location of `info.yaml` depends on format:
 
-1. **`data_cid` is present**:
+* **Modern format**
 
-   * `ipfs` is the direct path to the descriptor file (e.g., `bafy.../info.yaml`).
-   * `data_cid` is the CID of the folder containing all post assets (images, markdown files, etc.). This is your content base.
+  * `savva_content.data_cid` = base CID for assets.
+  * `ipfs` = direct path to `info.yaml`.
+* **Legacy format**
 
-2. **`data_cid` is NOT present (legacy format)**:
+  * No `data_cid`.
+  * `ipfs` = base CID. Descriptor assumed at `<ipfs>/info.yaml`.
 
-   * `ipfs` is the CID of the folder containing all post assets.
-   * The descriptor file is assumed to be at a standard path: `<ipfs>/info.yaml`.
+### Utility Functions
 
-The application logic should determine the descriptor path and the content base CID based on these rules.
+Use helpers from `src/ipfs/utils.js`:
 
-### The Post Descriptor (`info.yaml`)
+```js
+import {
+  getPostDescriptorPath,
+  getPostContentBaseCid,
+  resolvePostCidPath
+} from "../../ipfs/utils.js";
 
-The descriptor is a YAML file that defines the full structure of the post, including all its language variations and chapters.
+const post = { ... };
 
-#### Example `info.yaml`
+// 1. Path to descriptor file
+const descriptorPath = getPostDescriptorPath(post);
+
+// 2. Base CID for assets
+const contentBaseCid = getPostContentBaseCid(post);
+
+// 3. Resolve relative path (e.g., thumbnail)
+const fullThumbnailPath = resolvePostCidPath(post, post.savva_content.thumbnail);
+```
+
+---
+
+## IPFS Gateway Prioritization
+
+Fetch order:
+
+1. **Local node** (if enabled).
+2. **Post-specific gateways** (listed in descriptor).
+3. **System gateways** (backend `/info`).
+
+This ensures best speed and availability.
+
+---
+
+## The Post Descriptor (`info.yaml`)
+
+A YAML file defining the full structure: languages, chapters, metadata.
+
+### Example `info.yaml`
 
 ```yaml
-# Example info.yaml for a multi-language, multi-chapter post
-
 thumbnail: assets/post_thumbnail.png
+gateways:
+  - https://my-fast-pinning-service.cloud
 
 locales:
   en:
@@ -118,7 +159,6 @@ locales:
     text_preview: "A deep dive into the core concepts of decentralization..."
     tags: ["blockchain", "systems", "web3"]
     categories: ["Technology"]
-    # The main content, can be inline or a path
     data_path: content/en/main.md
     chapters:
       - title: "What is a Blockchain?"
@@ -141,16 +181,18 @@ locales:
 
 ### Key Descriptor Fields
 
-* **thumbnail**: Relative path to the post's main image, resolved against the content base CID.
-* **locales**: Object where each key is a language code (e.g., `en`, `ru`).
-* **title / text\_preview / tags / categories**: Language-specific metadata.
-* **data\_path**: Relative path to the main Markdown content for that language.
-* **chapters**: Array of chapter objects, each with its own title and `data_path`.
+* **thumbnail** — relative path to main image.
+* **gateways** — optional recommended IPFS gateways.
+* **locales** — object keyed by language codes.
 
-To get the full content of a chapter, you combine the content base CID with the `data_path` from the descriptor. For example, to fetch the English version of Chapter 1, you would request:
+  * **title / text\_preview / tags / categories** — language-specific metadata.
+  * **data\_path** — main Markdown content for that language.
+  * **chapters** — array of chapters, each with `title` and `data_path`.
 
-```
+To fetch full chapter content:
+
+```txt
 <content_base_cid>/content/en/chapter1.md
 ```
 
-from an IPFS gateway.
+

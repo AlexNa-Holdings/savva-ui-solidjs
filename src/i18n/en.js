@@ -151,4 +151,6 @@ export default {
   "wallet.onRequiredNetwork": "On required network",
     "postcard.copyIpfsCid": "Copy IPFS CID",
   "postcard.copySavvaCid": "Copy SAVVA CID",
+  "wallet.error.addressMismatch": "Wallet address mismatch. Please switch to the authorized account to proceed.",
+
 };

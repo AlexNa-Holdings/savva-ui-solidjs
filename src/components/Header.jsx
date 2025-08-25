@@ -1,5 +1,5 @@
 // src/components/Header.jsx
-import { Show, createSignal, onMount } from "solid-js";
+import { Show, createSignal, onMount, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import {
   connectWallet,
@@ -28,6 +28,13 @@ export default function Header({ onTogglePane }) {
     desiredId() != null &&
     walletChainId() !== desiredId();
 
+  const isAddressMismatched = createMemo(() => {
+    const walletAcc = walletAccount();
+    const authorizedAcc = app.authorizedUser()?.address;
+    if (!authorizedAcc || !walletAcc) return false;
+    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
+  });
+
   onMount(async () => {
     if (isWalletAvailable()) {
       await eagerConnect();
@@ -49,7 +56,6 @@ export default function Header({ onTogglePane }) {
 
   async function copyAddress() {
     try {
-      // The text is still copied, but no visual indicator will be shown.
       await navigator.clipboard.writeText(walletAccount());
     } catch (e) {
       console.error("Failed to copy address:", e);
@@ -111,11 +117,10 @@ export default function Header({ onTogglePane }) {
             >
               <div class="flex items-center gap-2">
                 <button
-                  class="
-                    px-2 py-1 rounded
-                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
-                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
-                  "
+                  classList={{
+                    "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                    "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                  }}
                   onClick={copyAddress}
                   title={app.t("wallet.copyAddress")}
                   aria-label={app.t("wallet.copyAddress")}

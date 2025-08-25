@@ -1,5 +1,5 @@
 // src/blockchain/auth.js
-import { createWalletClient, custom, hexToString } from "viem";
+import { hexToString } from "viem";
 import { getSavvaContract } from "./contracts.js";
 import { toHexBytes32, toChecksumAddress } from "./utils.js";
 import { walletAccount } from "./wallet.js";
@@ -24,10 +24,7 @@ export async function authorize(app) {
 
   const messageToSign = textToSign + modifierString;
   
-  const walletClient = createWalletClient({
-    chain: app.desiredChain(),
-    transport: custom(window.ethereum)
-  });
+  const walletClient = app.getGuardedWalletClient();
   const signature = await walletClient.signMessage({ account, message: messageToSign });
   
   const currentDomain = app.config().domain;
@@ -48,7 +45,6 @@ export async function authorize(app) {
   if (!adminRes.ok) throw new Error(`/is-admin check failed with status: ${adminRes.status}`);
   const isAdminData = await adminRes.json();
   
-  // MODIFICATION: Changed `is_admin` to `admin` to match the API response.
   const isAdmin = !!isAdminData?.admin;
 
   const coreUserData = {
