@@ -14,6 +14,9 @@ import UserCard from "../components/ui/UserCard.jsx";
 import PostInfo from "../components/feed/PostInfo.jsx";
 import MarkdownView from "../components/docs/MarkdownView.jsx";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import ChapterSelector from "../components/post/ChapterSelector.jsx";
+import ChapterPager from "../components/post/ChapterPager.jsx";
+import PostTags from "../components/post/PostTags.jsx";
 
 function rehypeRewriteLinks(options = {}) {
   return (tree) =>
@@ -37,11 +40,11 @@ function rehypeRewriteLinks(options = {}) {
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
-  const { identifier, app, lang } = params;
-  if (!identifier || !app.wsMethod) return null;
+  const { identifier, domain, app, lang } = params;
+  if (!identifier || !domain || !app.wsMethod) return null;
   const contentList = app.wsMethod("content-list");
   const requestParams = {
-    domain: app.selectedDomainName(),
+    domain: domain,
     lang: lang,
     limit: 1,
   };
@@ -83,16 +86,27 @@ async function fetchPostDetails(mainPost, app) {
   }
 }
 
-async function fetchMainContent(details, app, lang) {
+async function fetchMainContent(details, app, lang, chapterIndex) {
   if (!details?.descriptor || !lang) return "";
+
   const { descriptor, dataCidForContent } = details;
   const localizedDescriptor = descriptor.locales?.[lang];
   if (!localizedDescriptor) return "";
-  if (localizedDescriptor.data) {
-    return localizedDescriptor.data;
+
+  let contentPath;
+  if (chapterIndex === 0) { // Prologue (main content)
+    if (localizedDescriptor.data) return localizedDescriptor.data;
+    if (localizedDescriptor.data_path) {
+      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+    }
+  } else { // A specific chapter
+    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
+    if (chapter?.data_path) {
+      contentPath = `${dataCidForContent}/${chapter.data_path}`;
+    }
   }
-  if (localizedDescriptor.data_path && dataCidForContent) {
-    const contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+
+  if (contentPath) {
     try {
       const { res } = await ipfs.fetchBest(app, contentPath);
       return await res.text();
@@ -101,6 +115,7 @@ async function fetchMainContent(details, app, lang) {
       return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
     }
   }
+  
   return "";
 }
 
@@ -112,16 +127,22 @@ export default function PostPage() {
   const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
 
   const [post] = createResource(
-    () => ({ identifier: identifier(), app, lang: uiLang() }),
+    () => ({
+      identifier: identifier(),
+      domain: app.selectedDomainName(),
+      app,
+      lang: uiLang()
+    }),
     fetchPostByIdentifier
   );
   
   const [details] = createResource(post, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
-  
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+
   const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang() }), 
-    ({ details, lang }) => fetchMainContent(details, app, lang)
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
+    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
   );
 
   createEffect(() => {
@@ -161,8 +182,14 @@ export default function PostPage() {
     return null;
   });
   const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
-  const localizedMainContent = createMemo(() => mainContent());
   
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue"), data_path: null };
+    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
+    return [prologue, ...chapters];
+  });
+
+  const localizedMainContent = createMemo(() => mainContent());
   const ipfsBaseUrl = createMemo(() => {
     const dataCid = details()?.dataCidForContent;
     if (!dataCid) return "";
@@ -174,10 +201,36 @@ export default function PostPage() {
     [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
   ]);
 
+  const RightPanel = () => (
+    <aside class="sticky top-16">
+      <div 
+        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
+        style={{ "max-height": `calc(100vh - 5rem)` }}
+      >
+        <div class="p-4 space-y-3 overflow-y-auto h-full">
+          <h4 class="font-semibold">Right Panel</h4>
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">
+            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
+          </p>
+          <div class="text-xs space-y-2">
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
+            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
+            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
+            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+
   return (
-    <main class="p-4 max-w-3xl mx-auto">
+    <main class="sv-container p-4">
       <ClosePageButton />
-      
       <Switch>
         <Match when={post.loading}>
           <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
@@ -195,65 +248,78 @@ export default function PostPage() {
           </div>
         </Match>
         <Match when={post()}>
-          <article class="space-y-4">
-            <header class="flex justify-between items-start gap-4">
-              <div class="flex-1 min-w-0 space-y-3">
-                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
-                <UserCard author={post().author} />
-                <PostInfo 
-                  item={post()} 
-                  hideTopBorder={true} 
-                  timeFormat="long"
-                  rewardsAlign="left" 
-                />
-              </div>
-              <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
-                <Show when={thumbnail()}>
-                  {(src) => (
-                    <IpfsImage 
-                      src={src()} 
-                      class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
-                      alt="Post thumbnail"
-                      fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
-                    />
-                  )}
-                </Show>
-                <LangSelector 
-                  codes={availableLocales()}
-                  value={postLang()}
-                  onChange={setPostLang}
-                />
-              </div>
-            </header>
-
-            {/* --- MODIFICATION: New two-column layout for the body --- */}
-            <div class="flex items-start gap-4 pt-4 border-t border-[hsl(var(--border))]">
-              {/* Left Column: Main Content */}
-              <div class="flex-1 min-w-0">
-                <Switch>
-                  <Match when={details.loading || mainContent.loading}>
-                    <div class="flex justify-center p-8"><Spinner /></div>
-                  </Match>
-                  <Match when={mainContent.error}>
-                    <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
-                  </Match>
-                  <Match when={localizedMainContent()}>
-                    <MarkdownView 
-                      markdown={localizedMainContent()} 
-                      rehypePlugins={markdownPlugins()}
-                    />
-                  </Match>
-                </Switch>
-              </div>
-
-              {/* Right Column: Placeholder */}
-              <aside class="w-48 flex-shrink-0 space-y-2">
-                <div class="h-64 rounded-md border border-dashed border-[hsl(var(--border))] flex items-center justify-center text-sm text-[hsl(var(--muted-foreground))]">
-                  Right Column
+          <div class="max-w-5xl mx-auto">
+            <article class="space-y-4">
+              <header class="flex justify-between items-start gap-4">
+                <div class="flex-1 min-w-0 space-y-3">
+                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
+                  <UserCard author={post().author} />
+                  <PostInfo 
+                    item={post()} 
+                    hideTopBorder={true} 
+                    timeFormat="long"
+                    rewardsAlign="left" 
+                  />
+                  <PostTags postData={post()} />
                 </div>
-              </aside>
-            </div>
-          </article>
+                <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
+                  <Show when={thumbnail()}>
+                    {(src) => (
+                      <IpfsImage 
+                        src={src()} 
+                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                        alt="Post thumbnail"
+                        fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    )}
+                  </Show>
+                  <LangSelector 
+                    codes={availableLocales()}
+                    value={postLang()}
+                    onChange={setPostLang}
+                  />
+                </div>
+              </header>
+
+              <div class="pt-4 border-t border-[hsl(var(--border))]">
+                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
+                  <div>
+                    <Show when={(chapterList()?.length || 0) > 1}>
+                      <div class="flex justify-end mb-4">
+                        <ChapterSelector 
+                          chapters={chapterList()} 
+                          selectedIndex={selectedChapterIndex()} 
+                          onSelect={setSelectedChapterIndex}
+                        />
+                      </div>
+                    </Show>
+                    <Switch>
+                      <Match when={details.loading || mainContent.loading}>
+                        <div class="flex justify-center p-8"><Spinner /></div>
+                      </Match>
+                      <Match when={mainContent.error}>
+                        <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                      </Match>
+                      <Match when={localizedMainContent()}>
+                        <MarkdownView 
+                          markdown={localizedMainContent()} 
+                          rehypePlugins={markdownPlugins()}
+                        />
+                        <Show when={(chapterList()?.length || 0) > 1}>
+                          <ChapterPager 
+                            chapters={chapterList()}
+                            currentIndex={selectedChapterIndex()}
+                            onSelect={setSelectedChapterIndex}
+                          />
+                        </Show>
+                      </Match>
+                    </Switch>
+                  </div>
+                  <RightPanel />
+                </div>
+              </div>
+            </article>
+          </div>
         </Match>
       </Switch>
     </main>

@@ -31,18 +31,19 @@ export default function MarkdownView(props) {
         { unified }, { default: remarkParse }, { default: remarkGfm }, 
         { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
         { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
-        { default: rehypeStringify }, DOMPurify,
+        { default: rehypeStringify }, DOMPurify, { default: remarkBreaks },
       ] = await Promise.all([
         import("unified"), import("remark-parse"), import("remark-gfm"),
         import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
         import("rehype-autolink-headings"), import("rehype-pretty-code"),
-        import("rehype-stringify"), import("dompurify"),
+        import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
       ]);
 
       DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => { /* ... */ });
 
       const processor = unified()
         .use(remarkParse)
+        .use(remarkBreaks)
         .use(remarkFrontmatter, ["yaml", "toml"])
         .use(remarkGfm)
         .use(remarkRehype, { allowDangerousHtml: true });

@@ -182,6 +182,8 @@ src/
       ConnectionError.jsx
       MainView.jsx
       TabsBar.jsx
+    post/
+      ChapterSelector.jsx
     settings/
       Assets.jsx
       DeveloperSection.jsx
@@ -296,6 +298,88 @@ vite.config.js
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/components/post/ChapterSelector.jsx">
+// src/components/post/ChapterSelector.jsx
+import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+function TocIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+export default function ChapterSelector(props) {
+  const { t } = useApp();
+  const [isOpen, setIsOpen] = createSignal(false);
+  let containerRef; 
+
+  const chapters = () => props.chapters || [];
+  const selectedIndex = () => props.selectedIndex;
+
+  const selectedChapter = () => {
+    const idx = selectedIndex();
+    const list = chapters();
+    return idx >= 0 && idx < list.length ? list[idx] : null;
+  };
+
+  const handleClickOutside = (event) => {
+    if (containerRef && !containerRef.contains(event.target)) {
+      setIsOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  return (
+    <div class="flex items-center gap-3" ref={containerRef}>
+      <Show when={selectedChapter()?.title}>
+        <span class="font-semibold text-sm">{selectedChapter().title}</span>
+      </Show>
+
+      <div class="relative">
+        <button
+          class="p-2 rounded-full hover:bg-[hsl(var(--accent))]"
+          onClick={() => setIsOpen(!isOpen())}
+          aria-haspopup="true"
+          aria-expanded={isOpen()}
+          title={t("post.chapters.title")}
+        >
+          <TocIcon />
+        </button>
+
+        <Show when={isOpen()}>
+          <div class="absolute top-full right-0 mt-2 w-64 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-20">
+            <ul class="py-1" role="menu">
+              <For each={chapters()}>
+                {(chapter, i) => (
+                  <li>
+                    <a
+                      href="#"
+                      class={`block w-full text-left px-4 py-2 text-sm ${selectedIndex() === i() ? 'bg-[hsl(var(--accent))]' : 'hover:bg-[hsl(var(--accent))]'}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        props.onSelect?.(i());
+                        setIsOpen(false);
+                      }}
+                    >
+                      {chapter.title}
+                    </a>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </Show>
+      </div>
+    </div>
+  );
+}
+</file>
 
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
@@ -17675,84 +17759,6 @@ export function createWsBus({ replay = 0 } = {}) {
 }
 </file>
 
-<file path="src/net/wsRuntime.js">
-// src/net/wsRuntime.js
-import WsClient from "./WsClient";
-import { wsUrl } from "./endpoints";
-import { createWsBus } from "./wsBus";
-import { createWsApi } from "./wsApi";
-import { dbg } from "../utils/debug";
-
-let _client = null;
-let _bus = null;
-let _api = null;
-let _started = false;
-
-export function ensureWsStarted(reason = "init") {
-  if (!_client) {
-    _client = new WsClient();
-    _bus = createWsBus({ replay: 32 });
-    _api = createWsApi(_client);
-    _client.on("message", (obj) => {
-      const t = obj && (obj.type || obj.event);
-      if (t) _bus.emit(String(t), obj);
-    });
-  }
-  _client.setUrl();
-  const url = _client.url();
-  if (!url) {
-    dbg.warn("ws", "No WS URL configured");
-    return { client: _client, bus: _bus, api: _api };
-  }
-  if (_client.status() !== "open" && !_started) {
-    _client.connect();
-    _started = true;
-    dbg.log("ws", "singleton connect", { url, reason });
-  }
-  return { client: _client, bus: _bus, api: _api };
-}
-
-function onEndpointsUpdate() {
-  if (!_client) return;
-  const prev = _client.url();
-  _client.setUrl();
-  const next = _client.url();
-  if (next && next !== prev) {
-    dbg.log("ws", "singleton endpoints changed → reconnect", { prev, next });
-    _client.reconnect("endpoints-updated");
-  } else if (next && _client.status() !== "open") {
-    _client.connect();
-  }
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("savva:endpoints-updated", onEndpointsUpdate);
-  window.__ws = {
-    get client() { return _client; },
-    get bus() { return _bus; },
-    get api() { return _api; },
-    start: ensureWsStarted,
-  };
-}
-
-export function getWsClient() { return ensureWsStarted().client; }
-export function getWsApi()    { return ensureWsStarted().api; }
-export function onAlert(type, fn){ return ensureWsStarted().bus.on(type, fn); }
-export function offAlert(type, fn){ return ensureWsStarted().bus.off(type, fn); }
-
-// --- MODIFICATION: Add new helper function ---
-export function whenWsOpen() {
-  const ws = getWsClient();
-  if (ws.status() === 'open') return Promise.resolve();
-  return new Promise(resolve => {
-    const off = onAlert('open', () => {
-      off();
-      resolve();
-    });
-  });
-}
-</file>
-
 <file path="src/net/wsUrl.js">
 // File: src/net/wsUrl.js
 export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
@@ -18812,185 +18818,6 @@ export default function DocsPager(props) {
 }
 </file>
 
-<file path="src/components/docs/MarkdownView.jsx">
-// src/components/docs/MarkdownView.jsx
-import { createSignal, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-/* Inject a copy button into each <pre> before stringify */
-function rehypeCopyButton() {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      visit(tree, "element", (node) => {
-        if (node.tagName !== "pre") return;
-        const exists =
-          Array.isArray(node.children) &&
-          node.children.some(
-            (c) =>
-              c?.type === "element" &&
-              c?.properties?.className?.includes?.("sv-copy-btn")
-          );
-        if (exists) return;
-        node.children.push({
-          type: "element",
-          tagName: "button",
-          properties: { className: ["sv-copy-btn"], type: "button" },
-          children: [{ type: "text", value: "Copy" }],
-        });
-      });
-      return tree;
-    });
-}
-
-export default function MarkdownView(props) {
-  const { t } = useApp();
-  const [html, setHtml] = createSignal("");
-  let disposed = false;
-  let container;
-
-  async function renderMd() {
-    try {
-      const [
-        { unified },
-        { default: remarkParse },
-        { default: remarkGfm },
-        { default: remarkFrontmatter },
-        { default: remarkRehype },
-        { default: rehypeSlug },
-        { default: rehypeAutolinkHeadings },
-        { default: rehypePrettyCode },
-        { default: rehypeStringify },
-        DOMPurify,
-      ] = await Promise.all([
-        import("unified"),
-        import("remark-parse"),
-        import("remark-gfm"),
-        import("remark-frontmatter"),
-        import("remark-rehype"),
-        import("rehype-slug"),
-        import("rehype-autolink-headings"),
-        import("rehype-pretty-code"),
-        import("rehype-stringify"),
-        import("dompurify"),
-      ]);
-
-      // Preserve Shiki styles: allow CSS variables and var() uses on style attrs
-      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => {
-        if (data.attrName !== "style") return;
-        const src = String(data.attrValue || "");
-        const safe = [];
-        for (const decl of src.split(";")) {
-          const i = decl.indexOf(":");
-          if (i <= 0) continue;
-          const prop = decl.slice(0, i).trim().toLowerCase();
-          const val = decl.slice(i + 1).trim();
-          const isVarDecl = prop.startsWith("--"); // e.g., --shiki-*
-          const isVarUse = /^var\(/i.test(val);
-          const isColorProp =
-            prop === "color" ||
-            prop === "background" ||
-            prop === "background-color";
-          if (isVarDecl || isVarUse || isColorProp) safe.push(`${prop}:${val}`);
-        }
-        data.attrValue = safe.join(";");
-        if (data.attrValue) data.keepAttr = true;
-      });
-
-      const processor = unified()
-        .use(remarkParse)
-        .use(remarkFrontmatter, ["yaml", "toml"])
-        .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true })
-        .use(rehypeSlug)
-        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
-        .use(rehypePrettyCode, {
-          keepBackground: true,
-          theme: { light: "github-light", dark: "github-dark" },
-        })
-        .use(rehypeCopyButton)
-        .use(rehypeStringify, { allowDangerousHtml: true });
-
-      const file = await processor.process(String(props.markdown || ""));
-      const rawHtml = String(file);
-
-      const safe = DOMPurify.default.sanitize(rawHtml, {
-        USE_PROFILES: { html: true },
-        ADD_ATTR: ["style", "data-theme", "data-language", "data-line"],
-        ALLOW_DATA_ATTR: true,
-      });
-
-      if (!disposed) setHtml(safe);
-    } catch {
-      const safe = `<pre>${String(props.markdown || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")}</pre>`;
-      if (!disposed) setHtml(safe);
-    }
-  }
-
-  function copy(text) {
-    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
-    return new Promise((res, rej) => {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        res();
-      } catch (e) {
-        rej(e);
-      }
-    });
-  }
-
-  function onClick(e) {
-    const btn = e.target.closest?.(".sv-copy-btn");
-    if (!btn) return;
-    const code = btn.closest("pre")?.querySelector("code");
-    const text = code ? code.innerText : "";
-    copy(text).then(() => {
-      const prev = btn.textContent;
-      btn.textContent = t("docs.copied") || "Copied";
-      setTimeout(() => {
-        btn.textContent = t("docs.copy") || prev || "Copy";
-      }, 1200);
-    });
-  }
-
-  function relabelButtons() {
-    container?.querySelectorAll(".sv-copy-btn").forEach((b) => {
-      b.textContent = t("docs.copy") || "Copy";
-      b.title = t("docs.copy") || "Copy";
-      b.setAttribute("aria-label", t("docs.copy") || "Copy");
-    });
-  }
-
-  onMount(async () => {
-    await renderMd();
-    relabelButtons();
-    container?.addEventListener("click", onClick);
-  });
-
-  onCleanup(() => {
-    disposed = true;
-    container?.removeEventListener("click", onClick);
-  });
-
-  return (
-    <article
-      ref={(el) => (container = el)}
-      class="sv-docs prose prose-sm md:prose-base max-w-none"
-      innerHTML={html()}
-      aria-label={t("docs.article")}
-    />
-  );
-}
-</file>
-
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -19381,154 +19208,6 @@ export default function ForYouTab(props) {
 }
 </file>
 
-<file path="src/components/tabs/LeadersTab.jsx">
-// src/components/tabs/LeadersTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-import { whenWsOpen } from "../../net/wsRuntime.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-const TIME_FRAMES = ["month", "week", "year", "all"];
-
-export default function LeadersTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const [timeFrame, setTimeFrame] = createSignal("month");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      await whenWsOpen();
-      if (!contentList) return [];
-      const params = {
-        domain: domainName(),
-        content_type: "post",
-        limit,
-        offset,
-        lang: lang(),
-        order_by: 'total_author_share'
-      };
-      
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-
-      const user = app.authorizedUser();
-      if (user?.address) {
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      const selectedTime = timeFrame();
-      if (selectedTime !== "all") {
-        const now = new Date();
-        let pastDate = new Date();
-        if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
-        if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
-        if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
-        
-        // MODIFICATION: Changed to standard ISO string format.
-        params.min_time = pastDate.toISOString();
-      }
-
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      console.error("fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-4">
-          <div class="flex items-center gap-2 min-w-[220px]">
-            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={category()}
-              onInput={(e) => setCategory(e.currentTarget.value)}
-              aria-label={app.t("newTab.category")}
-            >
-              <For each={categoriesWithAll()}>
-                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-              </For>
-            </select>
-          </div>
-          <div class="flex items-center gap-2">
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={timeFrame()}
-              onInput={(e) => setTimeFrame(e.currentTarget.value)}
-              aria-label="Time frame"
-            >
-              <For each={TIME_FRAMES}>
-                {(frame) => <option value={frame}>{app.t(`timeFrame.${frame}`)}</option>}
-              </For>
-            </select>
-          </div>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-      />
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/ui/PostReactions.jsx">
 // src/components/ui/PostReactions.jsx
 import { For, createMemo, Show } from "solid-js";
@@ -19813,73 +19492,6 @@ export default function ViewModeToggle(props) {
 export { viewMode, setViewMode };
 </file>
 
-<file path="src/context/useAppAuth.js">
-// src/context/useAppAuth.js
-import { createSignal, onMount } from "solid-js";
-import { getWsClient, getWsApi } from "../net/wsRuntime.js";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast } from "../components/ui/toast.js";
-
-const AUTH_USER_KEY = "savva_auth_user";
-
-export function useAppAuth() {
-  const [authorizedUser, setAuthorizedUser] = createSignal(null);
-
-  onMount(() => {
-    try {
-      const savedUser = localStorage.getItem(AUTH_USER_KEY);
-      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
-    } catch (e) {
-      console.error("Failed to load authorized user:", e);
-      localStorage.removeItem(AUTH_USER_KEY);
-    }
-  });
-
-  async function login(coreUserData) {
-    if (!coreUserData || !coreUserData.address) return;
-    setAuthorizedUser(coreUserData);
-    try {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
-      const checksummedAccount = toChecksumAddress(coreUserData.address);
-      const userProfile = await getWsApi().call('get-user', {
-        domain: coreUserData.domain,
-        user_addr: checksummedAccount,
-      });
-      const fullUserData = { ...coreUserData, ...userProfile };
-      setAuthorizedUser(fullUserData);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
-    } catch (e) {
-      console.error("Failed to fetch/save user profile after login:", e);
-      pushErrorToast(e, { context: "Profile fetch failed" });
-    }
-  }
-
-  async function logout() {
-    try {
-      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
-      await fetch(`${httpBase()}logout`, { credentials: 'include' });
-    } catch (e) {
-      console.error("Logout API call failed, proceeding with client-side logout.", e);
-    }
-    setAuthorizedUser(null);
-    try {
-      localStorage.removeItem(AUTH_USER_KEY);
-    } catch (e) {
-      console.error("Failed to clear authorized user:", e);
-    }
-    getWsClient()?.reconnect('user-logged-out');
-  }
-
-  function handleAuthError() {
-    console.warn("Authorization error detected, logging out.");
-    logout();
-  }
-
-  return { authorizedUser, login, logout, handleAuthError };
-}
-</file>
-
 <file path="src/context/useAppConnection.js">
 // src/context/useAppConnection.js
 import { createSignal, onMount } from "solid-js";
@@ -20120,162 +19732,105 @@ export function currentDomain() { return _domain; }
 // src/ws/index.js
 </file>
 
-<file path="src/pages/PostPage.jsx">
-// src/pages/PostPage.jsx
-import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
-import { useHashRouter, navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton";
-import Spinner from "../components/ui/Spinner.jsx";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UserCard from "../components/ui/UserCard.jsx";
-import PostInfo from "../components/feed/PostInfo.jsx";
+<file path="src/net/wsRuntime.js">
+// src/net/wsRuntime.js
+import WsClient from "./WsClient";
+import { wsUrl } from "./endpoints";
+import { createWsBus } from "./wsBus";
+import { createWsApi } from "./wsApi";
+import { dbg } from "../utils/debug";
 
-const getIdentifier = (route) => route().split('/')[2] || "";
+let _client = null;
+let _bus = null;
+let _api = null;
+let _started = false;
 
-async function fetchPostByIdentifier(params) {
-  const { identifier, app, lang } = params;
-  if (!identifier || !app.wsMethod) return null;
-
-  const contentList = app.wsMethod("content-list");
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    lang: lang,
-    limit: 1,
-  };
-  
-  if (identifier.startsWith("0x")) {
-    requestParams.savva_cid = identifier;
-  } else {
-    requestParams.short_cid = identifier;
+export function ensureWsStarted(reason = "init") {
+  if (!_client) {
+    _client = new WsClient();
+    _bus = createWsBus({ replay: 32 });
+    _api = createWsApi(_client);
+    _client.on("message", (obj) => {
+      const t = obj && (obj.type || obj.event);
+      if (t) _bus.emit(String(t), obj);
+    });
   }
-  
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
+  _client.setUrl();
+  const url = _client.url();
+  if (!url) {
+    dbg.warn("ws", "No WS URL configured");
+    return { client: _client, bus: _bus, api: _api };
   }
-
-  const res = await contentList(requestParams);
-  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-  
-  return arr[0] || null;
+  if (_client.status() !== "open" && !_started) {
+    _client.connect();
+    _started = true;
+    dbg.log("ws", "singleton connect", { url, reason });
+  }
+  return { client: _client, bus: _bus, api: _api };
 }
 
-export default function PostPage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-  const identifier = createMemo(() => getIdentifier(route));
-  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+function onEndpointsUpdate() {
+  if (!_client) return;
+  const prev = _client.url();
+  _client.setUrl();
+  const next = _client.url();
+  if (next && next !== prev) {
+    dbg.log("ws", "singleton endpoints changed → reconnect", { prev, next });
+    _client.reconnect("endpoints-updated");
+  } else if (next && _client.status() !== "open") {
+    _client.connect();
+  }
+}
 
-  const [post] = createResource(
-    () => ({ identifier: identifier(), app, lang: uiLang() }),
-    fetchPostByIdentifier
-  );
-  
-  const [postLang, setPostLang] = createSignal(null);
+if (typeof window !== "undefined") {
+  window.addEventListener("savva:endpoints-updated", onEndpointsUpdate);
+  window.__ws = {
+    get client() {
+      return _client;
+    },
+    get bus() {
+      return _bus;
+    },
+    get api() {
+      return _api;
+    },
+    start: ensureWsStarted,
+  };
+}
 
-  createEffect(() => {
-    const p = post();
-    const id = identifier();
+export function getWsClient() {
+  return ensureWsStarted().client;
+}
+export function getWsApi() {
+  return ensureWsStarted().api;
+}
+export function onAlert(type, fn) {
+  return ensureWsStarted().bus.on(type, fn);
+}
+export function offAlert(type, fn) {
+  return ensureWsStarted().bus.off(type, fn);
+}
 
-    if (p && id.startsWith("0x") && p.short_cid) {
-      const newPath = `/post/${p.short_cid}`;
-      navigate(newPath, { replace: true });
+export function whenWsOpen({ timeoutMs = 12000 } = {}) {
+  const ws = getWsClient();
+  if (ws.status() === "open") return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    let timer;
+    const onOpen = () => {
+      ws.off("open", onOpen);
+      if (timer) clearTimeout(timer);
+      resolve();
+    };
+    ws.on("open", onOpen);
+
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        ws.off("open", onOpen);
+        reject(new Error("WS open timeout"));
+      }, timeoutMs);
     }
   });
-
-  createEffect(() => {
-    const p = post();
-    if (p && !postLang()) {
-      const availableLangs = Object.keys(p.savva_content?.locales || {});
-      if (availableLangs.length === 0) return;
-
-      const currentUiLang = uiLang();
-      let initialLang = availableLangs[0]; 
-
-      if (availableLangs.includes(currentUiLang)) {
-        initialLang = currentUiLang;
-      } else if (availableLangs.includes('en')) {
-        initialLang = 'en';
-      }
-      
-      setPostLang(initialLang);
-    }
-  });
-
-  const title = createMemo(() => post()?.savva_content?.locales?.[postLang()]?.title || "");
-  const text = createMemo(() => post()?.savva_content?.locales?.[postLang()]?.text || "");
-  const thumbnail = createMemo(() => post()?.savva_content?.thumbnail);
-  const availableLocales = createMemo(() => Object.keys(post()?.savva_content?.locales || {}));
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto">
-      <ClosePageButton />
-      
-      <Switch>
-        <Match when={post.loading}>
-          <div class="flex justify-center items-center h-64">
-            <Spinner class="w-8 h-8" />
-          </div>
-        </Match>
-
-        <Match when={post.error}>
-          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error.message}</p>
-          </div>
-        </Match>
-
-        <Match when={!post.loading && post() === null}>
-          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
-            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
-            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
-          </div>
-        </Match>
-
-        <Match when={post()}>
-          <article class="space-y-4">
-            <header class="flex justify-between items-start gap-4">
-              <div class="flex-1 min-w-0 space-y-3">
-                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title()}</h1>
-                <UserCard author={post().author} />
-                <PostInfo 
-                  item={post()} 
-                  hideTopBorder={true} 
-                  timeFormat="long"
-                  rewardsAlign="left" 
-                />
-              </div>
-              
-              {/* --- MODIFICATION: Added flex classes to center children --- */}
-              <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
-                <Show when={thumbnail()}>
-                  <IpfsImage 
-                    src={thumbnail()} 
-                    class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
-                    alt="Post thumbnail"
-                  />
-                </Show>
-                {/* --- MODIFICATION: Removed the variant prop --- */}
-                <LangSelector 
-                  codes={availableLocales()}
-                  value={postLang()}
-                  onChange={setPostLang}
-                />
-              </div>
-            </header>
-
-            <div class="prose prose-sm md:prose-base max-w-none pt-4 border-t border-[hsl(var(--border))]">
-              <p>{text()}</p>
-            </div>
-          </article>
-        </Match>
-      </Switch>
-    </main>
-  );
 }
 </file>
 
@@ -20930,6 +20485,126 @@ async function translateTo(langCode, englishPairs) {
 });
 </file>
 
+<file path="src/components/docs/MarkdownView.jsx">
+// src/components/docs/MarkdownView.jsx
+import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug.js";
+
+function rehypeCopyButton() {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      visit(tree, "element", (node) => {
+        if (node.tagName !== "pre") return;
+        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
+        node.children.push({
+          type: "element", tagName: "button",
+          properties: { className: ["sv-copy-btn"], type: "button" },
+          children: [{ type: "text", value: "Copy" }],
+        });
+      });
+      return tree;
+    });
+}
+
+export default function MarkdownView(props) {
+  const { t } = useApp();
+  const [html, setHtml] = createSignal("");
+  let disposed = false;
+  let container;
+
+  async function renderMd() {
+    try {
+      const [
+        { unified }, { default: remarkParse }, { default: remarkGfm }, 
+        { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
+        { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
+        { default: rehypeStringify }, DOMPurify,
+      ] = await Promise.all([
+        import("unified"), import("remark-parse"), import("remark-gfm"),
+        import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
+        import("rehype-autolink-headings"), import("rehype-pretty-code"),
+        import("rehype-stringify"), import("dompurify"),
+      ]);
+
+      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => { /* ... */ });
+
+      const processor = unified()
+        .use(remarkParse)
+        .use(remarkFrontmatter, ["yaml", "toml"])
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true });
+
+      if (props.rehypePlugins) {
+        for (const plugin of props.rehypePlugins) {
+          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
+        }
+      }
+      
+      processor
+        .use(rehypeSlug)
+        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
+        .use(rehypePrettyCode, {
+          keepBackground: true,
+          theme: { light: "github-light", dark: "github-dark" },
+        })
+        .use(rehypeCopyButton)
+        .use(rehypeStringify, { allowDangerousHtml: true });
+      
+      const file = await processor.process(String(props.markdown || ""));
+      const rawHtml = String(file);
+      const safe = DOMPurify.default.sanitize(rawHtml, { /* ... */ });
+
+      if (!disposed) setHtml(safe);
+    } catch (err) {
+      // --- MODIFICATION: Improved error logging and display ---
+      dbg.error("MarkdownView", "Markdown rendering failed:", err);
+      const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      
+      const errorHtml = `
+        <div style="color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive)); padding: 1rem; border-radius: 0.5rem;">
+          <strong>Markdown Rendering Error:</strong>
+          <pre style="margin-top: 0.5rem; white-space: pre-wrap;">${safeErr}</pre>
+          <hr style="margin: 1rem 0;" />
+          <strong>Original Content:</strong>
+          <pre style="white-space: pre-wrap;">${safeMd}</pre>
+        </div>`;
+      if (!disposed) setHtml(errorHtml);
+    }
+  }
+
+  function copy(text) { /* ... */ }
+  function onClick(e) { /* ... */ }
+  function relabelButtons() { /* ... */ }
+  
+  onMount(() => {
+    renderMd().then(() => relabelButtons());
+    container?.addEventListener("click", onClick);
+  });
+
+  createEffect(on(() => props.markdown, (md, prevMd) => {
+    if (md !== prevMd && prevMd !== undefined) {
+      renderMd().then(() => relabelButtons());
+    }
+  }, { defer: true }));
+
+  onCleanup(() => {
+    disposed = true;
+    container?.removeEventListener("click", onClick);
+  });
+
+  return (
+    <article
+      ref={(el) => (container = el)}
+      class="sv-docs prose prose-sm md:prose-base max-w-none"
+      innerHTML={html()}
+      aria-label={t("docs.article")}
+    />
+  );
+}
+</file>
+
 <file path="src/components/feed/PostInfo.jsx">
 // src/components/feed/PostInfo.jsx
 import { Show, createMemo } from "solid-js";
@@ -21026,52 +20701,6 @@ export default function PostListView(props) {
 }
 </file>
 
-<file path="src/components/main/MainView.jsx">
-// src/components/main/MainView.jsx
-import { createMemo, Show } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import TabsBar from "./TabsBar";
-import Container from "../layout/Container";
-import ToTopButton from "../ui/ToTopButton";
-import { dbg } from "../../utils/debug.js";
-
-export default function MainView() {
-  const { t, selectedDomain, domainAssetsConfig, domainAssetsSource, loading } = useApp();
-
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    return !d ? "" : typeof d === "string" ? d : d.name || "";
-  });
-
-  const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
-
-  const revision = createMemo(() => {
-    if (loading()) return null;
-
-    const source = domainAssetsSource?.();
-    const cfg = domainAssetsConfig?.();
-    const cid = cfg?.assets_cid || cfg?.cid || "";
-    const tabs = cfg?.modules?.tabs || "";
-    
-    const key = `${domainName()}|${source}|${cid}|${tabs}`;
-    // --- DEBUG: Log the revision key using dbg ---
-    dbg.log('MainView', `Revision key updated to: ${key}`);
-    return key;
-  });
-
-  return (
-    <Container>
-      <ToTopButton />
-      <div class="w-full">
-        <Show when={revision()} keyed>
-          {() => <TabsBar />}
-        </Show>
-      </div>
-    </Container>
-  );
-}
-</file>
-
 <file path="src/components/tabs/index.js">
 // src/components/tabs/index.js
 import ActualTab from "./ActualTab.jsx";
@@ -21095,6 +20724,154 @@ const REGISTRY = {
 export function getTabComponent(type) {
   const key = String(type || "").toLowerCase();
   return REGISTRY[key] || null;
+}
+</file>
+
+<file path="src/components/tabs/LeadersTab.jsx">
+// src/components/tabs/LeadersTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+const TIME_FRAMES = ["month", "week", "year", "all"];
+
+export default function LeadersTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const [timeFrame, setTimeFrame] = createSignal("month");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      await whenWsOpen();
+      if (!contentList) return [];
+      const params = {
+        domain: domainName(),
+        content_type: "post",
+        limit,
+        offset,
+        lang: lang(),
+        order_by: 'total_author_share'
+      };
+      
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      const selectedTime = timeFrame();
+      if (selectedTime !== "all") {
+        const now = new Date();
+        let pastDate = new Date();
+        if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
+        if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
+        if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
+        
+        // MODIFICATION: Changed to standard ISO string format.
+        params.min_time = pastDate.toISOString();
+      }
+
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      console.error("fetchPage error:", err);
+      return [];
+    }
+  }
+
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-4">
+          <div class="flex items-center gap-2 min-w-[220px]">
+            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={category()}
+              onInput={(e) => setCategory(e.currentTarget.value)}
+              aria-label={app.t("newTab.category")}
+            >
+              <For each={categoriesWithAll()}>
+                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+              </For>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={timeFrame()}
+              onInput={(e) => setTimeFrame(e.currentTarget.value)}
+              aria-label="Time frame"
+            >
+              <For each={TIME_FRAMES}>
+                {(frame) => <option value={frame}>{app.t(`timeFrame.${frame}`)}</option>}
+              </For>
+            </select>
+          </div>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+      />
+    </section>
+  );
 }
 </file>
 
@@ -21450,6 +21227,73 @@ export default function Toaster() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="src/context/useAppAuth.js">
+// src/context/useAppAuth.js
+import { createSignal, onMount } from "solid-js";
+import { getWsClient, getWsApi } from "../net/wsRuntime.js";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast } from "../components/ui/toast.js";
+
+const AUTH_USER_KEY = "savva_auth_user";
+
+export function useAppAuth() {
+  const [authorizedUser, setAuthorizedUser] = createSignal(null);
+
+  onMount(() => {
+    try {
+      const savedUser = localStorage.getItem(AUTH_USER_KEY);
+      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
+    } catch (e) {
+      console.error("Failed to load authorized user:", e);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+  });
+
+  async function login(coreUserData) {
+    if (!coreUserData || !coreUserData.address) return;
+    setAuthorizedUser(coreUserData);
+    try {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
+      const checksummedAccount = toChecksumAddress(coreUserData.address);
+      const userProfile = await getWsApi().call('get-user', {
+        domain: coreUserData.domain,
+        user_addr: checksummedAccount,
+      });
+      const fullUserData = { ...coreUserData, ...userProfile };
+      setAuthorizedUser(fullUserData);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
+    } catch (e) {
+      console.error("Failed to fetch/save user profile after login:", e);
+      pushErrorToast(e, { context: "Profile fetch failed" });
+    }
+  }
+
+  async function logout() {
+    try {
+      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
+      await fetch(`${httpBase()}logout`, { credentials: 'include' });
+    } catch (e) {
+      console.error("Logout API call failed, proceeding with client-side logout.", e);
+    }
+    setAuthorizedUser(null);
+    try {
+      localStorage.removeItem(AUTH_USER_KEY);
+    } catch (e) {
+      console.error("Failed to clear authorized user:", e);
+    }
+    getWsClient()?.reconnect('user-logged-out');
+  }
+
+  function handleAuthError() {
+    console.warn("Authorization error detected, logging out.");
+    logout();
+  }
+
+  return { authorizedUser, login, logout, handleAuthError };
 }
 </file>
 
@@ -22067,350 +21911,6 @@ export default {
 };
 </file>
 
-<file path="src/net/WsClient.js">
-// File: src/net/WsClient.js
-import { dbg } from "../utils/debug";
-import { wsUrl as endpointsWsUrl } from "./endpoints";
-
-/**
- * Pure WebSocket transport.
- * Request:  { id: number, type: string, data: any }
- * Response: { id?: number, type?: string, error?: string, data?: any }
- * Alerts:   { type: string, data?: any }  (no id)
- */
-export default class WsClient {
-  constructor({ url = "", protocols } = {}) {
-    this._url = url || "";
-    this._protocols = protocols || undefined;
-    this._ws = null;
-    this._manualClose = false;
-
-    this._status = "idle"; // idle | connecting | open | closed
-    this._attempt = 0;
-    this._shouldReconnect = true;
-    this._reconnectTid = null;
-
-    this._heartbeatTid = null;
-    this._heartbeatMs = 25_000;
-
-    this._sendQueue = [];
-    this._pending = new Map(); // id (string) -> { resolve, reject, timer }
-    this._nextId = 1;
-
-    this._listeners = new Map();
-
-    this._onOnline = () => this.reconnect("online");
-    if (typeof window !== "undefined") {
-      window.addEventListener("online", this._onOnline);
-      window.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible" && this._status !== "open") {
-          this.reconnect("visible");
-        }
-      });
-    }
-  }
-
-  // ─── public API ───────────────────────────────────────────────────────────────
-  dispose() {
-    this._shouldReconnect = false;
-    this._clearReconnect();
-    this._stopHeartbeat();
-    if (this._ws) {
-      try {
-        this._ws.close();
-      } catch {}
-    }
-    this._ws = null;
-    if (typeof window !== "undefined") {
-      window.removeEventListener("online", this._onOnline);
-    }
-    this._failInflight(new Error("WS disposed"));
-    this._emit("status", "closed");
-  }
-
-  url() {
-    return this._url;
-  }
-  status() {
-    return this._status;
-  }
-  attempt() {
-    return this._attempt;
-  }
-
-  setUrl(nextUrl) {
-    const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
-    const u = String(source || "");
-    if (!u) {
-      dbg.warn("ws", "No WS URL configured");
-      return;
-    }
-    if (u === this._url) return;
-    this._url = u;
-    dbg.log("ws", "URL updated", { url: u });
-  }
-
-  setAutoReconnect(on) {
-    this._shouldReconnect = !!on;
-  }
-
-  connect() {
-    if (!this._url) return;
-    if (
-      this._ws &&
-      (this._ws.readyState === WebSocket.OPEN ||
-        this._ws.readyState === WebSocket.CONNECTING)
-    ) {
-      return;
-    }
-    this._clearReconnect();
-    this._setStatus("connecting");
-    dbg.log("ws", "Connecting…", { url: this._url });
-
-    try {
-      const ws = new WebSocket(this._url, this._protocols);
-      this._ws = ws;
-
-      ws.addEventListener("open", () => {
-        this._attempt = 0;
-        this._setStatus("open");
-        dbg.log("ws", "Connected", { url: this._url });
-        this._flushQueue();
-        this._startHeartbeat();
-        this._emit("open");
-      });
-
-      ws.addEventListener("message", (ev) => this._onMessage(ev));
-
-      ws.addEventListener("error", (ev) => {
-        dbg.warn("ws", "Error", { event: ev });
-        this._emit("error", ev);
-      });
-
-      ws.addEventListener("close", (ev) => {
-        dbg.warn("ws", "Closed", { code: ev.code, reason: ev.reason });
-        this._stopHeartbeat();
-        this._setStatus("closed");
-        this._emit("close", ev);
-        this._failInflight(new Error("WS closed"));
-        if (this._shouldReconnect && !this._manualClose) {
-          this._scheduleReconnect();
-        }
-        this._manualClose = false; // Reset the flag after handling the close event.
-      });
-    } catch (e) {
-      dbg.error("ws", "Connect exception", e);
-      this._setStatus("closed");
-      this._scheduleReconnect();
-    }
-  }
-
-  reconnect(reason = "manual") {
-    dbg.log("ws", "Reconnecting…", { reason });
-    this._clearReconnect();
-    if (this._ws) {
-      this._manualClose = true; 
-      try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
-    }
-    this._ws = null;
-    
-    this.connect();
-  }
-
-  close() {
-    this._manualClose = true;
-    this._clearReconnect();
-    this._stopHeartbeat();
-    this._shouldReconnect = false;
-    try {
-      this._ws && this._ws.close(1000, "client-close");
-    } catch {}
-    this._ws = null;
-    this._setStatus("closed");
-    this._failInflight(new Error("WS closed by client"));
-  }
-
-  send(data) {
-    const open = this._ws && this._ws.readyState === WebSocket.OPEN;
-    if (open) this._ws.send(data);
-    else this._sendQueue.push(data);
-  }
-  sendJson(obj) {
-    this.send(JSON.stringify(obj));
-  }
-
-  /** Backend dialect:
-   * send: { id: number, name: "<handler>", data: {...} }
-   * ok:   { id, data, [type] }
-   * err:  { id, error: "<string>", [type] }
-   */
-  call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
-    const numericId = Number.isFinite(id) ? id : this._nextId++;
-    const callId = String(numericId);
-
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this._pending.delete(callId);
-        const err = new Error("WS request timeout");
-        err.code = "ETIMEDOUT";
-        reject(err);
-      }, timeoutMs);
-
-      this._pending.set(callId, { resolve, reject, timer });
-      this.sendJson({
-        id: numericId,
-        type: String(method),
-        data: params || {},
-      });
-    });
-  }
-
-  on(type, fn) {
-    const key = String(type || "");
-    const set = this._listeners.get(key) || new Set();
-    set.add(fn);
-    this._listeners.set(key, set);
-    return () => this.off(key, fn);
-  }
-  off(type, fn) {
-    const set = this._listeners.get(type);
-    if (!set) return;
-    set.delete(fn);
-    if (set.size === 0) this._listeners.delete(type);
-  }
-
-  // ─── internals ────────────────────────────────────────────────────────────────
-  _setStatus(s) {
-    if (this._status !== s) {
-      this._status = s;
-      this._emit("status", s);
-    }
-  }
-
-  _emit(type, payload) {
-    const set = this._listeners.get(type);
-    if (!set || set.size === 0) return;
-    for (const fn of Array.from(set)) {
-      try {
-        fn(payload);
-      } catch (e) {
-        dbg.error("ws", "listener error", e);
-      }
-    }
-  }
-
-  _onMessage(ev) {
-    let data = ev.data;
-    try {
-      const obj = JSON.parse(data);
-
-      // Correlated response: match (stringified) id
-      if (obj && obj.id != null) {
-        const key = String(obj.id);
-        const entry = this._pending.get(key);
-        if (entry) {
-          clearTimeout(entry.timer);
-          this._pending.delete(key);
-
-          if (typeof obj.error === "string" && obj.error) {
-            const err = new Error(obj.error || "WS error");
-            err.code = "WS_ERROR";
-            entry.reject(err);
-            return;
-          }
-
-          if ("data" in obj) {
-            entry.resolve(obj.data);
-            return;
-          }
-          // if backend someday returns {result: ...}, accept that too
-          if ("result" in obj) {
-            entry.resolve(obj.result);
-            return;
-          }
-
-          entry.resolve(obj);
-          return;
-        }
-      }
-
-      // Alerts / broadcasts: frames with a type and no matching id
-      if (obj && obj.type) {
-        // forward both the whole obj on "message" and the typed payload
-        this._emit(obj.type, obj.data ?? obj);
-        this._emit("message", obj);
-        return;
-      }
-
-      // Fallback
-      this._emit("message", obj);
-    } catch {
-      this._emit("raw", data);
-    }
-  }
-
-  _flushQueue() {
-    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
-    while (this._sendQueue.length) {
-      const item = this._sendQueue.shift();
-      try {
-        this._ws.send(item);
-      } catch {}
-    }
-  }
-
-  _startHeartbeat() {
-    this._stopHeartbeat();
-    if (this._heartbeatMs > 0) {
-      this._heartbeatTid = setInterval(() => {
-        try {
-          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-            this._ws.send('{"type":"ping"}');
-          }
-        } catch {}
-      }, this._heartbeatMs);
-    }
-  }
-  _stopHeartbeat() {
-    if (this._heartbeatTid) {
-      clearInterval(this._heartbeatTid);
-      this._heartbeatTid = null;
-    }
-  }
-
-  _scheduleReconnect() {
-    if (!this._shouldReconnect) return;
-    this._attempt += 1;
-    const base = 300 * Math.pow(2, this._attempt - 1);
-    const jitter = Math.floor(Math.random() * 400);
-    const delay = Math.min(10_000, base + jitter);
-    dbg.log("ws", "Reconnect scheduled", {
-      inMs: delay,
-      attempt: this._attempt,
-    });
-    this._clearReconnect();
-    this._reconnectTid = setTimeout(() => this.connect(), delay);
-  }
-  _clearReconnect() {
-    if (this._reconnectTid) {
-      clearTimeout(this._reconnectTid);
-      this._reconnectTid = null;
-    }
-  }
-
-  _failInflight(err) {
-    if (!this._pending.size) return;
-    for (const [, entry] of this._pending) {
-      clearTimeout(entry.timer);
-      try {
-        entry.reject(err);
-      } catch {}
-    }
-    this._pending.clear();
-  }
-}
-</file>
-
 <file path="src/net/WsConnector.jsx">
 // src/net/WsConnector.jsx
 import { onMount, onCleanup, createSignal } from "solid-js";
@@ -22763,75 +22263,48 @@ tabs:
 }
 </file>
 
-<file path="src/components/feed/ContentFeed.jsx">
-// src/components/feed/ContentFeed.jsx
-import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import PostListView from "./PostListView.jsx";
+<file path="src/components/main/MainView.jsx">
+// src/components/main/MainView.jsx
+import { createMemo, Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import TabsBar from "./TabsBar";
+import Container from "../layout/Container";
+import ToTopButton from "../ui/ToTopButton";
 import { dbg } from "../../utils/debug.js";
 
-export default function ContentFeed(props) {
-  const { t } = useApp();
-  const [items, setItems] = createSignal([]);
-  const [page, setPage] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
+export default function MainView() {
+  const { t, selectedDomain, domainAssetsConfig, domainAssetsSource, loading } = useApp();
 
-  async function loadMore() {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-    try {
-      const nextPage = page() + 1;
-      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
-      if (!chunk.length) setHasMore(false);
-      setItems((prev) => prev.concat(chunk));
-      setPage(nextPage);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(() => {
-    // --- DEBUG: Log when the component mounts using dbg ---
-    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
-    loadMore();
-    const handleScroll = () => {
-      const scrollThreshold = 600;
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (scrolledToBottom) loadMore();
-    };
-    let timeoutId = null;
-    const throttledHandleScroll = () => {
-      if (timeoutId === null) {
-        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
-      }
-    };
-    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
-    onCleanup(() => {
-      window.removeEventListener('scroll', throttledHandleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    });
+  const domainName = createMemo(() => {
+    const d = selectedDomain?.();
+    return !d ? "" : typeof d === "string" ? d : d.name || "";
   });
 
-  createEffect(on(() => props.resetOn, () => {
-    setItems([]);
-    setPage(0);
-    setHasMore(true);
-    setLoading(false);
-    queueMicrotask(loadMore);
-  }, { defer: true }));
+  const title = createMemo(() => t("main.title", { domain: domainName() || "SAVVA" }));
+
+  const revision = createMemo(() => {
+    if (loading()) return null;
+
+    const source = domainAssetsSource?.();
+    const cfg = domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const tabs = cfg?.modules?.tabs || "";
+    
+    const key = `${domainName()}|${source}|${cid}|${tabs}`;
+    // --- DEBUG: Log the revision key using dbg ---
+    dbg.log('MainView', `Revision key updated to: ${key}`);
+    return key;
+  });
 
   return (
-    <div class="w-full">
-      <PostListView
-        items={items()}
-        mode={props.mode}
-        isRailVisible={props.isRailVisible}
-      />
-      <Show when={loading()}>
-        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
-      </Show>
-    </div>
+    <Container>
+      <ToTopButton />
+      <div class="w-full">
+        <Show when={revision()} keyed>
+          {() => <TabsBar />}
+        </Show>
+      </div>
+    </Container>
   );
 }
 </file>
@@ -22984,128 +22457,348 @@ export default function Tabs(props) {
 }
 </file>
 
-<file path="src/ipfs/index.js">
-// src/ipfs/index.js
-import { fetchWithTimeout } from "../utils/net.js";
+<file path="src/net/WsClient.js">
+// File: src/net/WsClient.js
+import { dbg } from "../utils/debug";
+import { wsUrl as endpointsWsUrl } from "./endpoints";
 
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+/**
+ * Pure WebSocket transport.
+ * Request:  { id: number, type: string, data: any }
+ * Response: { id?: number, type?: string, error?: string, data?: any }
+ * Alerts:   { type: string, data?: any }  (no id)
+ */
+export default class WsClient {
+  constructor({ url = "", protocols } = {}) {
+    this._url = url || "";
+    this._protocols = protocols || undefined;
+    this._ws = null;
+    this._manualClose = false;
 
-function normalizeInput(input) {
-  let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
-  return s;
-}
+    this._status = "idle"; // idle | connecting | open | closed
+    this._attempt = 0;
+    this._shouldReconnect = true;
+    this._reconnectTid = null;
 
-function buildUrl(baseGateway, cidPath) {
-  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
-  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
-  if (!base || !path) return "";
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
-  return prefix + path;
-}
+    this._heartbeatTid = null;
+    this._heartbeatMs = 25_000;
 
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) return { res, url, gateway: gw };
+    this._sendQueue = [];
+    this._pending = new Map(); // id (string) -> { resolve, reject, timer }
+    this._nextId = 1;
 
-      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
-      httpError.url = url;
-      httpError.status = res.status; // Attach status for later inspection
-      errors.push(httpError);
+    this._listeners = new Map();
 
-    } catch (e) {
-      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
-      networkError.url = url;
-      errors.push(networkError);
+    this._onOnline = () => this.reconnect("online");
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", this._onOnline);
+      window.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && this._status !== "open") {
+          this.reconnect("visible");
+        }
+      });
     }
   }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  // If ANY error was a 404, it's likely a bad CID. Flag it.
-  if (errors.some(e => e.status === 404)) {
-      err.is404 = true;
-  }
-  throw err;
-}
 
-async function fetchIpfs(input, opts = {}) {
-  const { gateways = [], ...rest } = opts;
-  if (!gateways || gateways.length === 0) throw new Error("ipfs.fetch: no gateways provided");
-  const cidPath = normalizeInput(input);
-  const { res, url, gateway } = await tryGateways(cidPath, gateways, { init: rest });
-  return { response: res, url, gateway };
-}
-
-async function getJSON(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
-  return { data: await response.json(), url, gateway };
-}
-
-async function getText(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.text(), url, gateway };
-}
-
-async function getBlob(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.blob(), url, gateway };
-}
-
-async function getArrayBuffer(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.arrayBuffer(), url, gateway };
-}
-
-async function fetchBest(app, ipfsPath, options = {}) {
-  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
-  const cidPath = normalizeInput(ipfsPath);
-  let gatewaysToTry = [];
-  
-  let effectiveTimeout = timeoutMs;
-
-  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-    gatewaysToTry = [app.localIpfsGateway()];
-    effectiveTimeout = 30000;
-  } else {
-    const systemGateways = app.remoteIpfsGateways() || [];
-    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
+  // ─── public API ───────────────────────────────────────────────────────────────
+  dispose() {
+    this._shouldReconnect = false;
+    this._clearReconnect();
+    this._stopHeartbeat();
+    if (this._ws) {
+      try {
+        this._ws.close();
+      } catch {}
+    }
+    this._ws = null;
+    if (typeof window !== "undefined") {
+      window.removeEventListener("online", this._onOnline);
+    }
+    this._failInflight(new Error("WS disposed"));
+    this._emit("status", "closed");
   }
 
-  if (gatewaysToTry.length === 0) {
-    throw new Error("No IPFS gateways available to try.");
+  url() {
+    return this._url;
+  }
+  status() {
+    return this._status;
+  }
+  attempt() {
+    return this._attempt;
   }
 
-  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
-}
+  setUrl(nextUrl) {
+    const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
+    const u = String(source || "");
+    if (!u) {
+      dbg.warn("ws", "No WS URL configured");
+      return;
+    }
+    if (u === this._url) return;
+    this._url = u;
+    dbg.log("ws", "URL updated", { url: u });
+  }
 
-async function getJSONBest(app, ipfsPath, options = {}) {
-  const { response, url, gateway } = await fetchBest(app, ipfsPath, {
-    ...options,
-    headers: { Accept: "application/json", ...(options.headers || {}) },
-  });
-  return { data: await response.json(), url, gateway };
-}
+  setAutoReconnect(on) {
+    this._shouldReconnect = !!on;
+  }
 
-export const ipfs = {
-  fetch: fetchIpfs,
-  getJSON,
-  getText,
-  getBlob,
-  getArrayBuffer,
-  fetchBest,
-  getJSONBest,
-  normalizeInput,
-  buildUrl,
-};
+  connect() {
+    if (!this._url) return;
+    if (
+      this._ws &&
+      (this._ws.readyState === WebSocket.OPEN ||
+        this._ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+    this._clearReconnect();
+    this._setStatus("connecting");
+    dbg.log("ws", "Connecting…", { url: this._url });
+
+    try {
+      const ws = new WebSocket(this._url, this._protocols);
+      this._ws = ws;
+
+      ws.addEventListener("open", () => {
+        this._attempt = 0;
+        this._setStatus("open");
+        dbg.log("ws", "Connected", { url: this._url });
+        this._flushQueue();
+        this._startHeartbeat();
+        this._emit("open");
+      });
+
+      ws.addEventListener("message", (ev) => this._onMessage(ev));
+
+      ws.addEventListener("error", (ev) => {
+        dbg.warn("ws", "Error", { event: ev });
+        this._emit("error", ev);
+      });
+
+      ws.addEventListener("close", (ev) => {
+        dbg.warn("ws", "Closed", { code: ev.code, reason: ev.reason });
+        this._stopHeartbeat();
+        this._setStatus("closed");
+        this._emit("close", ev);
+        this._failInflight(new Error("WS closed"));
+        if (this._shouldReconnect && !this._manualClose) {
+          this._scheduleReconnect();
+        }
+        this._manualClose = false; // Reset the flag after handling the close event.
+      });
+    } catch (e) {
+      dbg.error("ws", "Connect exception", e);
+      this._setStatus("closed");
+      this._scheduleReconnect();
+    }
+  }
+
+  reconnect(reason = "manual") {
+    dbg.log("ws", "Reconnecting…", { reason });
+    this._clearReconnect();
+    if (this._ws) {
+      this._manualClose = true; 
+      try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
+    }
+    this._ws = null;
+    
+    this.connect();
+  }
+
+  close() {
+    this._manualClose = true;
+    this._clearReconnect();
+    this._stopHeartbeat();
+    this._shouldReconnect = false;
+    try {
+      this._ws && this._ws.close(1000, "client-close");
+    } catch {}
+    this._ws = null;
+    this._setStatus("closed");
+    this._failInflight(new Error("WS closed by client"));
+  }
+
+  send(data) {
+    const open = this._ws && this._ws.readyState === WebSocket.OPEN;
+    if (open) this._ws.send(data);
+    else this._sendQueue.push(data);
+  }
+  sendJson(obj) {
+    this.send(JSON.stringify(obj));
+  }
+
+  /** Backend dialect:
+   * send: { id: number, name: "<handler>", data: {...} }
+   * ok:   { id, data, [type] }
+   * err:  { id, error: "<string>", [type] }
+   */
+  call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
+    const numericId = Number.isFinite(id) ? id : this._nextId++;
+    const callId = String(numericId);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pending.delete(callId);
+        const err = new Error("WS request timeout");
+        err.code = "ETIMEDOUT";
+        reject(err);
+      }, timeoutMs);
+
+      this._pending.set(callId, { resolve, reject, timer });
+      this.sendJson({
+        id: numericId,
+        type: String(method),
+        data: params || {},
+      });
+    });
+  }
+
+  on(type, fn) {
+    const key = String(type || "");
+    const set = this._listeners.get(key) || new Set();
+    set.add(fn);
+    this._listeners.set(key, set);
+    return () => this.off(key, fn);
+  }
+  off(type, fn) {
+    const set = this._listeners.get(type);
+    if (!set) return;
+    set.delete(fn);
+    if (set.size === 0) this._listeners.delete(type);
+  }
+
+  // ─── internals ────────────────────────────────────────────────────────────────
+  _setStatus(s) {
+    if (this._status !== s) {
+      this._status = s;
+      this._emit("status", s);
+    }
+  }
+
+  _emit(type, payload) {
+    const set = this._listeners.get(type);
+    if (!set || set.size === 0) return;
+    for (const fn of Array.from(set)) {
+      try {
+        fn(payload);
+      } catch (e) {
+        dbg.error("ws", "listener error", e);
+      }
+    }
+  }
+
+  _onMessage(ev) {
+    let data = ev.data;
+    try {
+      const obj = JSON.parse(data);
+
+      // Correlated response: match (stringified) id
+      if (obj && obj.id != null) {
+        const key = String(obj.id);
+        const entry = this._pending.get(key);
+        if (entry) {
+          clearTimeout(entry.timer);
+          this._pending.delete(key);
+
+          if (typeof obj.error === "string" && obj.error) {
+            const err = new Error(obj.error || "WS error");
+            err.code = "WS_ERROR";
+            entry.reject(err);
+            return;
+          }
+
+          if ("data" in obj) {
+            entry.resolve(obj.data);
+            return;
+          }
+          // if backend someday returns {result: ...}, accept that too
+          if ("result" in obj) {
+            entry.resolve(obj.result);
+            return;
+          }
+
+          entry.resolve(obj);
+          return;
+        }
+      }
+
+      // Alerts / broadcasts: frames with a type and no matching id
+      if (obj && obj.type) {
+        // forward both the whole obj on "message" and the typed payload
+        this._emit(obj.type, obj.data ?? obj);
+        this._emit("message", obj);
+        return;
+      }
+
+      // Fallback
+      this._emit("message", obj);
+    } catch {
+      this._emit("raw", data);
+    }
+  }
+
+  _flushQueue() {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+    while (this._sendQueue.length) {
+      const item = this._sendQueue.shift();
+      try {
+        this._ws.send(item);
+      } catch {}
+    }
+  }
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    if (this._heartbeatMs > 0) {
+      this._heartbeatTid = setInterval(() => {
+        try {
+          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+            this._ws.send('{"type":"ping"}');
+          }
+        } catch {}
+      }, this._heartbeatMs);
+    }
+  }
+  _stopHeartbeat() {
+    if (this._heartbeatTid) {
+      clearInterval(this._heartbeatTid);
+      this._heartbeatTid = null;
+    }
+  }
+
+  _scheduleReconnect() {
+    if (!this._shouldReconnect) return;
+    this._attempt += 1;
+    const base = 300 * Math.pow(2, this._attempt - 1);
+    const jitter = Math.floor(Math.random() * 400);
+    const delay = Math.min(10_000, base + jitter);
+    dbg.log("ws", "Reconnect scheduled", {
+      inMs: delay,
+      attempt: this._attempt,
+    });
+    this._clearReconnect();
+    this._reconnectTid = setTimeout(() => this.connect(), delay);
+  }
+  _clearReconnect() {
+    if (this._reconnectTid) {
+      clearTimeout(this._reconnectTid);
+      this._reconnectTid = null;
+    }
+  }
+
+  _failInflight(err) {
+    if (!this._pending.size) return;
+    for (const [, entry] of this._pending) {
+      clearTimeout(entry.timer);
+      try {
+        entry.reject(err);
+      } catch {}
+    }
+    this._pending.clear();
+  }
+}
 </file>
 
 <file path="src/pages/Docs.jsx">
@@ -23151,6 +22844,288 @@ export default function Docs() {
         </main>
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="src/pages/PostPage.jsx">
+// src/pages/PostPage.jsx
+import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { parse } from "yaml";
+import { dbg } from "../utils/debug.js";
+import ClosePageButton from "../components/ui/ClosePageButton";
+import Spinner from "../components/ui/Spinner.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UserCard from "../components/ui/UserCard.jsx";
+import PostInfo from "../components/feed/PostInfo.jsx";
+import MarkdownView from "../components/docs/MarkdownView.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import ChapterSelector from "../components/post/ChapterSelector.jsx";
+
+function rehypeRewriteLinks(options = {}) {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      if (!options.base) return;
+      const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+      const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+      
+      visit(tree, "element", (node) => {
+        if (node.tagName === 'a' || node.tagName === 'img') {
+          const prop = node.tagName === 'a' ? 'href' : 'src';
+          const url = node.properties?.[prop];
+          if (typeof url === 'string' && isRelative(url)) {
+            node.properties[prop] = base + url;
+          }
+        }
+      });
+    });
+}
+
+const getIdentifier = (route) => route().split('/')[2] || "";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, app, lang } = params;
+  if (!identifier || !app.wsMethod) return null;
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    lang: lang,
+    limit: 1,
+  };
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  return arr[0] || null;
+}
+
+async function fetchPostDetails(mainPost, app) {
+  if (!mainPost) return null;
+  let descriptorPath;
+  let dataCidForContent;
+  if (mainPost.data_cid) {
+    descriptorPath = mainPost.ipfs;
+    dataCidForContent = mainPost.data_cid;
+  } else {
+    descriptorPath = `${mainPost.ipfs}/info.yaml`;
+    dataCidForContent = mainPost.ipfs;
+  }
+  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
+  if (!descriptorPath) return { descriptor: null, dataCidForContent };
+  try {
+    const { res } = await ipfs.fetchBest(app, descriptorPath);
+    const text = await res.text();
+    const descriptor = parse(text) || null;
+    return { descriptor, dataCidForContent };
+  } catch (error) {
+    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
+    return { descriptor: { error: error.message }, dataCidForContent };
+  }
+}
+
+async function fetchMainContent(details, app, lang, chapterIndex) {
+  if (!details?.descriptor || !lang) return "";
+
+  const { descriptor, dataCidForContent } = details;
+  const localizedDescriptor = descriptor.locales?.[lang];
+  if (!localizedDescriptor) return "";
+
+  let contentPath;
+  if (chapterIndex === 0) { // Prologue (main content)
+    if (localizedDescriptor.data) return localizedDescriptor.data;
+    if (localizedDescriptor.data_path) {
+      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+    }
+  } else { // A specific chapter
+    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
+    if (chapter?.data_path) {
+      contentPath = `${dataCidForContent}/${chapter.data_path}`;
+    }
+  }
+
+  if (contentPath) {
+    try {
+      const { res } = await ipfs.fetchBest(app, contentPath);
+      return await res.text();
+    } catch (error) {
+      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
+      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
+    }
+  }
+  
+  return "";
+}
+
+export default function PostPage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+  const identifier = createMemo(() => getIdentifier(route));
+  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+
+  const [post] = createResource(
+    () => ({ identifier: identifier(), app, lang: uiLang() }),
+    fetchPostByIdentifier
+  );
+  
+  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
+  const [postLang, setPostLang] = createSignal(null);
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+
+  const [mainContent] = createResource(
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
+    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
+  );
+
+  createEffect(() => {
+    const p = post();
+    const id = identifier();
+    if (p && id.startsWith("0x") && p.short_cid) {
+      const newPath = `/post/${p.short_cid}`;
+      navigate(newPath, { replace: true });
+    }
+  });
+
+  createEffect(() => {
+    const p = post();
+    if (p && !postLang()) {
+      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
+      if (availableLangs.length === 0) return;
+      const currentUiLang = uiLang();
+      let initialLang = availableLangs[0]; 
+      if (availableLangs.includes(currentUiLang)) {
+        initialLang = currentUiLang;
+      } else if (availableLangs.includes('en')) {
+        initialLang = 'en';
+      }
+      setPostLang(initialLang);
+    }
+  });
+
+  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const thumbnail = createMemo(() => {
+    const d = details();
+    if (!d) return null;
+    const dataCid = d.dataCidForContent;
+    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
+    if (dataCid && thumbnailPath) {
+      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
+    }
+    return null;
+  });
+  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
+  
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue"), data_path: null };
+    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
+    return [prologue, ...chapters];
+  });
+
+  const localizedMainContent = createMemo(() => mainContent());
+  const ipfsBaseUrl = createMemo(() => {
+    const dataCid = details()?.dataCidForContent;
+    if (!dataCid) return "";
+    const gateway = app.activeIpfsGateways()[0] || "http://127.0.0.1:8080/";
+    return `${gateway}ipfs/${dataCid}`;
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto">
+      <ClosePageButton />
+      <Switch>
+        <Match when={post.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={post.error || details()?.descriptor?.error}>
+          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
+            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
+          </div>
+        </Match>
+        <Match when={!post.loading && post() === null}>
+          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
+            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
+          </div>
+        </Match>
+        <Match when={post()}>
+          <article class="space-y-4">
+            <header class="flex justify-between items-start gap-4">
+              <div class="flex-1 min-w-0 space-y-3">
+                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
+                <UserCard author={post().author} />
+                <PostInfo 
+                  item={post()} 
+                  hideTopBorder={true} 
+                  timeFormat="long"
+                  rewardsAlign="left" 
+                />
+              </div>
+              <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
+                <Show when={thumbnail()}>
+                  {(src) => (
+                    <IpfsImage 
+                      src={src()} 
+                      class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                      alt="Post thumbnail"
+                      fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
+                    />
+                  )}
+                </Show>
+                <LangSelector 
+                  codes={availableLocales()}
+                  value={postLang()}
+                  onChange={setPostLang}
+                />
+              </div>
+            </header>
+
+            <div class="pt-4 border-t border-[hsl(var(--border))]">
+              <Show when={(chapterList()?.length || 0) > 1}>
+                <div class="flex justify-end mb-4">
+                  <ChapterSelector 
+                    chapters={chapterList()} 
+                    selectedIndex={selectedChapterIndex()} 
+                    onSelect={setSelectedChapterIndex}
+                  />
+                </div>
+              </Show>
+
+              <Switch>
+                <Match when={details.loading || mainContent.loading}>
+                  <div class="flex justify-center p-8"><Spinner /></div>
+                </Match>
+                <Match when={mainContent.error}>
+                  <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                </Match>
+                <Match when={localizedMainContent()}>
+                  <MarkdownView 
+                    markdown={localizedMainContent()} 
+                    rehypePlugins={markdownPlugins()}
+                  />
+                </Match>
+              </Switch>
+            </div>
+          </article>
+        </Match>
+      </Switch>
+    </main>
   );
 }
 </file>
@@ -23208,6 +23183,174 @@ export default function Docs() {
 </body>
 
 </html>
+</file>
+
+<file path="src/components/feed/ContentFeed.jsx">
+// src/components/feed/ContentFeed.jsx
+import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import PostListView from "./PostListView.jsx";
+import { dbg } from "../../utils/debug.js";
+
+export default function ContentFeed(props) {
+  const { t } = useApp();
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    try {
+      const nextPage = page() + 1;
+      dbg.log("ContentFeed", "loadMore → page", nextPage);
+      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
+      dbg.log("ContentFeed", "page result length", chunk.length);
+      if (!chunk.length) setHasMore(false);
+      setItems((prev) => prev.concat(chunk));
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(() => {
+    // --- DEBUG: Log when the component mounts using dbg ---
+    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
+    loadMore();
+    const handleScroll = () => {
+      const scrollThreshold = 600;
+      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
+      if (scrolledToBottom) loadMore();
+    };
+    let timeoutId = null;
+    const throttledHandleScroll = () => {
+      if (timeoutId === null) {
+        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
+      }
+    };
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+    onCleanup(() => {
+      window.removeEventListener('scroll', throttledHandleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  });
+
+  createEffect(on(() => props.resetOn, () => {
+    setItems([]);
+    setPage(0);
+    setHasMore(true);
+    setLoading(false);
+    queueMicrotask(loadMore);
+  }, { defer: true }));
+
+  return (
+    <div class="w-full">
+      <PostListView
+        items={items()}
+        mode={props.mode}
+        isRailVisible={props.isRailVisible}
+      />
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/ipfs/index.js">
+// src/ipfs/index.js
+import { fetchWithTimeout } from "../utils/net.js";
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+
+function normalizeInput(input) {
+  let s = String(input || "").trim();
+  if (!s) throw new Error("ipfs: empty input");
+  s = stripPrefix(s, "ipfs://");
+  s = stripPrefix(s, "/ipfs/");
+  s = stripPrefix(s, "ipfs/");
+  return s;
+}
+
+function buildUrl(baseGateway, cidPath) {
+  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
+  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
+  if (!base || !path) return "";
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
+  return prefix + path;
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) {
+        // This is the only successful return path. It guarantees `res` exists.
+        return { res, url, gateway: gw };
+      }
+
+      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
+      httpError.url = url;
+      httpError.status = res.status;
+      errors.push(httpError);
+
+    } catch (e) {
+      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
+      networkError.url = url;
+      errors.push(networkError);
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  if (errors.some(e => e.status === 404)) {
+      err.is404 = true;
+  }
+  throw err;
+}
+
+async function fetchBest(app, ipfsPath, options = {}) {
+  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
+  const cidPath = normalizeInput(ipfsPath);
+  let gatewaysToTry = [];
+  
+  let effectiveTimeout = timeoutMs;
+
+  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+    gatewaysToTry = [app.localIpfsGateway()];
+    effectiveTimeout = 30000;
+  } else {
+    const systemGateways = app.remoteIpfsGateways() || [];
+    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
+  }
+
+  if (gatewaysToTry.length === 0) {
+    throw new Error("No IPFS gateways available to try.");
+  }
+
+  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
+}
+
+async function getJSONBest(app, ipfsPath, options = {}) {
+  const { response, url, gateway } = await fetchBest(app, ipfsPath, {
+    ...options,
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+  });
+  return { data: await response.json(), url, gateway };
+}
+
+export const ipfs = {
+  fetchBest,
+  getJSONBest,
+  normalizeInput,
+  buildUrl,
+};
 </file>
 
 <file path="src/index.jsx">
@@ -23950,6 +24093,207 @@ html.dark .sv-docs code[data-theme*=" "] span {
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
+<file path="src/components/settings/LocalIpfsSection.jsx">
+// src/components/settings/LocalIpfsSection.jsx
+import { createSignal, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { fetchWithTimeout } from "../../utils/net.js";
+
+export default function LocalIpfsSection() {
+  const app = useApp();
+  const { t } = app;
+
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://127.0.0.1:5001");
+
+  const [diagRunning, setDiagRunning] = createSignal(false);
+  const [diagResults, setDiagResults] = createSignal(null);
+
+  async function runDiagnostics() {
+    setDiagRunning(true);
+    setDiagResults([]);
+    const results = [];
+    
+    const localApi = apiUrl().trim().replace(/\/+$/, "");
+    const localGateway = localApi.replace(/:\d+$/, ":8080");
+    const currentOrigin = window.location.origin;
+
+    // Step 1: Check basic API liveness and fetch config
+    let config = null;
+    try {
+      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
+      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
+      config = await res.json();
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok") });
+    } catch (err) {
+      const originsJson = JSON.stringify([currentOrigin]);
+      const fixCommand = 
+`# 1. ${t("ipfs.diag.fix.daemon")}
+ipfs daemon
+
+# 2. ${t("ipfs.diag.fix.browser")}
+
+# 3. ${t("ipfs.diag.fix.cors")}
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
+
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error"), fixCommand: fixCommand });
+      setDiagResults(results);
+      setDiagRunning(false);
+      return;
+    }
+    setDiagResults([...results]);
+
+    // Step 2: Analyze Gateway CORS Configuration
+    const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
+    if (gatewayOrigins.includes(currentOrigin) || gatewayOrigins.includes("*")) {
+      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok") });
+    } else {
+      const newOriginsList = [...new Set([currentOrigin, ...gatewayOrigins])];
+      const fixCommand = `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${JSON.stringify(newOriginsList)}'`;
+      results.push({
+        name: t("ipfs.diag.cors.name"),
+        status: "error",
+        details: t("ipfs.diag.cors.error"),
+        fixCommand: fixCommand
+      });
+    }
+    
+    // Step 3: Final Live Gateway Fetch Test
+    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
+    if (testCID) {
+      try {
+        const testUrl = `${localGateway}/ipfs/${testCID}`;
+        await fetchWithTimeout(testUrl);
+        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok") });
+      } catch (err) {
+        // MODIFICATION START
+        const singleOriginJson = JSON.stringify([currentOrigin]);
+        const wildcardOriginJson = JSON.stringify(['*']);
+
+        const fixCommand = 
+`# ${t("ipfs.diag.fix.gatewayTitle")}
+
+# ${t("ipfs.diag.fix.gatewaySingleOrigin")}
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${singleOriginJson}'
+
+# --- OR ---
+
+# ${t("ipfs.diag.fix.gatewayWildcard")}
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOriginJson}'
+`;
+
+        results.push({
+          name: t("ipfs.diag.fetch.name"),
+          status: "error",
+          details: t("ipfs.diag.fetch.errorFirewall"),
+          fixCommand: fixCommand
+        });
+        // MODIFICATION END
+      }
+    } else {
+      results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
+    }
+
+    setDiagResults(results);
+    setDiagRunning(false);
+  }
+
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      await app.enableLocalIpfs(apiUrl().trim());
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const statusColorClass = (status) => {
+    if (status === 'ok') return 'text-emerald-600';
+    if (status === 'error') return 'text-red-600';
+    return 'text-amber-500'; // for 'warn'
+  };
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+        <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
+        <label class="flex items-center gap-2">
+            <input type="checkbox" checked={app.localIpfsEnabled()} onInput={(e) => {
+                const checked = e.currentTarget.checked;
+                if (checked) { onEnableLocal(); } else { app.disableLocalIpfs(); }
+            }}/>
+            <span>{t("settings.localIpfs.enableCheckbox")}</span>
+        </label>
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
+            <label class="block">
+                <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
+                <input class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                    value={apiUrl()}
+                    onInput={(e) => {
+                        const val = e.currentTarget.value;
+                        setApiUrl(val);
+                        app.setLocalIpfsApiUrl?.(val);
+                    }}
+                    placeholder="http://127.0.0.1:5001" spellcheck={false}/>
+            </label>
+            <div class="flex md:self-end">
+                <Show when={!app.localIpfsEnabled()}
+                    fallback={<button class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={()=> app.disableLocalIpfs()}>{t("settings.localIpfs.disable")}</button>}>
+                    <button class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={onEnableLocal} disabled={testing()} title={t("settings.localIpfs.testEnable")}>
+                        {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
+                    </button>
+                </Show>
+            </div>
+        </div>
+        <div class="text-sm text-[hsl(var(--muted-foreground))]">
+            {t("settings.localIpfs.status.label")}:{" "}
+            <span class={app.localIpfsStatus()==='ok' ? "text-[hsl(var(--primary))]" : app.localIpfsStatus()==='down' ? "text-[hsl(var(--destructive))]" : "opacity-70"}>
+                {app.localIpfsStatus()}
+            </span>
+            <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+                <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
+            </Show>
+        </div>
+
+        <Show when={app.localIpfsEnabled()}>
+            <div class="pt-2 border-t border-[hsl(var(--border))]">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
+                    <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+                        onClick={runDiagnostics}
+                        disabled={diagRunning()}>
+                        {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
+                    </button>
+                </div>
+                <Show when={diagResults() && diagResults().length > 0}>
+                    <div class="mt-2 space-y-2 text-xs">
+                        <For each={diagResults()}>
+                            {(result) => (
+                                <div class="p-2 rounded bg-[hsl(var(--muted))]">
+                                    <div class="flex items-center">
+                                        <span class={`font-bold ${statusColorClass(result.status)}`}>
+                                            {result.status.toUpperCase()}:
+                                        </span>
+                                        <span class="font-semibold ml-2">{result.name}</span>
+                                    </div>
+                                    <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
+                                    <Show when={result.fixCommand}>
+                                        <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
+                                        <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
+                                            {result.fixCommand}
+                                        </pre>
+                                    </Show>
+                                </div>
+                            )}
+                        </For>
+                    </div>
+                </Show>
+            </div>
+        </Show>
+    </section>
+  );
+}
+</file>
+
 <file path="src/components/tabs/NewTab.jsx">
 // src/components/tabs/NewTab.jsx
 import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
@@ -23959,6 +24303,7 @@ import { loadAssetResource } from "../../utils/assetLoader";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { dbg } from "../../utils/debug.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -24008,7 +24353,10 @@ export default function NewTab(props) {
     try {
       dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
 
+      dbg.log("NewTab", `fetchPage(page=${page}) pre-wait, ws=${app.wsStatus?.()}`);
       await whenWsOpen();
+      dbg.log("NewTab", "after whenWsOpen");
+
 
       if (!contentList) {
         dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
@@ -24067,6 +24415,183 @@ export default function NewTab(props) {
         isRailVisible={props.isRailVisible}
       />
     </section>
+  );
+}
+</file>
+
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal, onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import {
+  connectWallet,
+  walletAccount,
+  walletChainId,
+  isWalletAvailable,
+  eagerConnect,
+} from "../blockchain/wallet";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+import AuthorizedUser from "./auth/AuthorizedUser.jsx";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const [eagerDone, setEagerDone] = createSignal(false);
+
+  const desiredId = () => app.desiredChainId();
+  const mismatched = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  onMount(async () => {
+    if (isWalletAvailable()) {
+      await eagerConnect();
+    }
+    setEagerDone(true);
+  });
+
+  async function onConnect() {
+    try {
+      await connectWallet();
+      if (desiredId()) {
+        try { await app.ensureWalletOnDesiredChain(); } catch {}
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      // The text is still copied, but no visual indicator will be shown.
+      await navigator.clipboard.writeText(walletAccount());
+    } catch (e) {
+      console.error("Failed to copy address:", e);
+    }
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  const chainLogoSrc = () => {
+    const id = desiredId();
+    return id ? getChainLogo(id) : null;
+  };
+
+  return (
+    <header
+      class="
+        sticky top-0 z-10
+        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
+        shadow-sm
+      "
+    >
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          {/* Left: brand */}
+          <div class="flex items-center">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+          </div>
+
+          {/* Right: wallet + auth + menu */}
+          <div class="flex items-center gap-3">
+
+            <AuthorizedUser />
+            
+            <Show
+              when={walletAccount()}
+              fallback={
+                <Show when={eagerDone() && isWalletAvailable()}>
+                  <button
+                    class="
+                      px-3 py-1.5 text-sm rounded
+                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
+                      hover:opacity-90
+                    "
+                    onClick={onConnect}
+                    title={app.t("wallet.connect")}
+                    aria-label={app.t("wallet.connect")}
+                  >
+                    {app.t("wallet.connect")}
+                  </button>
+                </Show>
+              }
+            >
+              <div class="flex items-center gap-2">
+                <button
+                  class="
+                    px-2 py-1 rounded
+                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
+                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
+                  "
+                  onClick={copyAddress}
+                  title={app.t("wallet.copyAddress")}
+                  aria-label={app.t("wallet.copyAddress")}
+                >
+                  {shortAddr(walletAccount())}
+                </button>
+
+                <Show
+                  when={!mismatched()}
+                  fallback={
+                    <button
+                      class="
+                        px-2 py-1 rounded
+                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
+                        hover:opacity-90
+                      "
+                      onClick={onSwitchChain}
+                      title={app.t("wallet.changeChain")}
+                      aria-label={app.t("wallet.changeChain")}
+                    >
+                      {app.t("wallet.changeChain")}
+                    </button>
+                  }
+                >
+                  <Show when={chainLogoSrc()}>
+                    <img
+                      src={chainLogoSrc()}
+                      alt="chain"
+                      class="w-5 h-5"
+                      title={app.t("wallet.onRequiredNetwork")}
+                    />
+                  </Show>
+                </Show>
+              </div>
+            </Show>
+
+            <button
+              class="
+                p-1 rounded transition
+                text-[hsl(var(--muted-foreground))]
+                hover:bg-[hsl(var(--muted))]
+              "
+              onClick={onTogglePane}
+              aria-label={app.t("menu.open")}
+              title={app.t("menu.open")}
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
   );
 }
 </file>
@@ -24353,384 +24878,6 @@ export default function SwitchConnectDialog(props) {
         </div>
       </div>
     </Show>
-  );
-}
-</file>
-
-<file path="src/components/settings/LocalIpfsSection.jsx">
-// src/components/settings/LocalIpfsSection.jsx
-import { createSignal, Show, For } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { fetchWithTimeout } from "../../utils/net.js";
-
-export default function LocalIpfsSection() {
-  const app = useApp();
-  const { t } = app;
-
-  const [testing, setTesting] = createSignal(false);
-  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://127.0.0.1:5001");
-
-  const [diagRunning, setDiagRunning] = createSignal(false);
-  const [diagResults, setDiagResults] = createSignal(null);
-
-  async function runDiagnostics() {
-    setDiagRunning(true);
-    setDiagResults([]);
-    const results = [];
-    
-    const localApi = apiUrl().trim().replace(/\/+$/, "");
-    const localGateway = localApi.replace(/:\d+$/, ":8080");
-    const currentOrigin = window.location.origin;
-
-    // Step 1: Check basic API liveness and fetch config
-    let config = null;
-    try {
-      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
-      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
-      config = await res.json();
-      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok") });
-    } catch (err) {
-      const originsJson = JSON.stringify([currentOrigin]);
-      const fixCommand = 
-`# 1. ${t("ipfs.diag.fix.daemon")}
-ipfs daemon
-
-# 2. ${t("ipfs.diag.fix.browser")}
-
-# 3. ${t("ipfs.diag.fix.cors")}
-ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
-
-      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error"), fixCommand: fixCommand });
-      setDiagResults(results);
-      setDiagRunning(false);
-      return;
-    }
-    setDiagResults([...results]);
-
-    // Step 2: Analyze Gateway CORS Configuration
-    const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
-    if (gatewayOrigins.includes(currentOrigin) || gatewayOrigins.includes("*")) {
-      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok") });
-    } else {
-      const newOriginsList = [...new Set([currentOrigin, ...gatewayOrigins])];
-      const fixCommand = `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${JSON.stringify(newOriginsList)}'`;
-      results.push({
-        name: t("ipfs.diag.cors.name"),
-        status: "error",
-        details: t("ipfs.diag.cors.error"),
-        fixCommand: fixCommand
-      });
-    }
-    
-    // Step 3: Final Live Gateway Fetch Test
-    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
-    if (testCID) {
-      try {
-        const testUrl = `${localGateway}/ipfs/${testCID}`;
-        await fetchWithTimeout(testUrl);
-        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok") });
-      } catch (err) {
-        // MODIFICATION START
-        const singleOriginJson = JSON.stringify([currentOrigin]);
-        const wildcardOriginJson = JSON.stringify(['*']);
-
-        const fixCommand = 
-`# ${t("ipfs.diag.fix.gatewayTitle")}
-
-# ${t("ipfs.diag.fix.gatewaySingleOrigin")}
-ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${singleOriginJson}'
-
-# --- OR ---
-
-# ${t("ipfs.diag.fix.gatewayWildcard")}
-ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOriginJson}'
-`;
-
-        results.push({
-          name: t("ipfs.diag.fetch.name"),
-          status: "error",
-          details: t("ipfs.diag.fetch.errorFirewall"),
-          fixCommand: fixCommand
-        });
-        // MODIFICATION END
-      }
-    } else {
-      results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
-    }
-
-    setDiagResults(results);
-    setDiagRunning(false);
-  }
-
-  async function onEnableLocal() {
-    setTesting(true);
-    try {
-      await app.enableLocalIpfs(apiUrl().trim());
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  const statusColorClass = (status) => {
-    if (status === 'ok') return 'text-emerald-600';
-    if (status === 'error') return 'text-red-600';
-    return 'text-amber-500'; // for 'warn'
-  };
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-        <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
-        <label class="flex items-center gap-2">
-            <input type="checkbox" checked={app.localIpfsEnabled()} onInput={(e) => {
-                const checked = e.currentTarget.checked;
-                if (checked) { onEnableLocal(); } else { app.disableLocalIpfs(); }
-            }}/>
-            <span>{t("settings.localIpfs.enableCheckbox")}</span>
-        </label>
-        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
-            <label class="block">
-                <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
-                <input class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                    value={apiUrl()}
-                    onInput={(e) => {
-                        const val = e.currentTarget.value;
-                        setApiUrl(val);
-                        app.setLocalIpfsApiUrl?.(val);
-                    }}
-                    placeholder="http://127.0.0.1:5001" spellcheck={false}/>
-            </label>
-            <div class="flex md:self-end">
-                <Show when={!app.localIpfsEnabled()}
-                    fallback={<button class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={()=> app.disableLocalIpfs()}>{t("settings.localIpfs.disable")}</button>}>
-                    <button class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={onEnableLocal} disabled={testing()} title={t("settings.localIpfs.testEnable")}>
-                        {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
-                    </button>
-                </Show>
-            </div>
-        </div>
-        <div class="text-sm text-[hsl(var(--muted-foreground))]">
-            {t("settings.localIpfs.status.label")}:{" "}
-            <span class={app.localIpfsStatus()==='ok' ? "text-[hsl(var(--primary))]" : app.localIpfsStatus()==='down' ? "text-[hsl(var(--destructive))]" : "opacity-70"}>
-                {app.localIpfsStatus()}
-            </span>
-            <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
-                <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
-            </Show>
-        </div>
-
-        <Show when={app.localIpfsEnabled()}>
-            <div class="pt-2 border-t border-[hsl(var(--border))]">
-                <div class="flex items-center justify-between">
-                    <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
-                    <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
-                        onClick={runDiagnostics}
-                        disabled={diagRunning()}>
-                        {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
-                    </button>
-                </div>
-                <Show when={diagResults() && diagResults().length > 0}>
-                    <div class="mt-2 space-y-2 text-xs">
-                        <For each={diagResults()}>
-                            {(result) => (
-                                <div class="p-2 rounded bg-[hsl(var(--muted))]">
-                                    <div class="flex items-center">
-                                        <span class={`font-bold ${statusColorClass(result.status)}`}>
-                                            {result.status.toUpperCase()}:
-                                        </span>
-                                        <span class="font-semibold ml-2">{result.name}</span>
-                                    </div>
-                                    <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
-                                    <Show when={result.fixCommand}>
-                                        <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
-                                        <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
-                                            {result.fixCommand}
-                                        </pre>
-                                    </Show>
-                                </div>
-                            )}
-                        </For>
-                    </div>
-                </Show>
-            </div>
-        </Show>
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-import { Show, createSignal, onMount } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import {
-  connectWallet,
-  walletAccount,
-  walletChainId,
-  isWalletAvailable,
-  eagerConnect,
-} from "../blockchain/wallet";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-import Container from "./layout/Container";
-import AuthorizedUser from "./auth/AuthorizedUser.jsx";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const [eagerDone, setEagerDone] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatched = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  onMount(async () => {
-    if (isWalletAvailable()) {
-      await eagerConnect();
-    }
-    setEagerDone(true);
-  });
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) {
-        try { await app.ensureWalletOnDesiredChain(); } catch {}
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      // The text is still copied, but no visual indicator will be shown.
-      await navigator.clipboard.writeText(walletAccount());
-    } catch (e) {
-      console.error("Failed to copy address:", e);
-    }
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  const chainLogoSrc = () => {
-    const id = desiredId();
-    return id ? getChainLogo(id) : null;
-  };
-
-  return (
-    <header
-      class="
-        sticky top-0 z-10
-        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
-        shadow-sm
-      "
-    >
-      <Container>
-        <div class="h-12 px-2 flex items-center justify-between">
-          {/* Left: brand */}
-          <div class="flex items-center">
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-          </div>
-
-          {/* Right: wallet + auth + menu */}
-          <div class="flex items-center gap-3">
-
-            <AuthorizedUser />
-            
-            <Show
-              when={walletAccount()}
-              fallback={
-                <Show when={eagerDone() && isWalletAvailable()}>
-                  <button
-                    class="
-                      px-3 py-1.5 text-sm rounded
-                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
-                      hover:opacity-90
-                    "
-                    onClick={onConnect}
-                    title={app.t("wallet.connect")}
-                    aria-label={app.t("wallet.connect")}
-                  >
-                    {app.t("wallet.connect")}
-                  </button>
-                </Show>
-              }
-            >
-              <div class="flex items-center gap-2">
-                <button
-                  class="
-                    px-2 py-1 rounded
-                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
-                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
-                  "
-                  onClick={copyAddress}
-                  title={app.t("wallet.copyAddress")}
-                  aria-label={app.t("wallet.copyAddress")}
-                >
-                  {shortAddr(walletAccount())}
-                </button>
-
-                <Show
-                  when={!mismatched()}
-                  fallback={
-                    <button
-                      class="
-                        px-2 py-1 rounded
-                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
-                        hover:opacity-90
-                      "
-                      onClick={onSwitchChain}
-                      title={app.t("wallet.changeChain")}
-                      aria-label={app.t("wallet.changeChain")}
-                    >
-                      {app.t("wallet.changeChain")}
-                    </button>
-                  }
-                >
-                  <Show when={chainLogoSrc()}>
-                    <img
-                      src={chainLogoSrc()}
-                      alt="chain"
-                      class="w-5 h-5"
-                      title={app.t("wallet.onRequiredNetwork")}
-                    />
-                  </Show>
-                </Show>
-              </div>
-            </Show>
-
-            <button
-              class="
-                p-1 rounded transition
-                text-[hsl(var(--muted-foreground))]
-                hover:bg-[hsl(var(--muted))]
-              "
-              onClick={onTogglePane}
-              aria-label={app.t("menu.open")}
-              title={app.t("menu.open")}
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </Container>
-    </header>
   );
 }
 </file>
@@ -25389,6 +25536,107 @@ export function useApp() {
 }
 </file>
 
+<file path="src/App.jsx">
+// src/App.jsx
+import { createSignal, onMount, Show, Switch, Match, createMemo, createEffect, on } from "solid-js";
+import Header from "./components/Header";
+import RightPane from "./components/RightPane";
+import Settings from "./pages/Settings";
+import Docs from "./pages/Docs";
+import { useHashRouter, navigate } from "./routing/hashRouter";
+import { useApp } from "./context/AppContext.jsx";
+import Toaster from "./components/Toaster";
+import MainView from "./components/main/MainView";
+import DomainCssLoader from "./theme/DomainCssLoader.jsx";
+import FaviconLoader from "./theme/FaviconLoader.jsx";
+import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
+import WsConnector from "./net/WsConnector.jsx";
+import ConnectionError from "./components/main/ConnectionError.jsx";
+import Spinner from "./components/ui/Spinner.jsx";
+import AssetDebugTap from "./dev/AssetDebugTap.jsx";
+import PostPage from "./pages/PostPage";
+
+export default function App() {
+  const [isPaneOpen, setIsPaneOpen] = createSignal(false);
+  const { route } = useHashRouter();
+  const app = useApp();
+
+  const currentView = createMemo(() => {
+    const r = route();
+    if (r.startsWith("/post/")) return "post";
+    if (r.startsWith("/settings")) return "settings";
+    if (r.startsWith("/docs")) return "docs";
+    return "main";
+  });
+
+  onMount(() => {
+    const handleKeydown = (e) => {
+      if (e.key !== "Escape") return;
+      
+      const view = currentView();
+      if (view === 'post' || view === 'settings' || view === 'docs') {
+        navigate(app.lastTabRoute() || "/");
+        return; 
+      }
+      
+      setIsPaneOpen(false);
+    };
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  });
+
+  createEffect(on(currentView, (view) => {
+    if (view === 'main') {
+      requestAnimationFrame(() => {
+        const y = app.savedScrollY();
+        console.log(`%c[App.jsx] Restoring scroll position to: ${y}`, 'color: green; font-weight: bold;');
+        window.scrollTo(0, y);
+      });
+    }
+  }));
+
+  const togglePane = () => setIsPaneOpen(!isPaneOpen());
+
+  return (
+    <Show
+      when={!app.loading()}
+      fallback={
+        <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
+          <Spinner class="w-8 h-8" />
+        </div>
+      }
+    >
+      <Show
+        when={!app.error()}
+        fallback={<ConnectionError error={app.error()} />}
+      >
+        <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
+          <DomainCssLoader />
+          <FaviconLoader />
+          <GoogleAnalyticsLoader />
+          <WsConnector />
+          <Header onTogglePane={togglePane} />
+          
+          <div style={{ display: currentView() === "main" ? "block" : "none" }}>
+            <MainView />
+          </div>
+
+          <Switch>
+            <Match when={currentView() === 'post'}><PostPage /></Match>
+            <Match when={currentView() === 'settings'}><Settings /></Match>
+            <Match when={currentView() === 'docs'}><Docs /></Match>
+          </Switch>
+          
+          <RightPane isOpen={isPaneOpen} onClose={togglePane} />
+          <Toaster />
+          <AssetDebugTap />
+        </div>
+      </Show>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/i18n/en.js">
 // Auto-generated by scripts/i18n.mjs. Do not edit by hand.
 export default {
@@ -25553,108 +25801,9 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
   "wallet.onRequiredNetwork": "On required network",
+    "post.chapters.prologue": "Prologue",
+  "post.chapters.title": "Table of Contents",
 };
-</file>
-
-<file path="src/App.jsx">
-// src/App.jsx
-import { createSignal, onMount, Show, Switch, Match, createMemo, createEffect, on } from "solid-js";
-import Header from "./components/Header";
-import RightPane from "./components/RightPane";
-import Settings from "./pages/Settings";
-import Docs from "./pages/Docs";
-import { useHashRouter, navigate } from "./routing/hashRouter";
-import { useApp } from "./context/AppContext.jsx";
-import Toaster from "./components/Toaster";
-import MainView from "./components/main/MainView";
-import DomainCssLoader from "./theme/DomainCssLoader.jsx";
-import FaviconLoader from "./theme/FaviconLoader.jsx";
-import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
-import WsConnector from "./net/WsConnector.jsx";
-import ConnectionError from "./components/main/ConnectionError.jsx";
-import Spinner from "./components/ui/Spinner.jsx";
-import AssetDebugTap from "./dev/AssetDebugTap.jsx";
-import PostPage from "./pages/PostPage";
-
-export default function App() {
-  const [isPaneOpen, setIsPaneOpen] = createSignal(false);
-  const { route } = useHashRouter();
-  const app = useApp();
-
-  const currentView = createMemo(() => {
-    const r = route();
-    if (r.startsWith("/post/")) return "post";
-    if (r.startsWith("/settings")) return "settings";
-    if (r.startsWith("/docs")) return "docs";
-    return "main";
-  });
-
-  onMount(() => {
-    const handleKeydown = (e) => {
-      if (e.key !== "Escape") return;
-      
-      const view = currentView();
-      if (view === 'post' || view === 'settings' || view === 'docs') {
-        navigate(app.lastTabRoute() || "/");
-        return; 
-      }
-      
-      setIsPaneOpen(false);
-    };
-    document.addEventListener("keydown", handleKeydown);
-    return () => document.removeEventListener("keydown", handleKeydown);
-  });
-
-  createEffect(on(currentView, (view) => {
-    if (view === 'main') {
-      requestAnimationFrame(() => {
-        const y = app.savedScrollY();
-        console.log(`%c[App.jsx] Restoring scroll position to: ${y}`, 'color: green; font-weight: bold;');
-        window.scrollTo(0, y);
-      });
-    }
-  }));
-
-  const togglePane = () => setIsPaneOpen(!isPaneOpen());
-
-  return (
-    <Show
-      when={!app.loading()}
-      fallback={
-        <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
-          <Spinner class="w-8 h-8" />
-        </div>
-      }
-    >
-      <Show
-        when={!app.error()}
-        fallback={<ConnectionError error={app.error()} />}
-      >
-        <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
-          <DomainCssLoader />
-          <FaviconLoader />
-          <GoogleAnalyticsLoader />
-          <WsConnector />
-          <Header onTogglePane={togglePane} />
-          
-          <div style={{ display: currentView() === "main" ? "block" : "none" }}>
-            <MainView />
-          </div>
-
-          <Switch>
-            <Match when={currentView() === 'post'}><PostPage /></Match>
-            <Match when={currentView() === 'settings'}><Settings /></Match>
-            <Match when={currentView() === 'docs'}><Docs /></Match>
-          </Switch>
-          
-          <RightPane isOpen={isPaneOpen} onClose={togglePane} />
-          <Toaster />
-          <AssetDebugTap />
-        </div>
-      </Show>
-    </Show>
-  );
-}
 </file>
 
 </files>

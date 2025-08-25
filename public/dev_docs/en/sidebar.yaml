@@ -17,3 +17,5 @@ sections:
         file: core-concepts/domain.md
       - label: Authentication
         file: core-concepts/auth.md
+      - label: Showing Posts
+        file: core-concepts/showing-posts.md

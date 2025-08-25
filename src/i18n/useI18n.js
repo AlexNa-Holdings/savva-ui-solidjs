@@ -37,10 +37,9 @@ function normalizeLang(code) {
 
 export function useI18n() {
   if (!i18nSingleton) {
-    // --- FIX: Moved the signal from the top level into this initialization block ---
     const [domainDicts, setDomainDicts] = createSignal({});
+    const [domainLangCodes, setDomainLangCodes] = createSignal([]);
 
-    // Keep domain → app → EN fallback order
     const resolveKey = (lang, key) => {
       const d = domainDicts();
       const fromDomain = d[lang]?.[key];
@@ -74,7 +73,7 @@ export function useI18n() {
 
     function setLang(next) {
       const v = normalizeLang(next);
-      setLangSignal(v); // <-- commit to signal (reactivity)
+      setLangSignal(v);
       try { localStorage.setItem(LANG_KEY, v); } catch {}
       if (typeof document !== "undefined") {
         document.documentElement.setAttribute("lang", v);
@@ -100,7 +99,6 @@ export function useI18n() {
       return showKeys() ? `${base} [${key}]` : base;
     };
 
-    // Cross‑tab sync
     if (typeof window !== "undefined") {
       window.addEventListener("storage", (e) => {
         if (e.key === LANG_KEY && e.newValue) setLangSignal(normalizeLang(e.newValue));
@@ -108,11 +106,10 @@ export function useI18n() {
       });
     }
 
-    // Expose union of built‑ins + domain dicts (useful for tooling/UI)
     const available = () => {
-      const builtin = Object.keys(APP_DICTS);
-      const domain = Object.keys(domainDicts());
-      return Array.from(new Set([...builtin, ...domain]));
+      const domainCodes = domainLangCodes();
+      if (domainCodes.length > 0) return domainCodes;
+      return Object.keys(APP_DICTS);
     };
 
     i18nSingleton = {
@@ -123,6 +120,7 @@ export function useI18n() {
       setShowKeys,
       available,
       setDomainDictionaries: (d) => setDomainDicts(d || {}),
+      setDomainLangCodes: (codes) => setDomainLangCodes(codes || []),
     };
   }
   return i18nSingleton;
