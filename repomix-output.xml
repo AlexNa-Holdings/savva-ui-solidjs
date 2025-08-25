@@ -174,6 +174,15 @@ src/
       DocsIndex.jsx
       DocsPager.jsx
       MarkdownView.jsx
+      rehype-media-players.js
+      rehype-rewrite-links.js
+    editor/
+      EditorFilesDrawer.jsx
+      EditorSidebar.jsx
+      EditorToolbar.jsx
+      MarkdownInput.jsx
+      text-utils.js
+      ToolbarIcons.jsx
     feed/
       ContentFeed.jsx
       PostCard.jsx
@@ -186,6 +195,7 @@ src/
     main/
       ConnectionError.jsx
       MainView.jsx
+      NewPostButton.jsx
       TabsBar.jsx
     post/
       ChapterPager.jsx
@@ -259,6 +269,7 @@ src/
     useI18n.js
   ipfs/
     index.js
+    utils.js
   net/
     endpoints.js
     index.js
@@ -270,6 +281,7 @@ src/
     wsUrl.js
   pages/
     Docs.jsx
+    EditorPage.jsx
     PostPage.jsx
     Settings.jsx
   routing/
@@ -307,73 +319,352 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/ui/ContextMenu.jsx">
-// src/components/ui/ContextMenu.jsx
-import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+<file path="src/components/docs/rehype-rewrite-links.js">
+// src/components/docs/rehype-rewrite-links.js
+import { visit } from "unist-util-visit";
 
-function MoreIcon(props) {
+/**
+ * A rehype plugin that rewrites relative image and link URLs to be absolute,
+ * based on a provided base URL.
+ * @param {object} options - The options object.
+ * @param {string} options.base - The base URL to prepend to relative paths.
+ */
+export function rehypeRewriteLinks(options = {}) {
+  return (tree) => {
+    if (!options.base) {
+      return;
+    }
+    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+    
+    visit(tree, "element", (node) => {
+      if (node.tagName === 'a' || node.tagName === 'img') {
+        const prop = node.tagName === 'a' ? 'href' : 'src';
+        const url = node.properties?.[prop];
+        if (typeof url === 'string' && isRelative(url)) {
+          node.properties[prop] = base + url;
+        }
+      }
+    });
+  };
+}
+</file>
+
+<file path="src/components/editor/EditorFilesDrawer.jsx">
+// src/components/editor/EditorFilesDrawer.jsx
+import { Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+function CloseIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="currentColor">
-      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
     </svg>
   );
 }
 
-export default function ContextMenu(props) {
-  const [isOpen, setIsOpen] = createSignal(false);
-  let containerRef;
+export default function EditorFilesDrawer(props) {
+  const { t } = useApp();
 
-  const handleClickOutside = (event) => {
-    if (containerRef && !containerRef.contains(event.target)) {
-      setIsOpen(false);
-    }
-  };
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col">
+          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
+            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
+            <button
+              onClick={props.onClose}
+              class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
+              aria-label={t("common.cancel")}
+            >
+              <CloseIcon />
+            </button>
+          </header>
+          <div class="flex-1 p-4 overflow-y-auto">
+            <div class="h-full flex items-center justify-center rounded-lg bg-[hsl(var(--muted))]">
+              <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.filesPlaceholder")}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <Show when={props.isOpen}>
+        <div
+          class="fixed inset-0 z-40 bg-black/20"
+          onClick={props.onClose}
+        />
+      </Show>
+    </>
+  );
+}
+</file>
 
-  onMount(() => document.addEventListener("mousedown", handleClickOutside));
-  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+<file path="src/components/editor/EditorSidebar.jsx">
+// src/components/editor/EditorSidebar.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import LangSelector from "../ui/LangSelector.jsx";
 
-  const handleItemClick = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    item.onClick?.();
-    setIsOpen(false);
+export default function EditorSidebar(props) {
+  const { t, domainAssetsConfig } = useApp();
+
+  const domainLangCodes = () => {
+    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
   };
 
   return (
-    <div class="absolute bottom-1 right-1 z-20" ref={containerRef}>
-      <button
-        class="p-1 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsOpen(!isOpen());
-        }}
-        aria-haspopup="true"
-        aria-expanded={isOpen()}
-      >
-        <MoreIcon />
-      </button>
+    <aside class="sticky top-16 space-y-4">
+      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
+        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.thumbnail")}</h3>
+        <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center">
+          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>
+        </div>
+      </div>
 
-      <Show when={isOpen()}>
-        <div class="absolute bottom-full right-0 mb-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5">
-          <ul class="py-1" role="menu">
-            <For each={props.items}>
-              {(item) => (
-                <li>
-                  <a
-                    href="#"
-                    class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-                    onClick={(e) => handleItemClick(e, item)}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              )}
-            </For>
-          </ul>
+      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
+        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.language")}</h3>
+        <LangSelector
+          codes={domainLangCodes()}
+          value={props.lang}
+          onChange={props.onLangChange}
+          variant="stretch"
+        />
+      </div>
+
+      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
+        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.files")}</h3>
+        <div class="h-48 rounded bg-[hsl(var(--muted))] flex items-center justify-center">
+          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.filesPlaceholder")}</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorToolbar.jsx">
+// src/components/editor/EditorToolbar.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { applyMarkdownFormat } from "./text-utils.js";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
+
+export default function EditorToolbar(props) {
+  const { t } = useApp();
+
+  const handleFormat = (format) => {
+    const textarea = props.getTextareaRef?.();
+    applyMarkdownFormat(textarea, format, props.onValueChange);
+  };
+
+  return (
+    <div class="flex items-center justify-between h-10 px-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <div class="flex items-center">
+        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
+          <BoldIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
+          <ItalicIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
+          <LinkIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
+          <ImageIcon />
+        </ToolbarButton>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          onClick={props.onToggleFiles}
+          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
+        >
+          {t("editor.toolbar.files")}
+        </button>
+        <button
+          onClick={props.onTogglePreview}
+          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
+        >
+          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/MarkdownInput.jsx">
+// src/components/editor/MarkdownInput.jsx
+import { Show } from "solid-js";
+import MarkdownView from "../docs/MarkdownView.jsx";
+
+export default function MarkdownInput(props) {
+  return (
+    <div class={`grid gap-4 h-[60vh] min-h-[400px] ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+      <textarea
+        ref={props.editorRef}
+        value={props.value}
+        onInput={(e) => props.onInput(e.currentTarget.value)}
+        class="w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+        placeholder={props.placeholder}
+      />
+      <Show when={props.showPreview}>
+        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+          <MarkdownView markdown={props.value} />
         </div>
       </Show>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/text-utils.js">
+// src/components/editor/text-utils.js
+
+/**
+ * Applies markdown formatting to the selected text in a textarea.
+ * @param {HTMLTextAreaElement} textarea - The textarea element.
+ * @param {'bold' | 'italic' | 'link' | 'image'} format - The markdown format to apply.
+ * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
+ */
+export function applyMarkdownFormat(textarea, format, onUpdate) {
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  const fullText = textarea.value;
+
+  let replacement;
+  let prefix, suffix, placeholder;
+
+  // Special handling for 'image' format
+  if (format === 'image') {
+    replacement = `![alt text](${selectedText || 'image_url'})`;
+  } else {
+    // Standard handling for other formats
+    switch (format) {
+      case 'bold':
+        prefix = '**';
+        suffix = '**';
+        placeholder = 'bold text';
+        break;
+      case 'italic':
+        prefix = '*';
+        suffix = '*';
+        placeholder = 'italic text';
+        break;
+      case 'link':
+        prefix = '[';
+        suffix = '](url)';
+        placeholder = 'link text';
+        break;
+      default:
+        return;
+    }
+    const textToWrap = selectedText || placeholder;
+    replacement = prefix + textToWrap + suffix;
+  }
+  
+  textarea.focus();
+  textarea.setSelectionRange(start, end);
+
+  // Use document.execCommand to insert the text. This is treated as a user
+  // action by the browser and is added to the undo/redo stack.
+  const success = document.execCommand('insertText', false, replacement);
+
+  // If execCommand fails for any reason, fall back to the direct update method.
+  if (!success) {
+    const newText = fullText.substring(0, start) + replacement + fullText.substring(end);
+    onUpdate(newText);
+  }
+
+  // After the state updates, re-focus and set the cursor position.
+  requestAnimationFrame(() => {
+    textarea.focus();
+    
+    if (format === 'image') {
+      if (selectedText) {
+        // If text was selected for the URL, select the placeholder alt text for editing.
+        const altTextStart = start + '!['.length;
+        const altTextEnd = altTextStart + 'alt text'.length;
+        textarea.setSelectionRange(altTextStart, altTextEnd);
+      } else {
+        // If no text was selected, select the placeholder URL.
+        const urlStart = start + '![alt text]('.length;
+        const urlEnd = urlStart + 'image_url'.length;
+        textarea.setSelectionRange(urlStart, urlEnd);
+      }
+    } else {
+      // Standard selection logic for other formats
+      if (selectedText) {
+        textarea.setSelectionRange(start, start + replacement.length);
+      } else {
+        const cursorPosStart = start + prefix.length;
+        const cursorPosEnd = cursorPosStart + placeholder.length;
+        textarea.setSelectionRange(cursorPosStart, cursorPosEnd);
+      }
+    }
+  });
+}
+</file>
+
+<file path="src/components/editor/ToolbarIcons.jsx">
+// src/components/editor/ToolbarIcons.jsx
+
+// A generic wrapper for toolbar buttons
+export function ToolbarButton(props) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      title={props.title}
+      class="p-2 rounded-md hover:bg-[hsl(var(--accent))]"
+      aria-label={props.title}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+// --- SVG Icons ---
+
+export function BoldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+      <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+    </svg>
+  );
+}
+
+export function ItalicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="19" y1="4" x2="10" y2="4"></line>
+      <line x1="14" y1="20" x2="5" y2="20"></line>
+      <line x1="15" y1="4" x2="9" y2="20"></line>
+    </svg>
+  );
+}
+
+export function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
+    </svg>
+  );
+}
+
+export function ImageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+      <polyline points="21 15 16 10 5 21"></polyline>
+    </svg>
   );
 }
 </file>
@@ -897,165 +1188,6 @@ What we’ll cover:
 - How the app boots and finds the correct backend & domain
 - How `/info` drives runtime behavior (domains, chain ID, IPFS gateways, assets)
 - How domain assets are resolved and when the default pack is used
-</file>
-
-<file path="public/dev_docs/en/core-concepts/showing-posts.md">
-# Showing Posts
-
-Displaying a SAVVA post is a two-step process. First, you fetch a list of post metadata objects from the SAVVA backend. Second, you use the IPFS information from that metadata to fetch the actual content (like the title, text, and images) from the decentralized network.
-
----
-
-## Step 1: Fetch Post Metadata from the Backend
-
-The primary way to get a list of posts is through the `content-list` WebSocket method. It's a flexible endpoint that supports pagination, sorting, and filtering.
-
-### Calling `content-list`
-
-You call the method with parameters specifying which content you need. Here's a typical example:
-
-```javascript
-// Example call using the app's wsMethod helper
-const posts = await app.wsMethod("content-list")({
-  domain: "savva.app",      // The domain to fetch posts from
-  limit: 12,                // Number of items per page
-  offset: 0,                // Start at the first item (for pagination)
-  lang: "en",               // Preferred language for any returned metadata
-  order_by: "fund_amount",  // Sort by total funds received
-  content_type: "post",     // We only want posts
-  category: "en:SAVVA Talk" // Optional: filter by a specific category
-});
-```
-
-### The Post Object Structure
-
-The `content-list` method returns an array of post objects. Each object contains all the on-chain metadata and pointers needed to fetch the full content.
-
-Here is an example of a single post object returned from the backend:
-
-```json
-{
-  "author": {
-    "address": "0x1234...",
-    "avatar": "Qm...",
-    "name": "alexna",
-    "display_name": "Alex Na",
-    "staked": "5000000000000000000000"
-  },
-  "category": "en:SAVVA Talk",
-  "domain": "savva.app",
-  "effective_time": "2025-08-20T10:30:00Z",
-  "fund": {
-    "amount": "125000000000000000000",
-    "round_time": 1672531200,
-    "total_author_share": "100000000000000000000"
-  },
-  "ipfs": "bafybeig.../info.yaml",
-  "data_cid": "bafybeig...",
-  "reactions": [10, 2, 0, 1],
-  "savva_cid": "0x01701...cfa2",
-  "short_cid": "aBcDeF1",
-  "tags": ["decentralization", "social"],
-  "savva_content": {
-    "locales": {
-      "en": {
-        "text_preview": "This is a short preview of the post content...",
-        "title": "My First Post on SAVVA"
-      },
-      "ru": {
-        "text_preview": "Это короткий анонс содержания поста...",
-        "title": "Мой первый пост на SAVVA"
-      }
-    },
-    "thumbnail": "thumbnail.jpg"
-  }
-}
-```
-
-### Key Fields Explained
-
-* **author**: Profile information of the post's author, including their staked amount.
-* **savva\_cid / short\_cid**: Unique identifiers for the post. The `savva_cid` is the full on-chain ID, while the `short_cid` is a user-friendly alternative. Use these to build URLs (e.g., `/post/<short_cid>`).
-* **ipfs & data\_cid**: Crucial pointers to the content on IPFS. See the next section for how to use them.
-* **savva\_content**: Metadata object directly from the backend cache. It contains a `locales` object with pre-fetched titles and previews, which is perfect for rendering post cards in a feed without needing to fetch from IPFS first.
-* **fund**: Information about the post's funding pool.
-* **reactions**: An array representing the counts for different reaction types (like, super, etc.).
-
----
-
-## Step 2: Resolve Full Content from IPFS
-
-While `savva_content` is useful for previews, you need to fetch from IPFS to get the full post body, chapters, and other assets.
-
-### Finding the Descriptor and Data Folder
-
-The `ipfs` and `data_cid` fields work together to tell you where everything is. There are two scenarios:
-
-1. **`data_cid` is present**:
-
-   * `ipfs` is the direct path to the descriptor file (e.g., `bafy.../info.yaml`).
-   * `data_cid` is the CID of the folder containing all post assets (images, markdown files, etc.). This is your content base.
-
-2. **`data_cid` is NOT present (legacy format)**:
-
-   * `ipfs` is the CID of the folder containing all post assets.
-   * The descriptor file is assumed to be at a standard path: `<ipfs>/info.yaml`.
-
-The application logic should determine the descriptor path and the content base CID based on these rules.
-
-### The Post Descriptor (`info.yaml`)
-
-The descriptor is a YAML file that defines the full structure of the post, including all its language variations and chapters.
-
-#### Example `info.yaml`
-
-```yaml
-# Example info.yaml for a multi-language, multi-chapter post
-
-thumbnail: assets/post_thumbnail.png
-
-locales:
-  en:
-    title: "Understanding Decentralized Systems"
-    text_preview: "A deep dive into the core concepts of decentralization..."
-    tags: ["blockchain", "systems", "web3"]
-    categories: ["Technology"]
-    # The main content, can be inline or a path
-    data_path: content/en/main.md
-    chapters:
-      - title: "What is a Blockchain?"
-        data_path: content/en/chapter1.md
-      - title: "IPFS and Content Addressing"
-        data_path: content/en/chapter2.md
-  
-  ru:
-    title: "Понимание децентрализованных систем"
-    text_preview: "Глубокое погружение в основные концепции децентрализации..."
-    tags: ["блокчейн", "системы", "web3"]
-    categories: ["Технологии"]
-    data_path: content/ru/main.md
-    chapters:
-      - title: "Что такое блокчейн?"
-        data_path: content/ru/chapter1.md
-      - title: "IPFS и контентная адресация"
-        data_path: content/ru/chapter2.md
-```
-
-### Key Descriptor Fields
-
-* **thumbnail**: Relative path to the post's main image, resolved against the content base CID.
-* **locales**: Object where each key is a language code (e.g., `en`, `ru`).
-* **title / text\_preview / tags / categories**: Language-specific metadata.
-* **data\_path**: Relative path to the main Markdown content for that language.
-* **chapters**: Array of chapter objects, each with its own title and `data_path`.
-
-To get the full content of a chapter, you combine the content base CID with the `data_path` from the descriptor. For example, to fetch the English version of Chapter 1, you would request:
-
-```
-<content_base_cid>/content/en/chapter1.md
-```
-
-from an IPFS gateway.
 </file>
 
 <file path="public/dev_docs/fr/core-concepts/app-init.md">
@@ -17040,72 +17172,6 @@ main().catch((err) => { console.error(err); process.exit(1); });
 ]
 </file>
 
-<file path="src/blockchain/auth.js">
-// src/blockchain/auth.js
-import { createWalletClient, custom, hexToString } from "viem";
-import { getSavvaContract } from "./contracts.js";
-import { toHexBytes32, toChecksumAddress } from "./utils.js";
-import { walletAccount } from "./wallet.js";
-import { httpBase } from "../net/endpoints.js";
-
-export async function authorize(app) {
-  const account = walletAccount();
-  if (!account) throw new Error("Wallet is not connected.");
-  const checksummedAccount = toChecksumAddress(account);
-
-  const info = app.info();
-  if (!info) throw new Error("Backend /info not loaded yet.");
-
-  const userProfileContract = await getSavvaContract(app, 'UserProfile');
-  const domainHex = toHexBytes32("");
-  const keyHex = toHexBytes32("auth_modifier");
-  const modifierHex = await userProfileContract.read.getString([account, domainHex, keyHex]);
-  const modifierString = hexToString(modifierHex, { size: 32 });
-  
-  const textToSign = info.auth_text_to_sign;
-  if (!textToSign) throw new Error("auth_text_to_sign not found in /info response.");
-
-  const messageToSign = textToSign + modifierString;
-  
-  const walletClient = createWalletClient({
-    chain: app.desiredChain(),
-    transport: custom(window.ethereum)
-  });
-  const signature = await walletClient.signMessage({ account, message: messageToSign });
-  
-  const currentDomain = app.config().domain;
-  
-  const authUrl = new URL(`${httpBase()}auth`);
-  authUrl.searchParams.set('user_addr', checksummedAccount);
-  authUrl.searchParams.set('domain', currentDomain);
-  authUrl.searchParams.set('signature', signature);
-  
-  const authRes = await fetch(authUrl.toString(), { credentials: 'include' });
-  if (!authRes.ok) throw new Error(`Authorization failed with status: ${authRes.status}`);
-
-  const isAdminUrl = new URL(`${httpBase()}is-admin`);
-  isAdminUrl.searchParams.set('address', checksummedAccount);
-  isAdminUrl.searchParams.set('domain', currentDomain);
-  
-  const adminRes = await fetch(isAdminUrl.toString(), { credentials: 'include' });
-  if (!adminRes.ok) throw new Error(`/is-admin check failed with status: ${adminRes.status}`);
-  const isAdminData = await adminRes.json();
-  
-  // MODIFICATION: Changed `is_admin` to `admin` to match the API response.
-  const isAdmin = !!isAdminData?.admin;
-
-  const coreUserData = {
-    address: account,
-    domain: currentDomain,
-    isAdmin: isAdmin,
-  };
-  
-  await app.login(coreUserData);
-  
-  return coreUserData;
-}
-</file>
-
 <file path="src/blockchain/contracts.js">
 // src/blockchain/contracts.js
 import { createPublicClient, http, getContract } from "viem";
@@ -17358,38 +17424,80 @@ export default function DocsIndex(props) {
 }
 </file>
 
+<file path="src/components/docs/rehype-media-players.js">
+// src/components/docs/rehype-media-players.js
+import { visit } from "unist-util-visit";
+
+const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
+
+function isVideoUrl(url) {
+  return VIDEO_EXTENSIONS.test(url);
+}
+
+function isAudioUrl(url) {
+  return AUDIO_EXTENSIONS.test(url);
+}
+
+function getYouTubeId(url) {
+  const match = url.match(YOUTUBE_REGEX);
+  return match ? match[1] : null;
+}
+
+export function rehypeMediaPlayers() {
+  return (tree) => {
+    visit(tree, "element", (node) => {
+      if (node.tagName !== "img" || !node.properties?.src) {
+        return;
+      }
+
+      const url = node.properties.src;
+      const youtubeId = getYouTubeId(url);
+
+      if (youtubeId) {
+        node.tagName = "div";
+        node.properties = {
+          className: "youtube-container",
+          style: "position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%;"
+        };
+        node.children = [{
+          type: "element",
+          tagName: "iframe",
+          properties: {
+            src: `https://www.youtube.com/embed/${youtubeId}`,
+            frameborder: "0",
+            allowfullscreen: true,
+            style: "position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+          },
+          children: []
+        }];
+      } else if (isVideoUrl(url)) {
+        node.tagName = "video";
+        node.properties = {
+          src: url,
+          controls: true,
+          style: "width: 100%; border-radius: 0.5rem;"
+        };
+        node.children = [];
+      } else if (isAudioUrl(url)) {
+        node.tagName = "audio";
+        node.properties = {
+          src: url,
+          controls: true,
+          style: "width: 100%;"
+        };
+        node.children = [];
+      }
+    });
+  };
+}
+</file>
+
 <file path="src/components/layout/Container.jsx">
 // src/components/layout/Container.jsx
 export default function Container(props) {
   return <div class={`sv-container ${props.class || ""}`}>{props.children}</div>;
-}
-</file>
-
-<file path="src/components/layout/RightRail.jsx">
-// src/components/layout/RightRail.jsx
-import { For, Switch, Match } from "solid-js";
-import HtmlBlock from "../widgets/HtmlBlock.jsx";
-import ContentListBlock from "../widgets/ContentListBlock.jsx";
-
-export default function RightRail(props) {
-  const blocks = () => props.config?.blocks || [];
-
-  return (
-    <For each={blocks()}>
-      {(block, i) => (
-        <div classList={{ "border-t border-[hsl(var(--border))]": i() > 0 }}>
-          <Switch>
-            <Match when={block.type === 'html'}>
-              <HtmlBlock block={block} />
-            </Match>
-            <Match when={block.type === 'content_List'}>
-              <ContentListBlock block={block} />
-            </Match>
-          </Switch>
-        </div>
-      )}
-    </For>
-  );
 }
 </file>
 
@@ -17438,6 +17546,43 @@ export default function ConnectionError(props) {
         </button>
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/main/NewPostButton.jsx">
+// src/components/main/NewPostButton.jsx
+import { navigate } from "../../routing/hashRouter";
+import { useApp } from "../../context/AppContext";
+
+function NewPostIcon(props) {
+  // This SVG is from your request, cleaned up for use as a component.
+  return (
+    <svg viewBox="0 0 32 32" class={props.class || "w-5 h-5"} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(-516 -99)">
+        <path d="M527.786,122.02 L522.414,125.273 C521.925,125.501 521.485,125.029 521.713,124.571 L524.965,119.195 L527.786,122.02 L527.786,122.02 Z M537.239,106.222 L540.776,109.712 L529.536,120.959 C528.22,119.641 526.397,117.817 526.024,117.444 L537.239,106.222 L537.239,106.222 Z M540.776,102.683 C541.164,102.294 541.793,102.294 542.182,102.683 L544.289,104.791 C544.677,105.18 544.677,105.809 544.289,106.197 L542.182,108.306 L538.719,104.74 L540.776,102.683 L540.776,102.683 Z M524.11,117.068 L519.81,125.773 C519.449,126.754 520.233,127.632 521.213,127.177 L529.912,122.874 C530.287,122.801 530.651,122.655 530.941,122.365 L546.396,106.899 C547.172,106.124 547.172,104.864 546.396,104.088 L542.884,100.573 C542.107,99.797 540.85,99.797 540.074,100.573 L524.619,116.038 C524.328,116.329 524.184,116.693 524.11,117.068 L524.11,117.068 Z M546,111 L546,127 C546,128.099 544.914,129.012 543.817,129.012 L519.974,129.012 C518.877,129.012 517.987,128.122 517.987,127.023 L517.987,103.165 C517.987,102.066 518.902,101 520,101 L536,101 L536,99 L520,99 C517.806,99 516,100.969 516,103.165 L516,127.023 C516,129.22 517.779,131 519.974,131 L543.817,131 C546.012,131 548,129.196 548,127 L548,111 L546,111 L546,111 Z" />
+      </g>
+    </svg>
+  );
+}
+
+export default function NewPostButton() {
+  const app = useApp();
+  const { t } = app;
+
+  const handleNewPost = () => {
+    app.setSavedScrollY(window.scrollY);
+    navigate("/editor/new");
+  };
+
+  return (
+    <button
+      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+      onClick={handleNewPost}
+      title={t("header.newPost")}
+    >
+      <NewPostIcon class="w-5 h-5" />
+    </button>
   );
 }
 </file>
@@ -18102,6 +18247,77 @@ export default function ClosePageButton({ title, offsetTop = 56 }) {
 }
 </file>
 
+<file path="src/components/ui/ContextMenu.jsx">
+// src/components/ui/ContextMenu.jsx
+import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+
+function MoreIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="currentColor">
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+    </svg>
+  );
+}
+
+export default function ContextMenu(props) {
+  const [isOpen, setIsOpen] = createSignal(false);
+  let containerRef;
+
+  const handleClickOutside = (event) => {
+    if (containerRef && !containerRef.contains(event.target)) {
+      setIsOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  const handleItemClick = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    item.onClick?.();
+    setIsOpen(false);
+  };
+
+  return (
+    <div class="absolute -bottom-2 -right-2 z-20" ref={containerRef}>
+      <button
+        class="p-1 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(!isOpen());
+        }}
+        aria-haspopup="true"
+        aria-expanded={isOpen()}
+      >
+        <MoreIcon />
+      </button>
+
+      <Show when={isOpen()}>
+        <div class="absolute bottom-full right-0 mb-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5">
+          <ul class="py-1" role="menu">
+            <For each={props.items}>
+              {(item) => (
+                <li>
+                  <a
+                    href="#"
+                    class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+                    onClick={(e) => handleItemClick(e, item)}
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/PostFundBadge.jsx">
 // src/components/ui/PostFundBadge.jsx
 import { createSignal, createEffect, on, createMemo } from "solid-js";
@@ -18470,156 +18686,6 @@ export default function ToTopButton(props) {
 }
 </file>
 
-<file path="src/components/widgets/ContentListBlock.jsx">
-// src/components/widgets/ContentListBlock.jsx
-import { createMemo, createResource, For, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import PostCard from "../feed/PostCard.jsx";
-import Spinner from "../ui/Spinner.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-
-function getLocalizedTitle(titleData, currentLang) {
-    if (!titleData || typeof titleData !== 'object') return "";
-    if (titleData[currentLang]) return titleData[currentLang];
-    if (titleData['*']) return titleData['*'];
-    if (titleData.en) return titleData.en;
-    const firstKey = Object.keys(titleData)[0];
-    return firstKey ? titleData[firstKey] : "";
-}
-
-async function fetchListContent(params) {
-  const { app, listName, count, lang } = params;
-  if (!app.wsMethod || !listName) return [];
-  
-  const getList = app.wsMethod("get-list");
-  
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    list_name: listName,
-    limit: count || 5,
-    offset: 0,
-    lang: lang,
-  };
-
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-
-  try {
-    const res = await getList(requestParams);
-    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-    return arr.map((it) => ({
-      id: it?.savva_cid || it?.savvaCID || it?.id,
-      _raw: it,
-    }));
-  } catch (err) {
-    console.error(`Failed to fetch content list '${listName}':`, err);
-    return { error: err.message }; 
-  }
-}
-
-export default function ContentListBlock(props) {
-  const app = useApp();
-  const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
-
-  const [contentListModule] = createResource(modulePath, async (path) => {
-    if (!path) return null;
-    try {
-      return await loadAssetResource(app, path, { type: 'yaml' });
-    } catch (e) {
-      console.error(`Failed to load content list module from ${path}`, e);
-      return null;
-    }
-  });
-  
-  const listDefinition = createMemo(() => {
-    const listName = props.block?.list_name;
-    if (!listName) return null;
-    return contentListModule()?.list?.[listName] || null;
-  });
-
-  const title = createMemo(() => {
-    const def = listDefinition();
-    return getLocalizedTitle(def?.title, app.lang());
-  });
-
-  const [listData] = createResource(() => ({
-    app: app,
-    listName: props.block?.list_name,
-    count: props.block?.count,
-    lang: app.lang()
-  }), fetchListContent);
-
-  return (
-    <div class="p-3">
-      <h4 class="font-semibold text-sm mb-2">{title() || props.block?.list_name}</h4>
-      <div class="space-y-3">
-        <Show when={listData.loading}>
-          <div class="flex justify-center items-center h-24">
-            <Spinner />
-          </div>
-        </Show>
-        <Show when={listData.error}>
-          <p class="text-xs text-[hsl(var(--destructive))]">
-            {app.t("common.error")}: {listData.error}
-          </p>
-        </Show>
-        <Show when={!listData.loading && !listData.error && listData()?.length > 0}>
-          <For each={listData()}>
-            {/* --- MODIFICATION: Using list mode with the new compact prop --- */}
-            {(item) => <PostCard item={item} mode="list" compact={true} />}
-          </For>
-        </Show>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/widgets/HtmlBlock.jsx">
-// src/components/widgets/HtmlBlock.jsx
-import { createMemo, createResource } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-
-/**
- * Selects the best path from a block's locale object.
- * Logic: current lang -> '*' -> 'en' -> first available.
- */
-function getLocalizedPath(block, currentLang) {
-  if (!block || typeof block !== 'object') return null;
-  
-  if (block[currentLang]) return block[currentLang];
-  if (block['*']) return block['*'];
-  if (block.en) return block.en;
-  
-  // Fallback to the first key that isn't 'type'
-  const fallbackKey = Object.keys(block).find(k => k !== 'type');
-  return fallbackKey ? block[fallbackKey] : null;
-}
-
-export default function HtmlBlock(props) {
-  const app = useApp();
-  const path = createMemo(() => getLocalizedPath(props.block, app.lang()));
-  
-  const [htmlContent] = createResource(path, async (p) => {
-    if (!p) return "";
-    try {
-      return await loadAssetResource(app, p, { type: 'text' });
-    } catch (e) {
-      console.error(`Failed to load HTML block from ${p}`, e);
-      return `<p class="text-red-500">Error loading content.</p>`;
-    }
-  });
-
-  return (
-    <div class="p-3 text-sm space-y-2" innerHTML={htmlContent() || ""} />
-  );
-}
-</file>
-
 <file path="src/components/RightPaneFooter.jsx">
 // File: src/components/ui/RightPaneFooter.jsx
 import { APP_VERSION } from "../version.js";
@@ -18751,6 +18817,59 @@ export function useLocalIpfs(dependencies) {
 }
 </file>
 
+<file path="src/ipfs/utils.js">
+// src/ipfs/utils.js
+
+/**
+ * Determines the base CID for a post's content, supporting both new and legacy formats.
+ * @param {object} post - The raw post object from the API.
+ * @returns {string|null} The base CID for the content folder.
+ */
+export function getPostContentBaseCid(post) {
+  if (!post) return null;
+  // New format: data_cid is nested in savva_content.
+  if (post.savva_content?.data_cid) {
+    return post.savva_content.data_cid;
+  }
+  // Legacy format: the top-level ipfs field is the base CID.
+  return post.ipfs?.split('/')[0] || null;
+}
+
+/**
+ * Resolves a relative path from a post's content folder into a full IPFS path.
+ * @param {object} post - The raw post object from the API.
+ * @param {string} relativePath - The relative path within the content folder (e.g., "thumbnail.jpg").
+ * @returns {string|null} The full, resolvable IPFS path (e.g., "bafy.../thumbnail.jpg").
+ */
+export function resolvePostCidPath(post, relativePath) {
+  if (!relativePath) return null;
+  const baseCid = getPostContentBaseCid(post);
+  if (!baseCid) return null;
+  
+  const cleanRelativePath = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+  return `${baseCid}/${cleanRelativePath}`;
+}
+
+/**
+ * Determines the full IPFS path to a post's descriptor file (info.yaml),
+ * supporting both new and legacy formats.
+ * @param {object} post - The raw post object from the API.
+ * @returns {string|null} The full, resolvable IPFS path to the descriptor.
+ */
+export function getPostDescriptorPath(post) {
+  if (!post || !post.ipfs) return null;
+  
+  // If data_cid is in savva_content, it's the new format where `ipfs` is the direct path.
+  if (post.savva_content?.data_cid) {
+    return post.ipfs;
+  }
+  
+  // Otherwise, it's the legacy format where `ipfs` is the folder CID.
+  const baseCid = post.ipfs.split('/')[0];
+  return `${baseCid}/info.yaml`;
+}
+</file>
+
 <file path="src/net/wsApi.js">
 // File: src/net/wsApi.js
 // Thin helper over WsClient for JSON-RPC-like calls and simple method sugar.
@@ -18830,6 +18949,333 @@ export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
   }
   u.search = params.toString() ? `?${params.toString()}` : "";
   return u.toString();
+}
+</file>
+
+<file path="src/pages/EditorPage.jsx">
+// src/pages/PostPage.jsx
+import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { parse } from "yaml";
+import { dbg } from "../utils/debug.js";
+import ClosePageButton from "../components/ui/ClosePageButton";
+import Spinner from "../components/ui/Spinner.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UserCard from "../components/ui/UserCard.jsx";
+import PostInfo from "../components/feed/PostInfo.jsx";
+import MarkdownView from "../components/docs/MarkdownView.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import ChapterSelector from "../components/post/ChapterSelector.jsx";
+import ChapterPager from "../components/post/ChapterPager.jsx";
+import PostTags from "../components/post/PostTags.jsx";
+import { getPostContentBaseCid, getPostDescriptorPath } from "../../ipfs/utils.js";
+import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
+
+const getIdentifier = (route) => route().split('/')[2] || "";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, domain, app, lang } = params;
+  if (!identifier || !domain || !app.wsMethod) return null;
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: domain,
+    lang: lang,
+    limit: 1,
+  };
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  return arr[0] || null;
+}
+
+async function fetchPostDetails(mainPost, app) {
+  if (!mainPost) return null;
+  
+  const descriptorPath = getPostDescriptorPath(mainPost);
+  const dataCidForContent = getPostContentBaseCid(mainPost);
+
+  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
+
+  if (!descriptorPath) {
+    return { descriptor: null, dataCidForContent };
+  }
+
+  try {
+    const { res } = await ipfs.fetchBest(app, descriptorPath);
+    const text = await res.text();
+    const descriptor = parse(text) || null;
+    return { descriptor, dataCidForContent };
+  } catch (error) {
+    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
+    return { descriptor: { error: error.message }, dataCidForContent };
+  }
+}
+
+async function fetchMainContent(details, app, lang, chapterIndex) {
+  if (!details?.descriptor || !lang) return "";
+
+  const { descriptor, dataCidForContent } = details;
+  const localizedDescriptor = descriptor.locales?.[lang];
+  if (!localizedDescriptor) return "";
+
+  let contentPath;
+  if (chapterIndex === 0) { // Prologue (main content)
+    if (localizedDescriptor.data) return localizedDescriptor.data;
+    if (localizedDescriptor.data_path) {
+      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+    }
+  } else { // A specific chapter
+    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
+    if (chapter?.data_path) {
+      contentPath = `${dataCidForContent}/${chapter.data_path}`;
+    }
+  }
+
+  if (contentPath) {
+    try {
+      const postGateways = details.descriptor?.gateways || [];
+      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
+      return await res.text();
+    } catch (error) {
+      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
+      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
+    }
+  }
+  
+  return "";
+}
+
+export default function PostPage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+  const identifier = createMemo(() => getIdentifier(route));
+  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+
+  const [post] = createResource(
+    () => ({
+      identifier: identifier(),
+      domain: app.selectedDomainName(),
+      app,
+      lang: uiLang()
+    }),
+    fetchPostByIdentifier
+  );
+  
+  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
+  const [postLang, setPostLang] = createSignal(null);
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+
+  const [mainContent] = createResource(
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
+    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
+  );
+
+  createEffect(() => {
+    const p = post();
+    const id = identifier();
+    if (p && id.startsWith("0x") && p.short_cid) {
+      const newPath = `/post/${p.short_cid}`;
+      navigate(newPath, { replace: true });
+    }
+  });
+
+  createEffect(() => {
+    const p = post();
+    if (p && !postLang()) {
+      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
+      if (availableLangs.length === 0) return;
+      const currentUiLang = uiLang();
+      let initialLang = availableLangs[0]; 
+      if (availableLangs.includes(currentUiLang)) {
+        initialLang = currentUiLang;
+      } else if (availableLangs.includes('en')) {
+        initialLang = 'en';
+      }
+      setPostLang(initialLang);
+    }
+  });
+
+  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const thumbnail = createMemo(() => {
+    const d = details();
+    if (!d) return null;
+    const dataCid = d.dataCidForContent;
+    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
+    if (dataCid && thumbnailPath) {
+      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
+    }
+    return null;
+  });
+  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
+  
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue"), data_path: null };
+    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
+    return [prologue, ...chapters];
+  });
+
+  const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
+  const localizedMainContent = createMemo(() => mainContent());
+  const ipfsBaseUrl = createMemo(() => {
+    const d = details();
+    if (!d) return "";
+    const dataCid = d.dataCidForContent;
+    if (!dataCid) return "";
+    
+    let bestGateway;
+    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+      bestGateway = app.localIpfsGateway();
+    } else if (Array.isArray(postSpecificGateways()) && postSpecificGateways().length > 0) {
+      bestGateway = postSpecificGateways()[0];
+    } else {
+      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
+    }
+    
+    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
+    return `${gatewayUrl}ipfs/${dataCid}`;
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
+
+  const RightPanel = () => (
+    <aside class="sticky top-16">
+      <div 
+        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
+        style={{ "max-height": `calc(100vh - 5rem)` }}
+      >
+        <div class="p-4 space-y-3 overflow-y-auto h-full">
+          <h4 class="font-semibold">Right Panel</h4>
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">
+            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
+          </p>
+          <div class="text-xs space-y-2">
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
+            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
+            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
+            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <main class="sv-container p-4">
+      <ClosePageButton />
+      <Switch>
+        <Match when={post.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={post.error || details()?.descriptor?.error}>
+          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
+            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
+          </div>
+        </Match>
+        <Match when={!post.loading && post() === null}>
+          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
+            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
+          </div>
+        </Match>
+        <Match when={post()}>
+          <div class="max-w-5xl mx-auto">
+            <article class="space-y-4">
+              <header class="flex justify-between items-start gap-4">
+                <div class="flex-1 min-w-0 space-y-3">
+                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
+                  <UserCard author={post().author} />
+                  <PostInfo 
+                    item={post()} 
+                    hideTopBorder={true} 
+                    timeFormat="long"
+                    rewardsAlign="left" 
+                  />
+                  <PostTags postData={post()} />
+                </div>
+                <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
+                  <Show when={thumbnail()}>
+                    {(src) => (
+                      <IpfsImage 
+                        src={src()} 
+                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                        alt="Post thumbnail"
+                        postGateways={postSpecificGateways()}
+                        fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    )}
+                  </Show>
+                  <LangSelector 
+                    codes={availableLocales()}
+                    value={postLang()}
+                    onChange={setPostLang}
+                  />
+                </div>
+              </header>
+
+              <div class="pt-4 border-t border-[hsl(var(--border))]">
+                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
+                  <div>
+                    <Show when={(chapterList()?.length || 0) > 1}>
+                      <div class="flex justify-end mb-4">
+                        <ChapterSelector 
+                          chapters={chapterList()} 
+                          selectedIndex={selectedChapterIndex()} 
+                          onSelect={setSelectedChapterIndex}
+                        />
+                      </div>
+                    </Show>
+                    <Switch>
+                      <Match when={details.loading || mainContent.loading}>
+                        <div class="flex justify-center p-8"><Spinner /></div>
+                      </Match>
+                      <Match when={mainContent.error}>
+                        <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                      </Match>
+                      <Match when={localizedMainContent()}>
+                        <MarkdownView 
+                          markdown={localizedMainContent()} 
+                          rehypePlugins={markdownPlugins()}
+                        />
+                        <Show when={(chapterList()?.length || 0) > 1}>
+                          <ChapterPager 
+                            chapters={chapterList()}
+                            currentIndex={selectedChapterIndex()}
+                            onSelect={setSelectedChapterIndex}
+                          />
+                        </Show>
+                      </Match>
+                    </Switch>
+                  </div>
+                  <RightPanel />
+                </div>
+              </div>
+            </article>
+          </div>
+        </Match>
+      </Switch>
+    </main>
+  );
 }
 </file>
 
@@ -19195,6 +19641,205 @@ Learn more about deploying your application with the [documentations](https://vi
 }
 </file>
 
+<file path="public/dev_docs/en/core-concepts/showing-posts.md">
+# Showing Posts
+
+Displaying a SAVVA post is a two-step process.
+
+1. Fetch a list of post metadata objects from the SAVVA backend.
+2. Use the IPFS information from that metadata to fetch the actual content (title, text, images, etc.) from the decentralized network.
+
+---
+
+## Step 1: Fetch Post Metadata from the Backend
+
+The primary way to get a list of posts is through the **`content-list`** WebSocket method.
+It supports pagination, sorting, and filtering.
+
+### Calling `content-list`
+
+You call the method with parameters specifying which content you need. Example:
+
+```js
+// Example call using the app's wsMethod helper
+const posts = await app.wsMethod("content-list")({
+  domain: "savva.app",      // Domain to fetch posts from
+  limit: 12,                // Number of items per page
+  offset: 0,                // Start index (for pagination)
+  lang: "en",               // Preferred language for metadata
+  order_by: "fund_amount",  // Sort by total funds received
+  content_type: "post",     // We only want posts
+  category: "en:SAVVA Talk" // Optional: filter by category
+});
+```
+
+---
+
+## The Post Object Structure
+
+The `content-list` method returns an array of **post objects**.
+Each contains metadata and pointers needed to fetch the full content.
+
+Example:
+
+```json
+{
+  "author": {
+    "address": "0x1234...",
+    "avatar": "Qm...",
+    "name": "alexna",
+    "display_name": "Alex Na",
+    "staked": "5000000000000000000000"
+  },
+  "category": "en:SAVVA Talk",
+  "domain": "savva.app",
+  "effective_time": "2025-08-20T10:30:00Z",
+  "fund": {
+    "amount": "125000000000000000000",
+    "round_time": 1672531200,
+    "total_author_share": "100000000000000000000"
+  },
+  "ipfs": "bafybeig.../info.yaml",
+  "reactions": [10, 2, 0, 1],
+  "savva_cid": "0x01701...cfa2",
+  "short_cid": "aBcDeF1",
+  "tags": ["decentralization", "social"],
+  "savva_content": {
+    "data_cid": "bafybeig...",
+    "locales": {
+      "en": {
+        "text_preview": "This is a short preview of the post content...",
+        "title": "My First Post on SAVVA"
+      },
+      "ru": {
+        "text_preview": "Это короткий анонс содержания поста...",
+        "title": "Мой первый пост на SAVVA"
+      }
+    },
+    "thumbnail": "thumbnail.jpg"
+  }
+}
+```
+
+### Key Fields Explained
+
+* **author** — profile info of the author (including staked amount).
+* **savva\_cid / short\_cid** — unique IDs. Use them to build URLs (`/post/<short_cid>`).
+* **ipfs / savva\_content.data\_cid** — pointers to IPFS content.
+* **savva\_content** — backend-cached metadata (titles, previews, thumbnails). Great for feed rendering without IPFS fetch.
+* **fund** — post’s funding pool information.
+* **reactions** — array of counts for each reaction type.
+
+---
+
+## Step 2: Resolve Full Content from IPFS
+
+While `savva_content` is useful for previews, full content must be fetched from IPFS (post body, chapters, assets).
+
+### Resolving Content Paths
+
+The location of `info.yaml` depends on format:
+
+* **Modern format**
+
+  * `savva_content.data_cid` = base CID for assets.
+  * `ipfs` = direct path to `info.yaml`.
+* **Legacy format**
+
+  * No `data_cid`.
+  * `ipfs` = base CID. Descriptor assumed at `<ipfs>/info.yaml`.
+
+### Utility Functions
+
+Use helpers from `src/ipfs/utils.js`:
+
+```js
+import {
+  getPostDescriptorPath,
+  getPostContentBaseCid,
+  resolvePostCidPath
+} from "../../ipfs/utils.js";
+
+const post = { ... };
+
+// 1. Path to descriptor file
+const descriptorPath = getPostDescriptorPath(post);
+
+// 2. Base CID for assets
+const contentBaseCid = getPostContentBaseCid(post);
+
+// 3. Resolve relative path (e.g., thumbnail)
+const fullThumbnailPath = resolvePostCidPath(post, post.savva_content.thumbnail);
+```
+
+---
+
+## IPFS Gateway Prioritization
+
+Fetch order:
+
+1. **Local node** (if enabled).
+2. **Post-specific gateways** (listed in descriptor).
+3. **System gateways** (backend `/info`).
+
+This ensures best speed and availability.
+
+---
+
+## The Post Descriptor (`info.yaml`)
+
+A YAML file defining the full structure: languages, chapters, metadata.
+
+### Example `info.yaml`
+
+```yaml
+thumbnail: assets/post_thumbnail.png
+gateways:
+  - https://my-fast-pinning-service.cloud
+
+locales:
+  en:
+    title: "Understanding Decentralized Systems"
+    text_preview: "A deep dive into the core concepts of decentralization..."
+    tags: ["blockchain", "systems", "web3"]
+    categories: ["Technology"]
+    data_path: content/en/main.md
+    chapters:
+      - title: "What is a Blockchain?"
+        data_path: content/en/chapter1.md
+      - title: "IPFS and Content Addressing"
+        data_path: content/en/chapter2.md
+  
+  ru:
+    title: "Понимание децентрализованных систем"
+    text_preview: "Глубокое погружение в основные концепции децентрализации..."
+    tags: ["блокчейн", "системы", "web3"]
+    categories: ["Технологии"]
+    data_path: content/ru/main.md
+    chapters:
+      - title: "Что такое блокчейн?"
+        data_path: content/ru/chapter1.md
+      - title: "IPFS и контентная адресация"
+        data_path: content/ru/chapter2.md
+```
+
+### Key Descriptor Fields
+
+* **thumbnail** — relative path to main image.
+* **gateways** — optional recommended IPFS gateways.
+* **locales** — object keyed by language codes.
+
+  * **title / text\_preview / tags / categories** — language-specific metadata.
+  * **data\_path** — main Markdown content for that language.
+  * **chapters** — array of chapters, each with `title` and `data_path`.
+
+To fetch full chapter content:
+
+```txt
+<content_base_cid>/content/en/chapter1.md
+```
+</file>
+
 <file path="public/dev_docs/en/index.md">
 # SAVVA Developer Documentation
 
@@ -19362,6 +20007,68 @@ function deploy() {
   console.error(err);
   process.exit(1);
 });
+</file>
+
+<file path="src/blockchain/auth.js">
+// src/blockchain/auth.js
+import { hexToString } from "viem";
+import { getSavvaContract } from "./contracts.js";
+import { toHexBytes32, toChecksumAddress } from "./utils.js";
+import { walletAccount } from "./wallet.js";
+import { httpBase } from "../net/endpoints.js";
+
+export async function authorize(app) {
+  const account = walletAccount();
+  if (!account) throw new Error("Wallet is not connected.");
+  const checksummedAccount = toChecksumAddress(account);
+
+  const info = app.info();
+  if (!info) throw new Error("Backend /info not loaded yet.");
+
+  const userProfileContract = await getSavvaContract(app, 'UserProfile');
+  const domainHex = toHexBytes32("");
+  const keyHex = toHexBytes32("auth_modifier");
+  const modifierHex = await userProfileContract.read.getString([account, domainHex, keyHex]);
+  const modifierString = hexToString(modifierHex, { size: 32 });
+  
+  const textToSign = info.auth_text_to_sign;
+  if (!textToSign) throw new Error("auth_text_to_sign not found in /info response.");
+
+  const messageToSign = textToSign + modifierString;
+  
+  const walletClient = app.getGuardedWalletClient();
+  const signature = await walletClient.signMessage({ account, message: messageToSign });
+  
+  const currentDomain = app.config().domain;
+  
+  const authUrl = new URL(`${httpBase()}auth`);
+  authUrl.searchParams.set('user_addr', checksummedAccount);
+  authUrl.searchParams.set('domain', currentDomain);
+  authUrl.searchParams.set('signature', signature);
+  
+  const authRes = await fetch(authUrl.toString(), { credentials: 'include' });
+  if (!authRes.ok) throw new Error(`Authorization failed with status: ${authRes.status}`);
+
+  const isAdminUrl = new URL(`${httpBase()}is-admin`);
+  isAdminUrl.searchParams.set('address', checksummedAccount);
+  isAdminUrl.searchParams.set('domain', currentDomain);
+  
+  const adminRes = await fetch(isAdminUrl.toString(), { credentials: 'include' });
+  if (!adminRes.ok) throw new Error(`/is-admin check failed with status: ${adminRes.status}`);
+  const isAdminData = await adminRes.json();
+  
+  const isAdmin = !!isAdminData?.admin;
+
+  const coreUserData = {
+    address: account,
+    domain: currentDomain,
+    isAdmin: isAdmin,
+  };
+  
+  await app.login(coreUserData);
+  
+  return coreUserData;
+}
 </file>
 
 <file path="src/blockchain/chainLogos.js">
@@ -19741,6 +20448,32 @@ export default function DocsPager(props) {
         </div>
       </nav>
     </Show>
+  );
+}
+</file>
+
+<file path="src/components/layout/RightRail.jsx">
+// src/components/layout/RightRail.jsx
+import { For, Switch, Match } from "solid-js";
+import HtmlBlock from "../widgets/HtmlBlock.jsx";
+import ContentListBlock from "../widgets/ContentListBlock.jsx";
+
+export default function RightRail(props) {
+  const blocks = () => props.config?.blocks || [];
+
+  return (
+    <For each={blocks()}>
+      {(block) => (
+        <Switch>
+          <Match when={block.type === 'html'}>
+            <HtmlBlock block={block} />
+          </Match>
+          <Match when={block.type === 'content_List'}>
+            <ContentListBlock block={block} />
+          </Match>
+        </Switch>
+      )}
+    </For>
   );
 }
 </file>
@@ -20251,83 +20984,6 @@ export function pushErrorToast(err, context = {}) {
 }
 </file>
 
-<file path="src/components/ui/UserCard.jsx">
-// src/components/ui/UserCard.jsx
-import { Show, createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "./IpfsImage.jsx";
-import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
-import VerifiedBadge from "./icons/VerifiedBadge.jsx";
-import StakerLevelIcon from "./StakerLevelIcon.jsx";
-
-function isVerified(a) {
-    return Boolean(a && a.name);
-}
-
-// --- MODIFICATION: New helper function to shorten the address ---
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function UserCard(props) {
-    const { t } = useApp();
-    const author = () => props.author || {};
-
-    const hasName = createMemo(() => author().name || author().display_name);
-
-    return (
-        <Show when={author()}>
-            <div class={`flex items-center gap-2 w-full ${props.compact ? 'h-auto' : 'h-8'}`}>
-                <Show when={!props.compact}>
-                    <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-                        <Show
-                            when={author().avatar}
-                            fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-                        >
-                            <IpfsImage
-                                src={author().avatar}
-                                alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
-                                class="w-full h-full object-cover"
-                            />
-                        </Show>
-                    </div>
-                </Show>
-
-                <div class="min-w-0 flex-1">
-                    <Show when={author().display_name && !props.compact}>
-                        <div class="text-xs truncate text-[hsl(var(--foreground))]">
-                            {author().display_name}
-                        </div>
-                    </Show>
-
-                    <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
-                        <Show when={author().name}>
-                            <div class="min-w-0 flex items-center">
-                                <span class="truncate uppercase font-semibold">{author().name}</span>
-                                <Show when={isVerified(author())}>
-                                    <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
-                                </Show>
-                            </div>
-                        </Show>
-                        
-                        {/* --- MODIFICATION: Show address as a fallback --- */}
-                        <Show when={!hasName() && author().address}>
-                            <span class="font-mono">{shortAddr(author().address)}</span>
-                        </Show>
-
-                        <StakerLevelIcon
-                            staked={author().staked}
-                            class={`${props.compact ? 'w-4 h-4' : 'w-6 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
-                        />
-                    </div>
-                </div>
-            </div>
-        </Show>
-    );
-}
-</file>
-
 <file path="src/components/ui/ViewModeToggle.jsx">
 // src/components/ui/ViewModeToggle.jsx
 import { createSignal } from "solid-js";
@@ -20430,6 +21086,168 @@ export default function ViewModeToggle(props) {
 }
 
 export { viewMode, setViewMode };
+</file>
+
+<file path="src/components/widgets/ContentListBlock.jsx">
+// src/components/widgets/ContentListBlock.jsx
+import { createMemo, createResource, For, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import PostCard from "../feed/PostCard.jsx";
+import Spinner from "../ui/Spinner.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+
+function getLocalizedTitle(titleData, currentLang) {
+    if (!titleData || typeof titleData !== 'object') return "";
+    if (titleData[currentLang]) return titleData[currentLang];
+    if (titleData['*']) return titleData['*'];
+    if (titleData.en) return titleData.en;
+    const firstKey = Object.keys(titleData)[0];
+    return firstKey ? titleData[firstKey] : "";
+}
+
+async function fetchListContent(params) {
+  const { app, listName, count, lang } = params;
+  if (!app.wsMethod || !listName) return [];
+  
+  const getList = app.wsMethod("get-list");
+  
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    list_name: listName,
+    limit: count || 5,
+    offset: 0,
+    lang: lang,
+  };
+
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  try {
+    const res = await getList(requestParams);
+    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+    return arr.map((it) => ({
+      id: it?.savva_cid || it?.savvaCID || it?.id,
+      _raw: it,
+    }));
+  } catch (err) {
+    console.error(`Failed to fetch content list '${listName}':`, err);
+    return { error: err.message }; 
+  }
+}
+
+export default function ContentListBlock(props) {
+  const app = useApp();
+  const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
+
+  const [contentListModule] = createResource(modulePath, async (path) => {
+    if (!path) return null;
+    try {
+      return await loadAssetResource(app, path, { type: 'yaml' });
+    } catch (e) {
+      console.error(`Failed to load content list module from ${path}`, e);
+      return null;
+    }
+  });
+  
+  const listDefinition = createMemo(() => {
+    const listName = props.block?.list_name;
+    if (!listName) return null;
+    return contentListModule()?.list?.[listName] || null;
+  });
+
+  const title = createMemo(() => {
+    const def = listDefinition();
+    return getLocalizedTitle(def?.title, app.lang());
+  });
+
+  const [listData] = createResource(() => ({
+    app: app,
+    listName: props.block?.list_name,
+    count: props.block?.count,
+    lang: app.lang()
+  }), fetchListContent);
+
+  return (
+    <div class="p-3 rounded-lg" style={{ background: "var(--gradient)" }}>
+      <h4 class="font-semibold text-sm mb-2 text-[hsl(var(--card))]">{title() || props.block?.list_name}</h4>
+      <div class="space-y-3">
+        <Show when={listData.loading}>
+          <div class="flex justify-center items-center h-24">
+            <Spinner />
+          </div>
+        </Show>
+        <Show when={listData.error}>
+          <p class="text-xs text-[hsl(var(--destructive))]">
+            {app.t("common.error")}: {listData.error}
+          </p>
+        </Show>
+        <Show when={!listData.loading && !listData.error && listData()?.length > 0}>
+          <For each={listData()}>
+            {(item) => {
+              const menuItems = item._raw?.pinned
+                ? [{ label: "Unpin Post", onClick: () => console.log("Unpin clicked for:", item.id) }]
+                : [{ label: "Pin Post", onClick: () => console.log("Pin clicked for:", item.id) }];
+              
+              return (
+                <PostCard
+                  item={item}
+                  mode="list"
+                  compact={true}
+                  contextMenuItems={menuItems}
+                />
+              );
+            }}
+          </For>
+        </Show>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/widgets/HtmlBlock.jsx">
+// src/components/widgets/HtmlBlock.jsx
+import { createMemo, createResource } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+
+/**
+ * Selects the best path from a block's locale object.
+ * Logic: current lang -> '*' -> 'en' -> first available.
+ */
+function getLocalizedPath(block, currentLang) {
+  if (!block || typeof block !== 'object') return null;
+  
+  if (block[currentLang]) return block[currentLang];
+  if (block['*']) return block['*'];
+  if (block.en) return block.en;
+  
+  // Fallback to the first key that isn't 'type'
+  const fallbackKey = Object.keys(block).find(k => k !== 'type');
+  return fallbackKey ? block[fallbackKey] : null;
+}
+
+export default function HtmlBlock(props) {
+  const app = useApp();
+  const path = createMemo(() => getLocalizedPath(props.block, app.lang()));
+  
+  const [htmlContent] = createResource(path, async (p) => {
+    if (!p) return "";
+    try {
+      return await loadAssetResource(app, p, { type: 'text' });
+    } catch (e) {
+      console.error(`Failed to load HTML block from ${p}`, e);
+      return `<p class="text-red-500">Error loading content.</p>`;
+    }
+  });
+
+  return (
+    <div class="p-3 text-sm space-y-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]" innerHTML={htmlContent() || ""} />
+  );
+}
 </file>
 
 <file path="src/context/useAppConnection.js">
@@ -21262,287 +22080,6 @@ backendLink: https://ui.savva.app/api/
 gear: true
 </file>
 
-<file path="scripts/i18n.mjs">
-// scripts/i18n.mjs
-import fs from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
-import dotenv from "dotenv";
-import OpenAI from "openai";
-
-// ---------- Config ----------
-const ROOT = process.cwd();
-dotenv.config({ path: path.join(ROOT, ".env") });
-
-const SRC_DIR = path.join(ROOT, "src");
-const I18N_DIR = path.join(SRC_DIR, "i18n");
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const BATCH_SIZE = 60; // how many keys to ask the model about per request
-
-// ---------- Collect used keys (scan t("key") calls) ----------
-const exts = [".js", ".jsx", ".ts", ".tsx"];
-const usedKeys = new Set();
-
-/**
- * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
- * (If you build keys dynamically, they won’t be picked up by any static scan.)
- */
-const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
-
-function walk(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === "dist") continue;
-      walk(p);
-    } else if (exts.includes(path.extname(entry.name))) {
-      const text = fs.readFileSync(p, "utf8");
-      let m;
-      while ((m = T_CALL.exec(text))) {
-        usedKeys.add(m[2]);
-      }
-    }
-  }
-}
-
-walk(SRC_DIR);
-
-// ---------- Helpers to load & write lang files ----------
-function isLangFile(name) {
-  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
-}
-function toModuleURL(filePath) {
-  return pathToFileURL(filePath).href;
-}
-async function loadLang(filePath) {
-  const mod = await import(toModuleURL(filePath));
-  const dict = mod?.default || {};
-  const normalized = {};
-  for (const [k, v] of Object.entries(dict)) {
-    normalized[k] = typeof v === "string" ? v : String(v);
-  }
-  return normalized;
-}
-function writeLang(filePath, obj) {
-  const sorted = Object.keys(obj)
-    .sort()
-    .reduce((acc, k) => {
-      acc[k] = obj[k];
-      return acc;
-    }, {});
-  const body =
-    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
-    "export default " +
-    JSON.stringify(sorted, null, 2) +
-    ";\n";
-  fs.writeFileSync(filePath, body, "utf8");
-}
-
-// ---------- OpenAI helpers ----------
-let openai = null;
-if (OPENAI_KEY) {
-  openai = new OpenAI({ apiKey: OPENAI_KEY });
-}
-
-function chunk(arr, size) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
-async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
-  if (!openai) return {};
-  const res = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          `You are a localization copywriter for a web app. ` +
-          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
-          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
-          `Do not add extra keys.`,
-      },
-      { role: "user", content: prompt },
-    ],
-  });
-  const text = res.choices?.[0]?.message?.content || "{}";
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
-
-async function fillEnglish(keys) {
-  const out = {};
-  for (const group of chunk(keys, BATCH_SIZE)) {
-    const prompt =
-      `For each key, produce an English UI string (microcopy). ` +
-      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
-      JSON.stringify({ keys: group }, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-async function translateTo(langCode, englishPairs) {
-  const out = {};
-  const keys = Object.keys(englishPairs);
-  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
-    const batchToTranslate = {};
-    for (const k of keyGroup) {
-      batchToTranslate[k] = englishPairs[k];
-    }
-    const prompt =
-      `Translate the values in the following JSON object to ${langCode}. ` +
-      `Return a JSON object with the same keys, but with translated string values. ` +
-      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
-      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
-      JSON.stringify(batchToTranslate, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-// ---------- Main ----------
-(async function main() {
-  // Sanity
-  if (!fs.existsSync(I18N_DIR)) {
-    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
-    process.exit(1);
-  }
-
-  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
-  if (langFiles.length === 0) {
-    console.error("[i18n] No language files found in src/i18n");
-    process.exit(1);
-  }
-
-  const enPath = path.join(I18N_DIR, "en.js");
-  if (!fs.existsSync(enPath)) {
-    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
-    process.exit(1);
-  }
-
-  // Load all dicts
-  const dicts = {};
-  for (const f of langFiles) {
-    dicts[f] = await loadLang(path.join(I18N_DIR, f));
-  }
-
-  const desiredKeys = new Set(usedKeys);
-
-  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
-  const enOrig = dicts["en.js"] || {};
-  const enNew = {};
-  const missingEn = [];
-
-  for (const k of desiredKeys) {
-    const v = enOrig[k];
-    const isMissingValue =
-      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-    if (isMissingValue) {
-      enNew[k] = "???";
-      missingEn.push(k);
-    } else {
-      enNew[k] = v;
-    }
-  }
-
-  writeLang(enPath, enNew);
-
-  // ---------- 2) Fill English "???" via OpenAI ----------
-  if (missingEn.length > 0) {
-    if (!openai) {
-      console.warn(
-        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
-      );
-    } else {
-      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
-      const filled = await fillEnglish(missingEn);
-      let filledCount = 0;
-      for (const k of missingEn) {
-        const candidate = filled[k];
-        if (typeof candidate === "string" && candidate.trim()) {
-          enNew[k] = candidate.trim();
-          filledCount++;
-        }
-      }
-      if (filledCount > 0) {
-        writeLang(enPath, enNew);
-        console.log(`[i18n] Filled ${filledCount} English strings.`);
-      }
-    }
-  } else {
-    console.log("[i18n] No missing English strings to fill.");
-  }
-
-  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
-  for (const f of langFiles) {
-    if (f === "en.js") continue;
-
-    const langPath = path.join(I18N_DIR, f);
-    const langCode = path.basename(f, ".js");
-    const langDict = dicts[f] || {};
-
-    // Prune/prepare
-    const out = {};
-    const toTranslate = {};
-    for (const k of desiredKeys) {
-      const v = langDict[k];
-      const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-      if (isMissing) {
-        out[k] = "???";
-        // Only translate if we have an English source string that isn't a placeholder
-        if (typeof enNew[k] === "string" && enNew[k].trim() && enNew[k] !== "???") {
-          toTranslate[k] = enNew[k];
-        }
-      } else {
-        out[k] = v;
-      }
-    }
-
-    writeLang(langPath, out);
-    const toTranslateCount = Object.keys(toTranslate).length;
-
-    if (toTranslateCount === 0) {
-      console.log(`[i18n] ${langCode}: nothing to translate.`);
-      continue;
-    }
-
-    if (!openai) {
-      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
-      continue;
-    }
-
-    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
-    const translated = await translateTo(langCode, toTranslate);
-    let translatedCount = 0;
-    for (const key of Object.keys(toTranslate)) {
-      const t = translated[key];
-      if (typeof t === "string" && t.trim() && out[key] === "???") {
-        out[key] = t.trim();
-        translatedCount++;
-      }
-    }
-    
-    if (translatedCount > 0) {
-        writeLang(langPath, out);
-    }
-    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
-  }
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
-</file>
-
 <file path="src/components/feed/PostInfo.jsx">
 // src/components/feed/PostInfo.jsx
 import { Show, createMemo } from "solid-js";
@@ -21662,189 +22199,6 @@ const REGISTRY = {
 export function getTabComponent(type) {
   const key = String(type || "").toLowerCase();
   return REGISTRY[key] || null;
-}
-</file>
-
-<file path="src/components/tabs/LeadersTab.jsx">
-// src/components/tabs/LeadersTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-import { whenWsOpen } from "../../net/wsRuntime.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-const TIME_FRAMES = ["month", "week", "year", "all"];
-
-export default function LeadersTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const [timeFrame, setTimeFrame] = createSignal("month");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      await whenWsOpen();
-      if (!contentList) return [];
-      const params = {
-        domain: domainName(),
-        content_type: "post",
-        limit,
-        offset,
-        lang: lang(),
-        order_by: 'total_author_share'
-      };
-      
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-
-      const user = app.authorizedUser();
-      if (user?.address) {
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      const selectedTime = timeFrame();
-      if (selectedTime !== "all") {
-        const now = new Date();
-        let pastDate = new Date();
-        if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
-        if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
-        if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
-        
-        // MODIFICATION: Changed to standard ISO string format.
-        params.min_time = pastDate.toISOString();
-      }
-
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      console.error("fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-4">
-          <div class="flex items-center gap-2 min-w-[220px]">
-            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={category()}
-              onInput={(e) => setCategory(e.currentTarget.value)}
-              aria-label={app.t("newTab.category")}
-            >
-              <For each={categoriesWithAll()}>
-                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-              </For>
-            </select>
-          </div>
-          <div class="flex items-center gap-2">
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={timeFrame()}
-              onInput={(e) => setTimeFrame(e.currentTarget.value)}
-              aria-label="Time frame"
-            >
-              <For each={TIME_FRAMES}>
-                {(frame) => <option value={frame}>{app.t(`timeFrame.${frame}`)}</option>}
-              </For>
-            </select>
-          </div>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-      />
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/tabs/RightRailLayout.jsx">
-// src/components/tabs/RightRailLayout.jsx
-import { Show } from "solid-js";
-import RightRail from "../layout/RightRail.jsx";
-
-const HEADER_H = 48;
-
-export default function RightRailLayout(props) {
-  return (
-    <section
-      class="w-full"
-      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
-    >
-      <Show
-        when={props.rightPanelConfig?.available}
-        fallback={
-          // When the right panel is unavailable, render content in a single column.
-          <div>{props.children}</div>
-        }
-      >
-        {/* When the right panel is available, render the two-column grid. */}
-        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
-          <div>{props.children}</div>
-          <aside class="hidden md:block sticky top-16">
-            <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-              <RightRail config={props.rightPanelConfig} />
-            </div>
-          </aside>
-        </div>
-      </Show>
-    </section>
-  );
 }
 </file>
 
@@ -22075,6 +22429,83 @@ export default function LangSelector(props) {
       </div>
     </Show>
   );
+}
+</file>
+
+<file path="src/components/ui/UserCard.jsx">
+// src/components/ui/UserCard.jsx
+import { Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "./IpfsImage.jsx";
+import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
+import VerifiedBadge from "./icons/VerifiedBadge.jsx";
+import StakerLevelIcon from "./StakerLevelIcon.jsx";
+
+function isVerified(a) {
+    return Boolean(a && a.name);
+}
+
+// --- MODIFICATION: New helper function to shorten the address ---
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function UserCard(props) {
+    const { t } = useApp();
+    const author = () => props.author || {};
+
+    const hasName = createMemo(() => author().name || author().display_name);
+
+    return (
+        <Show when={author()}>
+            <div class={`flex items-center gap-2 w-full ${props.compact ? 'h-auto' : 'h-8'}`}>
+                <Show when={!props.compact}>
+                    <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+                        <Show
+                            when={author().avatar}
+                            fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+                        >
+                            <IpfsImage
+                                src={author().avatar}
+                                alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
+                                class="w-full h-full object-cover"
+                            />
+                        </Show>
+                    </div>
+                </Show>
+
+                <div class="min-w-0 flex-1">
+                    <Show when={author().display_name && !props.compact}>
+                        <div class="text-xs truncate text-[hsl(var(--foreground))]">
+                            {author().display_name}
+                        </div>
+                    </Show>
+
+                    <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
+                        <Show when={author().name}>
+                            <div class="min-w-0 flex items-center">
+                                <span class="truncate uppercase font-semibold">{author().name}</span>
+                                <Show when={isVerified(author())}>
+                                    <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
+                                </Show>
+                            </div>
+                        </Show>
+                        
+                        {/* --- MODIFICATION: Show address as a fallback --- */}
+                        <Show when={!hasName() && author().address}>
+                            <span class="font-mono">{shortAddr(author().address)}</span>
+                        </Show>
+
+                        <StakerLevelIcon
+                            staked={author().staked}
+                            class={`${props.compact ? 'w-4 h-4' : 'w-6 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
+                        />
+                    </div>
+                </div>
+            </div>
+        </Show>
+    );
 }
 </file>
 
@@ -22775,228 +23206,480 @@ tabs:
 }
 </file>
 
-<file path="src/components/docs/MarkdownView.jsx">
-// src/components/docs/MarkdownView.jsx
-import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug.js";
+<file path="scripts/i18n.mjs">
+// scripts/i18n.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import dotenv from "dotenv";
+import OpenAI from "openai";
 
-function rehypeCopyButton() {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      visit(tree, "element", (node) => {
-        if (node.tagName !== "pre") return;
-        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
-        node.children.push({
-          type: "element", tagName: "button",
-          properties: { className: ["sv-copy-btn"], type: "button" },
-          children: [{ type: "text", value: "Copy" }],
-        });
-      });
-      return tree;
-    });
+// ---------- Config ----------
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const SRC_DIR = path.join(ROOT, "src");
+const I18N_DIR = path.join(SRC_DIR, "i18n");
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const BATCH_SIZE = 60; // how many keys to ask the model about per request
+const targetLang = process.argv[2] || null;
+const onlyEnglish = targetLang === 'en';
+
+// ---------- Collect used keys (scan t("key") calls) ----------
+const exts = [".js", ".jsx", ".ts", ".tsx"];
+const usedKeys = new Set();
+
+/**
+ * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
+ * (If you build keys dynamically, they won’t be picked up by any static scan.)
+ */
+const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
+      walk(p);
+    } else if (exts.includes(path.extname(entry.name))) {
+      const text = fs.readFileSync(p, "utf8");
+      let m;
+      while ((m = T_CALL.exec(text))) {
+        usedKeys.add(m[2]);
+      }
+    }
+  }
 }
 
-export default function MarkdownView(props) {
-  const { t } = useApp();
-  const [html, setHtml] = createSignal("");
-  let disposed = false;
-  let container;
+walk(SRC_DIR);
 
-  async function renderMd() {
-    try {
-      const [
-        { unified }, { default: remarkParse }, { default: remarkGfm }, 
-        { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
-        { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
-        { default: rehypeStringify }, DOMPurify, { default: remarkBreaks },
-      ] = await Promise.all([
-        import("unified"), import("remark-parse"), import("remark-gfm"),
-        import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
-        import("rehype-autolink-headings"), import("rehype-pretty-code"),
-        import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
-      ]);
+// ---------- Helpers to load & write lang files ----------
+function isLangFile(name) {
+  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
+}
+function toModuleURL(filePath) {
+  return pathToFileURL(filePath).href;
+}
+async function loadLang(filePath) {
+  const mod = await import(toModuleURL(filePath));
+  const dict = mod?.default || {};
+  const normalized = {};
+  for (const [k, v] of Object.entries(dict)) {
+    normalized[k] = typeof v === "string" ? v : String(v);
+  }
+  return normalized;
+}
+function writeLang(filePath, obj) {
+  const sorted = Object.keys(obj)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = obj[k];
+      return acc;
+    }, {});
+  const body =
+    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
+    "export default " +
+    JSON.stringify(sorted, null, 2) +
+    ";\n";
+  fs.writeFileSync(filePath, body, "utf8");
+}
 
-      DOMPurify.default.addHook("uponSanitizeAttribute", (node, data) => { /* ... */ });
+// ---------- OpenAI helpers ----------
+let openai = null;
+if (OPENAI_KEY) {
+  openai = new OpenAI({ apiKey: OPENAI_KEY });
+}
 
-      const processor = unified()
-        .use(remarkParse)
-        .use(remarkBreaks)
-        .use(remarkFrontmatter, ["yaml", "toml"])
-        .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true });
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
-      if (props.rehypePlugins) {
-        for (const plugin of props.rehypePlugins) {
-          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
-        }
-      }
-      
-      processor
-        .use(rehypeSlug)
-        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
-        .use(rehypePrettyCode, {
-          keepBackground: true,
-          theme: { light: "github-light", dark: "github-dark" },
-        })
-        .use(rehypeCopyButton)
-        .use(rehypeStringify, { allowDangerousHtml: true });
-      
-      const file = await processor.process(String(props.markdown || ""));
-      const rawHtml = String(file);
-      const safe = DOMPurify.default.sanitize(rawHtml, { /* ... */ });
+async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
+  if (!openai) return {};
+  const res = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          `You are a localization copywriter for a web app. ` +
+          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
+          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
+          `Do not add extra keys.`,
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+  const text = res.choices?.[0]?.message?.content || "{}";
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
 
-      if (!disposed) setHtml(safe);
-    } catch (err) {
-      // --- MODIFICATION: Improved error logging and display ---
-      dbg.error("MarkdownView", "Markdown rendering failed:", err);
-      const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      
-      const errorHtml = `
-        <div style="color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive)); padding: 1rem; border-radius: 0.5rem;">
-          <strong>Markdown Rendering Error:</strong>
-          <pre style="margin-top: 0.5rem; white-space: pre-wrap;">${safeErr}</pre>
-          <hr style="margin: 1rem 0;" />
-          <strong>Original Content:</strong>
-          <pre style="white-space: pre-wrap;">${safeMd}</pre>
-        </div>`;
-      if (!disposed) setHtml(errorHtml);
+async function fillEnglish(keys) {
+  const out = {};
+  for (const group of chunk(keys, BATCH_SIZE)) {
+    const prompt =
+      `For each key, produce an English UI string (microcopy). ` +
+      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
+      JSON.stringify({ keys: group }, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+async function translateTo(langCode, englishPairs) {
+  const out = {};
+  const keys = Object.keys(englishPairs);
+  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
+    const batchToTranslate = {};
+    for (const k of keyGroup) {
+      batchToTranslate[k] = englishPairs[k];
+    }
+    const prompt =
+      `Translate the values in the following JSON object to ${langCode}. ` +
+      `Return a JSON object with the same keys, but with translated string values. ` +
+      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
+      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
+      JSON.stringify(batchToTranslate, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+// ---------- Main ----------
+(async function main() {
+  // Sanity
+  if (!fs.existsSync(I18N_DIR)) {
+    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
+    process.exit(1);
+  }
+
+  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
+  if (langFiles.length === 0) {
+    console.error("[i18n] No language files found in src/i18n");
+    process.exit(1);
+  }
+
+  const enPath = path.join(I18N_DIR, "en.js");
+  if (!fs.existsSync(enPath)) {
+    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
+    process.exit(1);
+  }
+
+  // Load all dicts
+  const dicts = {};
+  for (const f of langFiles) {
+    dicts[f] = await loadLang(path.join(I18N_DIR, f));
+  }
+
+  const desiredKeys = new Set(usedKeys);
+
+  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
+  const enOrig = dicts["en.js"] || {};
+  const enNew = {};
+  const missingEn = [];
+
+  for (const k of desiredKeys) {
+    const v = enOrig[k];
+    const isMissingValue =
+      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+    if (isMissingValue) {
+      enNew[k] = "???";
+      missingEn.push(k);
+    } else {
+      enNew[k] = v;
     }
   }
 
-  function copy(text) { /* ... */ }
-  function onClick(e) { /* ... */ }
-  function relabelButtons() { /* ... */ }
-  
-  onMount(() => {
-    renderMd().then(() => relabelButtons());
-    container?.addEventListener("click", onClick);
-  });
+  writeLang(enPath, enNew);
 
-  createEffect(on(() => props.markdown, (md, prevMd) => {
-    if (md !== prevMd && prevMd !== undefined) {
-      renderMd().then(() => relabelButtons());
-    }
-  }, { defer: true }));
-
-  onCleanup(() => {
-    disposed = true;
-    container?.removeEventListener("click", onClick);
-  });
-
-  return (
-    <article
-      ref={(el) => (container = el)}
-      class="sv-docs prose prose-sm md:prose-base max-w-none"
-      innerHTML={html()}
-      aria-label={t("docs.article")}
-    />
-  );
-}
-</file>
-
-<file path="src/components/main/MainView.jsx">
-// src/components/main/MainView.jsx
-import { createMemo, Show } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import TabsBar from "./TabsBar";
-import Container from "../layout/Container";
-import ToTopButton from "../ui/ToTopButton";
-
-export default function MainView() {
-  const { t, selectedDomain, domainAssetsConfig, domainAssetsSource, loading } = useApp();
-
-  const domainName = createMemo(() => {
-    const d = selectedDomain?.();
-    return !d ? "" : typeof d === "string" ? d : d.name || "";
-  });
-
-  // --- MODIFICATION: Make the revision key more robust to prevent race conditions ---
-  const revision = createMemo(() => {
-    // Don't try to render if the app is in a top-level loading state.
-    if (loading()) return null;
-
-    // The key now includes the source, ensuring it only changes AFTER asset loading is complete.
-    const source = domainAssetsSource?.();
-    const cfg = domainAssetsConfig?.();
-    const cid = cfg?.assets_cid || cfg?.cid || "";
-    const tabs = cfg?.modules?.tabs || "";
-    
-    return `${domainName()}|${source}|${cid}|${tabs}`;
-  });
-
-  return (
-    <Container>
-      <ToTopButton />
-      <div class="w-full">
-        <Show when={revision()} keyed>
-          {() => <TabsBar />}
-        </Show>
-      </div>
-    </Container>
-  );
-}
-</file>
-
-<file path="src/components/ui/IpfsImage.jsx">
-// src/components/ui/IpfsImage.jsx
-import { createSignal, createEffect, Show, Switch, Match } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { ipfs } from "../../ipfs/index.js";
-import { pushErrorToast } from "./toast.js";
-import Spinner from "./Spinner.jsx";
-
-export default function IpfsImage(props) {
-  const app = useApp();
-  const [imageUrl, setImageUrl] = createSignal(null);
-  const [loading, setLoading] = createSignal(true);
-
-  createEffect(async () => {
-    setLoading(true);
-    setImageUrl(null);
-
-    const gateways = app.activeIpfsGateways();
-    if (!props.src || gateways.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { url } = await ipfs.fetchBest(app, props.src);
-      setImageUrl(url);
-    } catch (e) {
-      // Don't show a toast for 404s, just show the fallback.
-      if (!e.is404) {
-        pushErrorToast(e, { context: "IPFS image failed to load", cid: props.src });
+  // ---------- 2) Fill English "???" via OpenAI ----------
+  if (missingEn.length > 0) {
+    if (!openai) {
+      console.warn(
+        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
+      );
+    } else {
+      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
+      const filled = await fillEnglish(missingEn);
+      let filledCount = 0;
+      for (const k of missingEn) {
+        const candidate = filled[k];
+        if (typeof candidate === "string" && candidate.trim()) {
+          enNew[k] = candidate.trim();
+          filledCount++;
+        }
       }
-      console.error(`[IpfsImage] All gateways failed for ${props.src}:`, e.causes || e);
-    } finally {
-      setLoading(false);
+      if (filledCount > 0) {
+        writeLang(enPath, enNew);
+        console.log(`[i18n] Filled ${filledCount} English strings.`);
+      }
+    }
+  } else {
+    console.log("[i18n] No missing English strings to fill.");
+  }
+
+  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
+  if (onlyEnglish) {
+    console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
+    return;
+  }
+
+  for (const f of langFiles) {
+    if (f === "en.js") continue;
+
+    const langPath = path.join(I18N_DIR, f);
+    const langCode = path.basename(f, ".js");
+    const langDict = dicts[f] || {};
+
+    // Prune/prepare
+    const out = {};
+    const toTranslate = {};
+    for (const k of desiredKeys) {
+      const v = langDict[k];
+      const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+      if (isMissing) {
+        out[k] = "???";
+        // Only translate if we have an English source string that isn't a placeholder
+        if (typeof enNew[k] === "string" && enNew[k].trim() && enNew[k] !== "???") {
+          toTranslate[k] = enNew[k];
+        }
+      } else {
+        out[k] = v;
+      }
+    }
+
+    writeLang(langPath, out);
+    const toTranslateCount = Object.keys(toTranslate).length;
+
+    if (toTranslateCount === 0) {
+      console.log(`[i18n] ${langCode}: nothing to translate.`);
+      continue;
+    }
+
+    if (!openai) {
+      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
+      continue;
+    }
+
+    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
+    const translated = await translateTo(langCode, toTranslate);
+    let translatedCount = 0;
+    for (const key of Object.keys(toTranslate)) {
+      const t = translated[key];
+      if (typeof t === "string" && t.trim() && out[key] === "???") {
+        out[key] = t.trim();
+        translatedCount++;
+      }
+    }
+    
+    if (translatedCount > 0) {
+        writeLang(langPath, out);
+    }
+    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
+  }
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+</file>
+
+<file path="src/components/tabs/LeadersTab.jsx">
+// src/components/tabs/LeadersTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+const TIME_FRAMES = ["month", "week", "year", "all"];
+
+export default function LeadersTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const [timeFrame, setTimeFrame] = createSignal("month");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
     }
   });
 
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      await whenWsOpen();
+      if (!contentList) return [];
+      const params = {
+        domain: domainName(),
+        content_type: "post",
+        limit,
+        offset,
+        lang: lang(),
+        order_by: 'total_author_share'
+      };
+      
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      const selectedTime = timeFrame();
+      if (selectedTime !== "all") {
+        const now = new Date();
+        let pastDate = new Date();
+        if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
+        if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
+        if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
+
+          // i18n techical comments. Do not remove
+          // t("timeFrame.week")
+          // t("timeFrame.month")
+          // t("timeFrame.year")
+          // t("timeFrame.all")
+
+
+        // MODIFICATION: Changed to standard ISO string format.
+        params.min_time = pastDate.toISOString();
+      }
+
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      console.error("fetchPage error:", err);
+      return [];
+    }
+  }
+
   return (
-    <div class={`relative w-full h-full ${props.class || ""}`}>
-      <Switch>
-        <Match when={loading()}>
-          <div class="absolute inset-0 flex items-center justify-center bg-[hsl(var(--muted))]">
-            <Spinner />
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-4">
+          <div class="flex items-center gap-2 min-w-[220px]">
+            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={category()}
+              onInput={(e) => setCategory(e.currentTarget.value)}
+              aria-label={app.t("newTab.category")}
+            >
+              <For each={categoriesWithAll()}>
+                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+              </For>
+            </select>
           </div>
-        </Match>
-        <Match when={imageUrl()}>
-          <img
-            src={imageUrl()}
-            alt={props.alt || "IPFS Image"}
-            class="absolute inset-0 w-full h-full object-cover"
-            onError={() => setImageUrl(null)}
-          />
-        </Match>
-        <Match when={!imageUrl()}>
-          {props.fallback}
-        </Match>
-      </Switch>
-    </div>
+          <div class="flex items-center gap-2">
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={timeFrame()}
+              onInput={(e) => setTimeFrame(e.currentTarget.value)}
+              aria-label="Time frame"
+            >
+              <For each={TIME_FRAMES}>
+                {(frame) => <option value={frame}>{app.t(`timeFrame.${frame}`)}</option>}
+              </For>
+            </select>
+          </div>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/RightRailLayout.jsx">
+// src/components/tabs/RightRailLayout.jsx
+import { Show } from "solid-js";
+import RightRail from "../layout/RightRail.jsx";
+
+const HEADER_H = 48;
+
+export default function RightRailLayout(props) {
+  return (
+    <section
+      class="w-full"
+      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
+    >
+      <Show
+        when={props.rightPanelConfig?.available}
+        fallback={
+          // When the right panel is unavailable, render content in a single column.
+          <div>{props.children}</div>
+        }
+      >
+        {/* When the right panel is available, render the two-column grid. */}
+        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
+          <div>{props.children}</div>
+          <aside class="hidden md:block sticky top-16">
+            <div class="space-y-4">
+              <RightRail config={props.rightPanelConfig} />
+            </div>
+          </aside>
+        </div>
+      </Show>
+    </section>
   );
 }
 </file>
@@ -24061,6 +24744,27 @@ export default function ContentFeed(props) {
 }
 </file>
 
+<file path="src/components/main/MainView.jsx">
+// src/components/main/MainView.jsx
+import { useApp } from "../../context/AppContext";
+import TabsBar from "./TabsBar";
+import Container from "../layout/Container";
+import ToTopButton from "../ui/ToTopButton";
+
+export default function MainView() {
+  const { t } = useApp();
+
+  return (
+    <Container>
+      <ToTopButton />
+      <div class="w-full">
+        <TabsBar />
+      </div>
+    </Container>
+  );
+}
+</file>
+
 <file path="src/ipfs/index.js">
 // src/ipfs/index.js
 import { fetchWithTimeout } from "../utils/net.js";
@@ -24154,6 +24858,270 @@ export const ipfs = {
 };
 </file>
 
+<file path="src/index.jsx">
+// src/index.jsx
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./context/AppContext.jsx";
+
+const root = document.getElementById("root");
+
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
+</file>
+
+<file path="src/components/docs/MarkdownView.jsx">
+// src/components/docs/MarkdownView.jsx
+import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug.js";
+import { rehypeMediaPlayers } from "./rehype-media-players.js";
+
+function rehypeCopyButton() {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      visit(tree, "element", (node) => {
+        if (node.tagName !== "pre") return;
+        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
+        node.children.push({
+          type: "element", tagName: "button",
+          properties: { className: ["sv-copy-btn"], type: "button" },
+          children: [{ type: "text", value: "Copy" }],
+        });
+      });
+      return tree;
+    });
+}
+
+export default function MarkdownView(props) {
+  const { t } = useApp();
+  const [html, setHtml] = createSignal("");
+  let disposed = false;
+  let container;
+
+  async function renderMd() {
+    try {
+      const [
+        { unified }, { default: remarkParse }, { default: remarkGfm }, 
+        { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
+        { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
+        { default: rehypeStringify }, DOMPurify, { default: remarkBreaks },
+      ] = await Promise.all([
+        import("unified"), import("remark-parse"), import("remark-gfm"),
+        import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
+        import("rehype-autolink-headings"), import("rehype-pretty-code"),
+        import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
+      ]);
+
+      // Allow specific tags and attributes for media players
+      DOMPurify.default.addHook("uponSanitizeElement", (node, data) => {
+        if (data.tagName === 'iframe' || data.tagName === 'video' || data.tagName === 'audio') {
+            if(!node.hasAttribute('src')) node.remove();
+        }
+      });
+
+      const processor = unified()
+        .use(remarkParse)
+        .use(remarkBreaks)
+        .use(remarkFrontmatter, ["yaml", "toml"])
+        .use(remarkGfm)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeMediaPlayers) // Our new media plugin
+        .use(rehypeSlug)
+        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
+        .use(rehypePrettyCode, {
+          keepBackground: true,
+          theme: { light: "github-light", dark: "github-dark" },
+        })
+        .use(rehypeCopyButton)
+        .use(rehypeStringify, { allowDangerousHtml: true });
+      
+      const file = await processor.process(String(props.markdown || ""));
+      const rawHtml = String(file);
+      
+      const safe = DOMPurify.default.sanitize(rawHtml, {
+        ADD_TAGS: ["iframe", "video", "audio"],
+        ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style", "src"],
+        // Allow specific youtube domain for iframes
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        FORBID_TAGS: [],
+        FORBID_ATTR: []
+      });
+
+      if (!disposed) setHtml(safe);
+    } catch (err) {
+      dbg.error("MarkdownView", "Markdown rendering failed:", err);
+      const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      
+      const errorHtml = `
+        <div style="color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive)); padding: 1rem; border-radius: 0.5rem;">
+          <strong>Markdown Rendering Error:</strong>
+          <pre style="margin-top: 0.5rem; white-space: pre-wrap;">${safeErr}</pre>
+          <hr style="margin: 1rem 0;" />
+          <strong>Original Content:</strong>
+          <pre style="white-space: pre-wrap;">${safeMd}</pre>
+        </div>`;
+      if (!disposed) setHtml(errorHtml);
+    }
+  }
+
+  function copy(text) {
+    if (!text) return;
+    try {
+      navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.error("Failed to copy text:", e);
+    }
+  }
+
+  function onClick(e) {
+    const btn = e.target.closest(".sv-copy-btn");
+    if (!btn) return;
+    const pre = btn.closest("pre");
+    if (!pre) return;
+    
+    // Select the code content, excluding the button itself
+    const codeNode = pre.querySelector("code");
+    if (codeNode) {
+      copy(codeNode.innerText);
+      btn.textContent = t("clipboard.copied");
+      setTimeout(() => { btn.textContent = t("clipboard.copy"); }, 2000);
+    }
+  }
+
+  function relabelButtons() {
+    if (!container) return;
+    const buttons = container.querySelectorAll(".sv-copy-btn");
+    buttons.forEach(btn => { btn.textContent = t("clipboard.copy"); });
+  }
+  
+  onMount(() => {
+    renderMd().then(() => relabelButtons());
+    container?.addEventListener("click", onClick);
+  });
+
+  createEffect(on(() => props.markdown, (md, prevMd) => {
+    if (md !== prevMd && prevMd !== undefined) {
+      renderMd().then(() => relabelButtons());
+    }
+  }, { defer: true }));
+
+  onCleanup(() => {
+    disposed = true;
+    container?.removeEventListener("click", onClick);
+  });
+
+  return (
+    <article
+      ref={(el) => (container = el)}
+      class="sv-docs prose prose-sm md:prose-base max-w-none"
+      innerHTML={html()}
+      aria-label={t("docs.article")}
+    />
+  );
+}
+</file>
+
+<file path="src/components/settings/DeveloperSection.jsx">
+// src/components/settings/DeveloperSection.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug";
+
+export default function DeveloperSection() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
+
+      {/* Show translation keys */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.showKeys()}
+          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.showKeys")}</span>
+      </label>
+
+      {/* Enable debug logging */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={dbg.enabled()}
+          onInput={(e) => dbg.enable(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.debug.enable")}</span>
+      </label>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/ui/IpfsImage.jsx">
+// src/components/ui/IpfsImage.jsx
+import { createSignal, createEffect, Show, Switch, Match } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { ipfs } from "../../ipfs/index.js";
+import Spinner from "./Spinner.jsx";
+
+export default function IpfsImage(props) {
+  const app = useApp();
+  const [imageUrl, setImageUrl] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+
+  createEffect(async () => {
+    setLoading(true);
+    setImageUrl(null);
+
+    const gateways = app.activeIpfsGateways();
+    if (!props.src || gateways.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { url } = await ipfs.fetchBest(app, props.src, { postGateways: props.postGateways });
+      setImageUrl(url);
+    } catch (e) {
+      // Fallback silently on any error, but keep the log for debugging.
+      console.error(`[IpfsImage] All gateways failed for ${props.src}:`, e.causes || e);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  return (
+    <div class={`relative w-full h-full ${props.class || ""}`}>
+      <Switch>
+        <Match when={loading()}>
+          <div class="absolute inset-0 flex items-center justify-center bg-[hsl(var(--muted))]">
+            <Spinner />
+          </div>
+        </Match>
+        <Match when={imageUrl()}>
+          <img
+            src={imageUrl()}
+            alt={props.alt || "IPFS Image"}
+            class="absolute inset-0 w-full h-full object-cover"
+            onError={() => setImageUrl(null)}
+          />
+        </Match>
+        <Match when={!imageUrl()}>
+          {props.fallback}
+        </Match>
+      </Switch>
+    </div>
+  );
+}
+</file>
+
 <file path="src/pages/PostPage.jsx">
 // src/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
@@ -24174,6 +25142,7 @@ import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import ChapterSelector from "../components/post/ChapterSelector.jsx";
 import ChapterPager from "../components/post/ChapterPager.jsx";
 import PostTags from "../components/post/PostTags.jsx";
+import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
 
 function rehypeRewriteLinks(options = {}) {
   return (tree) =>
@@ -24221,17 +25190,16 @@ async function fetchPostByIdentifier(params) {
 
 async function fetchPostDetails(mainPost, app) {
   if (!mainPost) return null;
-  let descriptorPath;
-  let dataCidForContent;
-  if (mainPost.data_cid) {
-    descriptorPath = mainPost.ipfs;
-    dataCidForContent = mainPost.data_cid;
-  } else {
-    descriptorPath = `${mainPost.ipfs}/info.yaml`;
-    dataCidForContent = mainPost.ipfs;
-  }
+  
+  const descriptorPath = getPostDescriptorPath(mainPost);
+  const dataCidForContent = getPostContentBaseCid(mainPost);
+
   dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
-  if (!descriptorPath) return { descriptor: null, dataCidForContent };
+
+  if (!descriptorPath) {
+    return { descriptor: null, dataCidForContent };
+  }
+
   try {
     const { res } = await ipfs.fetchBest(app, descriptorPath);
     const text = await res.text();
@@ -24265,7 +25233,8 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
 
   if (contentPath) {
     try {
-      const { res } = await ipfs.fetchBest(app, contentPath);
+      const postGateways = details.descriptor?.gateways || [];
+      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
       return await res.text();
     } catch (error) {
       dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
@@ -24346,12 +25315,25 @@ export default function PostPage() {
     return [prologue, ...chapters];
   });
 
+  const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
   const localizedMainContent = createMemo(() => mainContent());
   const ipfsBaseUrl = createMemo(() => {
-    const dataCid = details()?.dataCidForContent;
+    const d = details();
+    if (!d) return "";
+    const dataCid = d.dataCidForContent;
     if (!dataCid) return "";
-    const gateway = app.activeIpfsGateways()[0] || "http://127.0.0.1:8080/";
-    return `${gateway}ipfs/${dataCid}`;
+    
+    let bestGateway;
+    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+      bestGateway = app.localIpfsGateway();
+    } else if (Array.isArray(postSpecificGateways()) && postSpecificGateways().length > 0) {
+      bestGateway = postSpecificGateways()[0];
+    } else {
+      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
+    }
+    
+    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
+    return `${gatewayUrl}ipfs/${dataCid}`;
   });
 
   const markdownPlugins = createMemo(() => [
@@ -24426,6 +25408,7 @@ export default function PostPage() {
                         src={src()} 
                         class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
                         alt="Post thumbnail"
+                        postGateways={postSpecificGateways()}
                         fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
                       />
                     )}
@@ -24480,258 +25463,6 @@ export default function PostPage() {
         </Match>
       </Switch>
     </main>
-  );
-}
-</file>
-
-<file path="src/index.jsx">
-// src/index.jsx
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./App";
-import { AppProvider } from "./context/AppContext.jsx";
-
-const root = document.getElementById("root");
-
-render(() => (
-  <AppProvider>
-    <App />
-  </AppProvider>
-), root);
-</file>
-
-<file path="src/components/feed/PostCard.jsx">
-// src/components/feed/PostCard.jsx
-import { Show, createMemo, createSignal } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UserCard from "../ui/UserCard.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import PostInfo from "./PostInfo.jsx";
-import NftBadge from "../ui/icons/NftBadge.jsx";
-import PostFundBadge from "../ui/PostFundBadge.jsx";
-import { navigate } from "../../routing/hashRouter";
-import ContextMenu from "../ui/ContextMenu.jsx";
-
-function PinIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
-      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-      <g id="SVGRepo_iconCarrier">
-        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
-      </g>
-    </svg>
-  );
-}
-
-function getLocalizedField(locales, fieldName, currentLang) {
-  if (!locales || typeof locales !== 'object') return "";
-  if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
-  if (locales.en?.[fieldName]) return locales.en[fieldName];
-  const firstLocaleKey = Object.keys(locales)[0];
-  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
-    return locales[firstLocaleKey][fieldName];
-  }
-  return "";
-}
-
-export default function PostCard(props) {
-  const app = useApp();
-  const author = () => props.item._raw?.author;
-  const content = () => props.item._raw?.savva_content;
-  const fund = () => props.item._raw?.fund;
-  const isListMode = () => props.mode === 'list';
-  const [isHovered, setIsHovered] = createSignal(false);
-
-  const displayImageSrc = createMemo(() => {
-    return content()?.thumbnail || author()?.avatar;
-  });
-
-  const title = createMemo(() => {
-    return getLocalizedField(content()?.locales, "title", app.lang());
-  });
-
-  const textPreview = createMemo(() => {
-    return getLocalizedField(content()?.locales, "text_preview", app.lang());
-  });
-
-  const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.bottom-1.right-1')) {
-      return;
-    }
-    e.preventDefault();
-    const postId = props.item?.id; 
-    if (postId) {
-      app.setSavedScrollY(window.scrollY);
-      navigate(`/post/${postId}`);
-    } else {
-      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
-    }
-  };
-
-  const handleUserClick = (e) => {
-    e.stopPropagation();
-    console.log("User card clicked, navigating to profile for:", author()?.address);
-  };
-
-  const contextMenuItems = createMemo(() => {
-    const items = [];
-    if (props.item._raw?.pinned) {
-      items.push({ label: "Unpin Post", onClick: () => console.log("Unpin clicked for:", props.item.id) });
-    } else {
-      items.push({ label: "Pin Post", onClick: () => console.log("Pin clicked for:", props.item.id) });
-    }
-    items.push({ label: "Delete Post", onClick: () => console.log("Delete clicked for:", props.item.id) });
-    items.push({ label: "Block Post", onClick: () => console.log("Block Post clicked for:", props.item.id) });
-    items.push({ label: "Block Author", onClick: () => console.log("Block Author clicked for:", props.item.id) });
-    return items;
-  });
-
-  const articleClasses = createMemo(() => {
-    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
-    if (isListMode()) {
-      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
-    }
-    return `${base} flex-col`;
-  });
-
-  const imageContainerClasses = createMemo(() => {
-    const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
-    return `relative shrink-0 ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
-  });
-  
-  const ImageBlock = () => {
-    const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
-    return (
-      <div class={imageContainerClasses()}>
-        <IpfsImage
-          src={displayImageSrc()}
-          class={roundingClass}
-          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
-        />
-        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
-          <div class="absolute bottom-2 right-0 z-10">
-            <PostFundBadge amount={fund()?.amount} />
-          </div>
-        </Show>
-      </div>
-    );
-  };
-
-  const contentContainerClasses = createMemo(() => {
-    return isListMode()
-      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
-      : "px-3 pb-3 flex-1 flex flex-col";
-  });
-
-  const textPreviewClasses = createMemo(() => {
-    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
-    if (isListMode()) {
-      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
-    }
-    return `${base} line-clamp-3`;
-  });
-
-  const ContentBlock = () => (
-    <div class={contentContainerClasses()}>
-      <div class="flex-1 space-y-1 min-h-0">
-        <Show when={title()}>
-          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
-            {title()}
-          </h4>
-        </Show>
-        <Show when={textPreview() && !props.compact}>
-          <p class={textPreviewClasses()}>
-            {textPreview()}
-          </p>
-        </Show>
-      </div>
-      
-      <div class="mt-1 user-card-container" onClick={handleUserClick}>
-        <UserCard author={author()} compact={props.compact} />
-      </div>
-
-      <Show when={!props.compact}>
-        <PostInfo item={props.item} mode={props.mode} />
-      </Show>
-    </div>
-  );
-
-  return (
-    <article 
-      class={articleClasses()} 
-      onClick={handleCardClick} 
-      style={{ cursor: 'pointer' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <Show when={props.item._raw?.pinned}>
-        <div class="absolute -top-2 -left-2 z-10">
-          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
-        </div>
-      </Show>
-
-      <Show when={props.item._raw?.nft?.owner}>
-        <div class="absolute -top-2 -right-2 z-10">
-          <NftBadge />
-        </div>
-      </Show>
-
-      <Show when={app.authorizedUser()?.isAdmin && isHovered()}>
-        <ContextMenu items={contextMenuItems()} />
-      </Show>
-
-      <Show
-        when={isListMode()}
-        fallback={
-          <>
-            <ImageBlock />
-            <ContentBlock />
-          </>
-        }
-      >
-        <ContentBlock />
-        <ImageBlock />
-      </Show>
-    </article>
-  );
-}
-</file>
-
-<file path="src/components/settings/DeveloperSection.jsx">
-// src/components/settings/DeveloperSection.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug";
-
-export default function DeveloperSection() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
-
-      {/* Show translation keys */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={app.showKeys()}
-          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.showKeys")}</span>
-      </label>
-
-      {/* Enable debug logging */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={dbg.enabled()}
-          onInput={(e) => dbg.enable(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.debug.enable")}</span>
-      </label>
-    </section>
   );
 }
 </file>
@@ -25275,6 +26006,233 @@ export function useI18n() {
 }
 </file>
 
+<file path="src/components/feed/PostCard.jsx">
+// src/components/feed/PostCard.jsx
+import { Show, createMemo, createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UserCard from "../ui/UserCard.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import PostInfo from "./PostInfo.jsx";
+import NftBadge from "../ui/icons/NftBadge.jsx";
+import PostFundBadge from "../ui/PostFundBadge.jsx";
+import { navigate } from "../../routing/hashRouter";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { pushToast } from "../ui/toast.js";
+import { resolvePostCidPath } from "../../ipfs/utils.js";
+
+function PinIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
+      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+      <g id="SVGRepo_iconCarrier">
+        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
+      </g>
+    </svg>
+  );
+}
+
+function getLocalizedField(locales, fieldName, currentLang) {
+  if (!locales || typeof locales !== 'object') return "";
+  if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
+  if (locales.en?.[fieldName]) return locales.en[fieldName];
+  const firstLocaleKey = Object.keys(locales)[0];
+  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
+    return locales[firstLocaleKey][fieldName];
+  }
+  return "";
+}
+
+export default function PostCard(props) {
+  const app = useApp();
+  const { t } = app;
+  const author = () => props.item._raw?.author;
+  const content = () => props.item._raw?.savva_content;
+  const fund = () => props.item._raw?.fund;
+  const isListMode = () => props.mode === 'list';
+  const [isHovered, setIsHovered] = createSignal(false);
+
+  const displayImageSrc = createMemo(() => {
+    const thumbnailPath = content()?.thumbnail;
+    if (thumbnailPath) {
+      return resolvePostCidPath(props.item._raw, thumbnailPath);
+    }
+    return author()?.avatar;
+  });
+
+  const title = createMemo(() => {
+    return getLocalizedField(content()?.locales, "title", app.lang());
+  });
+
+  const textPreview = createMemo(() => {
+    return getLocalizedField(content()?.locales, "text_preview", app.lang());
+  });
+
+  const handleCardClick = (e) => {
+    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.-bottom-2.-right-2')) {
+      return;
+    }
+    e.preventDefault();
+    const postId = props.item?.id; 
+    if (postId) {
+      app.setSavedScrollY(window.scrollY);
+      navigate(`/post/${postId}`);
+    } else {
+      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
+    }
+  };
+
+  const handleUserClick = (e) => {
+    e.stopPropagation();
+    console.log("User card clicked, navigating to profile for:", author()?.address);
+  };
+
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text).then(() => {
+      pushToast({ type: "success", message: t("clipboard.copied", { label }) });
+    }).catch(err => {
+      console.error(`Failed to copy ${label}:`, err);
+    });
+  };
+
+  const finalContextMenuItems = createMemo(() => {
+    const propItems = props.contextMenuItems || [];
+    const baseAdminItems = [];
+    const raw = props.item?._raw;
+
+    if (raw) {
+      const savvaCid = props.item.id;
+      const ipfsCid = raw.data_cid || raw.ipfs?.split('/')[0];
+
+      if (savvaCid) {
+        baseAdminItems.push({
+          label: t("postcard.copySavvaCid"),
+          onClick: () => copyToClipboard(savvaCid, "SAVVA CID")
+        });
+      }
+      if (ipfsCid) {
+        baseAdminItems.push({
+          label: t("postcard.copyIpfsCid"),
+          onClick: () => copyToClipboard(ipfsCid, "IPFS CID")
+        });
+      }
+    }
+    
+    return [...propItems, ...baseAdminItems];
+  });
+
+  const articleClasses = createMemo(() => {
+    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
+    if (isListMode()) {
+      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
+    }
+    return `${base} flex-col`;
+  });
+
+  const imageContainerClasses = createMemo(() => {
+    const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
+  });
+  
+  const ImageBlock = () => {
+    const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    return (
+      <div class={imageContainerClasses()}>
+        <IpfsImage
+          src={displayImageSrc()}
+          class={roundingClass}
+          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
+        />
+        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
+          <div class="absolute bottom-2 right-0 z-10">
+            <PostFundBadge amount={fund()?.amount} />
+          </div>
+        </Show>
+      </div>
+    );
+  };
+
+  const contentContainerClasses = createMemo(() => {
+    return isListMode()
+      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
+      : "px-3 pb-3 flex-1 flex flex-col";
+  });
+
+  const textPreviewClasses = createMemo(() => {
+    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
+    if (isListMode()) {
+      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
+    }
+    return `${base} line-clamp-3`;
+  });
+
+  const ContentBlock = () => (
+    <div class={contentContainerClasses()}>
+      <div class="flex-1 space-y-1 min-h-0">
+        <Show when={title()}>
+          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
+            {title()}
+          </h4>
+        </Show>
+        <Show when={textPreview() && !props.compact}>
+          <p class={textPreviewClasses()}>
+            {textPreview()}
+          </p>
+        </Show>
+      </div>
+      
+      <div class="mt-1 user-card-container" onClick={handleUserClick}>
+        <UserCard author={author()} compact={props.compact} />
+      </div>
+
+      <Show when={!props.compact}>
+        <PostInfo item={props.item} mode={props.mode} />
+      </Show>
+    </div>
+  );
+
+  return (
+    <article 
+      class={articleClasses()} 
+      onClick={handleCardClick} 
+      style={{ cursor: 'pointer' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Show when={props.item._raw?.pinned}>
+        <div class="absolute -top-2 -left-2 z-10">
+          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
+        </div>
+      </Show>
+
+      <Show when={props.item._raw?.nft?.owner}>
+        <div class="absolute -top-2 -right-2 z-10">
+          <NftBadge />
+        </div>
+      </Show>
+
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
+        <ContextMenu items={finalContextMenuItems()} />
+      </Show>
+
+      <Show
+        when={isListMode()}
+        fallback={
+          <>
+            <ImageBlock />
+            <ContentBlock />
+          </>
+        }
+      >
+        <ContentBlock />
+        <ImageBlock />
+      </Show>
+    </article>
+  );
+}
+</file>
+
 <file path="src/components/settings/LocalIpfsSection.jsx">
 // src/components/settings/LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
@@ -25597,183 +26555,6 @@ export default function NewTab(props) {
         isRailVisible={props.isRailVisible}
       />
     </section>
-  );
-}
-</file>
-
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-import { Show, createSignal, onMount } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import {
-  connectWallet,
-  walletAccount,
-  walletChainId,
-  isWalletAvailable,
-  eagerConnect,
-} from "../blockchain/wallet";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-import Container from "./layout/Container";
-import AuthorizedUser from "./auth/AuthorizedUser.jsx";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const [eagerDone, setEagerDone] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatched = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  onMount(async () => {
-    if (isWalletAvailable()) {
-      await eagerConnect();
-    }
-    setEagerDone(true);
-  });
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) {
-        try { await app.ensureWalletOnDesiredChain(); } catch {}
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      // The text is still copied, but no visual indicator will be shown.
-      await navigator.clipboard.writeText(walletAccount());
-    } catch (e) {
-      console.error("Failed to copy address:", e);
-    }
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
-    }
-  }
-
-  const chainLogoSrc = () => {
-    const id = desiredId();
-    return id ? getChainLogo(id) : null;
-  };
-
-  return (
-    <header
-      class="
-        sticky top-0 z-10
-        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
-        shadow-sm
-      "
-    >
-      <Container>
-        <div class="h-12 px-2 flex items-center justify-between">
-          {/* Left: brand */}
-          <div class="flex items-center">
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-          </div>
-
-          {/* Right: wallet + auth + menu */}
-          <div class="flex items-center gap-3">
-
-            <AuthorizedUser />
-            
-            <Show
-              when={walletAccount()}
-              fallback={
-                <Show when={eagerDone() && isWalletAvailable()}>
-                  <button
-                    class="
-                      px-3 py-1.5 text-sm rounded
-                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
-                      hover:opacity-90
-                    "
-                    onClick={onConnect}
-                    title={app.t("wallet.connect")}
-                    aria-label={app.t("wallet.connect")}
-                  >
-                    {app.t("wallet.connect")}
-                  </button>
-                </Show>
-              }
-            >
-              <div class="flex items-center gap-2">
-                <button
-                  class="
-                    px-2 py-1 rounded
-                    bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]
-                    hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]
-                  "
-                  onClick={copyAddress}
-                  title={app.t("wallet.copyAddress")}
-                  aria-label={app.t("wallet.copyAddress")}
-                >
-                  {shortAddr(walletAccount())}
-                </button>
-
-                <Show
-                  when={!mismatched()}
-                  fallback={
-                    <button
-                      class="
-                        px-2 py-1 rounded
-                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
-                        hover:opacity-90
-                      "
-                      onClick={onSwitchChain}
-                      title={app.t("wallet.changeChain")}
-                      aria-label={app.t("wallet.changeChain")}
-                    >
-                      {app.t("wallet.changeChain")}
-                    </button>
-                  }
-                >
-                  <Show when={chainLogoSrc()}>
-                    <img
-                      src={chainLogoSrc()}
-                      alt="chain"
-                      class="w-5 h-5"
-                      title={app.t("wallet.onRequiredNetwork")}
-                    />
-                  </Show>
-                </Show>
-              </div>
-            </Show>
-
-            <button
-              class="
-                p-1 rounded transition
-                text-[hsl(var(--muted-foreground))]
-                hover:bg-[hsl(var(--muted))]
-              "
-              onClick={onTogglePane}
-              aria-label={app.t("menu.open")}
-              title={app.t("menu.open")}
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </Container>
-    </header>
   );
 }
 </file>
@@ -26137,6 +26918,191 @@ export default function Settings() {
     "vite": "^7.1.2",
     "vite-plugin-solid": "^2.11.8"
   }
+}
+</file>
+
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal, onMount, createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import {
+  connectWallet,
+  walletAccount,
+  walletChainId,
+  isWalletAvailable,
+  eagerConnect,
+} from "../blockchain/wallet";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+import AuthorizedUser from "./auth/AuthorizedUser.jsx";
+import NewPostButton from "./main/NewPostButton.jsx";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const [eagerDone, setEagerDone] = createSignal(false);
+
+  const desiredId = () => app.desiredChainId();
+  const mismatched = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  const isAddressMismatched = createMemo(() => {
+    const walletAcc = walletAccount();
+    const authorizedAcc = app.authorizedUser()?.address;
+    if (!authorizedAcc || !walletAcc) return false;
+    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
+  });
+
+  onMount(async () => {
+    if (isWalletAvailable()) {
+      await eagerConnect();
+    }
+    setEagerDone(true);
+  });
+
+  async function onConnect() {
+    try {
+      await connectWallet();
+      if (desiredId()) {
+        try { await app.ensureWalletOnDesiredChain(); } catch {}
+      }
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+    } catch (e) {
+      console.error("Failed to copy address:", e);
+    }
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      console.error(e);
+      alert(e?.message || String(e));
+    }
+  }
+
+  const chainLogoSrc = () => {
+    const id = desiredId();
+    return id ? getChainLogo(id) : null;
+  };
+
+  return (
+    <header
+      class="
+        sticky top-0 z-10
+        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
+        shadow-sm
+      "
+    >
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          {/* Left: brand */}
+          <div class="flex items-center gap-4">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+          </div>
+
+          {/* Right: wallet + auth + menu */}
+          <div class="flex items-center gap-3">
+            <Show when={app.authorizedUser()}>
+              <NewPostButton />
+            </Show>
+            <AuthorizedUser />
+            
+            <Show
+              when={walletAccount()}
+              fallback={
+                <Show when={eagerDone() && isWalletAvailable()}>
+                  <button
+                    class="
+                      px-3 py-1.5 text-sm rounded
+                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
+                      hover:opacity-90
+                    "
+                    onClick={onConnect}
+                    title={app.t("wallet.connect")}
+                    aria-label={app.t("wallet.connect")}
+                  >
+                    {app.t("wallet.connect")}
+                  </button>
+                </Show>
+              }
+            >
+              <div class="flex items-center gap-2">
+                <button
+                  classList={{
+                    "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                    "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                  }}
+                  onClick={copyAddress}
+                  title={app.t("wallet.copyAddress")}
+                  aria-label={app.t("wallet.copyAddress")}
+                >
+                  {shortAddr(walletAccount())}
+                </button>
+
+                <Show
+                  when={!mismatched()}
+                  fallback={
+                    <button
+                      class="
+                        px-2 py-1 rounded
+                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
+                        hover:opacity-90
+                      "
+                      onClick={onSwitchChain}
+                      title={app.t("wallet.changeChain")}
+                      aria-label={app.t("wallet.changeChain")}
+                    >
+                      {app.t("wallet.changeChain")}
+                    </button>
+                  }
+                >
+                  <Show when={chainLogoSrc()}>
+                    <img
+                      src={chainLogoSrc()}
+                      alt="chain"
+                      class="w-5 h-5"
+                      title={app.t("wallet.onRequiredNetwork")}
+                    />
+                  </Show>
+                </Show>
+              </div>
+            </Show>
+
+            <button
+              class="
+                p-1 rounded transition
+                text-[hsl(var(--muted-foreground))]
+                hover:bg-[hsl(var(--muted))]
+              "
+              onClick={onTogglePane}
+              aria-label={app.t("menu.open")}
+              title={app.t("menu.open")}
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
+  );
 }
 </file>
 
@@ -26629,7 +27595,7 @@ export default function RightPane({ isOpen, onClose }) {
 // src/context/AppContext.jsx
 import * as Solid from "solid-js";
 import { getChainMeta } from "../blockchain/chains";
-import { switchOrAddChain } from "../blockchain/wallet";
+import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet";
 import { useI18n } from "../i18n/useI18n";
 import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
@@ -26637,6 +27603,7 @@ import { useAppConnection } from "./useAppConnection.js";
 import { useDomainAssets } from "./useDomainAssets.js";
 import { pushToast, pushErrorToast } from "../components/ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
+import { createWalletClient, custom } from "viem";
 
 const AppContext = Solid.createContext();
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
@@ -26678,7 +27645,6 @@ export function AppProvider(props) {
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
 
-  // --- MODIFICATION: New effect to update the document title ---
   Solid.createEffect(() => {
     const cfg = assets.domainAssetsConfig();
     const lang = i18n.lang();
@@ -26706,6 +27672,32 @@ export function AppProvider(props) {
     }
   });
 
+  function getGuardedWalletClient() {
+    const walletAcc = walletAccount();
+    const authorizedAcc = auth.authorizedUser()?.address;
+
+    if (authorizedAcc && walletAcc && walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
+      const errText = i18n.t("wallet.error.addressMismatch");
+      pushErrorToast(new Error(errText));
+      throw new Error(errText);
+    }
+    
+    if (!isWalletAvailable()) {
+      throw new Error("Wallet is not available.");
+    }
+
+    const chain = desiredChain();
+    if (!chain) {
+      throw new Error("Target chain is not configured.");
+    }
+
+    return createWalletClient({
+      chain: chain,
+      account: walletAcc,
+      transport: custom(window.ethereum)
+    });
+  }
+
   const value = {
     ...conn, ...auth, ...assets, ...ipfs,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
@@ -26718,6 +27710,7 @@ export function AppProvider(props) {
     remoteIpfsGateways, activeIpfsGateways,
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
+    getGuardedWalletClient,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
@@ -26750,6 +27743,7 @@ import ConnectionError from "./components/main/ConnectionError.jsx";
 import Spinner from "./components/ui/Spinner.jsx";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import PostPage from "./pages/PostPage";
+import EditorPage from "./pages/EditorPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -26761,7 +27755,18 @@ export default function App() {
     if (r.startsWith("/post/")) return "post";
     if (r.startsWith("/settings")) return "settings";
     if (r.startsWith("/docs")) return "docs";
+    if (r.startsWith("/editor/")) return "editor";
     return "main";
+  });
+
+  const domainRevision = createMemo(() => {
+    if (app.loading()) return null;
+    const domainName = app.selectedDomainName?.();
+    const source = app.domainAssetsSource?.();
+    const cfg = app.domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const tabsPath = cfg?.modules?.tabs || "";
+    return `${domainName}|${source}|${cid}|${tabsPath}`;
   });
 
   onMount(() => {
@@ -26769,7 +27774,7 @@ export default function App() {
       if (e.key !== "Escape") return;
       
       const view = currentView();
-      if (view === 'post' || view === 'settings' || view === 'docs') {
+      if (view !== 'main') {
         navigate(app.lastTabRoute() || "/");
         return; 
       }
@@ -26810,17 +27815,19 @@ export default function App() {
           <FaviconLoader />
           <GoogleAnalyticsLoader />
           <WsConnector />
-          <Header onTogglePane={togglePane} />
           
-          <div style={{ display: currentView() === "main" ? "block" : "none" }}>
-            <MainView />
-          </div>
-
-          <Switch>
-            <Match when={currentView() === 'post'}><PostPage /></Match>
-            <Match when={currentView() === 'settings'}><Settings /></Match>
-            <Match when={currentView() === 'docs'}><Docs /></Match>
-          </Switch>
+          <Show when={domainRevision()} keyed>
+            <>
+              <Header onTogglePane={togglePane} />
+              <Switch>
+                <Match when={currentView() === 'main'}><MainView /></Match>
+                <Match when={currentView() === 'post'}><PostPage /></Match>
+                <Match when={currentView() === 'settings'}><Settings /></Match>
+                <Match when={currentView() === 'docs'}><Docs /></Match>
+                <Match when={currentView() === 'editor'}><EditorPage /></Match>
+              </Switch>
+            </>
+          </Show>
           
           <RightPane isOpen={isPaneOpen} onClose={togglePane} />
           <Toaster />
@@ -26838,6 +27845,8 @@ export default {
   "app.versionLabel": "Version",
   "brand.name": "SAVVA",
   "categories.all": "All Categories",
+  "clipboard.copied": "Copied to clipboard!",
+  "clipboard.copy": "Copy",
   "common.apply": "Apply",
   "common.applying": "Applying…",
   "common.cancel": "Cancel",
@@ -26857,11 +27866,17 @@ export default {
   "docs.section": "Section",
   "docs.sidebar.empty": "No docs yet. Add sidebar.yaml under dev_docs/<lang>/",
   "docs.title": "Developer Docs",
+  "editor.placeholder": "The post editor will be here.",
+  "editor.title": "Post Editor",
+  "editor.titleComment": "Comment",
+  "editor.titleEditPost": "Edit Post",
+  "editor.titleNewPost": "New Post",
   "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
   "error.connection.retry": "Refresh Page",
   "error.connection.title": "Connection Failed",
   "error.ws.message": "Unable to connect. Please try again.",
   "error.ws.title": "Connection Error",
+  "header.newPost": "New Post",
   "ipfs.diag.cors.error": "CORS configuration issue.",
   "ipfs.diag.cors.name": "Gateway CORS Check",
   "ipfs.diag.cors.ok": "CORS is configured correctly.",
@@ -26893,6 +27908,8 @@ export default {
   "post.chapters.title": "Table of Contents",
   "post.notFound.message": "The post you're looking for doesn't exist or has been removed.",
   "post.notFound.title": "Post Not Found",
+  "postcard.copyIpfsCid": "Copy IPFS CID",
+  "postcard.copySavvaCid": "Copy SAVVA CID",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
   "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
@@ -26973,13 +27990,36 @@ export default {
   "time.minute.singular": "{n} minute ago",
   "time.now": "Now",
   "timeFrame.${frame}": "Time Frame: {frame}",
+  "timeFrame.all": "All Time",
+  "timeFrame.month": "Month",
+  "timeFrame.week": "Week",
+  "timeFrame.year": "Year",
   "ui.mode.dark": "Dark mode",
   "ui.mode.light": "Light mode",
   "ui.toTop": "Back to Top",
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.error.addressMismatch": "Wallet address mismatch. Please switch to the authorized account to proceed.",
+  "wallet.onRequiredNetwork": "On required network",
+   "editor.bodyPlaceholder": "Start writing your post content here...",
+  "editor.sidebar.files": "Files",
+  "editor.sidebar.filesPlaceholder": "File manager coming soon.",
+  "editor.sidebar.language": "Language",
+  "editor.sidebar.thumbnail": "Thumbnail",
+  "editor.sidebar.thumbnailPlaceholder": "Thumbnail preview",
+  "editor.titleComment": "Edit Comment",
+  "editor.titleEditPost": "Edit Post",
+  "editor.titleNewPost": "New Post",
+  "editor.titlePlaceholder": "Post Title",
+    "editor.toolbar.hidePreview": "Hide Preview",
+  "editor.toolbar.showPreview": "Show Preview",
+    "editor.toolbar.bold": "Bold",
+  "editor.toolbar.image": "Image",
+  "editor.toolbar.italic": "Italic",
+  "editor.toolbar.link": "Link",
+
+
 };
 </file>
 
