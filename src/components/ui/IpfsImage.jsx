@@ -20,7 +20,7 @@ export default function IpfsImage(props) {
     }
 
     try {
-      const { url } = await ipfs.fetchBest(app, props.src);
+      const { url } = await ipfs.fetchBest(app, props.src, { postGateways: props.postGateways });
       setImageUrl(url);
     } catch (e) {
       // Fallback silently on any error, but keep the log for debugging.

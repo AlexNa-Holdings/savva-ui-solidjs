@@ -9,6 +9,8 @@ import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
 import { navigate } from "../../routing/hashRouter";
 import ContextMenu from "../ui/ContextMenu.jsx";
+import { pushToast } from "../ui/toast.js";
+import { resolvePostCidPath } from "../../ipfs/utils.js";
 
 function PinIcon(props) {
   return (
@@ -35,6 +37,7 @@ function getLocalizedField(locales, fieldName, currentLang) {
 
 export default function PostCard(props) {
   const app = useApp();
+  const { t } = app;
   const author = () => props.item._raw?.author;
   const content = () => props.item._raw?.savva_content;
   const fund = () => props.item._raw?.fund;
@@ -42,7 +45,11 @@ export default function PostCard(props) {
   const [isHovered, setIsHovered] = createSignal(false);
 
   const displayImageSrc = createMemo(() => {
-    return content()?.thumbnail || author()?.avatar;
+    const thumbnailPath = content()?.thumbnail;
+    if (thumbnailPath) {
+      return resolvePostCidPath(props.item._raw, thumbnailPath);
+    }
+    return author()?.avatar;
   });
 
   const title = createMemo(() => {
@@ -54,7 +61,7 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.bottom-1.right-1')) {
+    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.-bottom-2.-right-2')) {
       return;
     }
     e.preventDefault();
@@ -71,6 +78,40 @@ export default function PostCard(props) {
     e.stopPropagation();
     console.log("User card clicked, navigating to profile for:", author()?.address);
   };
+
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text).then(() => {
+      pushToast({ type: "success", message: t("clipboard.copied", { label }) });
+    }).catch(err => {
+      console.error(`Failed to copy ${label}:`, err);
+    });
+  };
+
+  const finalContextMenuItems = createMemo(() => {
+    const propItems = props.contextMenuItems || [];
+    const baseAdminItems = [];
+    const raw = props.item?._raw;
+
+    if (raw) {
+      const savvaCid = props.item.id;
+      const ipfsCid = raw.data_cid || raw.ipfs?.split('/')[0];
+
+      if (savvaCid) {
+        baseAdminItems.push({
+          label: t("postcard.copySavvaCid"),
+          onClick: () => copyToClipboard(savvaCid, "SAVVA CID")
+        });
+      }
+      if (ipfsCid) {
+        baseAdminItems.push({
+          label: t("postcard.copyIpfsCid"),
+          onClick: () => copyToClipboard(ipfsCid, "IPFS CID")
+        });
+      }
+    }
+    
+    return [...propItems, ...baseAdminItems];
+  });
 
   const articleClasses = createMemo(() => {
     const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
@@ -162,8 +203,8 @@ export default function PostCard(props) {
         </div>
       </Show>
 
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && props.contextMenuItems}>
-        <ContextMenu items={props.contextMenuItems} />
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
+        <ContextMenu items={finalContextMenuItems()} />
       </Show>
 
       <Show

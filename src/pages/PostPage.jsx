@@ -17,6 +17,7 @@ import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import ChapterSelector from "../components/post/ChapterSelector.jsx";
 import ChapterPager from "../components/post/ChapterPager.jsx";
 import PostTags from "../components/post/PostTags.jsx";
+import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
 
 function rehypeRewriteLinks(options = {}) {
   return (tree) =>
@@ -64,17 +65,16 @@ async function fetchPostByIdentifier(params) {
 
 async function fetchPostDetails(mainPost, app) {
   if (!mainPost) return null;
-  let descriptorPath;
-  let dataCidForContent;
-  if (mainPost.data_cid) {
-    descriptorPath = mainPost.ipfs;
-    dataCidForContent = mainPost.data_cid;
-  } else {
-    descriptorPath = `${mainPost.ipfs}/info.yaml`;
-    dataCidForContent = mainPost.ipfs;
-  }
+  
+  const descriptorPath = getPostDescriptorPath(mainPost);
+  const dataCidForContent = getPostContentBaseCid(mainPost);
+
   dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
-  if (!descriptorPath) return { descriptor: null, dataCidForContent };
+
+  if (!descriptorPath) {
+    return { descriptor: null, dataCidForContent };
+  }
+
   try {
     const { res } = await ipfs.fetchBest(app, descriptorPath);
     const text = await res.text();
@@ -108,7 +108,8 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
 
   if (contentPath) {
     try {
-      const { res } = await ipfs.fetchBest(app, contentPath);
+      const postGateways = details.descriptor?.gateways || [];
+      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
       return await res.text();
     } catch (error) {
       dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
@@ -189,12 +190,25 @@ export default function PostPage() {
     return [prologue, ...chapters];
   });
 
+  const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
   const localizedMainContent = createMemo(() => mainContent());
   const ipfsBaseUrl = createMemo(() => {
-    const dataCid = details()?.dataCidForContent;
+    const d = details();
+    if (!d) return "";
+    const dataCid = d.dataCidForContent;
     if (!dataCid) return "";
-    const gateway = app.activeIpfsGateways()[0] || "http://127.0.0.1:8080/";
-    return `${gateway}ipfs/${dataCid}`;
+    
+    let bestGateway;
+    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+      bestGateway = app.localIpfsGateway();
+    } else if (Array.isArray(postSpecificGateways()) && postSpecificGateways().length > 0) {
+      bestGateway = postSpecificGateways()[0];
+    } else {
+      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
+    }
+    
+    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
+    return `${gatewayUrl}ipfs/${dataCid}`;
   });
 
   const markdownPlugins = createMemo(() => [
@@ -269,6 +283,7 @@ export default function PostPage() {
                         src={src()} 
                         class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
                         alt="Post thumbnail"
+                        postGateways={postSpecificGateways()}
                         fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
                       />
                     )}

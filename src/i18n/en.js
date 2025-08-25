@@ -138,11 +138,17 @@ export default {
   "time.minute.singular": "{n} minute ago",
   "time.now": "Now",
   "timeFrame.${frame}": "Time Frame: {frame}",
+  "timeFrame.all": "All Time",
+  "timeFrame.month": "Month",
+  "timeFrame.week": "Week",
+  "timeFrame.year": "Year",
   "ui.mode.dark": "Dark mode",
   "ui.mode.light": "Light mode",
   "ui.toTop": "Back to Top",
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "postcard.copyIpfsCid": "Copy IPFS CID",
+  "postcard.copySavvaCid": "Copy SAVVA CID",
 };

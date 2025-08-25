@@ -14,6 +14,8 @@ const I18N_DIR = path.join(SRC_DIR, "i18n");
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const BATCH_SIZE = 60; // how many keys to ask the model about per request
+const targetLang = process.argv[2] || null;
+const onlyEnglish = targetLang === 'en';
 
 // ---------- Collect used keys (scan t("key") calls) ----------
 const exts = [".js", ".jsx", ".ts", ".tsx"];
@@ -219,6 +221,11 @@ async function translateTo(langCode, englishPairs) {
   }
 
   // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
+  if (onlyEnglish) {
+    console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
+    return;
+  }
+
   for (const f of langFiles) {
     if (f === "en.js") continue;
 
