@@ -2,6 +2,9 @@
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
 import { useHashRouter, navigate } from "../routing/hashRouter";
 import { useApp } from "../context/AppContext.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { parse } from "yaml";
+import { dbg } from "../utils/debug.js";
 import ClosePageButton from "../components/ui/ClosePageButton";
 import Spinner from "../components/ui/Spinner.jsx";
 import { toChecksumAddress } from "../blockchain/utils.js";
@@ -9,35 +12,113 @@ import LangSelector from "../components/ui/LangSelector.jsx";
 import IpfsImage from "../components/ui/IpfsImage.jsx";
 import UserCard from "../components/ui/UserCard.jsx";
 import PostInfo from "../components/feed/PostInfo.jsx";
+import MarkdownView from "../components/docs/MarkdownView.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+
+function rehypeRewriteLinks(options = {}) {
+  return (tree) =>
+    import("unist-util-visit").then(({ visit }) => {
+      if (!options.base) return;
+      const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+      const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+      
+      visit(tree, "element", (node) => {
+        if (node.tagName === 'a' || node.tagName === 'img') {
+          const prop = node.tagName === 'a' ? 'href' : 'src';
+          const url = node.properties?.[prop];
+          if (typeof url === 'string' && isRelative(url)) {
+            node.properties[prop] = base + url;
+          }
+        }
+      });
+    });
+}
 
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, app, lang } = params;
   if (!identifier || !app.wsMethod) return null;
-
   const contentList = app.wsMethod("content-list");
   const requestParams = {
     domain: app.selectedDomainName(),
     lang: lang,
     limit: 1,
   };
-  
   if (identifier.startsWith("0x")) {
     requestParams.savva_cid = identifier;
   } else {
     requestParams.short_cid = identifier;
   }
-  
   const user = app.authorizedUser();
   if (user?.address) {
     requestParams.my_addr = toChecksumAddress(user.address);
   }
-
   const res = await contentList(requestParams);
   const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-  
   return arr[0] || null;
+}
+
+async function fetchPostDetails(mainPost, app) {
+  if (!mainPost) return null;
+  let descriptorPath;
+  let dataCidForContent;
+  if (mainPost.data_cid) {
+    descriptorPath = mainPost.ipfs;
+    dataCidForContent = mainPost.data_cid;
+  } else {
+    descriptorPath = `${mainPost.ipfs}/info.yaml`;
+    dataCidForContent = mainPost.ipfs;
+  }
+  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
+  if (!descriptorPath) return { descriptor: null, dataCidForContent };
+  try {
+    const { res } = await ipfs.fetchBest(app, descriptorPath);
+    const text = await res.text();
+    const descriptor = parse(text) || null;
+    return { descriptor, dataCidForContent };
+  } catch (error) {
+    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
+    return { descriptor: { error: error.message }, dataCidForContent };
+  }
+}
+
+async function fetchMainContent(details, app, lang) {
+  dbg.log('PostPage', 'fetchMainContent called with details:', { details, lang });
+  if (!details?.descriptor || !lang) {
+    dbg.log('PostPage', 'fetchMainContent: No descriptor or lang, returning empty.');
+    return "";
+  }
+
+  const { descriptor, dataCidForContent } = details;
+  const localizedDescriptor = descriptor.locales?.[lang];
+
+  if (!localizedDescriptor) {
+    dbg.log('PostPage', `fetchMainContent: No locales found for lang '${lang}'.`);
+    return "";
+  }
+
+  // Case 1: Content is embedded directly in the localized descriptor
+  if (localizedDescriptor.data) {
+    dbg.log('PostPage', 'fetchMainContent: Found direct data in localized descriptor.');
+    return localizedDescriptor.data;
+  }
+
+  // Case 2: Content is in a separate file referenced by a localized data_path
+  if (localizedDescriptor.data_path && dataCidForContent) {
+    const contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+    dbg.log('PostPage', 'Fetching main content from localized data_path:', contentPath);
+    try {
+      const { res } = await ipfs.fetchBest(app, contentPath);
+      return await res.text();
+    } catch (error) {
+      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
+      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
+    }
+  }
+  
+  dbg.log('PostPage', 'fetchMainContent: No "data" or "data_path" in localized descriptor, returning empty.');
+  return "";
 }
 
 export default function PostPage() {
@@ -52,12 +133,17 @@ export default function PostPage() {
     fetchPostByIdentifier
   );
   
+  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
+  
+  const [mainContent] = createResource(
+    () => ({ details: details(), lang: postLang() }), 
+    ({ details, lang }) => fetchMainContent(details, app, lang)
+  );
 
   createEffect(() => {
     const p = post();
     const id = identifier();
-
     if (p && id.startsWith("0x") && p.short_cid) {
       const newPath = `/post/${p.short_cid}`;
       navigate(newPath, { replace: true });
@@ -67,26 +153,43 @@ export default function PostPage() {
   createEffect(() => {
     const p = post();
     if (p && !postLang()) {
-      const availableLangs = Object.keys(p.savva_content?.locales || {});
+      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
       if (availableLangs.length === 0) return;
-
       const currentUiLang = uiLang();
       let initialLang = availableLangs[0]; 
-
       if (availableLangs.includes(currentUiLang)) {
         initialLang = currentUiLang;
       } else if (availableLangs.includes('en')) {
         initialLang = 'en';
       }
-      
       setPostLang(initialLang);
     }
   });
 
-  const title = createMemo(() => post()?.savva_content?.locales?.[postLang()]?.title || "");
-  const text = createMemo(() => post()?.savva_content?.locales?.[postLang()]?.text || "");
-  const thumbnail = createMemo(() => post()?.savva_content?.thumbnail);
-  const availableLocales = createMemo(() => Object.keys(post()?.savva_content?.locales || {}));
+  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const thumbnail = createMemo(() => {
+    const d = details();
+    if (!d) return null;
+    const dataCid = d.dataCidForContent;
+    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
+    if (dataCid && thumbnailPath) {
+      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
+    }
+    return null;
+  });
+  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
+  const localizedMainContent = createMemo(() => mainContent());
+  
+  const ipfsBaseUrl = createMemo(() => {
+    const dataCid = details()?.dataCidForContent;
+    if (!dataCid) return "";
+    const gateway = app.activeIpfsGateways()[0] || "http://127.0.0.1:8080/";
+    return `${gateway}ipfs/${dataCid}`;
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
 
   return (
     <main class="p-4 max-w-3xl mx-auto">
@@ -94,15 +197,13 @@ export default function PostPage() {
       
       <Switch>
         <Match when={post.loading}>
-          <div class="flex justify-center items-center h-64">
-            <Spinner class="w-8 h-8" />
-          </div>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
         </Match>
 
-        <Match when={post.error}>
+        <Match when={post.error || details()?.descriptor?.error}>
           <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
             <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error.message}</p>
+            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
           </div>
         </Match>
 
@@ -117,7 +218,7 @@ export default function PostPage() {
           <article class="space-y-4">
             <header class="flex justify-between items-start gap-4">
               <div class="flex-1 min-w-0 space-y-3">
-                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title()}</h1>
+                <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
                 <UserCard author={post().author} />
                 <PostInfo 
                   item={post()} 
@@ -126,17 +227,17 @@ export default function PostPage() {
                   rewardsAlign="left" 
                 />
               </div>
-              
-              {/* --- MODIFICATION: Added flex classes to center children --- */}
               <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
                 <Show when={thumbnail()}>
-                  <IpfsImage 
-                    src={thumbnail()} 
-                    class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
-                    alt="Post thumbnail"
-                  />
+                  {(src) => (
+                    <IpfsImage 
+                      src={src()} 
+                      class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                      alt="Post thumbnail"
+                      fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
+                    />
+                  )}
                 </Show>
-                {/* --- MODIFICATION: Removed the variant prop --- */}
                 <LangSelector 
                   codes={availableLocales()}
                   value={postLang()}
@@ -145,8 +246,21 @@ export default function PostPage() {
               </div>
             </header>
 
-            <div class="prose prose-sm md:prose-base max-w-none pt-4 border-t border-[hsl(var(--border))]">
-              <p>{text()}</p>
+            <div class="pt-4 border-t border-[hsl(var(--border))]">
+              <Switch>
+                <Match when={details.loading || mainContent.loading}>
+                  <div class="flex justify-center p-8"><Spinner /></div>
+                </Match>
+                <Match when={mainContent.error}>
+                  <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                </Match>
+                <Match when={localizedMainContent()}>
+                  <MarkdownView 
+                    markdown={localizedMainContent()} 
+                    rehypePlugins={markdownPlugins()}
+                  />
+                </Match>
+              </Switch>
             </div>
           </article>
         </Match>

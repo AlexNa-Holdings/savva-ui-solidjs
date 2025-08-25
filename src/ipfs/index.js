@@ -28,11 +28,14 @@ async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = 
     const url = buildUrl(gw, cidPath);
     try {
       const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) return { res, url, gateway: gw };
+      if (res && res.ok) {
+        // This is the only successful return path. It guarantees `res` exists.
+        return { res, url, gateway: gw };
+      }
 
       const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
       httpError.url = url;
-      httpError.status = res.status; // Attach status for later inspection
+      httpError.status = res.status;
       errors.push(httpError);
 
     } catch (e) {
@@ -43,39 +46,10 @@ async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = 
   }
   const err = new Error("All IPFS gateways failed");
   err.causes = errors;
-  // If ANY error was a 404, it's likely a bad CID. Flag it.
   if (errors.some(e => e.status === 404)) {
       err.is404 = true;
   }
   throw err;
-}
-
-async function fetchIpfs(input, opts = {}) {
-  const { gateways = [], ...rest } = opts;
-  if (!gateways || gateways.length === 0) throw new Error("ipfs.fetch: no gateways provided");
-  const cidPath = normalizeInput(input);
-  const { res, url, gateway } = await tryGateways(cidPath, gateways, { init: rest });
-  return { response: res, url, gateway };
-}
-
-async function getJSON(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, { ...opts, headers: { Accept: "application/json", ...(opts?.headers || {}) } });
-  return { data: await response.json(), url, gateway };
-}
-
-async function getText(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.text(), url, gateway };
-}
-
-async function getBlob(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.blob(), url, gateway };
-}
-
-async function getArrayBuffer(input, opts) {
-  const { response, url, gateway } = await fetchIpfs(input, opts);
-  return { data: await response.arrayBuffer(), url, gateway };
 }
 
 async function fetchBest(app, ipfsPath, options = {}) {
@@ -109,11 +83,6 @@ async function getJSONBest(app, ipfsPath, options = {}) {
 }
 
 export const ipfs = {
-  fetch: fetchIpfs,
-  getJSON,
-  getText,
-  getBlob,
-  getArrayBuffer,
   fetchBest,
   getJSONBest,
   normalizeInput,
