@@ -2,6 +2,7 @@
 import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
+import { rehypeMediaPlayers } from "./rehype-media-players.js";
 
 function rehypeCopyButton() {
   return (tree) =>
@@ -62,15 +63,18 @@ export default function MarkdownView(props) {
           theme: { light: "github-light", dark: "github-dark" },
         })
         .use(rehypeCopyButton)
+        .use(rehypeMediaPlayers)
         .use(rehypeStringify, { allowDangerousHtml: true });
       
       const file = await processor.process(String(props.markdown || ""));
       const rawHtml = String(file);
-      const safe = DOMPurify.default.sanitize(rawHtml, { /* ... */ });
+      const safe = DOMPurify.default.sanitize(rawHtml, {
+        ADD_TAGS: ["iframe", "video", "audio"],
+        ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style"],
+      });
 
       if (!disposed) setHtml(safe);
     } catch (err) {
-      // --- MODIFICATION: Improved error logging and display ---
       dbg.error("MarkdownView", "Markdown rendering failed:", err);
       const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
       const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
