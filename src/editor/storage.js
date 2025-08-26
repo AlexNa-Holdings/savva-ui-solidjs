@@ -145,8 +145,6 @@ export async function loadNewPostDraft() {
     const descriptor = parse(descriptorYaml);
     for (const lang in descriptor.locales) {
       const localeData = descriptor.locales[lang];
-      const chapterTitles = params.locales?.[lang]?.chapters || [];
-      
       postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
       
       if (localeData.data_path) {
@@ -157,8 +155,8 @@ export async function loadNewPostDraft() {
         for (let i = 0; i < localeData.chapters.length; i++) {
           const chapterDesc = localeData.chapters[i];
           const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
-          const chapterTitle = chapterTitles[i]?.title || "";
-          postData[lang].chapters.push({ title: chapterTitle, body: chapterBody });
+          // FIX: Only load the body here. Titles come from params.
+          postData[lang].chapters.push({ body: chapterBody });
         }
       }
     }
@@ -184,7 +182,9 @@ export async function saveNewPostDraft(draftData) {
   
   const { content, params } = draftData;
 
-  const finalParams = { ...params, locales: {} };
+  // Create a deep copy to avoid mutation issues.
+  const finalParams = JSON.parse(JSON.stringify(params || {}));
+  if (!finalParams.locales) finalParams.locales = {};
 
   const descriptor = {
     savva_spec_version: "2.0",
@@ -204,19 +204,22 @@ export async function saveNewPostDraft(draftData) {
         chapters: []
       };
 
-      finalParams.locales[lang] = { chapters: [] };
+      if (!finalParams.locales[lang]) finalParams.locales[lang] = { chapters: [] };
       
       await writeFile(dirHandle, dataPath, data.body || "");
 
       if (Array.isArray(data.chapters)) {
+        // FIX: Read chapter titles from the `params` object, not the `content` object.
+        const paramChapters = params?.locales?.[lang]?.chapters || [];
+        
         for (let i = 0; i < data.chapters.length; i++) {
-          const chapter = data.chapters[i];
+          const chapterContent = data.chapters[i];
+          const chapterParams = paramChapters[i] || { title: "" };
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
           
           descriptor.locales[lang].chapters.push({ data_path: chapterPath });
-          finalParams.locales[lang].chapters.push({ title: chapter.title });
           
-          await writeFile(dirHandle, chapterPath, chapter.body || "");
+          await writeFile(dirHandle, chapterPath, chapterContent.body || "");
         }
       }
     }

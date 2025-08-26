@@ -189,4 +189,13 @@ export default {
   "editor.files.menu.insert": "Insert",
   "editor.files.menu.insertUrl": "Insert URL",
   "editor.files.menu.setThumbnail": "Set as Thumbnail",
+    "editor.params.title": "Additional Parameters",
+  "editor.params.nsfw.label": "NSFW",
+  "editor.params.nsfw.help": "Content contains explicit language or images.",
+  "editor.params.fundraiser.label": "Promoted Fundrising Campaign ID",
+  "editor.previewPost": "Preview Post",
+    "editor.fullPreview.title": "Final Check",
+  "editor.fullPreview.help": "This is a preview of how your post will look once published. Review it carefully before proceeding.",
+  "editor.fullPreview.back": "Back to Editing",
+  "editor.fullPreview.continue": "Continue",
 };

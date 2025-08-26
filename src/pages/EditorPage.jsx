@@ -16,6 +16,7 @@ import EditorTocButton from "../components/editor/EditorTocButton.jsx";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
 import { insertTextAtCursor } from "../components/editor/text-utils.js";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 
 export default function EditorPage() {
   const { t, domainAssetsConfig } = useApp();
@@ -31,6 +32,7 @@ export default function EditorPage() {
   const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
   const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
   const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
+  const [showFullPreview, setShowFullPreview] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -115,6 +117,10 @@ export default function EditorPage() {
         [field]: value
       }
     }));
+  };
+
+  const updateParam = (field, value) => {
+    setPostParams(prev => ({ ...prev, [field]: value }));
   };
 
   const updateChapterTitle = (index, newTitle) => {
@@ -243,77 +249,133 @@ export default function EditorPage() {
     <main class="p-4 max-w-7xl mx-auto space-y-4">
       <ClosePageButton />
 
-      <header class="flex justify-between items-start gap-4">
-        <div class="flex-1 min-w-0">
-          <h2 class="text-2xl font-semibold">{title()}</h2>
-          <p class="text-sm text-[hsl(var(--muted-foreground))]">
-            Mode: <strong>{editorMode()}</strong>
-          </p>
-        </div>
-        <div class="w-48 flex-shrink-0 space-y-2">
-          <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-            <Show when={thumbnailUrl()}
-              fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
-            >
-              <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
-            </Show>
-          </div>
-          <LangSelector
-            codes={domainLangCodes()}
-            value={activeLang()}
-            onChange={setActiveLang}
+      <Show
+        when={!showFullPreview()}
+        fallback={
+          <EditorFullPreview 
+            postData={postData()}
+            postParams={postParams()}
+            activeLang={activeLang()}
+            thumbnailUrl={thumbnailUrl()}
+            onBack={() => setShowFullPreview(false)}
           />
-        </div>
-      </header>
-
-      <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
-        <div>
-          <div class="flex items-center gap-4 mb-4">
-            <input
-              type="text"
-              value={currentLangData().title}
-              onInput={(e) => updateField('title', e.currentTarget.value)}
-              placeholder={t("editor.titlePlaceholder")}
-              class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+        }
+      >
+        <header class="flex justify-between items-start gap-4">
+          <div class="flex-1 min-w-0">
+            <h2 class="text-2xl font-semibold">{title()}</h2>
+            <p class="text-sm text-[hsl(var(--muted-foreground))]">
+              Mode: <strong>{editorMode()}</strong>
+            </p>
+          </div>
+          <div class="w-48 flex-shrink-0 space-y-2">
+            <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+              <Show when={thumbnailUrl()}
+                fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+              >
+                <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+              </Show>
+            </div>
+            <LangSelector
+              codes={domainLangCodes()}
+              value={activeLang()}
+              onChange={setActiveLang}
             />
-            <div class="flex-shrink-0 flex items-center gap-2">
-              <Show when={!showChapters()}>
-                <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
-              </Show>
-              <Show when={!showFiles()}>
-                <EditorFilesButton onClick={() => setShowFiles(true)} />
-              </Show>
-            </div>
           </div>
-          
-          <Show when={showChapters()}>
-            <div class="mb-4">
-                <EditorChapterSelector
-                    chapters={combinedChapters()}
-                    activeIndex={editingChapterIndex()}
-                    onSelectIndex={setEditingChapterIndex}
-                    onAdd={handleAddChapter}
-                    onRemove={handleRemoveChapter}
-                    onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
-                />
+        </header>
+
+        <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
+          <div>
+            <div class="flex items-center gap-4 mb-4">
+              <input
+                type="text"
+                value={currentLangData().title}
+                onInput={(e) => updateField('title', e.currentTarget.value)}
+                placeholder={t("editor.titlePlaceholder")}
+                class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+              />
+              <div class="flex-shrink-0 flex items-center gap-2">
+                <Show when={!showChapters()}>
+                  <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                </Show>
+                <Show when={!showFiles()}>
+                  <EditorFilesButton onClick={() => setShowFiles(true)} />
+                </Show>
+              </div>
             </div>
-          </Show>
-          
-          <EditorToolbar
-            isPreview={showPreview()}
-            onTogglePreview={() => setShowPreview(!showPreview())}
-            getTextareaRef={() => textareaRef}
-            onValueChange={handleEditorInput}
-          />
-          <MarkdownInput
-            editorRef={(el) => (textareaRef = el)}
-            value={currentEditorContent()}
-            onInput={handleEditorInput}
-            placeholder={t("editor.bodyPlaceholder")}
-            showPreview={showPreview()}
-            rehypePlugins={markdownPlugins()} 
-          />
-        </div>
+            
+            <Show when={showChapters()}>
+              <div class="mb-4">
+                  <EditorChapterSelector
+                      chapters={combinedChapters()}
+                      activeIndex={editingChapterIndex()}
+                      onSelectIndex={setEditingChapterIndex}
+                      onAdd={handleAddChapter}
+                      onRemove={handleRemoveChapter}
+                      onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                  />
+              </div>
+            </Show>
+            
+            <EditorToolbar
+              isPreview={showPreview()}
+              onTogglePreview={() => setShowPreview(!showPreview())}
+              getTextareaRef={() => textareaRef}
+              onValueChange={handleEditorInput}
+            />
+            <MarkdownInput
+              editorRef={(el) => (textareaRef = el)}
+              value={currentEditorContent()}
+              onInput={handleEditorInput}
+              placeholder={t("editor.bodyPlaceholder")}
+              showPreview={showPreview()}
+              rehypePlugins={markdownPlugins()} 
+            />
+
+            <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+              <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
+              <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+                <div class="justify-self-start self-start">
+                  <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                    {t("editor.params.nsfw.help")}
+                  </p>
+                </div>
+                <div class="justify-self-start">
+                  <input
+                    id="nsfw-checkbox"
+                    type="checkbox"
+                    class="h-5 w-5"
+                    checked={postParams().nsfw || false}
+                    onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
+                  />
+                </div>
+
+                <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+                <div class="justify-self-start">
+                  <input
+                    id="fundraiser-id"
+                    type="number"
+                    value={postParams().fundraiser || 0}
+                    onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                    class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                    min="0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+              <button 
+                onClick={() => setShowFullPreview(true)}
+                class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
+              >
+                {t("editor.previewPost")}
+              </button>
+            </div>
+
+          </div>
+        </Show>
       </Show>
 
       <EditorFilesDrawer 
