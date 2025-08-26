@@ -199,5 +199,22 @@ export default {
   "editor.fullPreview.back": "Back to Editing",
   "editor.fullPreview.continue": "Continue",
    "editor.thumbnail.delete": "Delete thumbnail",
+   "editor.publish.title": "Publish Post",
+     "editor.publish.title": "Publish Post",
+  "editor.publish.steps.validate": "Validating Post",
+  "editor.publish.steps.validate.help": "Checking post structure",
+  "editor.publish.steps.ipfs": "Upload to IPFS",
+  "editor.publish.steps.ipfs.help": "Saving data to IPFS",
+  "editor.publish.steps.ipfs_publish": "IPFS Publishing",
+  "editor.publish.steps.ipfs_publish.help": "Waiting for content availability",
+  "editor.publish.steps.register": "Registering",
+  "editor.publish.steps.register.help": "Registering in blockchain",
+  "editor.publish.steps.publish": "Publishing",
+  "editor.publish.steps.publish.help": "Publishing to feed",
+  "editor.publish.validation.errorTitle": "Validation Error",
+  "editor.publish.validation.errorIncomplete": "Language '{lang}' is incomplete. It must have both a title and some content in the prologue.",
+  "editor.publish.validation.backToEditor": "Back to Editor",
+  "editor.publish.validation.unexpectedError": "An unexpected error occurred during validation: {message}",
+  
   
 };

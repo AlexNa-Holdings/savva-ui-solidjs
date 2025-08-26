@@ -61,11 +61,14 @@ export default function EditorFullPreview(props) {
           <h2 class="font-bold">{t("editor.fullPreview.title")}</h2>
           <p class="text-xs opacity-90">{t("editor.fullPreview.help")}</p>
         </div>
-        <button class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90">
+        <button 
+          onClick={props.onContinue}
+          class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90"
+        >
           {t("editor.fullPreview.continue")}
         </button>
       </div>
-
+      
       <div class="bg-[hsl(var(--background))] p-4 rounded-lg border border-[hsl(var(--border))]">
         <article class="space-y-4">
           <header class="flex justify-between items-start gap-4">

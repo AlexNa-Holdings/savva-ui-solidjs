@@ -17,6 +17,7 @@ import ConfirmModal from "../components/ui/ConfirmModal.jsx";
 import { insertTextAtCursor } from "../components/editor/text-utils.js";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
+import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
 
 function TrashIcon(props) {
   return (
@@ -42,6 +43,7 @@ export default function EditorPage() {
   const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
   const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
   const [showFullPreview, setShowFullPreview] = createSignal(false);
+  const [showPublishWizard, setShowPublishWizard] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -306,6 +308,10 @@ export default function EditorPage() {
             chapters={combinedChapters()}
             filledLangs={filledLangs()}
             onBack={() => setShowFullPreview(false)}
+            onContinue={() => {
+              setShowFullPreview(false);
+              setShowPublishWizard(true);
+            }}
           />
         }
       >
@@ -453,6 +459,12 @@ export default function EditorPage() {
         onConfirm={confirmRemoveChapter}
         title={t("editor.chapters.confirmDeleteTitle")}
         message={t("editor.chapters.confirmDeleteMessage")}
+      />
+      <PostSubmissionWizard 
+        isOpen={showPublishWizard()}
+        onClose={() => setShowPublishWizard(false)}
+        postData={postData}
+        postParams={postParams}
       />
     </main>
   );
