@@ -9,20 +9,22 @@ import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import ChapterSelector from "../post/ChapterSelector.jsx";
 import ChapterPager from "../post/ChapterPager.jsx";
+import LangSelector from "../ui/LangSelector.jsx";
 
 export default function EditorFullPreview(props) {
   const app = useApp();
   const { t } = app;
   const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+  const [previewLang, setPreviewLang] = createSignal(props.activeLang);
 
   const author = () => app.authorizedUser();
-  const lang = () => props.activeLang;
+  const lang = () => previewLang();
 
   const title = createMemo(() => props.postData?.[lang()]?.title || "");
 
   const chapterList = createMemo(() => {
     const prologue = { title: t("post.chapters.prologue") };
-    // Use the combined chapters prop from EditorPage, which already has titles
+    const currentChapters = props.chapters?.filter(c => props.postData[lang()]?.chapters.includes(c)) || [];
     return [prologue, ...(props.chapters || [])];
   });
 
@@ -30,11 +32,9 @@ export default function EditorFullPreview(props) {
     const data = props.postData?.[lang()];
     if (!data) return "";
     const index = selectedChapterIndex();
-    // Index 0 is the prologue (main body)
     if (index === 0) {
       return data.body || "";
     }
-    // Chapters in the data array are offset by 1 because of the prologue
     return data.chapters?.[index - 1]?.body || "";
   });
 
@@ -53,7 +53,6 @@ export default function EditorFullPreview(props) {
 
   return (
     <div class="max-w-5xl mx-auto space-y-4">
-      {/* Header with your specified layout */}
       <div class="p-3 pr-4 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
         <button onClick={props.onBack} class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
           {t("editor.fullPreview.back")}
@@ -67,7 +66,6 @@ export default function EditorFullPreview(props) {
         </button>
       </div>
 
-      {/* Main Content with PostPage background */}
       <div class="bg-[hsl(var(--background))] p-4 rounded-lg border border-[hsl(var(--border))]">
         <article class="space-y-4">
           <header class="flex justify-between items-start gap-4">
@@ -76,9 +74,18 @@ export default function EditorFullPreview(props) {
               <UserCard author={author()} />
               <PostTags postData={postForTags()} />
             </div>
-            <div class="w-48 flex-shrink-0">
+            <div class="w-48 flex-shrink-0 space-y-2">
               <Show when={props.thumbnailUrl}>
                 <img src={props.thumbnailUrl} alt="Thumbnail preview" class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" />
+              </Show>
+              <Show when={(props.filledLangs || []).length > 1}>
+                <div class="flex justify-center">
+                    <LangSelector
+                        codes={props.filledLangs}
+                        value={previewLang()}
+                        onChange={setPreviewLang}
+                    />
+                </div>
               </Show>
             </div>
           </header>

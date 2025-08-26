@@ -44,6 +44,11 @@ export default function EditorPage() {
     if (path.startsWith("/editor/comment/")) return "comment";
     return "unknown";
   });
+  
+  const domainLangCodes = createMemo(() => {
+    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
+  });
 
   onMount(async () => {
     const handleKeyDown = (e) => {
@@ -58,13 +63,18 @@ export default function EditorPage() {
     try {
       if (editorMode() === "new_post") {
         const draft = await loadNewPostDraft();
-        const initialData = draft?.content || { en: { title: "", body: "", chapters: [] } };
-        const initialParams = draft?.params || {};
-        setPostData(initialData);
-        setPostParams(initialParams);
-
-        if ((initialData[activeLang()]?.chapters || []).length > 0) {
-          setShowChapters(true);
+        if (draft && draft.content) {
+            setPostData(draft.content);
+            setPostParams(draft.params || {});
+        } else {
+            const newPostData = {};
+            const newPostParams = { locales: {} };
+            for (const langCode of domainLangCodes()) {
+                newPostData[langCode] = { title: "", body: "", chapters: [] };
+                newPostParams.locales[langCode] = { chapters: [] };
+            }
+            setPostData(newPostData);
+            setPostParams(newPostParams);
         }
       } else {
         setPostData({ en: { title: "", body: "", chapters: [] } });
@@ -96,16 +106,18 @@ export default function EditorPage() {
   });
 
   createEffect(on(activeLang, (lang) => {
-    if (!postData()) return;
-    const chapters = postData()[lang]?.chapters || [];
+    if (!postData()?.[lang]) {
+        setPostData(p => ({...p, [lang]: { title: "", body: "", chapters: [] }}));
+        setPostParams(p => {
+            const locales = {...(p.locales || {})};
+            if (!locales[lang]) locales[lang] = { chapters: [] };
+            return {...p, locales};
+        });
+    }
+    const chapters = postData()?.[lang]?.chapters || [];
     setShowChapters(chapters.length > 0);
     setEditingChapterIndex(-1);
   }));
-
-  const domainLangCodes = () => {
-    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
-    return fromDomain.length > 0 ? fromDomain : ["en"];
-  };
 
   const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
 
@@ -256,6 +268,15 @@ export default function EditorPage() {
     }));
   });
 
+  const filledLangs = createMemo(() => {
+    const data = postData();
+    if (!data) return [];
+    return domainLangCodes().filter(langCode => {
+        const langData = data[langCode];
+        return langData && langData.title?.trim() && langData.body?.trim();
+    });
+  });
+
   return (
     <main class="p-4 max-w-7xl mx-auto space-y-4">
       <Show
@@ -267,6 +288,7 @@ export default function EditorPage() {
             activeLang={activeLang()}
             thumbnailUrl={thumbnailUrl()}
             chapters={combinedChapters()}
+            filledLangs={filledLangs()}
             onBack={() => setShowFullPreview(false)}
           />
         }
@@ -288,11 +310,13 @@ export default function EditorPage() {
                   <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
                 </Show>
               </div>
-              <LangSelector
-                codes={domainLangCodes()}
-                value={activeLang()}
-                onChange={setActiveLang}
-              />
+              <div class="flex justify-center">
+                <LangSelector
+                    codes={domainLangCodes()}
+                    value={activeLang()}
+                    onChange={setActiveLang}
+                />
+              </div>
             </div>
           </header>
 
