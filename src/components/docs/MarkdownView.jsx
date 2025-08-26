@@ -6,6 +6,7 @@ import { rehypeMediaPlayers } from "./rehype-media-players.js";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypePrettyCode from "rehype-pretty-code";
+import remarkBreaks from "remark-breaks";
 
 function rehypeCopyButton() {
   return (tree) =>
@@ -31,7 +32,6 @@ export default function MarkdownView(props) {
 
   async function renderMd() {
     try {
-      // Correctly destructure the default export for DOMPurify
       const [
         { unified }, { default: remarkParse }, { default: remarkGfm },
         { default: remarkRehype }, { default: rehypeStringify }, { default: DOMPurify },
@@ -41,8 +41,7 @@ export default function MarkdownView(props) {
         import("remark-rehype"), import("rehype-stringify"), import("dompurify"),
         import("unist-util-visit")
       ]);
-
-      // Define the custom copy button plugin
+  
       const rehypeCopyButton = () => (tree) => {
         visit(tree, "element", (node) => {
           if (node.tagName !== "pre" || node.children.some(c => c.properties?.className?.includes("sv-copy-btn"))) return;
@@ -54,44 +53,43 @@ export default function MarkdownView(props) {
         });
         return tree;
       };
-
-      // Configure DOMPurify hooks (now using the correct object)
+      
       DOMPurify.addHook("uponSanitizeElement", (node, data) => {
         if (data.tagName === 'iframe' || data.tagName === 'video' || data.tagName === 'audio') {
           if (!node.hasAttribute('src')) node.remove();
         }
       });
-
-      // Build the processor pipeline
+  
       const processor = unified()
         .use(remarkParse)
         .use(remarkGfm)
+        .use(remarkBreaks)
         .use(remarkRehype, { allowDangerousHtml: true });
-
+  
       if (props.rehypePlugins) {
         for (const plugin of props.rehypePlugins) {
+          // This robustly handles both [plugin, options] and just plugin
           processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
         }
       }
-
+  
       processor
         .use(rehypeMediaPlayers)
         .use(rehypeSlug)
         .use(rehypeCopyButton)
         .use(rehypeStringify, { allowDangerousHtml: true });
-
+  
       const file = await processor.process(String(props.markdown || ""));
       const rawHtml = String(file);
-
-      // Sanitize the final HTML (now using the correct object)
+      
       const safe = DOMPurify.sanitize(rawHtml, {
         ADD_TAGS: ["iframe", "video", "audio"],
         ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style", "src"],
         ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
       });
-
+  
       if (!disposed) setHtml(safe);
-
+  
     } catch (err) {
       dbg.error("MarkdownView", "Markdown rendering failed:", err);
       const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -99,7 +97,6 @@ export default function MarkdownView(props) {
       if (!disposed) setHtml(errorHtml);
     }
   }
-
 
   function copy(text) {
     if (!text) return;
@@ -135,11 +132,12 @@ export default function MarkdownView(props) {
     container?.addEventListener("click", onClick);
   });
 
+  // MODIFICATION: Removed { defer: true } to make updates immediate.
   createEffect(on(() => props.markdown, (md, prevMd) => {
     if (md !== prevMd && prevMd !== undefined) {
       renderMd().then(() => relabelButtons());
     }
-  }, { defer: true }));
+  }));
 
   onCleanup(() => {
     disposed = true;

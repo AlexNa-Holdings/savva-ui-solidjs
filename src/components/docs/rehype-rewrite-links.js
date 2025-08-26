@@ -9,9 +9,11 @@ import { visit } from "unist-util-visit";
  */
 export function rehypeRewriteLinks(options = {}) {
   return (tree) => {
+    // FIX: Always return the tree, even if there's no base URL.
     if (!options.base) {
-      return;
+      return tree;
     }
+    
     const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
     const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
     

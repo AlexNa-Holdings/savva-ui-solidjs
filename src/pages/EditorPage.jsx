@@ -9,12 +9,13 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadNewPostDraft, saveNewPostDraft } from "../editor/storage.js";
+import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
 import { insertTextAtCursor } from "../components/editor/text-utils.js";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 
 export default function EditorPage() {
   const { t, domainAssetsConfig } = useApp();
@@ -22,12 +23,14 @@ export default function EditorPage() {
   let textareaRef;
 
   const [postData, setPostData] = createSignal(null);
+  const [postParams, setPostParams] = createSignal({});
   const [activeLang, setActiveLang] = createSignal("en");
   const [showPreview, setShowPreview] = createSignal(false);
   const [showFiles, setShowFiles] = createSignal(false);
   const [showChapters, setShowChapters] = createSignal(false);
   const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
   const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
+  const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -53,27 +56,42 @@ export default function EditorPage() {
     try {
       if (editorMode() === "new_post") {
         const draft = await loadNewPostDraft();
-        const initialData = draft || { en: { title: "", body: "", chapters: [] } };
+        const initialData = draft?.content || { en: { title: "", body: "", chapters: [] } };
+        const initialParams = draft?.params || {};
         setPostData(initialData);
+        setPostParams(initialParams);
+
         if ((initialData[activeLang()]?.chapters || []).length > 0) {
           setShowChapters(true);
         }
       } else {
         setPostData({ en: { title: "", body: "", chapters: [] } });
+        setPostParams({});
       }
     } catch (error) {
       dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
       setPostData({ en: { title: "", body: "", chapters: [] } });
+      setPostParams({});
     }
   });
 
-  createEffect(on(postData, (data) => {
+  createEffect(on([postData, postParams], ([data, params]) => {
     if (data === null || editorMode() !== "new_post") return;
     clearTimeout(autoSaveTimeoutId);
     autoSaveTimeoutId = setTimeout(() => {
-      saveNewPostDraft(data);
+      saveNewPostDraft({ content: data, params: params });
     }, 500);
   }, { defer: true }));
+
+  createEffect(async () => {
+    const thumbPath = postParams()?.thumbnail;
+    if (thumbPath) {
+      const url = await resolveDraftFileUrl(thumbPath);
+      setThumbnailUrl(url);
+    } else {
+      setThumbnailUrl(null);
+    }
+  });
 
   createEffect(on(activeLang, (lang) => {
     if (!postData()) return;
@@ -100,19 +118,35 @@ export default function EditorPage() {
   };
 
   const updateChapterTitle = (index, newTitle) => {
-    setPostData(prev => {
+    setPostParams(prev => {
       const lang = activeLang();
-      const chapters = [...(prev[lang]?.chapters || [])];
-      chapters[index] = { ...chapters[index], title: newTitle };
-      return { ...prev, [lang]: { ...prev[lang], chapters } };
+      const newLocales = { ...(prev.locales || {}) };
+      const newChapters = [...(newLocales[lang]?.chapters || [])];
+      newChapters[index] = { ...newChapters[index], title: newTitle };
+      newLocales[lang] = { ...newLocales[lang], chapters: newChapters };
+      return { ...prev, locales: newLocales };
     });
   };
 
   const handleAddChapter = () => {
-    const newChapter = { title: "", body: "" };
-    const newChapters = [...(currentLangData().chapters || []), newChapter];
-    updateAllChapters(newChapters);
-    setEditingChapterIndex(newChapters.length - 1);
+    const newChapterContent = { body: "" };
+    const newChapterParams = { title: "" };
+    
+    setPostData(prev => {
+      const lang = activeLang();
+      const chapters = [...(prev[lang]?.chapters || []), newChapterContent];
+      return { ...prev, [lang]: { ...prev[lang], chapters } };
+    });
+
+    setPostParams(prev => {
+      const lang = activeLang();
+      const newLocales = { ...(prev.locales || {}) };
+      const newChapters = [...(newLocales[lang]?.chapters || []), newChapterParams];
+      newLocales[lang] = { ...newLocales[lang], chapters: newChapters };
+      return { ...prev, locales: newLocales };
+    });
+
+    setEditingChapterIndex(currentLangData().chapters.length);
   };
 
   const handleRemoveChapter = () => {
@@ -122,22 +156,25 @@ export default function EditorPage() {
   
   const confirmRemoveChapter = () => {
     const indexToRemove = editingChapterIndex();
-    const newChapters = (currentLangData().chapters || []).filter((_, i) => i !== indexToRemove);
+    
+    setPostData(prev => {
+      const lang = activeLang();
+      const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
+      return { ...prev, [lang]: { ...prev[lang], chapters } };
+    });
+
+    setPostParams(prev => {
+      const lang = activeLang();
+      const newLocales = { ...(prev.locales || {}) };
+      const chapters = (newLocales[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
+      newLocales[lang] = { ...newLocales[lang], chapters };
+      return { ...prev, locales: newLocales };
+    });
+
     setEditingChapterIndex(indexToRemove - 1);
-    updateAllChapters(newChapters);
-    if (newChapters.length === 0) {
+    if (currentLangData().chapters.length - 1 === 0) {
       setShowChapters(false);
     }
-  };
-
-  const updateAllChapters = (newChapters) => {
-    setPostData(prev => ({
-        ...prev,
-        [activeLang()]: {
-            ...prev[activeLang()],
-            chapters: newChapters
-        }
-    }));
   };
 
   const currentEditorContent = createMemo(() => {
@@ -155,7 +192,7 @@ export default function EditorPage() {
         const lang = activeLang();
         const chapters = [...(postData()[lang]?.chapters || [])];
         chapters[index] = { ...chapters[index], body: value };
-        updateAllChapters(chapters);
+        updateField('chapters', chapters);
     }
   };
 
@@ -171,7 +208,8 @@ export default function EditorPage() {
   };
 
   const handleSetThumbnail = (fileName) => {
-    console.log("Set thumbnail to:", fileName);
+    const relativePath = `uploads/${fileName}`;
+    setPostParams(prev => ({ ...prev, thumbnail: relativePath }));
   };
 
   const handleInsertUrl = (fileName) => {
@@ -192,6 +230,15 @@ export default function EditorPage() {
     return [rehypeResolveDraftUrls];
   });
 
+  const combinedChapters = createMemo(() => {
+    const contentChapters = currentLangData().chapters || [];
+    const paramChapters = postParams()?.locales?.[activeLang()]?.chapters || [];
+    return contentChapters.map((c, i) => ({
+      ...c,
+      title: paramChapters[i]?.title || ""
+    }));
+  });
+
   return (
     <main class="p-4 max-w-7xl mx-auto space-y-4">
       <ClosePageButton />
@@ -204,8 +251,12 @@ export default function EditorPage() {
           </p>
         </div>
         <div class="w-48 flex-shrink-0 space-y-2">
-          <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center">
-            <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>
+          <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+            <Show when={thumbnailUrl()}
+              fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+            >
+              <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+            </Show>
           </div>
           <LangSelector
             codes={domainLangCodes()}
@@ -238,7 +289,7 @@ export default function EditorPage() {
           <Show when={showChapters()}>
             <div class="mb-4">
                 <EditorChapterSelector
-                    chapters={currentLangData().chapters}
+                    chapters={combinedChapters()}
                     activeIndex={editingChapterIndex()}
                     onSelectIndex={setEditingChapterIndex}
                     onAdd={handleAddChapter}
@@ -260,7 +311,7 @@ export default function EditorPage() {
             onInput={handleEditorInput}
             placeholder={t("editor.bodyPlaceholder")}
             showPreview={showPreview()}
-            rehypePlugins={markdownPlugins()}
+            rehypePlugins={markdownPlugins()} 
           />
         </div>
       </Show>

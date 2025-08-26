@@ -4,6 +4,7 @@ import { parse, stringify } from "yaml";
 
 const NEW_POST_DIR = "new_post";
 const UPLOAD_DIR = "uploads";
+const PARAMS_FILE = "new_post.json";
 
 async function getDirectoryHandle(path) {
   try {
@@ -110,12 +111,8 @@ export async function deleteUploadedFile(fileName) {
   }
 }
 
-/**
- * Creates a temporary blob URL for a file in the draft, for previews.
- * @param {string} relativePath - e.g., "uploads/image.png"
- * @returns {Promise<string|null>} A blob URL or null if not found.
- */
 export async function resolveDraftFileUrl(relativePath) {
+  if (!relativePath) return null;
   try {
     const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
     const pathParts = relativePath.split('/').filter(Boolean);
@@ -139,71 +136,93 @@ export async function loadNewPostDraft() {
   dbg.log("storage", "Loading new post draft...");
   const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
   const descriptorYaml = await readFile(dirHandle, "info.yaml");
-  
-  if (!descriptorYaml) {
-    dbg.log("storage", "No draft found.");
-    return null;
-  }
+  const paramsJson = await readFile(dirHandle, PARAMS_FILE);
 
-  const descriptor = parse(descriptorYaml);
   const postData = {};
+  const params = paramsJson ? JSON.parse(paramsJson) : {};
 
-  for (const lang in descriptor.locales) {
-    const localeData = descriptor.locales[lang];
-    postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
-    if (localeData.data_path) {
-      postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
-    }
-    if (Array.isArray(localeData.chapters)) {
-      for (const chapter of localeData.chapters) {
-        if (chapter.data_path) {
-          const chapterBody = await readFile(dirHandle, chapter.data_path) || "";
-          postData[lang].chapters.push({ title: chapter.title, body: chapterBody });
+  if (descriptorYaml) {
+    const descriptor = parse(descriptorYaml);
+    for (const lang in descriptor.locales) {
+      const localeData = descriptor.locales[lang];
+      const chapterTitles = params.locales?.[lang]?.chapters || [];
+      
+      postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
+      
+      if (localeData.data_path) {
+        postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
+      }
+      
+      if (Array.isArray(localeData.chapters)) {
+        for (let i = 0; i < localeData.chapters.length; i++) {
+          const chapterDesc = localeData.chapters[i];
+          const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
+          const chapterTitle = chapterTitles[i]?.title || "";
+          postData[lang].chapters.push({ title: chapterTitle, body: chapterBody });
         }
       }
     }
   }
-  
-  dbg.log("storage", "Draft loaded successfully.", postData);
-  return postData;
+
+  const draft = {
+    content: Object.keys(postData).length > 0 ? postData : { en: { title: "", body: "", chapters: [] } },
+    params: params
+  };
+
+  if (!draft.content && !Object.keys(draft.params).length) {
+    dbg.log("storage", "No draft found.");
+    return null;
+  }
+
+  dbg.log("storage", "Draft loaded successfully.", draft);
+  return draft;
 }
 
-export async function saveNewPostDraft(postData) {
-  dbg.log("storage", "Saving new post draft...", postData);
+export async function saveNewPostDraft(draftData) {
+  dbg.log("storage", "Saving new post draft...", draftData);
   const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
   
+  const { content, params } = draftData;
+
+  const finalParams = { ...params, locales: {} };
+
   const descriptor = {
     savva_spec_version: "2.0",
     mime_type: "text/markdown",
     locales: {}
   };
 
-  for (const lang in postData) {
-    const data = postData[lang];
-    const dataPath = `${lang}/data.md`;
-    
-    descriptor.locales[lang] = {
-      title: data.title || "",
-      text_preview: (data.body || "").substring(0, 200),
-      data_path: dataPath,
-      chapters: []
-    };
-    
-    await writeFile(dirHandle, dataPath, data.body || "");
+  if (content) {
+    for (const lang in content) {
+      const data = content[lang];
+      const dataPath = `${lang}/data.md`;
+      
+      descriptor.locales[lang] = {
+        title: data.title || "",
+        text_preview: (data.body || "").substring(0, 200),
+        data_path: dataPath,
+        chapters: []
+      };
 
-    if (Array.isArray(data.chapters)) {
-      for (let i = 0; i < data.chapters.length; i++) {
-        const chapter = data.chapters[i];
-        const chapterPath = `${lang}/chapters/${i + 1}.md`;
-        descriptor.locales[lang].chapters.push({
-          title: chapter.title,
-          data_path: chapterPath,
-        });
-        await writeFile(dirHandle, chapterPath, chapter.body || "");
+      finalParams.locales[lang] = { chapters: [] };
+      
+      await writeFile(dirHandle, dataPath, data.body || "");
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapter = data.chapters[i];
+          const chapterPath = `${lang}/chapters/${i + 1}.md`;
+          
+          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
+          finalParams.locales[lang].chapters.push({ title: chapter.title });
+          
+          await writeFile(dirHandle, chapterPath, chapter.body || "");
+        }
       }
     }
+    await writeFile(dirHandle, "info.yaml", stringify(descriptor));
   }
-
-  await writeFile(dirHandle, "info.yaml", stringify(descriptor));
+  
+  await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
   dbg.log("storage", "Draft saved successfully.");
 }

@@ -47,7 +47,7 @@ export default function PostCard(props) {
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
     if (thumbnailPath) {
-      return resolvePostCidPath(props.item._raw, thumbnailPath);
+      return thumbnailPath;
     }
     return author()?.avatar;
   });

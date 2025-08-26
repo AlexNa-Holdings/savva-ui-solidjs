@@ -20,6 +20,7 @@ import PostTags from "../components/post/PostTags.jsx";
 import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
 
+
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
@@ -194,7 +195,7 @@ export default function PostPage() {
   });
 
   const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }],
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
   ]);
 
   const RightPanel = () => (
