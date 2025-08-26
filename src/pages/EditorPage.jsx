@@ -7,13 +7,18 @@ import MarkdownInput from "../components/editor/MarkdownInput.jsx";
 import LangSelector from "../components/ui/LangSelector.jsx";
 import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
-import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
+import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
+import { rehypeMediaPlayers } from "../components/docs/rehype-media-players.js";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypePrettyCode from "rehype-pretty-code";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
 import { loadNewPostDraft, saveNewPostDraft } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
+import { insertTextAtCursor } from "../components/editor/text-utils.js";
 
 export default function EditorPage() {
   const { t, domainAssetsConfig } = useApp();
@@ -28,6 +33,9 @@ export default function EditorPage() {
   const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
   const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
 
+  let autoSaveTimeoutId;
+  onCleanup(() => clearTimeout(autoSaveTimeoutId));
+
   const editorMode = createMemo(() => {
     const path = route();
     if (path.startsWith("/editor/new")) return "new_post";
@@ -37,6 +45,17 @@ export default function EditorPage() {
   });
 
   onMount(async () => {
+    // MODIFICATION: Set up synchronous event listeners and cleanups first.
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowFiles(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
+
+    // Now, proceed with asynchronous operations.
     try {
       if (editorMode() === "new_post") {
         const draft = await loadNewPostDraft();
@@ -52,23 +71,12 @@ export default function EditorPage() {
       dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
       setPostData({ en: { title: "", body: "", chapters: [] } });
     }
-
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        setShowFiles(prev => !prev);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
   });
 
   createEffect(on(postData, (data) => {
     if (data === null || editorMode() !== "new_post") return;
-    let timeoutId;
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
+    clearTimeout(autoSaveTimeoutId);
+    autoSaveTimeoutId = setTimeout(() => {
       saveNewPostDraft(data);
     }, 500);
   }, { defer: true }));
@@ -121,11 +129,8 @@ export default function EditorPage() {
   const confirmRemoveChapter = () => {
     const indexToRemove = editingChapterIndex();
     const newChapters = (currentLangData().chapters || []).filter((_, i) => i !== indexToRemove);
-    
-    // Select the previous chapter or prologue
     setEditingChapterIndex(indexToRemove - 1);
     updateAllChapters(newChapters);
-
     if (newChapters.length === 0) {
       setShowChapters(false);
     }
@@ -160,6 +165,25 @@ export default function EditorPage() {
     }
   };
 
+  const handleInsertFile = (fileName, fileType) => {
+    const url = `uploads/${fileName}`;
+    let markdown;
+    if (fileType === 'image') {
+      markdown = `![${fileName}](${url})`;
+    } else {
+      markdown = `[${fileName}](${url})`;
+    }
+    insertTextAtCursor(textareaRef, markdown, handleEditorInput);
+  };
+
+  const handleSetThumbnail = (fileName) => {
+    console.log("Set thumbnail to:", fileName);
+  };
+
+  const handleInsertUrl = (fileName) => {
+    insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
+  };
+
   const title = createMemo(() => {
     switch (editorMode()) {
       case "new_post": return t("editor.titleNewPost");
@@ -169,8 +193,19 @@ export default function EditorPage() {
     }
   });
 
-  const ipfsBaseUrl = createMemo(() => ""); 
-  const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
+  const markdownPlugins = createMemo(() => {
+    dbg.log("EditorPage", "Creating markdown plugins for preview.");
+    return [
+      rehypeMediaPlayers,
+      rehypeResolveDraftUrls,
+      rehypeSlug,
+      [rehypeAutolinkHeadings, { behavior: "wrap" }],
+      [rehypePrettyCode, {
+        keepBackground: true,
+        theme: { light: "github-light", dark: "github-dark" },
+      }],
+    ];
+  });
 
   return (
     <main class="p-4 max-w-7xl mx-auto space-y-4">
@@ -248,6 +283,9 @@ export default function EditorPage() {
       <EditorFilesDrawer 
         isOpen={showFiles()}
         onClose={() => setShowFiles(false)}
+        onInsert={handleInsertFile}
+        onSetThumbnail={handleSetThumbnail}
+        onInsertUrl={handleInsertUrl}
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}

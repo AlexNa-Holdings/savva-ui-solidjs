@@ -2,7 +2,6 @@
 import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
-import { rehypeMediaPlayers } from "./rehype-media-players.js";
 
 function rehypeCopyButton() {
   return (tree) =>
@@ -30,17 +29,14 @@ export default function MarkdownView(props) {
     try {
       const [
         { unified }, { default: remarkParse }, { default: remarkGfm }, 
-        { default: remarkFrontmatter }, { default: remarkRehype }, { default: rehypeSlug }, 
-        { default: rehypeAutolinkHeadings }, { default: rehypePrettyCode }, 
+        { default: remarkFrontmatter }, { default: remarkRehype },
         { default: rehypeStringify }, DOMPurify, { default: remarkBreaks },
       ] = await Promise.all([
         import("unified"), import("remark-parse"), import("remark-gfm"),
-        import("remark-frontmatter"), import("remark-rehype"), import("rehype-slug"),
-        import("rehype-autolink-headings"), import("rehype-pretty-code"),
+        import("remark-frontmatter"), import("remark-rehype"),
         import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
       ]);
 
-      // Allow specific tags and attributes for media players
       DOMPurify.default.addHook("uponSanitizeElement", (node, data) => {
         if (data.tagName === 'iframe' || data.tagName === 'video' || data.tagName === 'audio') {
             if(!node.hasAttribute('src')) node.remove();
@@ -52,14 +48,16 @@ export default function MarkdownView(props) {
         .use(remarkBreaks)
         .use(remarkFrontmatter, ["yaml", "toml"])
         .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true })
-        .use(rehypeMediaPlayers) // Our new media plugin
-        .use(rehypeSlug)
-        .use(rehypeAutolinkHeadings, { behavior: "wrap" })
-        .use(rehypePrettyCode, {
-          keepBackground: true,
-          theme: { light: "github-light", dark: "github-dark" },
-        })
+        .use(remarkRehype, { allowDangerousHtml: true });
+
+      // MODIFICATION: Only use plugins passed via props.
+      if (props.rehypePlugins) {
+        for (const plugin of props.rehypePlugins) {
+          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
+        }
+      }
+      
+      processor
         .use(rehypeCopyButton)
         .use(rehypeStringify, { allowDangerousHtml: true });
       
@@ -69,8 +67,7 @@ export default function MarkdownView(props) {
       const safe = DOMPurify.default.sanitize(rawHtml, {
         ADD_TAGS: ["iframe", "video", "audio"],
         ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style", "src"],
-        // Allow specific youtube domain for iframes
-        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
         FORBID_TAGS: [],
         FORBID_ATTR: []
       });
@@ -108,7 +105,6 @@ export default function MarkdownView(props) {
     const pre = btn.closest("pre");
     if (!pre) return;
     
-    // Select the code content, excluding the button itself
     const codeNode = pre.querySelector("code");
     if (codeNode) {
       copy(codeNode.innerText);

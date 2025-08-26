@@ -1,8 +1,7 @@
 // src/hooks/useLocalIpfs.js
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal, onCleanup, createEffect } from "solid-js";
 import { fetchWithTimeout } from "../utils/net.js";
 
-// Constants are now local to this hook
 const IPFS_LOCAL_KEY = "ipfs_local_enabled";
 const IPFS_LOCAL_API_KEY = "ipfs_local_api";
 const IPFS_LOCAL_GATEWAY_KEY = "ipfs_local_gateway";
@@ -52,16 +51,26 @@ export function useLocalIpfs(dependencies) {
     if (ipfsMonitorTid) { clearInterval(ipfsMonitorTid); ipfsMonitorTid = null; }
   }
 
+  // MODIFICATION: Wrap the monitor's lifecycle in a createEffect.
+  createEffect(() => {
+    if (localIpfsEnabled() && localIpfsApiUrl()) {
+      startLocalIpfsMonitor();
+    } else {
+      stopLocalIpfsMonitor();
+    }
+    // This cleanup runs when the effect re-runs or the component unmounts.
+    onCleanup(() => stopLocalIpfsMonitor());
+  });
+
   async function enableLocalIpfs(apiUrl) {
     try {
       const gw = await probeLocalIpfs(apiUrl);
       setLocalIpfsApiUrl(apiUrl);
       setLocalIpfsGateway(gw);
-      setLocalIpfsEnabled(true);
-      localStorage.setItem(IPFS_LOCAL_KEY, "1");
       localStorage.setItem(IPFS_LOCAL_API_KEY, apiUrl);
       localStorage.setItem(IPFS_LOCAL_GATEWAY_KEY, gw);
-      startLocalIpfsMonitor();
+      localStorage.setItem(IPFS_LOCAL_KEY, "1");
+      setLocalIpfsEnabled(true); // The effect will start the monitor
     } catch (e) {
       pushErrorToast(e, { op: "enableLocalIpfs", apiUrl });
       throw e;
@@ -69,20 +78,12 @@ export function useLocalIpfs(dependencies) {
   }
 
   async function disableLocalIpfs() {
-    stopLocalIpfsMonitor();
-    setLocalIpfsEnabled(false);
     setLocalIpfsGateway("");
     localStorage.setItem(IPFS_LOCAL_KEY, "0");
     localStorage.removeItem(IPFS_LOCAL_GATEWAY_KEY);
+    setLocalIpfsEnabled(false); // The effect will stop the monitor
     pushToast({ type: "info", message: t("settings.ipfs.localDisabled") });
   }
-
-  // Start the monitor if it was enabled on page load
-  if (localIpfsEnabled() && localIpfsApiUrl()) {
-    startLocalIpfsMonitor();
-  }
-
-  onCleanup(() => stopLocalIpfsMonitor());
 
   return {
     localIpfsEnabled,

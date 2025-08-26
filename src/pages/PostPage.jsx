@@ -18,25 +18,11 @@ import ChapterSelector from "../components/post/ChapterSelector.jsx";
 import ChapterPager from "../components/post/ChapterPager.jsx";
 import PostTags from "../components/post/PostTags.jsx";
 import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
-
-function rehypeRewriteLinks(options = {}) {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      if (!options.base) return;
-      const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
-      const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
-      
-      visit(tree, "element", (node) => {
-        if (node.tagName === 'a' || node.tagName === 'img') {
-          const prop = node.tagName === 'a' ? 'href' : 'src';
-          const url = node.properties?.[prop];
-          if (typeof url === 'string' && isRelative(url)) {
-            node.properties[prop] = base + url;
-          }
-        }
-      });
-    });
-}
+import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
+import { rehypeMediaPlayers } from "../components/docs/rehype-media-players.js";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypePrettyCode from "rehype-pretty-code";
 
 const getIdentifier = (route) => route().split('/')[2] || "";
 
@@ -212,7 +198,14 @@ export default function PostPage() {
   });
 
   const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+    rehypeMediaPlayers,
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }],
+    rehypeSlug,
+    [rehypeAutolinkHeadings, { behavior: "wrap" }],
+    [rehypePrettyCode, {
+      keepBackground: true,
+      theme: { light: "github-light", dark: "github-dark" },
+    }],
   ]);
 
   const RightPanel = () => (

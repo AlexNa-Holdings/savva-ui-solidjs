@@ -175,14 +175,22 @@ src/
       DocsPager.jsx
       MarkdownView.jsx
       rehype-media-players.js
+      rehype-resolve-draft-urls.js
       rehype-rewrite-links.js
     editor/
+      ChapterManager.jsx
+      EditorChapterSelector.jsx
+      EditorFilesButton.jsx
       EditorFilesDrawer.jsx
       EditorSidebar.jsx
+      EditorTocButton.jsx
       EditorToolbar.jsx
+      FileContextMenu.jsx
+      FileGridItem.jsx
       MarkdownInput.jsx
       text-utils.js
       ToolbarIcons.jsx
+      UploadFromUrlModal.jsx
     feed/
       ContentFeed.jsx
       PostCard.jsx
@@ -227,6 +235,7 @@ src/
         VerifiedBadge.jsx
       BrandLogo.jsx
       ClosePageButton.jsx
+      ConfirmModal.jsx
       ContextMenu.jsx
       IpfsImage.jsx
       LangSelector.jsx
@@ -256,6 +265,8 @@ src/
     useDomainAssets.js
   dev/
     AssetDebugTap.jsx
+  editor/
+    storage.js
   hooks/
     useConnect.js
     useLocalIpfs.js
@@ -319,352 +330,217 @@ vite.config.js
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/components/docs/rehype-rewrite-links.js">
-// src/components/docs/rehype-rewrite-links.js
+<file path="src/components/docs/rehype-resolve-draft-urls.js">
+// src/components/docs/rehype-resolve-draft-urls.js
 import { visit } from "unist-util-visit";
+import { resolveDraftFileUrl } from "../../editor/storage.js";
+import { dbg } from "../../utils/debug.js";
 
-/**
- * A rehype plugin that rewrites relative image and link URLs to be absolute,
- * based on a provided base URL.
- * @param {object} options - The options object.
- * @param {string} options.base - The base URL to prepend to relative paths.
- */
-export function rehypeRewriteLinks(options = {}) {
-  return (tree) => {
-    if (!options.base) {
-      return;
-    }
-    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
-    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
-    
+const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+
+export function rehypeResolveDraftUrls() {
+  return async (tree) => {
+    const nodesToUpdate = [];
     visit(tree, "element", (node) => {
-      if (node.tagName === 'a' || node.tagName === 'img') {
-        const prop = node.tagName === 'a' ? 'href' : 'src';
-        const url = node.properties?.[prop];
+      if (node.tagName === 'img' || node.tagName === 'video' || node.tagName === 'audio') {
+        const url = node.properties?.src;
         if (typeof url === 'string' && isRelative(url)) {
-          node.properties[prop] = base + url;
+          nodesToUpdate.push({ node, url });
         }
       }
     });
+
+    if (nodesToUpdate.length > 0) {
+      dbg.log("PreviewResolver", `Found ${nodesToUpdate.length} relative media URLs to resolve.`);
+      await Promise.all(
+        nodesToUpdate.map(async ({ node, url }) => {
+          const blobUrl = await resolveDraftFileUrl(url);
+          dbg.log("PreviewResolver", `Resolving '${url}' -> '${blobUrl}'`);
+          if (blobUrl) {
+            node.properties.src = blobUrl;
+          }
+        })
+      );
+    }
   };
 }
 </file>
 
-<file path="src/components/editor/EditorFilesDrawer.jsx">
-// src/components/editor/EditorFilesDrawer.jsx
-import { Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
+<file path="src/components/editor/FileContextMenu.jsx">
+// src/components/editor/FileContextMenu.jsx
+import { onMount, onCleanup, For } from "solid-js";
 
-function CloseIcon(props) {
+export default function FileContextMenu(props) {
+  let menuRef;
+
+  const handleClickOutside = (event) => {
+    if (menuRef && !menuRef.contains(event.target)) {
+      props.onClose?.();
+    }
+  };
+
+  onMount(() => {
+    setTimeout(() => document.addEventListener("mousedown", handleClickOutside), 0);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  });
+
+  const handleItemClick = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    item.onClick?.();
+    props.onClose?.();
+  };
+
   return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"></line>
-      <line x1="6" y1="6" x2="18" y2="18"></line>
+    <div
+      ref={menuRef}
+      class="absolute w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-30"
+      // This style attribute applies the dynamic position
+      style={{ top: `${props.y}px`, left: `${props.x}px` }}
+    >
+      <ul class="py-1" role="menu">
+        <For each={props.items}>
+          {(item) => (
+            <li>
+              <a
+                href="#"
+                class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+                onClick={(e) => handleItemClick(e, item)}
+              >
+                {item.label}
+              </a>
+            </li>
+          )}
+        </For>
+      </ul>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/FileGridItem.jsx">
+// src/components/editor/FileGridItem.jsx
+import { Show, createMemo } from "solid-js";
+
+function VideoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-8 h-8 text-[hsl(var(--muted-foreground))]">
+      <path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
     </svg>
   );
 }
 
-export default function EditorFilesDrawer(props) {
-  const { t } = useApp();
+function AudioIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-8 h-8 text-[hsl(var(--muted-foreground))]">
+      <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+    </svg>
+  );
+}
+
+export default function FileGridItem(props) {
+  const fileType = createMemo(() => {
+    const name = props.file?.name?.toLowerCase() || "";
+    if (/\.(jpe?g|png|gif|webp)$/.test(name)) return "image";
+    if (/\.(mp4|webm|ogg)$/.test(name)) return "video";
+    if (/\.(mp3|wav|m4a)$/.test(name)) return "audio";
+    return "other";
+  });
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    props.onMenuOpen?.({
+      file: props.file,
+      fileType: fileType(),
+      element: e.currentTarget,
+    });
+  };
 
   return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col">
-          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
-            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
+    <div
+      class="relative group aspect-square rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] overflow-hidden cursor-pointer"
+      onClick={handleClick}
+      onContextMenu={handleClick}
+    >
+      <Show when={fileType() === 'image'}>
+        <img src={props.file.url} alt={props.file.name} class="w-full h-full object-cover" />
+      </Show>
+      <Show when={fileType() === 'video'}>
+        <div class="w-full h-full flex items-center justify-center">
+          <VideoIcon />
+        </div>
+      </Show>
+      <Show when={fileType() === 'audio'}>
+        <div class="w-full h-full flex items-center justify-center">
+          <AudioIcon />
+        </div>
+      </Show>
+      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center truncate">
+        {props.file.name}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/UploadFromUrlModal.jsx">
+// src/components/editor/UploadFromUrlModal.jsx
+import { createSignal, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function UploadFromUrlModal(props) {
+  const { t } = useApp();
+  const [url, setUrl] = createSignal("");
+  const [isLoading, setIsLoading] = createSignal(false);
+
+  const handleUpload = async () => {
+    if (!url().trim()) return;
+    setIsLoading(true);
+    try {
+      await props.onUpload?.(url());
+      props.onClose?.();
+    } catch (e) {
+      // Error toast is handled by the parent
+      console.error("Upload from URL failed:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Show when={props.isOpen}>
+      <div class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-md p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">{t("editor.files.uploadModalTitle")}</h3>
+          <input
+            type="text"
+            value={url()}
+            onInput={(e) => setUrl(e.currentTarget.value)}
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            placeholder={t("editor.files.uploadModalPlaceholder")}
+          />
+          <div class="flex gap-2 justify-end mt-4">
             <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
               onClick={props.onClose}
-              class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
-              aria-label={t("common.cancel")}
             >
-              <CloseIcon />
+              {t("common.cancel")}
             </button>
-          </header>
-          <div class="flex-1 p-4 overflow-y-auto">
-            <div class="h-full flex items-center justify-center rounded-lg bg-[hsl(var(--muted))]">
-              <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.filesPlaceholder")}</span>
-            </div>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={handleUpload}
+              disabled={isLoading()}
+            >
+              {isLoading() ? t("editor.files.uploading") : t("editor.files.uploadModalConfirm")}
+            </button>
           </div>
         </div>
       </div>
-      <Show when={props.isOpen}>
-        <div
-          class="fixed inset-0 z-40 bg-black/20"
-          onClick={props.onClose}
-        />
-      </Show>
-    </>
-  );
-}
-</file>
-
-<file path="src/components/editor/EditorSidebar.jsx">
-// src/components/editor/EditorSidebar.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import LangSelector from "../ui/LangSelector.jsx";
-
-export default function EditorSidebar(props) {
-  const { t, domainAssetsConfig } = useApp();
-
-  const domainLangCodes = () => {
-    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
-    return fromDomain.length > 0 ? fromDomain : ["en"];
-  };
-
-  return (
-    <aside class="sticky top-16 space-y-4">
-      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
-        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.thumbnail")}</h3>
-        <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center">
-          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>
-        </div>
-      </div>
-
-      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
-        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.language")}</h3>
-        <LangSelector
-          codes={domainLangCodes()}
-          value={props.lang}
-          onChange={props.onLangChange}
-          variant="stretch"
-        />
-      </div>
-
-      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
-        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.files")}</h3>
-        <div class="h-48 rounded bg-[hsl(var(--muted))] flex items-center justify-center">
-          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.filesPlaceholder")}</span>
-        </div>
-      </div>
-    </aside>
-  );
-}
-</file>
-
-<file path="src/components/editor/EditorToolbar.jsx">
-// src/components/editor/EditorToolbar.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { applyMarkdownFormat } from "./text-utils.js";
-import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
-
-export default function EditorToolbar(props) {
-  const { t } = useApp();
-
-  const handleFormat = (format) => {
-    const textarea = props.getTextareaRef?.();
-    applyMarkdownFormat(textarea, format, props.onValueChange);
-  };
-
-  return (
-    <div class="flex items-center justify-between h-10 px-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-      <div class="flex items-center">
-        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
-          <BoldIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
-          <ItalicIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
-          <LinkIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
-          <ImageIcon />
-        </ToolbarButton>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          onClick={props.onToggleFiles}
-          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
-        >
-          {t("editor.toolbar.files")}
-        </button>
-        <button
-          onClick={props.onTogglePreview}
-          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
-        >
-          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
-        </button>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/MarkdownInput.jsx">
-// src/components/editor/MarkdownInput.jsx
-import { Show } from "solid-js";
-import MarkdownView from "../docs/MarkdownView.jsx";
-
-export default function MarkdownInput(props) {
-  return (
-    <div class={`grid gap-4 h-[60vh] min-h-[400px] ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-      <textarea
-        ref={props.editorRef}
-        value={props.value}
-        onInput={(e) => props.onInput(e.currentTarget.value)}
-        class="w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-        placeholder={props.placeholder}
-      />
-      <Show when={props.showPreview}>
-        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-          <MarkdownView markdown={props.value} />
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/text-utils.js">
-// src/components/editor/text-utils.js
-
-/**
- * Applies markdown formatting to the selected text in a textarea.
- * @param {HTMLTextAreaElement} textarea - The textarea element.
- * @param {'bold' | 'italic' | 'link' | 'image'} format - The markdown format to apply.
- * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
- */
-export function applyMarkdownFormat(textarea, format, onUpdate) {
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const selectedText = textarea.value.substring(start, end);
-  const fullText = textarea.value;
-
-  let replacement;
-  let prefix, suffix, placeholder;
-
-  // Special handling for 'image' format
-  if (format === 'image') {
-    replacement = `![alt text](${selectedText || 'image_url'})`;
-  } else {
-    // Standard handling for other formats
-    switch (format) {
-      case 'bold':
-        prefix = '**';
-        suffix = '**';
-        placeholder = 'bold text';
-        break;
-      case 'italic':
-        prefix = '*';
-        suffix = '*';
-        placeholder = 'italic text';
-        break;
-      case 'link':
-        prefix = '[';
-        suffix = '](url)';
-        placeholder = 'link text';
-        break;
-      default:
-        return;
-    }
-    const textToWrap = selectedText || placeholder;
-    replacement = prefix + textToWrap + suffix;
-  }
-  
-  textarea.focus();
-  textarea.setSelectionRange(start, end);
-
-  // Use document.execCommand to insert the text. This is treated as a user
-  // action by the browser and is added to the undo/redo stack.
-  const success = document.execCommand('insertText', false, replacement);
-
-  // If execCommand fails for any reason, fall back to the direct update method.
-  if (!success) {
-    const newText = fullText.substring(0, start) + replacement + fullText.substring(end);
-    onUpdate(newText);
-  }
-
-  // After the state updates, re-focus and set the cursor position.
-  requestAnimationFrame(() => {
-    textarea.focus();
-    
-    if (format === 'image') {
-      if (selectedText) {
-        // If text was selected for the URL, select the placeholder alt text for editing.
-        const altTextStart = start + '!['.length;
-        const altTextEnd = altTextStart + 'alt text'.length;
-        textarea.setSelectionRange(altTextStart, altTextEnd);
-      } else {
-        // If no text was selected, select the placeholder URL.
-        const urlStart = start + '![alt text]('.length;
-        const urlEnd = urlStart + 'image_url'.length;
-        textarea.setSelectionRange(urlStart, urlEnd);
-      }
-    } else {
-      // Standard selection logic for other formats
-      if (selectedText) {
-        textarea.setSelectionRange(start, start + replacement.length);
-      } else {
-        const cursorPosStart = start + prefix.length;
-        const cursorPosEnd = cursorPosStart + placeholder.length;
-        textarea.setSelectionRange(cursorPosStart, cursorPosEnd);
-      }
-    }
-  });
-}
-</file>
-
-<file path="src/components/editor/ToolbarIcons.jsx">
-// src/components/editor/ToolbarIcons.jsx
-
-// A generic wrapper for toolbar buttons
-export function ToolbarButton(props) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      title={props.title}
-      class="p-2 rounded-md hover:bg-[hsl(var(--accent))]"
-      aria-label={props.title}
-    >
-      {props.children}
-    </button>
-  );
-}
-
-// --- SVG Icons ---
-
-export function BoldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-      <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-    </svg>
-  );
-}
-
-export function ItalicIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="19" y1="4" x2="10" y2="4"></line>
-      <line x1="14" y1="20" x2="5" y2="20"></line>
-      <line x1="15" y1="4" x2="9" y2="20"></line>
-    </svg>
-  );
-}
-
-export function LinkIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
-    </svg>
-  );
-}
-
-export function ImageIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-      <polyline points="21 15 16 10 5 21"></polyline>
-    </svg>
+    </Show>
   );
 }
 </file>
@@ -17494,6 +17370,670 @@ export function rehypeMediaPlayers() {
 }
 </file>
 
+<file path="src/components/docs/rehype-rewrite-links.js">
+// src/components/docs/rehype-rewrite-links.js
+import { visit } from "unist-util-visit";
+
+/**
+ * A rehype plugin that rewrites relative image and link URLs to be absolute,
+ * based on a provided base URL.
+ * @param {object} options - The options object.
+ * @param {string} options.base - The base URL to prepend to relative paths.
+ */
+export function rehypeRewriteLinks(options = {}) {
+  return (tree) => {
+    if (!options.base) {
+      return;
+    }
+    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+    
+    visit(tree, "element", (node) => {
+      if (node.tagName === 'a' || node.tagName === 'img') {
+        const prop = node.tagName === 'a' ? 'href' : 'src';
+        const url = node.properties?.[prop];
+        if (typeof url === 'string' && isRelative(url)) {
+          node.properties[prop] = base + url;
+        }
+      }
+    });
+  };
+}
+</file>
+
+<file path="src/components/editor/ChapterManager.jsx">
+// src/components/editor/ChapterManager.jsx
+import { For, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+function PlusIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  );
+}
+
+export default function ChapterManager(props) {
+  const { t } = useApp();
+
+  const handleAddChapter = () => {
+    const newChapter = { title: t("editor.chapters.newChapterTitle"), body: "" };
+    props.onUpdate([...(props.chapters || []), newChapter]);
+  };
+
+  const handleRemoveChapter = (index) => {
+    const updatedChapters = (props.chapters || []).filter((_, i) => i !== index);
+    props.onUpdate(updatedChapters);
+    // If the active chapter was deleted, switch to prologue
+    if (props.activeIndex === index) {
+      props.onSelectIndex(-1);
+    }
+  };
+
+  const handleTitleChange = (index, newTitle) => {
+    const updatedChapters = (props.chapters || []).map((chapter, i) => 
+      i === index ? { ...chapter, title: newTitle } : chapter
+    );
+    props.onUpdate(updatedChapters);
+  };
+
+  const activeClass = (index) => props.activeIndex === index ? "bg-[hsl(var(--accent))]" : "hover:bg-[hsl(var(--accent))]";
+
+  return (
+    <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-3">
+      <h3 class="text-lg font-semibold">{t("editor.chapters.title")}</h3>
+      <div class="space-y-2">
+        {/* Prologue Item */}
+        <div class={`flex items-center gap-2 p-1 rounded ${activeClass(-1)}`}>
+          <button class="flex-1 text-left text-sm font-semibold" onClick={() => props.onSelectIndex(-1)}>
+            {t("post.chapters.prologue")}
+          </button>
+        </div>
+
+        {/* Chapter Items */}
+        <For each={props.chapters}>
+          {(chapter, index) => (
+            <div class={`flex items-center gap-2 p-1 rounded ${activeClass(index())}`}>
+              <button class="text-left text-sm font-semibold" onClick={() => props.onSelectIndex(index())}>
+                {index() + 1}.
+              </button>
+              <input
+                type="text"
+                value={chapter.title}
+                onInput={(e) => handleTitleChange(index(), e.currentTarget.value)}
+                class="flex-1 px-2 py-1 text-sm rounded border bg-[hsl(var(--background))] border-[hsl(var(--input))]"
+              />
+              <button
+                onClick={() => handleRemoveChapter(index())}
+                class="p-1 text-xs text-[hsl(var(--destructive))]"
+              >
+                {t("common.remove")}
+              </button>
+            </div>
+          )}
+        </For>
+      </div>
+      <button
+        onClick={handleAddChapter}
+        class="text-sm px-3 py-1 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] flex items-center gap-1"
+      >
+        <PlusIcon class="w-4 h-4" />
+        {t("editor.chapters.add")}
+      </button>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorChapterSelector.jsx">
+// src/components/editor/EditorChapterSelector.jsx
+import { createSignal, onMount, onCleanup, Show, For, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+function ChevronDownIcon(props) {
+  return (
+    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
+      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
+    </svg>
+  );
+}
+
+function PlusIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  );
+}
+
+function MinusIcon(props) {
+    return (
+      <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    );
+}
+
+export default function EditorChapterSelector(props) {
+  const { t } = useApp();
+  const [isOpen, setIsOpen] = createSignal(false);
+  let containerRef;
+
+  const chapters = () => props.chapters || [];
+  const activeIndex = () => props.activeIndex;
+
+  const activeItem = createMemo(() => {
+    const index = activeIndex();
+    if (index === -1) return { title: t("post.chapters.prologue") };
+    return chapters()[index] || null;
+  });
+
+  const displayedTitle = createMemo(() => {
+    const item = activeItem();
+    if (!item) return "";
+    const index = activeIndex();
+    return index > -1 ? `${index + 1}. ${item.title}` : item.title;
+  });
+
+  const handleClickOutside = (event) => {
+    if (containerRef && !containerRef.contains(event.target)) {
+      setIsOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  return (
+    <div class="space-y-2">
+        <div class="flex items-center gap-2">
+            <div class="relative w-full" ref={containerRef}>
+                <button
+                    class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--accent))]"
+                    onClick={() => setIsOpen(!isOpen())}
+                    aria-haspopup="true"
+                    aria-expanded={isOpen()}
+                >
+                    <span class="font-semibold truncate">{displayedTitle()}</span>
+                    <ChevronDownIcon />
+                </button>
+
+                <Show when={isOpen()}>
+                    <div class="absolute top-full left-0 mt-1 w-full max-h-60 overflow-y-auto rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-20">
+                    <ul class="py-1" role="menu">
+                        <li>
+                            <a href="#" class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]" onClick={(e) => { e.preventDefault(); props.onSelectIndex(-1); setIsOpen(false); }}>
+                                {t("post.chapters.prologue")}
+                            </a>
+                        </li>
+                        <For each={chapters()}>
+                        {(chapter, i) => (
+                            <li>
+                                <a href="#" class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]" onClick={(e) => { e.preventDefault(); props.onSelectIndex(i()); setIsOpen(false); }}>
+                                    {i() + 1}. {chapter.title}
+                                </a>
+                            </li>
+                        )}
+                        </For>
+                    </ul>
+                    </div>
+                </Show>
+            </div>
+            <button onClick={props.onAdd} title={t("editor.chapters.add")} class="p-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+                <PlusIcon />
+            </button>
+            <button onClick={props.onRemove} title={t("editor.chapters.remove")} disabled={activeIndex() === -1} class="p-2 rounded-md bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] disabled:opacity-50">
+                <MinusIcon />
+            </button>
+        </div>
+        <Show when={activeIndex() > -1}>
+            <input
+                type="text"
+                value={activeItem()?.title || ""}
+                onInput={(e) => props.onTitleChange(e.currentTarget.value)}
+                placeholder={t("editor.chapters.titlePlaceholder")}
+                class="w-full text-sm px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+            />
+        </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorFilesDrawer.jsx">
+// src/components/editor/EditorFilesDrawer.jsx
+import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
+import FileGridItem from "./FileGridItem.jsx";
+import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
+import { pushToast, pushErrorToast } from "../ui/toast.js";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import FileContextMenu from "./FileContextMenu.jsx";
+import { dbg } from "../../utils/debug.js";
+
+function CloseIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  );
+}
+
+export default function EditorFilesDrawer(props) {
+  const { t } = useApp();
+  const [files, setFiles] = createSignal([]);
+  const [showUrlModal, setShowUrlModal] = createSignal(false);
+  const [fileToDelete, setFileToDelete] = createSignal(null);
+  const [menuData, setMenuData] = createSignal(null);
+  let fileInputRef;
+  let drawerContentRef;
+
+  const refreshFiles = async () => {
+    const fileList = await listUploadedFiles();
+    setFiles(fileList);
+  };
+
+  createEffect(on(() => props.isOpen, (isOpen) => {
+    if (isOpen) refreshFiles();
+    else setMenuData(null);
+  }));
+
+  const handleFileSelect = async (e) => {
+    const selectedFiles = Array.from(e.currentTarget.files);
+    if (selectedFiles.length === 0) return;
+    for (const file of selectedFiles) await addUploadedFile(file);
+    await refreshFiles();
+    if (fileInputRef) fileInputRef.value = "";
+  };
+
+  const handleUrlUpload = async (url) => {
+    try {
+      const file = await addUploadedFileFromUrl(url);
+      pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: t("editor.files.uploadError") });
+      throw error;
+    }
+  };
+
+  const handleDelete = (fileName) => setFileToDelete(fileName);
+  
+  const confirmDelete = async () => {
+    try {
+      await deleteUploadedFile(fileToDelete());
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: "File deletion failed" });
+    }
+  };
+
+  const handleMenuOpen = ({ file, fileType, element }) => {
+    const drawerRect = drawerContentRef.getBoundingClientRect();
+    const itemRect = element.getBoundingClientRect();
+    
+    let x = itemRect.left - drawerRect.left;
+    let y = element.offsetTop;
+
+    // --- Prevent menu from opening off-screen ---
+    const menuWidth = 192; // w-48 is 12rem = 192px
+    const menuHeight = 150; // Approximate height of the context menu
+    const padding = 16; // p-4 inside the drawer
+
+    if (x + menuWidth > drawerRect.width - padding) {
+      x = drawerRect.width - menuWidth - padding;
+    }
+    if (y + menuHeight > drawerContentRef.scrollHeight) {
+      y = drawerContentRef.scrollHeight - menuHeight - 5;
+    }
+    
+    setMenuData({ file, fileType, x, y });
+  };
+
+  const menuItems = createMemo(() => {
+    const data = menuData();
+    if (!data) return [];
+    const { file, fileType } = data;
+    const items = [];
+    if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
+      items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
+    }
+    if (fileType === 'image') {
+      items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
+    }
+    items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });
+    items.push({ label: t("editor.files.menu.delete"), onClick: () => handleDelete(file.name) });
+    return items;
+  });
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col">
+          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
+            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
+            <button onClick={props.onClose} class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"><CloseIcon /></button>
+          </header>
+
+          <div class="p-4 border-b border-[hsl(var(--border))] space-y-2">
+            <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect} class="hidden" />
+            <button onClick={() => fileInputRef.click()} class="w-full text-sm px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+              {t("editor.files.uploadFromDisk")}
+            </button>
+            <button onClick={() => setShowUrlModal(true)} class="w-full text-sm px-3 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+              {t("editor.files.uploadFromUrl")}
+            </button>
+          </div>
+
+          <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
+            <Show when={files().length > 0} fallback={
+              <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
+                {t("editor.files.empty")}
+              </div>
+            }>
+              <div class="grid grid-cols-3 gap-2">
+                <For each={files()}>
+                  {(file) => <FileGridItem 
+                    file={file}
+                    onMenuOpen={handleMenuOpen}
+                  />}
+                </For>
+              </div>
+            </Show>
+            <Show when={menuData()}>
+              <FileContextMenu 
+                x={menuData().x} 
+                y={menuData().y} 
+                items={menuItems()} 
+                onClose={() => setMenuData(null)} 
+              />
+            </Show>
+          </div>
+        </div>
+      </div>
+      <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>
+      <UploadFromUrlModal isOpen={showUrlModal()} onClose={() => setShowUrlModal(false)} onUpload={handleUrlUpload} />
+      <ConfirmModal
+        isOpen={!!fileToDelete()}
+        onClose={() => setFileToDelete(null)}
+        onConfirm={confirmDelete}
+        title={t("editor.files.confirmDeleteTitle")}
+        message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
+      />
+    </>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorSidebar.jsx">
+// src/components/editor/EditorSidebar.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import LangSelector from "../ui/LangSelector.jsx";
+
+export default function EditorSidebar(props) {
+  const { t, domainAssetsConfig } = useApp();
+
+  const domainLangCodes = () => {
+    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
+  };
+
+  return (
+    <aside class="sticky top-16 space-y-4">
+      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
+        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.thumbnail")}</h3>
+        <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center">
+          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>
+        </div>
+      </div>
+
+      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
+        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.language")}</h3>
+        <LangSelector
+          codes={domainLangCodes()}
+          value={props.lang}
+          onChange={props.onLangChange}
+          variant="stretch"
+        />
+      </div>
+
+      <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-4">
+        <h3 class="text-sm font-semibold mb-2">{t("editor.sidebar.files")}</h3>
+        <div class="h-48 rounded bg-[hsl(var(--muted))] flex items-center justify-center">
+          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.filesPlaceholder")}</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorTocButton.jsx">
+// src/components/editor/EditorTocButton.jsx
+import { useApp } from "../../context/AppContext.jsx";
+
+function TocIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+export default function EditorTocButton(props) {
+  const { t } = useApp();
+  return (
+    <button
+      onClick={props.onClick}
+      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+      title={t("editor.chapters.add")}
+    >
+      <TocIcon class="w-5 h-5" />
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/editor/MarkdownInput.jsx">
+// src/components/editor/MarkdownInput.jsx
+import { Show } from "solid-js";
+import MarkdownView from "../docs/MarkdownView.jsx";
+
+export default function MarkdownInput(props) {
+  return (
+    <div class={`grid gap-4 h-[60vh] min-h-[400px] ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+      <textarea
+        ref={props.editorRef}
+        value={props.value}
+        onInput={(e) => props.onInput(e.currentTarget.value)}
+        class="w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+        placeholder={props.placeholder}
+      />
+      <Show when={props.showPreview}>
+        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+          <MarkdownView markdown={props.value} />
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/text-utils.js">
+// src/components/editor/text-utils.js
+
+/**
+ * Inserts a given string of text at the current cursor position in a textarea.
+ * @param {HTMLTextAreaElement} textarea - The textarea element.
+ * @param {string} text - The text to insert.
+ * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
+ */
+export function insertTextAtCursor(textarea, text, onUpdate) {
+  if (!textarea || !text) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const fullText = textarea.value;
+
+  const newText = fullText.substring(0, start) + text + fullText.substring(end);
+  onUpdate(newText);
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    const newCursorPos = start + text.length;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+  });
+}
+
+
+/**
+ * Applies markdown formatting to the selected text in a textarea.
+ * @param {HTMLTextAreaElement} textarea - The textarea element.
+ * @param {'bold' | 'italic' | 'link' | 'image'} format - The markdown format to apply.
+ * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
+ */
+export function applyMarkdownFormat(textarea, format, onUpdate) {
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  const fullText = textarea.value;
+
+  let replacement;
+  let prefix, suffix, placeholder;
+
+  // Special handling for 'image' format
+  if (format === 'image') {
+    replacement = `![alt text](${selectedText || 'image_url'})`;
+  } else {
+    // Standard handling for other formats
+    switch (format) {
+      case 'bold':
+        prefix = '**';
+        suffix = '**';
+        placeholder = 'bold text';
+        break;
+      case 'italic':
+        prefix = '*';
+        suffix = '*';
+        placeholder = 'italic text';
+        break;
+      case 'link':
+        prefix = '[';
+        suffix = '](url)';
+        placeholder = 'link text';
+        break;
+      default:
+        return;
+    }
+    const textToWrap = selectedText || placeholder;
+    replacement = prefix + textToWrap + suffix;
+  }
+  
+  textarea.focus();
+  textarea.setSelectionRange(start, end);
+
+  const success = document.execCommand('insertText', false, replacement);
+
+  if (!success) {
+    const newText = fullText.substring(0, start) + replacement + fullText.substring(end);
+    onUpdate(newText);
+  }
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    
+    if (format === 'image') {
+      if (selectedText) {
+        const altTextStart = start + '!['.length;
+        const altTextEnd = altTextStart + 'alt text'.length;
+        textarea.setSelectionRange(altTextStart, altTextEnd);
+      } else {
+        const urlStart = start + '![alt text]('.length;
+        const urlEnd = urlStart + 'image_url'.length;
+        textarea.setSelectionRange(urlStart, urlEnd);
+      }
+    } else {
+      if (selectedText) {
+        textarea.setSelectionRange(start, start + replacement.length);
+      } else {
+        const cursorPosStart = start + prefix.length;
+        const cursorPosEnd = cursorPosStart + placeholder.length;
+        textarea.setSelectionRange(cursorPosStart, cursorPosEnd);
+      }
+    }
+  });
+}
+</file>
+
+<file path="src/components/editor/ToolbarIcons.jsx">
+// src/components/editor/ToolbarIcons.jsx
+
+// A generic wrapper for toolbar buttons
+export function ToolbarButton(props) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      title={props.title}
+      class="p-2 rounded-md hover:bg-[hsl(var(--accent))]"
+      aria-label={props.title}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+// --- SVG Icons ---
+
+export function BoldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+      <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+    </svg>
+  );
+}
+
+export function ItalicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="19" y1="4" x2="10" y2="4"></line>
+      <line x1="14" y1="20" x2="5" y2="20"></line>
+      <line x1="15" y1="4" x2="9" y2="20"></line>
+    </svg>
+  );
+}
+
+export function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
+    </svg>
+  );
+}
+
+export function ImageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+      <polyline points="21 15 16 10 5 21"></polyline>
+    </svg>
+  );
+}
+</file>
+
 <file path="src/components/layout/Container.jsx">
 // src/components/layout/Container.jsx
 export default function Container(props) {
@@ -18247,6 +18787,45 @@ export default function ClosePageButton({ title, offsetTop = 56 }) {
 }
 </file>
 
+<file path="src/components/ui/ConfirmModal.jsx">
+// src/components/ui/ConfirmModal.jsx
+import { Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+
+export default function ConfirmModal(props) {
+  const { t } = useApp();
+
+  return (
+    <Show when={props.isOpen}>
+      <div class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-md p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-2">{props.title}</h3>
+          <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">{props.message}</p>
+          <div class="flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {props.cancelText || t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              onClick={() => {
+                props.onConfirm?.();
+                props.onClose?.();
+              }}
+            >
+              {props.confirmText || t("common.confirm")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/components/ui/ContextMenu.jsx">
 // src/components/ui/ContextMenu.jsx
 import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
@@ -18949,333 +19528,6 @@ export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
   }
   u.search = params.toString() ? `?${params.toString()}` : "";
   return u.toString();
-}
-</file>
-
-<file path="src/pages/EditorPage.jsx">
-// src/pages/PostPage.jsx
-import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
-import { useHashRouter, navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import { ipfs } from "../ipfs/index.js";
-import { parse } from "yaml";
-import { dbg } from "../utils/debug.js";
-import ClosePageButton from "../components/ui/ClosePageButton";
-import Spinner from "../components/ui/Spinner.jsx";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UserCard from "../components/ui/UserCard.jsx";
-import PostInfo from "../components/feed/PostInfo.jsx";
-import MarkdownView from "../components/docs/MarkdownView.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import ChapterSelector from "../components/post/ChapterSelector.jsx";
-import ChapterPager from "../components/post/ChapterPager.jsx";
-import PostTags from "../components/post/PostTags.jsx";
-import { getPostContentBaseCid, getPostDescriptorPath } from "../../ipfs/utils.js";
-import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
-
-const getIdentifier = (route) => route().split('/')[2] || "";
-
-async function fetchPostByIdentifier(params) {
-  const { identifier, domain, app, lang } = params;
-  if (!identifier || !domain || !app.wsMethod) return null;
-  const contentList = app.wsMethod("content-list");
-  const requestParams = {
-    domain: domain,
-    lang: lang,
-    limit: 1,
-  };
-  if (identifier.startsWith("0x")) {
-    requestParams.savva_cid = identifier;
-  } else {
-    requestParams.short_cid = identifier;
-  }
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-  const res = await contentList(requestParams);
-  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-  return arr[0] || null;
-}
-
-async function fetchPostDetails(mainPost, app) {
-  if (!mainPost) return null;
-  
-  const descriptorPath = getPostDescriptorPath(mainPost);
-  const dataCidForContent = getPostContentBaseCid(mainPost);
-
-  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
-
-  if (!descriptorPath) {
-    return { descriptor: null, dataCidForContent };
-  }
-
-  try {
-    const { res } = await ipfs.fetchBest(app, descriptorPath);
-    const text = await res.text();
-    const descriptor = parse(text) || null;
-    return { descriptor, dataCidForContent };
-  } catch (error) {
-    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
-    return { descriptor: { error: error.message }, dataCidForContent };
-  }
-}
-
-async function fetchMainContent(details, app, lang, chapterIndex) {
-  if (!details?.descriptor || !lang) return "";
-
-  const { descriptor, dataCidForContent } = details;
-  const localizedDescriptor = descriptor.locales?.[lang];
-  if (!localizedDescriptor) return "";
-
-  let contentPath;
-  if (chapterIndex === 0) { // Prologue (main content)
-    if (localizedDescriptor.data) return localizedDescriptor.data;
-    if (localizedDescriptor.data_path) {
-      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
-    }
-  } else { // A specific chapter
-    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
-    if (chapter?.data_path) {
-      contentPath = `${dataCidForContent}/${chapter.data_path}`;
-    }
-  }
-
-  if (contentPath) {
-    try {
-      const postGateways = details.descriptor?.gateways || [];
-      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
-      return await res.text();
-    } catch (error) {
-      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
-      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
-    }
-  }
-  
-  return "";
-}
-
-export default function PostPage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-  const identifier = createMemo(() => getIdentifier(route));
-  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-
-  const [post] = createResource(
-    () => ({
-      identifier: identifier(),
-      domain: app.selectedDomainName(),
-      app,
-      lang: uiLang()
-    }),
-    fetchPostByIdentifier
-  );
-  
-  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
-  const [postLang, setPostLang] = createSignal(null);
-  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
-
-  const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
-    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
-  );
-
-  createEffect(() => {
-    const p = post();
-    const id = identifier();
-    if (p && id.startsWith("0x") && p.short_cid) {
-      const newPath = `/post/${p.short_cid}`;
-      navigate(newPath, { replace: true });
-    }
-  });
-
-  createEffect(() => {
-    const p = post();
-    if (p && !postLang()) {
-      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
-      if (availableLangs.length === 0) return;
-      const currentUiLang = uiLang();
-      let initialLang = availableLangs[0]; 
-      if (availableLangs.includes(currentUiLang)) {
-        initialLang = currentUiLang;
-      } else if (availableLangs.includes('en')) {
-        initialLang = 'en';
-      }
-      setPostLang(initialLang);
-    }
-  });
-
-  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
-  const thumbnail = createMemo(() => {
-    const d = details();
-    if (!d) return null;
-    const dataCid = d.dataCidForContent;
-    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
-    if (dataCid && thumbnailPath) {
-      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
-    }
-    return null;
-  });
-  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
-  
-  const chapterList = createMemo(() => {
-    const prologue = { title: t("post.chapters.prologue"), data_path: null };
-    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
-    return [prologue, ...chapters];
-  });
-
-  const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
-  const localizedMainContent = createMemo(() => mainContent());
-  const ipfsBaseUrl = createMemo(() => {
-    const d = details();
-    if (!d) return "";
-    const dataCid = d.dataCidForContent;
-    if (!dataCid) return "";
-    
-    let bestGateway;
-    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-      bestGateway = app.localIpfsGateway();
-    } else if (Array.isArray(postSpecificGateways()) && postSpecificGateways().length > 0) {
-      bestGateway = postSpecificGateways()[0];
-    } else {
-      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
-    }
-    
-    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
-    return `${gatewayUrl}ipfs/${dataCid}`;
-  });
-
-  const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
-  ]);
-
-  const RightPanel = () => (
-    <aside class="sticky top-16">
-      <div 
-        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
-        style={{ "max-height": `calc(100vh - 5rem)` }}
-      >
-        <div class="p-4 space-y-3 overflow-y-auto h-full">
-          <h4 class="font-semibold">Right Panel</h4>
-          <p class="text-sm text-[hsl(var(--muted-foreground))]">
-            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
-          </p>
-          <div class="text-xs space-y-2">
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
-            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
-            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
-            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
-            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-
-  return (
-    <main class="sv-container p-4">
-      <ClosePageButton />
-      <Switch>
-        <Match when={post.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
-        </Match>
-        <Match when={post.error || details()?.descriptor?.error}>
-          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
-          </div>
-        </Match>
-        <Match when={!post.loading && post() === null}>
-          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
-            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
-            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
-          </div>
-        </Match>
-        <Match when={post()}>
-          <div class="max-w-5xl mx-auto">
-            <article class="space-y-4">
-              <header class="flex justify-between items-start gap-4">
-                <div class="flex-1 min-w-0 space-y-3">
-                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
-                  <UserCard author={post().author} />
-                  <PostInfo 
-                    item={post()} 
-                    hideTopBorder={true} 
-                    timeFormat="long"
-                    rewardsAlign="left" 
-                  />
-                  <PostTags postData={post()} />
-                </div>
-                <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
-                  <Show when={thumbnail()}>
-                    {(src) => (
-                      <IpfsImage 
-                        src={src()} 
-                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
-                        alt="Post thumbnail"
-                        postGateways={postSpecificGateways()}
-                        fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
-                      />
-                    )}
-                  </Show>
-                  <LangSelector 
-                    codes={availableLocales()}
-                    value={postLang()}
-                    onChange={setPostLang}
-                  />
-                </div>
-              </header>
-
-              <div class="pt-4 border-t border-[hsl(var(--border))]">
-                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
-                  <div>
-                    <Show when={(chapterList()?.length || 0) > 1}>
-                      <div class="flex justify-end mb-4">
-                        <ChapterSelector 
-                          chapters={chapterList()} 
-                          selectedIndex={selectedChapterIndex()} 
-                          onSelect={setSelectedChapterIndex}
-                        />
-                      </div>
-                    </Show>
-                    <Switch>
-                      <Match when={details.loading || mainContent.loading}>
-                        <div class="flex justify-center p-8"><Spinner /></div>
-                      </Match>
-                      <Match when={mainContent.error}>
-                        <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
-                      </Match>
-                      <Match when={localizedMainContent()}>
-                        <MarkdownView 
-                          markdown={localizedMainContent()} 
-                          rehypePlugins={markdownPlugins()}
-                        />
-                        <Show when={(chapterList()?.length || 0) > 1}>
-                          <ChapterPager 
-                            chapters={chapterList()}
-                            currentIndex={selectedChapterIndex()}
-                            onSelect={setSelectedChapterIndex}
-                          />
-                        </Show>
-                      </Match>
-                    </Switch>
-                  </div>
-                  <RightPanel />
-                </div>
-              </div>
-            </article>
-          </div>
-        </Match>
-      </Switch>
-    </main>
-  );
 }
 </file>
 
@@ -20452,6 +20704,76 @@ export default function DocsPager(props) {
 }
 </file>
 
+<file path="src/components/editor/EditorFilesButton.jsx">
+// src/components/editor/EditorFilesButton.jsx
+import { useApp } from "../../context/AppContext.jsx";
+
+function FilesIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={props.class || "w-5 h-5"}>
+      <path d="M9 6H9.33687C9.58146 6 9.70385 6 9.81893 6.02763C9.92097 6.05213 10.0189 6.09263 10.1084 6.14746C10.2093 6.20928 10.2959 6.29591 10.4688 6.46875L13.5315 9.53149C13.7044 9.70444 13.7904 9.79044 13.8523 9.89135C13.9071 9.98082 13.9482 10.0786 13.9727 10.1807C14 10.2946 14 10.4155 14 10.6552V18M9 6H4.59961C4.03956 6 3.75981 6 3.5459 6.10899C3.35774 6.20487 3.20487 6.35774 3.10899 6.5459C3 6.75981 3 7.04004 3 7.6001V19.4001C3 19.9601 3 20.2398 3.10899 20.4537C3.20487 20.6419 3.35774 20.7952 3.5459 20.8911C3.7596 21 4.03902 21 4.598 21L12.4011 21C12.96 21 13.2405 21 13.4542 20.8911C13.6423 20.7952 13.7948 20.6421 13.8906 20.4539C13.9996 20.24 14 19.9599 14 19.3999V18M9 6V9.4C9 9.96005 9 10.2399 9.10899 10.4538C9.20487 10.642 9.35774 10.7952 9.5459 10.8911C9.7596 11 10.039 11 10.598 11H13.9996M10 6.0001V4.6001C10 4.04005 10 3.75981 10.109 3.5459C10.2049 3.35774 10.3577 3.20487 10.5459 3.10899C10.7598 3 11.0396 3 11.5996 3H16M16 3H16.3369C16.5815 3 16.7038 3 16.8189 3.02763C16.921 3.05213 17.0189 3.09263 17.1084 3.14746C17.2093 3.20928 17.2959 3.29592 17.4688 3.46875L20.5315 6.53149C20.7044 6.70444 20.7904 6.79044 20.8523 6.89135C20.9071 6.98082 20.9482 7.07863 20.9727 7.18066C21 7.29458 21 7.41552 21 7.65515V16.3999C21 16.9599 20.9996 17.24 20.8906 17.4539C20.7948 17.6421 20.6429 17.7952 20.4548 17.8911C20.2411 18 19.961 18 19.402 18H14M16 3V6.4C16 6.96005 16 7.23988 16.109 7.4538C16.2049 7.64196 16.3577 7.79524 16.5459 7.89111C16.7596 8 17.039 8 17.598 8H20.9996" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  );
+}
+
+export default function EditorFilesButton(props) {
+  const { t } = useApp();
+  return (
+    <button
+      onClick={props.onClick}
+      class="flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-l-full text-[hsl(var(--card))] font-semibold text-sm shadow-lg cursor-pointer"
+      style={{ background: "var(--gradient)" }}
+    >
+      <FilesIcon class="w-5 h-5" />
+      <span>{t("editor.toolbar.files")}</span>
+    </button>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorToolbar.jsx">
+// src/components/editor/EditorToolbar.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { applyMarkdownFormat } from "./text-utils.js";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
+
+export default function EditorToolbar(props) {
+  const { t } = useApp();
+
+  const handleFormat = (format) => {
+    const textarea = props.getTextareaRef?.();
+    applyMarkdownFormat(textarea, format, props.onValueChange);
+  };
+
+  return (
+    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <div class="flex items-center">
+        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
+          <BoldIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
+          <ItalicIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
+          <LinkIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
+          <ImageIcon />
+        </ToolbarButton>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          onClick={props.onTogglePreview}
+          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
+        >
+          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/layout/RightRail.jsx">
 // src/components/layout/RightRail.jsx
 import { For, Switch, Match } from "solid-js";
@@ -21428,6 +21750,218 @@ export default function AssetDebugTap() {
 
     // Nothing to render
     return null;
+}
+</file>
+
+<file path="src/editor/storage.js">
+// src/editor/storage.js
+import { dbg } from "../utils/debug";
+import { parse, stringify } from "yaml";
+
+const NEW_POST_DIR = "new_post";
+const UPLOAD_DIR = "uploads";
+
+async function getDirectoryHandle(path) {
+  try {
+    if (!navigator.storage || !navigator.storage.getDirectory) {
+      dbg.warn("storage", "Origin Private File System API not available.");
+      return null;
+    }
+    const root = await navigator.storage.getDirectory();
+    let currentHandle = root;
+    for (const part of path.split('/').filter(Boolean)) {
+      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+    }
+    return currentHandle;
+  } catch (e) {
+    dbg.error("storage", `Failed to get directory handle for '${path}'`, e);
+    throw e;
+  }
+}
+
+async function readFile(dirHandle, path) {
+  if (!dirHandle) return null;
+  try {
+    const pathParts = path.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return await file.text();
+  } catch (e) {
+    if (e.name === 'NotFoundError') return null;
+    dbg.error("storage", `Failed to read file: ${path}`, e);
+    throw e;
+  }
+}
+
+async function writeFile(dirHandle, path, content) {
+  if (!dirHandle) return;
+  try {
+    const pathParts = path.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i], { create: true });
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+  } catch (e) {
+    dbg.error("storage", `Failed to write file: ${path}`, e);
+    throw e;
+  }
+}
+
+export async function listUploadedFiles() {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  if (!uploadsDirHandle) return [];
+  
+  const files = [];
+  for await (const entry of uploadsDirHandle.values()) {
+    if (entry.kind === 'file') {
+      const file = await entry.getFile();
+      const url = URL.createObjectURL(file);
+      files.push({ name: entry.name, url });
+    }
+  }
+  return files;
+}
+
+export async function addUploadedFile(file) {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  await writeFile(uploadsDirHandle, file.name, file);
+}
+
+export async function addUploadedFileFromUrl(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const fileName = url.substring(url.lastIndexOf('/') + 1) || "downloaded_file";
+    const file = new File([blob], fileName, { type: blob.type });
+    await addUploadedFile(file);
+    return file;
+  } catch (error) {
+    dbg.error("storage", "Failed to upload from URL", { url, error });
+    throw error;
+  }
+}
+
+export async function deleteUploadedFile(fileName) {
+  try {
+    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+    if (!uploadsDirHandle) return;
+    await uploadsDirHandle.removeEntry(fileName);
+    dbg.log("storage", `Deleted file: ${fileName}`);
+  } catch (error) {
+    dbg.error("storage", `Failed to delete file: ${fileName}`, error);
+    throw error;
+  }
+}
+
+/**
+ * Creates a temporary blob URL for a file in the draft, for previews.
+ * @param {string} relativePath - e.g., "uploads/image.png"
+ * @returns {Promise<string|null>} A blob URL or null if not found.
+ */
+export async function resolveDraftFileUrl(relativePath) {
+  try {
+    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+    const pathParts = relativePath.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return URL.createObjectURL(file);
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath}`, e);
+    }
+    return null;
+  }
+}
+
+export async function loadNewPostDraft() {
+  dbg.log("storage", "Loading new post draft...");
+  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+  const descriptorYaml = await readFile(dirHandle, "info.yaml");
+  
+  if (!descriptorYaml) {
+    dbg.log("storage", "No draft found.");
+    return null;
+  }
+
+  const descriptor = parse(descriptorYaml);
+  const postData = {};
+
+  for (const lang in descriptor.locales) {
+    const localeData = descriptor.locales[lang];
+    postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
+    if (localeData.data_path) {
+      postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
+    }
+    if (Array.isArray(localeData.chapters)) {
+      for (const chapter of localeData.chapters) {
+        if (chapter.data_path) {
+          const chapterBody = await readFile(dirHandle, chapter.data_path) || "";
+          postData[lang].chapters.push({ title: chapter.title, body: chapterBody });
+        }
+      }
+    }
+  }
+  
+  dbg.log("storage", "Draft loaded successfully.", postData);
+  return postData;
+}
+
+export async function saveNewPostDraft(postData) {
+  dbg.log("storage", "Saving new post draft...", postData);
+  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+  
+  const descriptor = {
+    savva_spec_version: "2.0",
+    mime_type: "text/markdown",
+    locales: {}
+  };
+
+  for (const lang in postData) {
+    const data = postData[lang];
+    const dataPath = `${lang}/data.md`;
+    
+    descriptor.locales[lang] = {
+      title: data.title || "",
+      text_preview: (data.body || "").substring(0, 200),
+      data_path: dataPath,
+      chapters: []
+    };
+    
+    await writeFile(dirHandle, dataPath, data.body || "");
+
+    if (Array.isArray(data.chapters)) {
+      for (let i = 0; i < data.chapters.length; i++) {
+        const chapter = data.chapters[i];
+        const chapterPath = `${lang}/chapters/${i + 1}.md`;
+        descriptor.locales[lang].chapters.push({
+          title: chapter.title,
+          data_path: chapterPath,
+        });
+        await writeFile(dirHandle, chapterPath, chapter.body || "");
+      }
+    }
+  }
+
+  await writeFile(dirHandle, "info.yaml", stringify(descriptor));
+  dbg.log("storage", "Draft saved successfully.");
 }
 </file>
 
@@ -24614,6 +25148,292 @@ export default function Docs() {
 }
 </file>
 
+<file path="src/pages/EditorPage.jsx">
+// src/pages/EditorPage.jsx
+import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import { useHashRouter } from "../routing/hashRouter.js";
+import MarkdownInput from "../components/editor/MarkdownInput.jsx";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import EditorToolbar from "../components/editor/EditorToolbar.jsx";
+import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
+import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
+import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
+import { loadNewPostDraft, saveNewPostDraft } from "../editor/storage.js";
+import { dbg } from "../utils/debug.js";
+import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
+import EditorTocButton from "../components/editor/EditorTocButton.jsx";
+import ConfirmModal from "../components/ui/ConfirmModal.jsx";
+import { insertTextAtCursor } from "../components/editor/text-utils.js";
+
+export default function EditorPage() {
+  const { t, domainAssetsConfig } = useApp();
+  const { route } = useHashRouter();
+  let textareaRef;
+
+  const [postData, setPostData] = createSignal(null);
+  const [activeLang, setActiveLang] = createSignal("en");
+  const [showPreview, setShowPreview] = createSignal(false);
+  const [showFiles, setShowFiles] = createSignal(false);
+  const [showChapters, setShowChapters] = createSignal(false);
+  const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
+  const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
+
+  const editorMode = createMemo(() => {
+    const path = route();
+    if (path.startsWith("/editor/new")) return "new_post";
+    if (path.startsWith("/editor/edit/")) return "edit_post";
+    if (path.startsWith("/editor/comment/")) return "comment";
+    return "unknown";
+  });
+
+  onMount(async () => {
+    try {
+      if (editorMode() === "new_post") {
+        const draft = await loadNewPostDraft();
+        const initialData = draft || { en: { title: "", body: "", chapters: [] } };
+        setPostData(initialData);
+        if ((initialData[activeLang()]?.chapters || []).length > 0) {
+          setShowChapters(true);
+        }
+      } else {
+        setPostData({ en: { title: "", body: "", chapters: [] } });
+      }
+    } catch (error) {
+      dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
+      setPostData({ en: { title: "", body: "", chapters: [] } });
+    }
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowFiles(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
+  });
+
+  createEffect(on(postData, (data) => {
+    if (data === null || editorMode() !== "new_post") return;
+    let timeoutId;
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      saveNewPostDraft(data);
+    }, 500);
+  }, { defer: true }));
+
+  createEffect(on(activeLang, (lang) => {
+    if (!postData()) return;
+    const chapters = postData()[lang]?.chapters || [];
+    setShowChapters(chapters.length > 0);
+    setEditingChapterIndex(-1);
+  }));
+
+  const domainLangCodes = () => {
+    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
+  };
+
+  const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
+
+  const updateField = (field, value) => {
+    setPostData(prev => ({
+      ...prev,
+      [activeLang()]: {
+        ...(prev?.[activeLang()] || { chapters: [] }),
+        [field]: value
+      }
+    }));
+  };
+
+  const updateChapterTitle = (index, newTitle) => {
+    setPostData(prev => {
+      const lang = activeLang();
+      const chapters = [...(prev[lang]?.chapters || [])];
+      chapters[index] = { ...chapters[index], title: newTitle };
+      return { ...prev, [lang]: { ...prev[lang], chapters } };
+    });
+  };
+
+  const handleAddChapter = () => {
+    const newChapter = { title: "", body: "" };
+    const newChapters = [...(currentLangData().chapters || []), newChapter];
+    updateAllChapters(newChapters);
+    setEditingChapterIndex(newChapters.length - 1);
+  };
+
+  const handleRemoveChapter = () => {
+    if (editingChapterIndex() === -1) return;
+    setShowConfirmDelete(true);
+  };
+  
+  const confirmRemoveChapter = () => {
+    const indexToRemove = editingChapterIndex();
+    const newChapters = (currentLangData().chapters || []).filter((_, i) => i !== indexToRemove);
+    setEditingChapterIndex(indexToRemove - 1);
+    updateAllChapters(newChapters);
+    if (newChapters.length === 0) {
+      setShowChapters(false);
+    }
+  };
+
+  const updateAllChapters = (newChapters) => {
+    setPostData(prev => ({
+        ...prev,
+        [activeLang()]: {
+            ...prev[activeLang()],
+            chapters: newChapters
+        }
+    }));
+  };
+
+  const currentEditorContent = createMemo(() => {
+    const langData = currentLangData();
+    const index = editingChapterIndex();
+    if (index === -1) return langData.body;
+    return langData.chapters?.[index]?.body || "";
+  });
+  
+  const handleEditorInput = (value) => {
+    const index = editingChapterIndex();
+    if (index === -1) {
+      updateField('body', value);
+    } else {
+        const lang = activeLang();
+        const chapters = [...(postData()[lang]?.chapters || [])];
+        chapters[index] = { ...chapters[index], body: value };
+        updateAllChapters(chapters);
+    }
+  };
+
+  const handleInsertFile = (fileName, fileType) => {
+    const url = `uploads/${fileName}`;
+    let markdown;
+    if (fileType === 'image') {
+      markdown = `![${fileName}](${url})`;
+    } else {
+      markdown = `[${fileName}](${url})`;
+    }
+    insertTextAtCursor(textareaRef, markdown, handleEditorInput);
+  };
+
+  const handleSetThumbnail = (fileName) => {
+    console.log("Set thumbnail to:", fileName);
+  };
+
+  const handleInsertUrl = (fileName) => {
+    insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
+  };
+
+  const title = createMemo(() => {
+    switch (editorMode()) {
+      case "new_post": return t("editor.titleNewPost");
+      case "edit_post": return t("editor.titleEditPost");
+      case "comment": return t("editor.titleComment");
+      default: return t("editor.title");
+    }
+  });
+
+  const markdownPlugins = createMemo(() => {
+    dbg.log("EditorPage", "Creating markdown plugins for preview.");
+    return [rehypeResolveDraftUrls];
+  });
+
+  return (
+    <main class="p-4 max-w-7xl mx-auto space-y-4">
+      <ClosePageButton />
+
+      <header class="flex justify-between items-start gap-4">
+        <div class="flex-1 min-w-0">
+          <h2 class="text-2xl font-semibold">{title()}</h2>
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">
+            Mode: <strong>{editorMode()}</strong>
+          </p>
+        </div>
+        <div class="w-48 flex-shrink-0 space-y-2">
+          <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center">
+            <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>
+          </div>
+          <LangSelector
+            codes={domainLangCodes()}
+            value={activeLang()}
+            onChange={setActiveLang}
+          />
+        </div>
+      </header>
+
+      <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
+        <div>
+          <div class="flex items-center gap-4 mb-4">
+            <input
+              type="text"
+              value={currentLangData().title}
+              onInput={(e) => updateField('title', e.currentTarget.value)}
+              placeholder={t("editor.titlePlaceholder")}
+              class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+            />
+            <div class="flex-shrink-0 flex items-center gap-2">
+              <Show when={!showChapters()}>
+                <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+              </Show>
+              <Show when={!showFiles()}>
+                <EditorFilesButton onClick={() => setShowFiles(true)} />
+              </Show>
+            </div>
+          </div>
+          
+          <Show when={showChapters()}>
+            <div class="mb-4">
+                <EditorChapterSelector
+                    chapters={currentLangData().chapters}
+                    activeIndex={editingChapterIndex()}
+                    onSelectIndex={setEditingChapterIndex}
+                    onAdd={handleAddChapter}
+                    onRemove={handleRemoveChapter}
+                    onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                />
+            </div>
+          </Show>
+          
+          <EditorToolbar
+            isPreview={showPreview()}
+            onTogglePreview={() => setShowPreview(!showPreview())}
+            getTextareaRef={() => textareaRef}
+            onValueChange={handleEditorInput}
+          />
+          <MarkdownInput
+            editorRef={(el) => (textareaRef = el)}
+            value={currentEditorContent()}
+            onInput={handleEditorInput}
+            placeholder={t("editor.bodyPlaceholder")}
+            showPreview={showPreview()}
+            rehypePlugins={markdownPlugins()}
+          />
+        </div>
+      </Show>
+
+      <EditorFilesDrawer 
+        isOpen={showFiles()}
+        onClose={() => setShowFiles(false)}
+        onInsert={handleInsertFile}
+        onSetThumbnail={handleSetThumbnail}
+        onInsertUrl={handleInsertUrl}
+      />
+      <ConfirmModal
+        isOpen={showConfirmDelete()}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={confirmRemoveChapter}
+        title={t("editor.chapters.confirmDeleteTitle")}
+        message={t("editor.chapters.confirmDeleteMessage")}
+      />
+    </main>
+  );
+}
+</file>
+
 <file path="index.html">
 <!doctype html>
 <html lang="en">
@@ -24917,7 +25737,6 @@ export default function MarkdownView(props) {
         import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
       ]);
 
-      // Allow specific tags and attributes for media players
       DOMPurify.default.addHook("uponSanitizeElement", (node, data) => {
         if (data.tagName === 'iframe' || data.tagName === 'video' || data.tagName === 'audio') {
             if(!node.hasAttribute('src')) node.remove();
@@ -24929,8 +25748,17 @@ export default function MarkdownView(props) {
         .use(remarkBreaks)
         .use(remarkFrontmatter, ["yaml", "toml"])
         .use(remarkGfm)
-        .use(remarkRehype, { allowDangerousHtml: true })
-        .use(rehypeMediaPlayers) // Our new media plugin
+        .use(remarkRehype, { allowDangerousHtml: true });
+
+      // This loop ensures any plugins passed from the parent (like our URL resolver) are used.
+      if (props.rehypePlugins) {
+        for (const plugin of props.rehypePlugins) {
+          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
+        }
+      }
+      
+      processor
+        .use(rehypeMediaPlayers)
         .use(rehypeSlug)
         .use(rehypeAutolinkHeadings, { behavior: "wrap" })
         .use(rehypePrettyCode, {
@@ -24946,8 +25774,8 @@ export default function MarkdownView(props) {
       const safe = DOMPurify.default.sanitize(rawHtml, {
         ADD_TAGS: ["iframe", "video", "audio"],
         ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style", "src"],
-        // Allow specific youtube domain for iframes
-        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        // This regex is updated to allow 'blob:' URLs, which are used for the preview.
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
         FORBID_TAGS: [],
         FORBID_ATTR: []
       });
@@ -24985,7 +25813,6 @@ export default function MarkdownView(props) {
     const pre = btn.closest("pre");
     if (!pre) return;
     
-    // Select the code content, excluding the button itself
     const codeNode = pre.querySelector("code");
     if (codeNode) {
       copy(codeNode.innerText);
@@ -27866,11 +28693,24 @@ export default {
   "docs.section": "Section",
   "docs.sidebar.empty": "No docs yet. Add sidebar.yaml under dev_docs/<lang>/",
   "docs.title": "Developer Docs",
-  "editor.placeholder": "The post editor will be here.",
+  "editor.bodyPlaceholder": "Start writing your post content here...",
+  "editor.sidebar.files": "Files",
+  "editor.sidebar.filesPlaceholder": "File manager coming soon.",
+  "editor.sidebar.language": "Language",
+  "editor.sidebar.thumbnail": "Thumbnail",
+  "editor.sidebar.thumbnailPlaceholder": "Thumbnail preview",
   "editor.title": "Post Editor",
-  "editor.titleComment": "Comment",
+  "editor.titleComment": "Edit Comment",
   "editor.titleEditPost": "Edit Post",
   "editor.titleNewPost": "New Post",
+  "editor.titlePlaceholder": "Post Title",
+  "editor.toolbar.bold": "Bold",
+  "editor.toolbar.files": "Files",
+  "editor.toolbar.hidePreview": "Hide Preview",
+  "editor.toolbar.image": "Image",
+  "editor.toolbar.italic": "Italic",
+  "editor.toolbar.link": "Link",
+  "editor.toolbar.showPreview": "Show Preview",
   "error.connection.message": "The application could not connect to the backend server. It may be temporarily offline. Please try again later.",
   "error.connection.retry": "Refresh Page",
   "error.connection.title": "Connection Failed",
@@ -28002,24 +28842,22 @@ export default {
   "wallet.copyAddress": "Copy address",
   "wallet.error.addressMismatch": "Wallet address mismatch. Please switch to the authorized account to proceed.",
   "wallet.onRequiredNetwork": "On required network",
-   "editor.bodyPlaceholder": "Start writing your post content here...",
-  "editor.sidebar.files": "Files",
-  "editor.sidebar.filesPlaceholder": "File manager coming soon.",
-  "editor.sidebar.language": "Language",
-  "editor.sidebar.thumbnail": "Thumbnail",
-  "editor.sidebar.thumbnailPlaceholder": "Thumbnail preview",
-  "editor.titleComment": "Edit Comment",
-  "editor.titleEditPost": "Edit Post",
-  "editor.titleNewPost": "New Post",
-  "editor.titlePlaceholder": "Post Title",
-    "editor.toolbar.hidePreview": "Hide Preview",
-  "editor.toolbar.showPreview": "Show Preview",
-    "editor.toolbar.bold": "Bold",
-  "editor.toolbar.image": "Image",
-  "editor.toolbar.italic": "Italic",
-  "editor.toolbar.link": "Link",
-
-
+    "common.remove": "Remove",
+  "editor.chapters.add": "Add Chapter",
+  "editor.chapters.title": "Chapters",
+    "common.confirm": "Confirm",
+  "editor.chapters.confirmDeleteMessage": "Are you sure you want to delete this chapter? This action cannot be undone.",
+  "editor.chapters.confirmDeleteTitle": "Delete Chapter",
+  "editor.chapters.remove": "Delete Chapter",
+    "editor.files.empty": "No files uploaded yet. Use the buttons above to add files to your post.",
+  "editor.files.uploadFromDisk": "Upload from Disk",
+  "editor.files.uploadFromUrl": "Upload from URL",
+   "editor.files.confirmDeleteMessage": "Are you sure you want to delete the file '{name}'? This cannot be undone.",
+  "editor.files.confirmDeleteTitle": "Delete File",
+  "editor.files.menu.delete": "Delete",
+  "editor.files.menu.insert": "Insert",
+  "editor.files.menu.insertUrl": "Insert URL",
+  "editor.files.menu.setThumbnail": "Set as Thumbnail",
 };
 </file>
 

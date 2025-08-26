@@ -3,17 +3,22 @@ import { dbg } from "../utils/debug";
 import { parse, stringify } from "yaml";
 
 const NEW_POST_DIR = "new_post";
+const UPLOAD_DIR = "uploads";
 
-async function getDirectoryHandle(dirName) {
+async function getDirectoryHandle(path) {
   try {
     if (!navigator.storage || !navigator.storage.getDirectory) {
       dbg.warn("storage", "Origin Private File System API not available.");
       return null;
     }
     const root = await navigator.storage.getDirectory();
-    return await root.getDirectoryHandle(dirName, { create: true });
+    let currentHandle = root;
+    for (const part of path.split('/').filter(Boolean)) {
+      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+    }
+    return currentHandle;
   } catch (e) {
-    dbg.error("storage", `Failed to get directory handle for '${dirName}'`, e);
+    dbg.error("storage", `Failed to get directory handle for '${path}'`, e);
     throw e;
   }
 }
@@ -53,6 +58,80 @@ async function writeFile(dirHandle, path, content) {
   } catch (e) {
     dbg.error("storage", `Failed to write file: ${path}`, e);
     throw e;
+  }
+}
+
+export async function listUploadedFiles() {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  if (!uploadsDirHandle) return [];
+  
+  const files = [];
+  for await (const entry of uploadsDirHandle.values()) {
+    if (entry.kind === 'file') {
+      const file = await entry.getFile();
+      const url = URL.createObjectURL(file);
+      files.push({ name: entry.name, url });
+    }
+  }
+  return files;
+}
+
+export async function addUploadedFile(file) {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  await writeFile(uploadsDirHandle, file.name, file);
+}
+
+export async function addUploadedFileFromUrl(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const fileName = url.substring(url.lastIndexOf('/') + 1) || "downloaded_file";
+    const file = new File([blob], fileName, { type: blob.type });
+    await addUploadedFile(file);
+    return file;
+  } catch (error) {
+    dbg.error("storage", "Failed to upload from URL", { url, error });
+    throw error;
+  }
+}
+
+export async function deleteUploadedFile(fileName) {
+  try {
+    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+    if (!uploadsDirHandle) return;
+    await uploadsDirHandle.removeEntry(fileName);
+    dbg.log("storage", `Deleted file: ${fileName}`);
+  } catch (error) {
+    dbg.error("storage", `Failed to delete file: ${fileName}`, error);
+    throw error;
+  }
+}
+
+/**
+ * Creates a temporary blob URL for a file in the draft, for previews.
+ * @param {string} relativePath - e.g., "uploads/image.png"
+ * @returns {Promise<string|null>} A blob URL or null if not found.
+ */
+export async function resolveDraftFileUrl(relativePath) {
+  try {
+    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+    const pathParts = relativePath.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return URL.createObjectURL(file);
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath}`, e);
+    }
+    return null;
   }
 }
 

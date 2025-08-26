@@ -180,4 +180,13 @@ export default {
   "editor.chapters.confirmDeleteMessage": "Are you sure you want to delete this chapter? This action cannot be undone.",
   "editor.chapters.confirmDeleteTitle": "Delete Chapter",
   "editor.chapters.remove": "Delete Chapter",
+    "editor.files.empty": "No files uploaded yet. Use the buttons above to add files to your post.",
+  "editor.files.uploadFromDisk": "Upload from Disk",
+  "editor.files.uploadFromUrl": "Upload from URL",
+   "editor.files.confirmDeleteMessage": "Are you sure you want to delete the file '{name}'? This cannot be undone.",
+  "editor.files.confirmDeleteTitle": "Delete File",
+  "editor.files.menu.delete": "Delete",
+  "editor.files.menu.insert": "Insert",
+  "editor.files.menu.insertUrl": "Insert URL",
+  "editor.files.menu.setThumbnail": "Set as Thumbnail",
 };

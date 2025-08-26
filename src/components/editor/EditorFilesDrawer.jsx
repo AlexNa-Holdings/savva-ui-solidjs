@@ -1,6 +1,13 @@
 // src/components/editor/EditorFilesDrawer.jsx
-import { Show } from "solid-js";
+import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
+import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
+import FileGridItem from "./FileGridItem.jsx";
+import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
+import { pushToast, pushErrorToast } from "../ui/toast.js";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import FileContextMenu from "./FileContextMenu.jsx";
+import { dbg } from "../../utils/debug.js";
 
 function CloseIcon(props) {
   return (
@@ -13,6 +20,90 @@ function CloseIcon(props) {
 
 export default function EditorFilesDrawer(props) {
   const { t } = useApp();
+  const [files, setFiles] = createSignal([]);
+  const [showUrlModal, setShowUrlModal] = createSignal(false);
+  const [fileToDelete, setFileToDelete] = createSignal(null);
+  const [menuData, setMenuData] = createSignal(null);
+  let fileInputRef;
+  let drawerContentRef;
+
+  const refreshFiles = async () => {
+    const fileList = await listUploadedFiles();
+    setFiles(fileList);
+  };
+
+  createEffect(on(() => props.isOpen, (isOpen) => {
+    if (isOpen) refreshFiles();
+    else setMenuData(null);
+  }));
+
+  const handleFileSelect = async (e) => {
+    const selectedFiles = Array.from(e.currentTarget.files);
+    if (selectedFiles.length === 0) return;
+    for (const file of selectedFiles) await addUploadedFile(file);
+    await refreshFiles();
+    if (fileInputRef) fileInputRef.value = "";
+  };
+
+  const handleUrlUpload = async (url) => {
+    try {
+      const file = await addUploadedFileFromUrl(url);
+      pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: t("editor.files.uploadError") });
+      throw error;
+    }
+  };
+
+  const handleDelete = (fileName) => setFileToDelete(fileName);
+  
+  const confirmDelete = async () => {
+    try {
+      await deleteUploadedFile(fileToDelete());
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: "File deletion failed" });
+    }
+  };
+
+  const handleMenuOpen = ({ file, fileType, element }) => {
+    const drawerRect = drawerContentRef.getBoundingClientRect();
+    const itemRect = element.getBoundingClientRect();
+    
+    let x = itemRect.left - drawerRect.left;
+    let y = element.offsetTop;
+
+    // --- Prevent menu from opening off-screen ---
+    const menuWidth = 192; // w-48 is 12rem = 192px
+    const menuHeight = 150; // Approximate height of the context menu
+    const padding = 16; // p-4 inside the drawer
+
+    if (x + menuWidth > drawerRect.width - padding) {
+      x = drawerRect.width - menuWidth - padding;
+    }
+    if (y + menuHeight > drawerContentRef.scrollHeight) {
+      y = drawerContentRef.scrollHeight - menuHeight - 5;
+    }
+    
+    setMenuData({ file, fileType, x, y });
+  };
+
+  const menuItems = createMemo(() => {
+    const data = menuData();
+    if (!data) return [];
+    const { file, fileType } = data;
+    const items = [];
+    if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
+      items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
+    }
+    if (fileType === 'image') {
+      items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
+    }
+    items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });
+    items.push({ label: t("editor.files.menu.delete"), onClick: () => handleDelete(file.name) });
+    return items;
+  });
 
   return (
     <>
@@ -23,27 +114,54 @@ export default function EditorFilesDrawer(props) {
         <div class="h-full flex flex-col">
           <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
             <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
-            <button
-              onClick={props.onClose}
-              class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
-              aria-label={t("common.cancel")}
-            >
-              <CloseIcon />
-            </button>
+            <button onClick={props.onClose} class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"><CloseIcon /></button>
           </header>
-          <div class="flex-1 p-4 overflow-y-auto">
-            <div class="h-full flex items-center justify-center rounded-lg bg-[hsl(var(--muted))]">
-              <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.filesPlaceholder")}</span>
-            </div>
+
+          <div class="p-4 border-b border-[hsl(var(--border))] space-y-2">
+            <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect} class="hidden" />
+            <button onClick={() => fileInputRef.click()} class="w-full text-sm px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+              {t("editor.files.uploadFromDisk")}
+            </button>
+            <button onClick={() => setShowUrlModal(true)} class="w-full text-sm px-3 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+              {t("editor.files.uploadFromUrl")}
+            </button>
+          </div>
+
+          <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
+            <Show when={files().length > 0} fallback={
+              <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
+                {t("editor.files.empty")}
+              </div>
+            }>
+              <div class="grid grid-cols-3 gap-2">
+                <For each={files()}>
+                  {(file) => <FileGridItem 
+                    file={file}
+                    onMenuOpen={handleMenuOpen}
+                  />}
+                </For>
+              </div>
+            </Show>
+            <Show when={menuData()}>
+              <FileContextMenu 
+                x={menuData().x} 
+                y={menuData().y} 
+                items={menuItems()} 
+                onClose={() => setMenuData(null)} 
+              />
+            </Show>
           </div>
         </div>
       </div>
-      <Show when={props.isOpen}>
-        <div
-          class="fixed inset-0 z-40 bg-black/20"
-          onClick={props.onClose}
-        />
-      </Show>
+      <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>
+      <UploadFromUrlModal isOpen={showUrlModal()} onClose={() => setShowUrlModal(false)} onUpload={handleUrlUpload} />
+      <ConfirmModal
+        isOpen={!!fileToDelete()}
+        onClose={() => setFileToDelete(null)}
+        onConfirm={confirmDelete}
+        title={t("editor.files.confirmDeleteTitle")}
+        message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
+      />
     </>
   );
 }

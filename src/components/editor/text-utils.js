@@ -1,6 +1,30 @@
 // src/components/editor/text-utils.js
 
 /**
+ * Inserts a given string of text at the current cursor position in a textarea.
+ * @param {HTMLTextAreaElement} textarea - The textarea element.
+ * @param {string} text - The text to insert.
+ * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
+ */
+export function insertTextAtCursor(textarea, text, onUpdate) {
+  if (!textarea || !text) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const fullText = textarea.value;
+
+  const newText = fullText.substring(0, start) + text + fullText.substring(end);
+  onUpdate(newText);
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    const newCursorPos = start + text.length;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+  });
+}
+
+
+/**
  * Applies markdown formatting to the selected text in a textarea.
  * @param {HTMLTextAreaElement} textarea - The textarea element.
  * @param {'bold' | 'italic' | 'link' | 'image'} format - The markdown format to apply.
@@ -48,34 +72,27 @@ export function applyMarkdownFormat(textarea, format, onUpdate) {
   textarea.focus();
   textarea.setSelectionRange(start, end);
 
-  // Use document.execCommand to insert the text. This is treated as a user
-  // action by the browser and is added to the undo/redo stack.
   const success = document.execCommand('insertText', false, replacement);
 
-  // If execCommand fails for any reason, fall back to the direct update method.
   if (!success) {
     const newText = fullText.substring(0, start) + replacement + fullText.substring(end);
     onUpdate(newText);
   }
 
-  // After the state updates, re-focus and set the cursor position.
   requestAnimationFrame(() => {
     textarea.focus();
     
     if (format === 'image') {
       if (selectedText) {
-        // If text was selected for the URL, select the placeholder alt text for editing.
         const altTextStart = start + '!['.length;
         const altTextEnd = altTextStart + 'alt text'.length;
         textarea.setSelectionRange(altTextStart, altTextEnd);
       } else {
-        // If no text was selected, select the placeholder URL.
         const urlStart = start + '![alt text]('.length;
         const urlEnd = urlStart + 'image_url'.length;
         textarea.setSelectionRange(urlStart, urlEnd);
       }
     } else {
-      // Standard selection logic for other formats
       if (selectedText) {
         textarea.setSelectionRange(start, start + replacement.length);
       } else {
