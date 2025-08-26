@@ -172,5 +172,12 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
   "wallet.error.addressMismatch": "Wallet address mismatch. Please switch to the authorized account to proceed.",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+    "common.remove": "Remove",
+  "editor.chapters.add": "Add Chapter",
+  "editor.chapters.title": "Chapters",
+    "common.confirm": "Confirm",
+  "editor.chapters.confirmDeleteMessage": "Are you sure you want to delete this chapter? This action cannot be undone.",
+  "editor.chapters.confirmDeleteTitle": "Delete Chapter",
+  "editor.chapters.remove": "Delete Chapter",
 };

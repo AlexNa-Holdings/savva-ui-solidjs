@@ -3,13 +3,9 @@ import { dbg } from "../utils/debug";
 import { parse, stringify } from "yaml";
 
 const NEW_POST_DIR = "new_post";
-const TEMP_EDIT_DIR = "temp_edit";
-
-// --- Core OPFS Helpers ---
 
 async function getDirectoryHandle(dirName) {
   try {
-    // This API is only available in secure contexts (HTTPS or localhost)
     if (!navigator.storage || !navigator.storage.getDirectory) {
       dbg.warn("storage", "Origin Private File System API not available.");
       return null;
@@ -27,13 +23,9 @@ async function readFile(dirHandle, path) {
   try {
     const pathParts = path.split('/').filter(Boolean);
     let currentHandle = dirHandle;
-
-    // Traverse directories
     for (let i = 0; i < pathParts.length - 1; i++) {
       currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
     }
-
-    // Get file in the final directory
     const fileName = pathParts[pathParts.length - 1];
     const fileHandle = await currentHandle.getFileHandle(fileName);
     const file = await fileHandle.getFile();
@@ -50,11 +42,9 @@ async function writeFile(dirHandle, path, content) {
   try {
     const pathParts = path.split('/').filter(Boolean);
     let currentHandle = dirHandle;
-
     for (let i = 0; i < pathParts.length - 1; i++) {
       currentHandle = await currentHandle.getDirectoryHandle(pathParts[i], { create: true });
     }
-
     const fileName = pathParts[pathParts.length - 1];
     const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
     const writable = await fileHandle.createWritable();
@@ -66,20 +56,10 @@ async function writeFile(dirHandle, path, content) {
   }
 }
 
-// --- Post-Specific Logic ---
-
-/**
- * Loads a post draft from the 'new_post' directory in OPFS.
- */
 export async function loadNewPostDraft() {
   dbg.log("storage", "Loading new post draft...");
   const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
   const descriptorYaml = await readFile(dirHandle, "info.yaml");
-  
-  // --- ADDED FOR DEBUGGING ---
-  console.log("--- Draft info.yaml Content ---");
-  console.log(descriptorYaml);
-  // ---------------------------
   
   if (!descriptorYaml) {
     dbg.log("storage", "No draft found.");
@@ -91,10 +71,17 @@ export async function loadNewPostDraft() {
 
   for (const lang in descriptor.locales) {
     const localeData = descriptor.locales[lang];
-    postData[lang] = { title: localeData.title || "" };
+    postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
     if (localeData.data_path) {
-      const body = await readFile(dirHandle, localeData.data_path);
-      postData[lang].body = body || "";
+      postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
+    }
+    if (Array.isArray(localeData.chapters)) {
+      for (const chapter of localeData.chapters) {
+        if (chapter.data_path) {
+          const chapterBody = await readFile(dirHandle, chapter.data_path) || "";
+          postData[lang].chapters.push({ title: chapter.title, body: chapterBody });
+        }
+      }
     }
   }
   
@@ -102,9 +89,6 @@ export async function loadNewPostDraft() {
   return postData;
 }
 
-/**
- * Saves a post draft to the 'new_post' directory in OPFS.
- */
 export async function saveNewPostDraft(postData) {
   dbg.log("storage", "Saving new post draft...", postData);
   const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
@@ -122,10 +106,23 @@ export async function saveNewPostDraft(postData) {
     descriptor.locales[lang] = {
       title: data.title || "",
       text_preview: (data.body || "").substring(0, 200),
-      data_path: dataPath
+      data_path: dataPath,
+      chapters: []
     };
     
     await writeFile(dirHandle, dataPath, data.body || "");
+
+    if (Array.isArray(data.chapters)) {
+      for (let i = 0; i < data.chapters.length; i++) {
+        const chapter = data.chapters[i];
+        const chapterPath = `${lang}/chapters/${i + 1}.md`;
+        descriptor.locales[lang].chapters.push({
+          title: chapter.title,
+          data_path: chapterPath,
+        });
+        await writeFile(dirHandle, chapterPath, chapter.body || "");
+      }
+    }
   }
 
   await writeFile(dirHandle, "info.yaml", stringify(descriptor));

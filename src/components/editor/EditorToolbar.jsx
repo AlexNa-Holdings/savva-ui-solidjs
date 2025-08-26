@@ -12,7 +12,7 @@ export default function EditorToolbar(props) {
   };
 
   return (
-    <div class="flex items-center justify-between h-10 px-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
       <div class="flex items-center">
         <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
           <BoldIcon />
