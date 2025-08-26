@@ -18,6 +18,15 @@ import { insertTextAtCursor } from "../components/editor/text-utils.js";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 
+function TrashIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  );
+}
+
 export default function EditorPage() {
   const { t, domainAssetsConfig } = useApp();
   const { route } = useHashRouter();
@@ -241,6 +250,13 @@ export default function EditorPage() {
     setPostParams(prev => ({ ...prev, thumbnail: relativePath }));
   };
 
+  const handleDeleteThumbnail = () => {
+    setPostParams(prev => {
+      const { thumbnail, ...rest } = prev;
+      return rest;
+    });
+  };
+
   const handleInsertUrl = (fileName) => {
     insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
   };
@@ -303,11 +319,20 @@ export default function EditorPage() {
               </p>
             </div>
             <div class="w-48 flex-shrink-0 space-y-2">
-              <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+              <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
                 <Show when={thumbnailUrl()}
                   fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
                 >
                   <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button 
+                      onClick={handleDeleteThumbnail}
+                      title={t("editor.thumbnail.delete")}
+                      class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
+                    >
+                      <TrashIcon class="w-5 h-5" />
+                    </button>
+                  </div>
                 </Show>
               </div>
               <div class="flex justify-center">

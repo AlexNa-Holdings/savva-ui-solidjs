@@ -198,4 +198,6 @@ export default {
   "editor.fullPreview.help": "This is a preview of how your post will look once published. Review it carefully before proceeding.",
   "editor.fullPreview.back": "Back to Editing",
   "editor.fullPreview.continue": "Continue",
+   "editor.thumbnail.delete": "Delete thumbnail",
+  
 };
