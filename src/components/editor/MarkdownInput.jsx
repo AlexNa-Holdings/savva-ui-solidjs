@@ -14,7 +14,7 @@ export default function MarkdownInput(props) {
       />
       <Show when={props.showPreview}>
         <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-          <MarkdownView markdown={props.value} />
+          <MarkdownView markdown={props.value} rehypePlugins={props.rehypePlugins} />
         </div>
       </Show>
     </div>

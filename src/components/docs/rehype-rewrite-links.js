@@ -24,5 +24,7 @@ export function rehypeRewriteLinks(options = {}) {
         }
       }
     });
+
+    return tree;
   };
 }

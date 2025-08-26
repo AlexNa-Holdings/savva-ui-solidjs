@@ -8,10 +8,6 @@ import LangSelector from "../components/ui/LangSelector.jsx";
 import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
-import { rehypeMediaPlayers } from "../components/docs/rehype-media-players.js";
-import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import rehypePrettyCode from "rehype-pretty-code";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
 import { loadNewPostDraft, saveNewPostDraft } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
@@ -45,7 +41,6 @@ export default function EditorPage() {
   });
 
   onMount(async () => {
-    // MODIFICATION: Set up synchronous event listeners and cleanups first.
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
@@ -55,7 +50,6 @@ export default function EditorPage() {
     window.addEventListener('keydown', handleKeyDown);
     onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
 
-    // Now, proceed with asynchronous operations.
     try {
       if (editorMode() === "new_post") {
         const draft = await loadNewPostDraft();
@@ -195,16 +189,7 @@ export default function EditorPage() {
 
   const markdownPlugins = createMemo(() => {
     dbg.log("EditorPage", "Creating markdown plugins for preview.");
-    return [
-      rehypeMediaPlayers,
-      rehypeResolveDraftUrls,
-      rehypeSlug,
-      [rehypeAutolinkHeadings, { behavior: "wrap" }],
-      [rehypePrettyCode, {
-        keepBackground: true,
-        theme: { light: "github-light", dark: "github-dark" },
-      }],
-    ];
+    return [rehypeResolveDraftUrls];
   });
 
   return (

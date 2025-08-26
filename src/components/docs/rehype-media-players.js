@@ -63,5 +63,6 @@ export function rehypeMediaPlayers() {
         node.children = [];
       }
     });
+    return tree; // Added this line
   };
 }

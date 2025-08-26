@@ -2,6 +2,10 @@
 import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
+import { rehypeMediaPlayers } from "./rehype-media-players.js";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypePrettyCode from "rehype-pretty-code";
 
 function rehypeCopyButton() {
   return (tree) =>
@@ -27,68 +31,75 @@ export default function MarkdownView(props) {
 
   async function renderMd() {
     try {
+      // Correctly destructure the default export for DOMPurify
       const [
-        { unified }, { default: remarkParse }, { default: remarkGfm }, 
-        { default: remarkFrontmatter }, { default: remarkRehype },
-        { default: rehypeStringify }, DOMPurify, { default: remarkBreaks },
+        { unified }, { default: remarkParse }, { default: remarkGfm },
+        { default: remarkRehype }, { default: rehypeStringify }, { default: DOMPurify },
+        { visit }
       ] = await Promise.all([
         import("unified"), import("remark-parse"), import("remark-gfm"),
-        import("remark-frontmatter"), import("remark-rehype"),
-        import("rehype-stringify"), import("dompurify"), import("remark-breaks"),
+        import("remark-rehype"), import("rehype-stringify"), import("dompurify"),
+        import("unist-util-visit")
       ]);
 
-      DOMPurify.default.addHook("uponSanitizeElement", (node, data) => {
+      // Define the custom copy button plugin
+      const rehypeCopyButton = () => (tree) => {
+        visit(tree, "element", (node) => {
+          if (node.tagName !== "pre" || node.children.some(c => c.properties?.className?.includes("sv-copy-btn"))) return;
+          node.children.push({
+            type: "element", tagName: "button",
+            properties: { className: ["sv-copy-btn"], type: "button" },
+            children: [{ type: "text", value: "Copy" }],
+          });
+        });
+        return tree;
+      };
+
+      // Configure DOMPurify hooks (now using the correct object)
+      DOMPurify.addHook("uponSanitizeElement", (node, data) => {
         if (data.tagName === 'iframe' || data.tagName === 'video' || data.tagName === 'audio') {
-            if(!node.hasAttribute('src')) node.remove();
+          if (!node.hasAttribute('src')) node.remove();
         }
       });
 
+      // Build the processor pipeline
       const processor = unified()
         .use(remarkParse)
-        .use(remarkBreaks)
-        .use(remarkFrontmatter, ["yaml", "toml"])
         .use(remarkGfm)
         .use(remarkRehype, { allowDangerousHtml: true });
 
-      // MODIFICATION: Only use plugins passed via props.
       if (props.rehypePlugins) {
         for (const plugin of props.rehypePlugins) {
           processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
         }
       }
-      
+
       processor
+        .use(rehypeMediaPlayers)
+        .use(rehypeSlug)
         .use(rehypeCopyButton)
         .use(rehypeStringify, { allowDangerousHtml: true });
-      
+
       const file = await processor.process(String(props.markdown || ""));
       const rawHtml = String(file);
-      
-      const safe = DOMPurify.default.sanitize(rawHtml, {
+
+      // Sanitize the final HTML (now using the correct object)
+      const safe = DOMPurify.sanitize(rawHtml, {
         ADD_TAGS: ["iframe", "video", "audio"],
         ADD_ATTR: ["allowfullscreen", "frameborder", "controls", "style", "src"],
         ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp|cid|xmpp|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
-        FORBID_TAGS: [],
-        FORBID_ATTR: []
       });
 
       if (!disposed) setHtml(safe);
+
     } catch (err) {
       dbg.error("MarkdownView", "Markdown rendering failed:", err);
       const safeErr = String(err?.message || err).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      const safeMd = String(props.markdown || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      
-      const errorHtml = `
-        <div style="color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive)); padding: 1rem; border-radius: 0.5rem;">
-          <strong>Markdown Rendering Error:</strong>
-          <pre style="margin-top: 0.5rem; white-space: pre-wrap;">${safeErr}</pre>
-          <hr style="margin: 1rem 0;" />
-          <strong>Original Content:</strong>
-          <pre style="white-space: pre-wrap;">${safeMd}</pre>
-        </div>`;
+      const errorHtml = `<div style="color: red; border: 1px solid red; padding: 1rem;"><strong>Error:</strong><pre>${safeErr}</pre></div>`;
       if (!disposed) setHtml(errorHtml);
     }
   }
+
 
   function copy(text) {
     if (!text) return;
@@ -104,7 +115,7 @@ export default function MarkdownView(props) {
     if (!btn) return;
     const pre = btn.closest("pre");
     if (!pre) return;
-    
+
     const codeNode = pre.querySelector("code");
     if (codeNode) {
       copy(codeNode.innerText);
@@ -118,7 +129,7 @@ export default function MarkdownView(props) {
     const buttons = container.querySelectorAll(".sv-copy-btn");
     buttons.forEach(btn => { btn.textContent = t("clipboard.copy"); });
   }
-  
+
   onMount(() => {
     renderMd().then(() => relabelButtons());
     container?.addEventListener("click", onClick);

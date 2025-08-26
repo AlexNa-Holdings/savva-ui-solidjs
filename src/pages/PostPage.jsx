@@ -19,10 +19,6 @@ import ChapterPager from "../components/post/ChapterPager.jsx";
 import PostTags from "../components/post/PostTags.jsx";
 import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
-import { rehypeMediaPlayers } from "../components/docs/rehype-media-players.js";
-import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
-import rehypePrettyCode from "rehype-pretty-code";
 
 const getIdentifier = (route) => route().split('/')[2] || "";
 
@@ -198,14 +194,7 @@ export default function PostPage() {
   });
 
   const markdownPlugins = createMemo(() => [
-    rehypeMediaPlayers,
     [rehypeRewriteLinks, { base: ipfsBaseUrl() }],
-    rehypeSlug,
-    [rehypeAutolinkHeadings, { behavior: "wrap" }],
-    [rehypePrettyCode, {
-      keepBackground: true,
-      theme: { light: "github-light", dark: "github-dark" },
-    }],
   ]);
 
   const RightPanel = () => (
