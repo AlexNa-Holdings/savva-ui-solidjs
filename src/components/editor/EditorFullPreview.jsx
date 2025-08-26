@@ -22,6 +22,7 @@ export default function EditorFullPreview(props) {
 
   const chapterList = createMemo(() => {
     const prologue = { title: t("post.chapters.prologue") };
+    // Use the combined chapters prop from EditorPage, which already has titles
     return [prologue, ...(props.chapters || [])];
   });
 
@@ -29,9 +30,11 @@ export default function EditorFullPreview(props) {
     const data = props.postData?.[lang()];
     if (!data) return "";
     const index = selectedChapterIndex();
+    // Index 0 is the prologue (main body)
     if (index === 0) {
       return data.body || "";
     }
+    // Chapters in the data array are offset by 1 because of the prologue
     return data.chapters?.[index - 1]?.body || "";
   });
 
@@ -50,16 +53,16 @@ export default function EditorFullPreview(props) {
 
   return (
     <div class="max-w-5xl mx-auto space-y-4">
-      {/* Condensed Header */}
-      <div class="p-3 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
-        <button onClick={props.onBack} class="px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
+      {/* Header with your specified layout */}
+      <div class="p-3 pr-4 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
+        <button onClick={props.onBack} class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
           {t("editor.fullPreview.back")}
         </button>
         <div class="text-center text-[hsl(var(--card))]">
           <h2 class="font-bold">{t("editor.fullPreview.title")}</h2>
           <p class="text-xs opacity-90">{t("editor.fullPreview.help")}</p>
         </div>
-        <button class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90">
+        <button class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90">
           {t("editor.fullPreview.continue")}
         </button>
       </div>

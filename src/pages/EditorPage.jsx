@@ -1,5 +1,5 @@
 // src/pages/EditorPage.jsx
-import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup } from "solid-js";
+import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, batch } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
 import { useHashRouter } from "../routing/hashRouter.js";
@@ -126,33 +126,40 @@ export default function EditorPage() {
   const updateChapterTitle = (index, newTitle) => {
     setPostParams(prev => {
       const lang = activeLang();
-      const newLocales = { ...(prev.locales || {}) };
-      const newChapters = [...(newLocales[lang]?.chapters || [])];
-      newChapters[index] = { ...newChapters[index], title: newTitle };
-      newLocales[lang] = { ...newLocales[lang], chapters: newChapters };
-      return { ...prev, locales: newLocales };
+      const locales = { ...(prev.locales || {}) };
+      const langParams = locales[lang] || { chapters: [] };
+      const chapters = [...(langParams.chapters || [])];
+      if (index >= 0 && index < chapters.length) {
+        chapters[index] = { ...chapters[index], title: newTitle };
+      }
+      locales[lang] = { ...langParams, chapters };
+      return { ...prev, locales };
     });
   };
 
   const handleAddChapter = () => {
     const newChapterContent = { body: "" };
-    const newChapterParams = { title: "" };
-    
-    setPostData(prev => {
-      const lang = activeLang();
-      const chapters = [...(prev[lang]?.chapters || []), newChapterContent];
-      return { ...prev, [lang]: { ...prev[lang], chapters } };
-    });
+    const newChapterParams = { title: t("editor.chapters.newChapterTitle") || "New Chapter" };
+    const newIndex = (postData()[activeLang()]?.chapters || []).length;
 
-    setPostParams(prev => {
-      const lang = activeLang();
-      const newLocales = { ...(prev.locales || {}) };
-      const newChapters = [...(newLocales[lang]?.chapters || []), newChapterParams];
-      newLocales[lang] = { ...newLocales[lang], chapters: newChapters };
-      return { ...prev, locales: newLocales };
-    });
+    batch(() => {
+      setPostData(prev => {
+        const lang = activeLang();
+        const langData = prev[lang] || { title: "", body: "", chapters: [] };
+        const chapters = [...(langData.chapters || []), newChapterContent];
+        return { ...prev, [lang]: { ...langData, chapters } };
+      });
 
-    setEditingChapterIndex(currentLangData().chapters.length);
+      setPostParams(prev => {
+        const lang = activeLang();
+        const locales = { ...(prev.locales || {}) };
+        const langParams = locales[lang] || { chapters: [] };
+        const chapters = [...(langParams.chapters || []), newChapterParams];
+        locales[lang] = { ...langParams, chapters };
+        return { ...prev, locales };
+      });
+    });
+    setEditingChapterIndex(newIndex);
   };
 
   const handleRemoveChapter = () => {
@@ -163,22 +170,26 @@ export default function EditorPage() {
   const confirmRemoveChapter = () => {
     const indexToRemove = editingChapterIndex();
     
-    setPostData(prev => {
-      const lang = activeLang();
-      const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
-      return { ...prev, [lang]: { ...prev[lang], chapters } };
+    batch(() => {
+      setPostData(prev => {
+        const lang = activeLang();
+        const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
+        return { ...prev, [lang]: { ...prev[lang], chapters } };
+      });
+
+      setPostParams(prev => {
+        const lang = activeLang();
+        const newLocales = { ...(prev.locales || {}) };
+        if (newLocales[lang]?.chapters) {
+          const chapters = (newLocales[lang].chapters || []).filter((_, i) => i !== indexToRemove);
+          newLocales[lang] = { ...newLocales[lang], chapters };
+        }
+        return { ...prev, locales: newLocales };
+      });
     });
 
-    setPostParams(prev => {
-      const lang = activeLang();
-      const newLocales = { ...(prev.locales || {}) };
-      const chapters = (newLocales[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
-      newLocales[lang] = { ...newLocales[lang], chapters };
-      return { ...prev, locales: newLocales };
-    });
-
-    setEditingChapterIndex(indexToRemove - 1);
-    if (currentLangData().chapters.length - 1 === 0) {
+    setEditingChapterIndex(indexToRemove >= 1 ? indexToRemove - 1 : -1);
+    if (postData()[activeLang()]?.chapters.length === 0) {
       setShowChapters(false);
     }
   };
@@ -241,14 +252,12 @@ export default function EditorPage() {
     const paramChapters = postParams()?.locales?.[activeLang()]?.chapters || [];
     return contentChapters.map((c, i) => ({
       ...c,
-      title: paramChapters[i]?.title || ""
+      title: paramChapters?.[i]?.title || ""
     }));
   });
 
   return (
     <main class="p-4 max-w-7xl mx-auto space-y-4">
-      <ClosePageButton />
-
       <Show
         when={!showFullPreview()}
         fallback={
@@ -257,125 +266,129 @@ export default function EditorPage() {
             postParams={postParams()}
             activeLang={activeLang()}
             thumbnailUrl={thumbnailUrl()}
+            chapters={combinedChapters()}
             onBack={() => setShowFullPreview(false)}
           />
         }
       >
-        <header class="flex justify-between items-start gap-4">
-          <div class="flex-1 min-w-0">
-            <h2 class="text-2xl font-semibold">{title()}</h2>
-            <p class="text-sm text-[hsl(var(--muted-foreground))]">
-              Mode: <strong>{editorMode()}</strong>
-            </p>
-          </div>
-          <div class="w-48 flex-shrink-0 space-y-2">
-            <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-              <Show when={thumbnailUrl()}
-                fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
-              >
-                <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
-              </Show>
+        <>
+          <ClosePageButton />
+          <header class="flex justify-between items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <h2 class="text-2xl font-semibold">{title()}</h2>
+              <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                Mode: <strong>{editorMode()}</strong>
+              </p>
             </div>
-            <LangSelector
-              codes={domainLangCodes()}
-              value={activeLang()}
-              onChange={setActiveLang}
-            />
-          </div>
-        </header>
-
-        <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
-          <div>
-            <div class="flex items-center gap-4 mb-4">
-              <input
-                type="text"
-                value={currentLangData().title}
-                onInput={(e) => updateField('title', e.currentTarget.value)}
-                placeholder={t("editor.titlePlaceholder")}
-                class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+            <div class="w-48 flex-shrink-0 space-y-2">
+              <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+                <Show when={thumbnailUrl()}
+                  fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+                >
+                  <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+                </Show>
+              </div>
+              <LangSelector
+                codes={domainLangCodes()}
+                value={activeLang()}
+                onChange={setActiveLang}
               />
-              <div class="flex-shrink-0 flex items-center gap-2">
-                <Show when={!showChapters()}>
-                  <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
-                </Show>
-                <Show when={!showFiles()}>
-                  <EditorFilesButton onClick={() => setShowFiles(true)} />
-                </Show>
-              </div>
             </div>
-            
-            <Show when={showChapters()}>
-              <div class="mb-4">
-                  <EditorChapterSelector
-                      chapters={combinedChapters()}
-                      activeIndex={editingChapterIndex()}
-                      onSelectIndex={setEditingChapterIndex}
-                      onAdd={handleAddChapter}
-                      onRemove={handleRemoveChapter}
-                      onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
-                  />
-              </div>
-            </Show>
-            
-            <EditorToolbar
-              isPreview={showPreview()}
-              onTogglePreview={() => setShowPreview(!showPreview())}
-              getTextareaRef={() => textareaRef}
-              onValueChange={handleEditorInput}
-            />
-            <MarkdownInput
-              editorRef={(el) => (textareaRef = el)}
-              value={currentEditorContent()}
-              onInput={handleEditorInput}
-              placeholder={t("editor.bodyPlaceholder")}
-              showPreview={showPreview()}
-              rehypePlugins={markdownPlugins()} 
-            />
+          </header>
 
-            <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-              <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
-              <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
-                <div class="justify-self-start self-start">
-                  <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
-                  <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                    {t("editor.params.nsfw.help")}
-                  </p>
-                </div>
-                <div class="justify-self-start">
-                  <input
-                    id="nsfw-checkbox"
-                    type="checkbox"
-                    class="h-5 w-5"
-                    checked={postParams().nsfw || false}
-                    onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
-                  />
-                </div>
-
-                <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
-                <div class="justify-self-start">
-                  <input
-                    id="fundraiser-id"
-                    type="number"
-                    value={postParams().fundraiser || 0}
-                    onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
-                    class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                    min="0"
-                  />
+          <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
+            <div>
+              <div class="flex items-center gap-4 mb-4">
+                <input
+                  type="text"
+                  value={currentLangData().title}
+                  onInput={(e) => updateField('title', e.currentTarget.value)}
+                  placeholder={t("editor.titlePlaceholder")}
+                  class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+                />
+                <div class="flex-shrink-0 flex items-center gap-2">
+                  <Show when={!showChapters()}>
+                    <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                  </Show>
+                  <Show when={!showFiles()}>
+                    <EditorFilesButton onClick={() => setShowFiles(true)} />
+                  </Show>
                 </div>
               </div>
-            </div>
+              
+              <Show when={showChapters()}>
+                <div class="mb-4">
+                    <EditorChapterSelector
+                        chapters={combinedChapters()}
+                        activeIndex={editingChapterIndex()}
+                        onSelectIndex={setEditingChapterIndex}
+                        onAdd={handleAddChapter}
+                        onRemove={handleRemoveChapter}
+                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                    />
+                </div>
+              </Show>
+              
+              <EditorToolbar
+                isPreview={showPreview()}
+                onTogglePreview={() => setShowPreview(!showPreview())}
+                getTextareaRef={() => textareaRef}
+                onValueChange={handleEditorInput}
+              />
+              <MarkdownInput
+                editorRef={(el) => (textareaRef = el)}
+                value={currentEditorContent()}
+                onInput={handleEditorInput}
+                placeholder={t("editor.bodyPlaceholder")}
+                showPreview={showPreview()}
+                rehypePlugins={markdownPlugins()} 
+              />
 
-            <div class="mt-6 flex justify-end">
-              <button 
-                onClick={() => setShowFullPreview(true)}
-                class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
-              >
-                {t("editor.previewPost")}
-              </button>
-            </div>
+              <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
+                <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+                  <div class="justify-self-start self-start">
+                    <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                      {t("editor.params.nsfw.help")}
+                    </p>
+                  </div>
+                  <div class="justify-self-start">
+                    <input
+                      id="nsfw-checkbox"
+                      type="checkbox"
+                      class="h-5 w-5"
+                      checked={postParams().nsfw || false}
+                      onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
+                    />
+                  </div>
 
-          </div>
-        </Show>
+                  <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+                  <div class="justify-self-start">
+                    <input
+                      id="fundraiser-id"
+                      type="number"
+                      value={postParams().fundraiser || 0}
+                      onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                      class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 flex justify-end">
+                <button 
+                  onClick={() => setShowFullPreview(true)}
+                  class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
+                >
+                  {t("editor.previewPost")}
+                </button>
+              </div>
+
+            </div>
+          </Show>
+        </>
       </Show>
 
       <EditorFilesDrawer 
@@ -387,7 +400,7 @@ export default function EditorPage() {
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}
-        onClose={() => setShowConfirmDelete(false)}
+        onClose={() => setFileToDelete(null)}
         onConfirm={confirmRemoveChapter}
         title={t("editor.chapters.confirmDeleteTitle")}
         message={t("editor.chapters.confirmDeleteMessage")}
