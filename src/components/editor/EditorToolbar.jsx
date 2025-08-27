@@ -1,7 +1,8 @@
 // src/components/editor/EditorToolbar.jsx
 import { useApp } from "../../context/AppContext.jsx";
 import { applyMarkdownFormat } from "../../editor/text-utils.js";
-import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon, MaximizeIcon, MinimizeIcon } from "./ToolbarIcons.jsx";
+import { Show } from "solid-js";
 
 export default function EditorToolbar(props) {
   const { t } = useApp();
@@ -34,6 +35,14 @@ export default function EditorToolbar(props) {
         >
           {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
         </button>
+        <ToolbarButton
+          onClick={props.onToggleFullScreen}
+          title={props.isFullScreen ? t("editor.toolbar.minimize") : t("editor.toolbar.maximize")}
+        >
+          <Show when={props.isFullScreen} fallback={<MaximizeIcon />}>
+            <MinimizeIcon />
+          </Show>
+        </ToolbarButton>
       </div>
     </div>
   );

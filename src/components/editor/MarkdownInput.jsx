@@ -4,7 +4,7 @@ import MarkdownView from "../docs/MarkdownView.jsx";
 
 export default function MarkdownInput(props) {
   return (
-    <div class={`grid gap-4 h-[60vh] min-h-[400px] ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+    <div class={`grid gap-4 ${props.isFullScreen ? 'flex-grow' : 'h-[400px]'} ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
       <textarea
         ref={props.editorRef}
         value={props.value}

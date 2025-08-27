@@ -45,6 +45,7 @@ export default function EditorPage() {
   const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
   const [showFullPreview, setShowFullPreview] = createSignal(false);
   const [showPublishWizard, setShowPublishWizard] = createSignal(false);
+  const [isFullScreen, setIsFullScreen] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -64,9 +65,21 @@ export default function EditorPage() {
 
   onMount(async () => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        setShowFiles(prev => !prev);
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 'f':
+            e.preventDefault();
+            setShowFiles(prev => !prev);
+            break;
+          case 'p':
+            e.preventDefault();
+            setShowPreview(prev => !prev);
+            break;
+          case 'm':
+            e.preventDefault();
+            setIsFullScreen(prev => !prev);
+            break;
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -308,7 +321,10 @@ export default function EditorPage() {
   });
 
   return (
-    <main class="p-4 max-w-7xl mx-auto space-y-4">
+    <main classList={{
+      "p-4 max-w-7xl mx-auto space-y-4": !isFullScreen(),
+      "h-[calc(100vh-3rem)] flex flex-col": isFullScreen()
+    }}>
       <Show
         when={!showFullPreview()}
         fallback={
@@ -328,72 +344,78 @@ export default function EditorPage() {
         }
       >
         <>
-          <ClosePageButton />
-          <header class="flex justify-between items-start gap-4">
-            <div class="flex-1 min-w-0">
-              <h2 class="text-2xl font-semibold">{title()}</h2>
-              <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                Mode: <strong>{editorMode()}</strong>
-              </p>
-            </div>
-            <div class="w-48 flex-shrink-0 space-y-2">
-              <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-                <Show when={thumbnailUrl()}
-                  fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
-                >
-                  <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
-                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button 
-                      onClick={handleDeleteThumbnail}
-                      title={t("editor.thumbnail.delete")}
-                      class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
-                    >
-                      <TrashIcon class="w-5 h-5" />
-                    </button>
-                  </div>
-                </Show>
+          <Show when={!isFullScreen()}>
+            <ClosePageButton />
+            <header class="flex justify-between items-start gap-4">
+              <div class="flex-1 min-w-0">
+                <h2 class="text-2xl font-semibold">{title()}</h2>
+                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                  Mode: <strong>{editorMode()}</strong>
+                </p>
               </div>
-              <div class="flex justify-center">
-                <LangSelector
-                    codes={domainLangCodes()}
-                    value={activeLang()}
-                    onChange={setActiveLang}
-                />
+              <div class="w-48 flex-shrink-0 space-y-2">
+                <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+                  <Show when={thumbnailUrl()}
+                    fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+                  >
+                    <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button 
+                        onClick={handleDeleteThumbnail}
+                        title={t("editor.thumbnail.delete")}
+                        class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
+                      >
+                        <TrashIcon class="w-5 h-5" />
+                      </button>
+                    </div>
+                  </Show>
+                </div>
+                <div class="flex justify-center">
+                  <LangSelector
+                      codes={domainLangCodes()}
+                      value={activeLang()}
+                      onChange={setActiveLang}
+                  />
+                </div>
               </div>
-            </div>
-          </header>
+            </header>
+          </Show>
 
           <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
-            <div>
-              <div class="flex items-center gap-4 mb-4">
-                <input
-                  type="text"
-                  value={currentLangData().title}
-                  onInput={(e) => updateField('title', e.currentTarget.value)}
-                  placeholder={t("editor.titlePlaceholder")}
-                  class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
-                />
-                <div class="flex-shrink-0 flex items-center gap-2">
-                  <Show when={!showChapters()}>
-                    <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
-                  </Show>
-                  <Show when={!showFiles()}>
-                    <EditorFilesButton onClick={() => setShowFiles(true)} />
-                  </Show>
-                </div>
-              </div>
-              
-              <Show when={showChapters()}>
-                <div class="mb-4">
-                    <EditorChapterSelector
-                        chapters={combinedChapters()}
-                        activeIndex={editingChapterIndex()}
-                        onSelectIndex={setEditingChapterIndex}
-                        onAdd={handleAddChapter}
-                        onRemove={handleRemoveChapter}
-                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+            <div classList={{ "h-full flex flex-col": isFullScreen() }}>
+              <Show when={!isFullScreen()}>
+                <>
+                  <div class="flex items-center gap-4 mb-4">
+                    <input
+                      type="text"
+                      value={currentLangData().title}
+                      onInput={(e) => updateField('title', e.currentTarget.value)}
+                      placeholder={t("editor.titlePlaceholder")}
+                      class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
                     />
-                </div>
+                    <div class="flex-shrink-0 flex items-center gap-2">
+                      <Show when={!showChapters()}>
+                        <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                      </Show>
+                      <Show when={!showFiles()}>
+                        <EditorFilesButton onClick={() => setShowFiles(true)} />
+                      </Show>
+                    </div>
+                  </div>
+                  
+                  <Show when={showChapters()}>
+                    <div class="mb-4">
+                        <EditorChapterSelector
+                            chapters={combinedChapters()}
+                            activeIndex={editingChapterIndex()}
+                            onSelectIndex={setEditingChapterIndex}
+                            onAdd={handleAddChapter}
+                            onRemove={handleRemoveChapter}
+                            onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                        />
+                    </div>
+                  </Show>
+                </>
               </Show>
               
               <EditorToolbar
@@ -401,6 +423,8 @@ export default function EditorPage() {
                 onTogglePreview={() => setShowPreview(!showPreview())}
                 getTextareaRef={() => textareaRef}
                 onValueChange={handleEditorInput}
+                isFullScreen={isFullScreen()}
+                onToggleFullScreen={() => setIsFullScreen(p => !p)}
               />
               <MarkdownInput
                 editorRef={(el) => (textareaRef = el)}
@@ -408,51 +432,55 @@ export default function EditorPage() {
                 onInput={handleEditorInput}
                 placeholder={t("editor.bodyPlaceholder")}
                 showPreview={showPreview()}
-                rehypePlugins={markdownPlugins()} 
+                rehypePlugins={markdownPlugins()}
+                isFullScreen={isFullScreen()}
               />
 
-              <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
-                <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
-                  <div class="justify-self-start self-start">
-                    <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
-                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                      {t("editor.params.nsfw.help")}
-                    </p>
-                  </div>
-                  <div class="justify-self-start">
-                    <input
-                      id="nsfw-checkbox"
-                      type="checkbox"
-                      class="h-5 w-5"
-                      checked={postParams().nsfw || false}
-                      onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
-                    />
+              <Show when={!isFullScreen()}>
+                <>
+                  <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                    <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
+                    <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+                      <div class="justify-self-start self-start">
+                        <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                          {t("editor.params.nsfw.help")}
+                        </p>
+                      </div>
+                      <div class="justify-self-start">
+                        <input
+                          id="nsfw-checkbox"
+                          type="checkbox"
+                          class="h-5 w-5"
+                          checked={postParams().nsfw || false}
+                          onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
+                        />
+                      </div>
+
+                      <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+                      <div class="justify-self-start">
+                        <input
+                          id="fundraiser-id"
+                          type="number"
+                          value={postParams().fundraiser || 0}
+                          onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                          class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                          min="0"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
-                  <div class="justify-self-start">
-                    <input
-                      id="fundraiser-id"
-                      type="number"
-                      value={postParams().fundraiser || 0}
-                      onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
-                      class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                      min="0"
-                    />
+                  <div class="mt-6 flex justify-end">
+                    <button 
+                      onClick={() => setShowFullPreview(true)}
+                      class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
+                    >
+                      {t("editor.previewPost")}
+                    </button>
                   </div>
-                </div>
-              </div>
-
-              <div class="mt-6 flex justify-end">
-                <button 
-                  onClick={() => setShowFullPreview(true)}
-                  class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
-                >
-                  {t("editor.previewPost")}
-                </button>
-              </div>
-
+                </>
+              </Show>
             </div>
           </Show>
         </>

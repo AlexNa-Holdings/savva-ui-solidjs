@@ -175,9 +175,6 @@ src/
       DocsIndex.jsx
       DocsPager.jsx
       MarkdownView.jsx
-      rehype-media-players.js
-      rehype-resolve-draft-urls.js
-      rehype-rewrite-links.js
     editor/
       wizard_steps/
         StepCheckRights.jsx
@@ -197,7 +194,6 @@ src/
       FileGridItem.jsx
       MarkdownInput.jsx
       PostSubmissionWizard.jsx
-      text-utils.js
       ToolbarIcons.jsx
       UploadFromUrlModal.jsx
     feed/
@@ -255,7 +251,6 @@ src/
       StakerLevelIcon.jsx
       Tabs.jsx
       ThemeToggle.jsx
-      toast.js
       ToTopButton.jsx
       UserCard.jsx
       ViewModeToggle.jsx
@@ -274,9 +269,14 @@ src/
     useDomainAssets.js
   dev/
     AssetDebugTap.jsx
+  docs/
+    rehype-media-players.js
+    rehype-resolve-draft-urls.js
+    rehype-rewrite-links.js
   editor/
     preview-utils.js
     storage.js
+    text-utils.js
   hooks/
     useConnect.js
     useLocalIpfs.js
@@ -316,6 +316,9 @@ src/
     DomainCssLoader.jsx
     FaviconLoader.jsx
     GoogleAnalyticsLoader.jsx
+  ui/
+    contextMenuBuilder.js
+    toast.js
   utils/
     assetLoader.js
     assetsDiagnostics.js
@@ -16972,117 +16975,6 @@ export async function getSavvaContract(app, contractName) {
 }
 </file>
 
-<file path="src/components/auth/AuthorizedUser.jsx">
-// src/components/auth/AuthorizedUser.jsx
-import { createSignal, Show, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
-import { authorize } from "../../blockchain/auth.js";
-import { pushErrorToast } from "../ui/toast.js";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-
-function ChevronDownIcon(props) {
-  return (
-    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
-      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
-    </svg>
-  );
-}
-
-export default function AuthorizedUser() {
-  const app = useApp();
-  const { t } = app;
-  const [menuOpen, setMenuOpen] = createSignal(false);
-  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
-  let menuRef;
-
-  const handleLoginClick = async () => {
-    setIsLoggingIn(true);
-    try {
-      await authorize(app);
-    } catch (e) {
-      console.error("Authorization failed:", e);
-      pushErrorToast(e, { context: "Login failed" });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleLogoutClick = () => {
-    app.logout();
-    setMenuOpen(false);
-  };
-  
-  const handleClickOutside = (event) => {
-    if (menuRef && !menuRef.contains(event.target)) {
-      setMenuOpen(false);
-    }
-  };
-
-  onMount(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-  });
-
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  });
-
-  return (
-    <div class="relative" ref={menuRef}>
-      <Show
-        when={app.authorizedUser()}
-        fallback={
-          <Show when={walletAccount()}>
-            <button
-              class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70"
-              onClick={handleLoginClick}
-              disabled={isLoggingIn()}
-            >
-              {isLoggingIn() ? t("common.checking") : "Login"}
-            </button>
-          </Show>
-        }
-      >
-        {(user) => (
-          <button
-            class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
-            onClick={() => setMenuOpen(!menuOpen())}
-            aria-haspopup="true"
-            aria-expanded={menuOpen()}
-          >
-            <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-              <IpfsImage
-                src={user().avatar}
-                alt="User Avatar"
-                class="w-full h-full object-cover"
-                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-              />
-            </div>
-            <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-          </button>
-        )}
-      </Show>
-
-      <Show when={menuOpen()}>
-        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
-          <div class="py-1" role="menu" aria-orientation="vertical">
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
-            >
-              Logout
-            </a>
-          </div>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/docs/DocsIndex.jsx">
 // src/components/docs/DocsIndex.jsx
 import { createMemo, createResource, For, Show } from "solid-js";
@@ -18527,77 +18419,6 @@ export default function ConfirmModal(props) {
 }
 </file>
 
-<file path="src/components/ui/ContextMenu.jsx">
-// src/components/ui/ContextMenu.jsx
-import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
-
-function MoreIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="currentColor">
-      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-    </svg>
-  );
-}
-
-export default function ContextMenu(props) {
-  const [isOpen, setIsOpen] = createSignal(false);
-  let containerRef;
-
-  const handleClickOutside = (event) => {
-    if (containerRef && !containerRef.contains(event.target)) {
-      setIsOpen(false);
-    }
-  };
-
-  onMount(() => document.addEventListener("mousedown", handleClickOutside));
-  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
-
-  const handleItemClick = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    item.onClick?.();
-    setIsOpen(false);
-  };
-
-  return (
-    <div class="absolute -bottom-2 -right-2 z-20" ref={containerRef}>
-      <button
-        class="p-1 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsOpen(!isOpen());
-        }}
-        aria-haspopup="true"
-        aria-expanded={isOpen()}
-      >
-        <MoreIcon />
-      </button>
-
-      <Show when={isOpen()}>
-        <div class="absolute bottom-full right-0 mb-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5">
-          <ul class="py-1" role="menu">
-            <For each={props.items}>
-              {(item) => (
-                <li>
-                  <a
-                    href="#"
-                    class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-                    onClick={(e) => handleItemClick(e, item)}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/ui/PostFundBadge.jsx">
 // src/components/ui/PostFundBadge.jsx
 import { createSignal, createEffect, on, createMemo } from "solid-js";
@@ -18998,6 +18819,176 @@ export default function RightPaneFooter() {
 }
 </file>
 
+<file path="src/docs/rehype-media-players.js">
+// src/components/docs/rehype-media-players.js
+import { visit } from "unist-util-visit";
+
+const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
+
+function isVideoUrl(url) {
+  return VIDEO_EXTENSIONS.test(url);
+}
+
+function isAudioUrl(url) {
+  return AUDIO_EXTENSIONS.test(url);
+}
+
+function getYouTubeId(url) {
+  const match = url.match(YOUTUBE_REGEX);
+  return match ? match[1] : null;
+}
+
+export function rehypeMediaPlayers() {
+  return (tree) => {
+    visit(tree, "element", (node) => {
+      if (node.tagName !== "img" || !node.properties?.src) {
+        return;
+      }
+
+      const url = node.properties.src;
+      const youtubeId = getYouTubeId(url);
+
+      if (youtubeId) {
+        node.tagName = "div";
+        node.properties = {
+          className: "youtube-container",
+          style: "position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%;"
+        };
+        node.children = [{
+          type: "element",
+          tagName: "iframe",
+          properties: {
+            src: `https://www.youtube.com/embed/${youtubeId}`,
+            frameborder: "0",
+            allowfullscreen: true,
+            style: "position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+          },
+          children: []
+        }];
+      } else if (isVideoUrl(url)) {
+        node.tagName = "video";
+        node.properties = {
+          src: url,
+          controls: true,
+          style: "width: 100%; border-radius: 0.5rem;"
+        };
+        node.children = [];
+      } else if (isAudioUrl(url)) {
+        node.tagName = "audio";
+        node.properties = {
+          src: url,
+          controls: true,
+          style: "width: 100%;"
+        };
+        node.children = [];
+      }
+    });
+    return tree; // Added this line
+  };
+}
+</file>
+
+<file path="src/docs/rehype-resolve-draft-urls.js">
+// src/components/docs/rehype-resolve-draft-urls.js
+import { visit } from "unist-util-visit";
+import { resolveDraftFileUrl } from "../editor/storage.js";
+import { dbg } from "../utils/debug.js";
+
+// A very small guard to avoid double-work and malformed inputs
+const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);
+
+/**
+ * Resolve relative media URLs (img/video/audio + <a>) to blob: URLs from the
+ * editor draft storage. Designed to be robust in async pipelines.
+ *
+ * Usage: pass the FACTORY (this function) to the unified pipeline, not the result.
+ */
+export function rehypeResolveDraftUrls() {
+  return async (tree) => {
+    if (!tree || typeof tree !== "object") {
+      dbg.error("PreviewResolver", "Received invalid tree; skipping URL resolution.");
+      return tree;
+    }
+
+    dbg.log("PreviewResolver", "Resolving draft media URLs...");
+
+    const tasks = [];
+
+    visit(tree, "element", (node) => {
+      // media tags
+      if (node.tagName === "img" || node.tagName === "video" || node.tagName === "audio") {
+        const src = node.properties?.src;
+        if (isRelative(src)) {
+          tasks.push(
+            (async () => {
+              const blobUrl = await resolveDraftFileUrl(src);
+              if (blobUrl) node.properties.src = blobUrl;
+            })()
+          );
+        }
+      }
+
+      // links to local files (let users link to attachments)
+      if (node.tagName === "a") {
+        const href = node.properties?.href;
+        if (isRelative(href)) {
+          tasks.push(
+            (async () => {
+              const blobUrl = await resolveDraftFileUrl(href);
+              if (blobUrl) node.properties.href = blobUrl;
+            })()
+          );
+        }
+      }
+    });
+
+    if (tasks.length) {
+      await Promise.allSettled(tasks);
+      dbg.log("PreviewResolver", `Resolved ${tasks.length} URL(s) from draft storage`);
+    }
+
+    return tree;
+  };
+}
+</file>
+
+<file path="src/docs/rehype-rewrite-links.js">
+// src/components/docs/rehype-rewrite-links.js
+import { visit } from "unist-util-visit";
+
+/**
+ * A rehype plugin that rewrites relative image and link URLs to be absolute,
+ * based on a provided base URL.
+ * @param {object} options - The options object.
+ * @param {string} options.base - The base URL to prepend to relative paths.
+ */
+export function rehypeRewriteLinks(options = {}) {
+  return (tree) => {
+    // FIX: Always return the tree, even if there's no base URL.
+    if (!options.base) {
+      return tree;
+    }
+    
+    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+    
+    visit(tree, "element", (node) => {
+      if (node.tagName === 'a' || node.tagName === 'img') {
+        const prop = node.tagName === 'a' ? 'href' : 'src';
+        const url = node.properties?.[prop];
+        if (typeof url === 'string' && isRelative(url)) {
+          node.properties[prop] = base + url;
+        }
+      }
+    });
+
+    return tree;
+  };
+}
+</file>
+
 <file path="src/editor/preview-utils.js">
 // src/editor/preview-utils.js
 
@@ -19033,56 +19024,111 @@ export function createTextPreview(markdownText) {
 }
 </file>
 
-<file path="src/ipfs/utils.js">
-// src/ipfs/utils.js
+<file path="src/editor/text-utils.js">
+// src/components/editor/text-utils.js
 
 /**
- * Determines the base CID for a post's content, supporting both new and legacy formats.
- * @param {object} post - The raw post object from the API.
- * @returns {string|null} The base CID for the content folder.
+ * Inserts a given string of text at the current cursor position in a textarea.
+ * @param {HTMLTextAreaElement} textarea - The textarea element.
+ * @param {string} text - The text to insert.
+ * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
  */
-export function getPostContentBaseCid(post) {
-  if (!post) return null;
-  // New format: data_cid is nested in savva_content.
-  if (post.savva_content?.data_cid) {
-    return post.savva_content.data_cid;
-  }
-  // Legacy format: the top-level ipfs field is the base CID.
-  return post.ipfs?.split('/')[0] || null;
+export function insertTextAtCursor(textarea, text, onUpdate) {
+  if (!textarea || !text) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const fullText = textarea.value;
+
+  const newText = fullText.substring(0, start) + text + fullText.substring(end);
+  onUpdate(newText);
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    const newCursorPos = start + text.length;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+  });
 }
 
-/**
- * Resolves a relative path from a post's content folder into a full IPFS path.
- * @param {object} post - The raw post object from the API.
- * @param {string} relativePath - The relative path within the content folder (e.g., "thumbnail.jpg").
- * @returns {string|null} The full, resolvable IPFS path (e.g., "bafy.../thumbnail.jpg").
- */
-export function resolvePostCidPath(post, relativePath) {
-  if (!relativePath) return null;
-  const baseCid = getPostContentBaseCid(post);
-  if (!baseCid) return null;
-  
-  const cleanRelativePath = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-  return `${baseCid}/${cleanRelativePath}`;
-}
 
 /**
- * Determines the full IPFS path to a post's descriptor file (info.yaml),
- * supporting both new and legacy formats.
- * @param {object} post - The raw post object from the API.
- * @returns {string|null} The full, resolvable IPFS path to the descriptor.
+ * Applies markdown formatting to the selected text in a textarea.
+ * @param {HTMLTextAreaElement} textarea - The textarea element.
+ * @param {'bold' | 'italic' | 'link' | 'image'} format - The markdown format to apply.
+ * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
  */
-export function getPostDescriptorPath(post) {
-  if (!post || !post.ipfs) return null;
-  
-  // If data_cid is in savva_content, it's the new format where `ipfs` is the direct path.
-  if (post.savva_content?.data_cid) {
-    return post.ipfs;
+export function applyMarkdownFormat(textarea, format, onUpdate) {
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  const fullText = textarea.value;
+
+  let replacement;
+  let prefix, suffix, placeholder;
+
+  // Special handling for 'image' format
+  if (format === 'image') {
+    replacement = `![alt text](${selectedText || 'image_url'})`;
+  } else {
+    // Standard handling for other formats
+    switch (format) {
+      case 'bold':
+        prefix = '**';
+        suffix = '**';
+        placeholder = 'bold text';
+        break;
+      case 'italic':
+        prefix = '*';
+        suffix = '*';
+        placeholder = 'italic text';
+        break;
+      case 'link':
+        prefix = '[';
+        suffix = '](url)';
+        placeholder = 'link text';
+        break;
+      default:
+        return;
+    }
+    const textToWrap = selectedText || placeholder;
+    replacement = prefix + textToWrap + suffix;
   }
   
-  // Otherwise, it's the legacy format where `ipfs` is the folder CID.
-  const baseCid = post.ipfs.split('/')[0];
-  return `${baseCid}/info.yaml`;
+  textarea.focus();
+  textarea.setSelectionRange(start, end);
+
+  const success = document.execCommand('insertText', false, replacement);
+
+  if (!success) {
+    const newText = fullText.substring(0, start) + replacement + fullText.substring(end);
+    onUpdate(newText);
+  }
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    
+    if (format === 'image') {
+      if (selectedText) {
+        const altTextStart = start + '!['.length;
+        const altTextEnd = altTextStart + 'alt text'.length;
+        textarea.setSelectionRange(altTextStart, altTextEnd);
+      } else {
+        const urlStart = start + '![alt text]('.length;
+        const urlEnd = urlStart + 'image_url'.length;
+        textarea.setSelectionRange(urlStart, urlEnd);
+      }
+    } else {
+      if (selectedText) {
+        textarea.setSelectionRange(start, start + replacement.length);
+      } else {
+        const cursorPosStart = start + prefix.length;
+        const cursorPosEnd = cursorPosStart + placeholder.length;
+        textarea.setSelectionRange(cursorPosStart, cursorPosEnd);
+      }
+    }
+  });
 }
 </file>
 
@@ -19399,6 +19445,154 @@ export default function GoogleAnalyticsLoader() {
   });
 
   return null;
+}
+</file>
+
+<file path="src/ui/contextMenuBuilder.js">
+// src/components/ui/contextMenuBuilder.js
+import { pushToast } from "../ui/toast.js";
+import { getPostDescriptorPath, getPostContentBaseCid } from "../ipfs/utils.js";
+
+// A helper to avoid rewriting the clipboard logic everywhere
+function copyToClipboard(text, label, t) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    pushToast({ type: "success", message: t("clipboard.copied", { label }) });
+  }).catch(err => {
+    console.error(`Failed to copy ${label}:`, err);
+  });
+}
+
+/**
+ * Returns a standard set of admin menu items for a given post.
+ * @param {object} post - The raw post object.
+ * @param {function} t - The translation function from i18n.
+ * @returns {Array<object>} An array of menu item objects.
+ */
+export function getPostAdminItems(post, t) {
+  if (!post) return [];
+
+  const items = [];
+  const savvaCid = post.savva_cid;
+  const descriptorCid = getPostDescriptorPath(post)?.split('/')[0];
+  const dataCid = getPostContentBaseCid(post);
+
+  if (savvaCid) {
+    items.push({
+      label: t("postcard.copySavvaCid"),
+      onClick: () => copyToClipboard(savvaCid, "SAVVA CID", t)
+    });
+  }
+  if (descriptorCid) {
+    items.push({
+      label: t("postcard.copyDescriptorCid"), 
+      onClick: () => copyToClipboard(descriptorCid, "Descriptor CID", t)
+    });
+  }
+  if (dataCid) {
+    items.push({
+      label: t("postcard.copyDataCid"),
+      onClick: () => copyToClipboard(dataCid, "Data CID", t)
+    });
+  }
+
+  return items;
+}
+
+/**
+ * Returns pinning/unpinning menu items for a post.
+ * @param {object} post - The raw post object.
+ * @param {function} t - The translation function from i18n.
+ * @returns {Array<object>} An array containing a single pin/unpin menu item, or an empty array.
+ */
+export function getPinningItems(post, t) {
+  if (!post) return [];
+  
+  // Note: The onClick handlers are placeholders for now.
+  if (post.pinned) {
+    return [{ 
+      label: t("postcard.unpin"), 
+      onClick: () => console.log("Unpin clicked for:", post.savva_cid) 
+    }];
+  } else {
+    return [{ 
+      label: t("postcard.pin"), 
+      onClick: () => console.log("Pin clicked for:", post.savva_cid) 
+    }];
+  }
+}
+</file>
+
+<file path="src/ui/toast.js">
+// src/components/ui/toast.js
+import { createSignal } from "solid-js";
+
+export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
+
+let counter = 0;
+
+export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
+  const id = ++counter;
+  const item = { id, type, message: String(message || ""), details, expanded: false };
+  setToasts((curr) => [...curr, item]);
+
+  // MODIFICATION: Removed '&& type !== "error"' to allow the timer to apply to all toast types.
+  if (autohideMs > 0) {
+    setTimeout(() => dismissToast(id), autohideMs);
+  }
+  return id;
+}
+
+export function dismissToast(id) {
+  setToasts((curr) => curr.filter((t) => t.id !== id));
+}
+
+export function toggleToast(id) {
+  setToasts((curr) =>
+    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
+  );
+}
+
+/** Convenience: turn any Error (or unknown) into a compact, useful details object */
+export function errorDetails(err, extra = {}) {
+  if (!err) return extra || {};
+  const base = {
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    type: err.type,
+    status: err.status,
+    stack: err.stack,
+    cause: err.cause && typeof err.cause === "object" ? {
+      name: err.cause.name,
+      message: err.cause.message,
+      code: err.cause.code,
+      status: err.cause.status,
+    } : undefined,
+  };
+  
+  if (Array.isArray(err.causes)) {
+    base.causes = err.causes.map((e) => ({
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+      url: e?.url 
+    }));
+  }
+  
+  return { ...base, ...extra };
+}
+
+/** push an error toast with extracted details */
+export function pushErrorToast(err, context = {}) {
+  return pushToast({
+    type: "error",
+    message: err?.message || "Unexpected error",
+    details: errorDetails(err, context),
+    // MODIFICATION: Changed from 0 to 60000ms (1 minute).
+    autohideMs: 60000,
+  });
 }
 </file>
 
@@ -20155,6 +20349,117 @@ export async function switchOrAddChain(meta) {
 export { walletAccount, walletChainId };
 </file>
 
+<file path="src/components/auth/AuthorizedUser.jsx">
+// src/components/auth/AuthorizedUser.jsx
+import { createSignal, Show, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { walletAccount } from "../../blockchain/wallet.js";
+import { authorize } from "../../blockchain/auth.js";
+import { pushErrorToast } from "../../ui/toast.js";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+
+function ChevronDownIcon(props) {
+  return (
+    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
+      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
+    </svg>
+  );
+}
+
+export default function AuthorizedUser() {
+  const app = useApp();
+  const { t } = app;
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
+  let menuRef;
+
+  const handleLoginClick = async () => {
+    setIsLoggingIn(true);
+    try {
+      await authorize(app);
+    } catch (e) {
+      console.error("Authorization failed:", e);
+      pushErrorToast(e, { context: "Login failed" });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogoutClick = () => {
+    app.logout();
+    setMenuOpen(false);
+  };
+  
+  const handleClickOutside = (event) => {
+    if (menuRef && !menuRef.contains(event.target)) {
+      setMenuOpen(false);
+    }
+  };
+
+  onMount(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  });
+
+  return (
+    <div class="relative" ref={menuRef}>
+      <Show
+        when={app.authorizedUser()}
+        fallback={
+          <Show when={walletAccount()}>
+            <button
+              class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70"
+              onClick={handleLoginClick}
+              disabled={isLoggingIn()}
+            >
+              {isLoggingIn() ? t("common.checking") : "Login"}
+            </button>
+          </Show>
+        }
+      >
+        {(user) => (
+          <button
+            class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
+            onClick={() => setMenuOpen(!menuOpen())}
+            aria-haspopup="true"
+            aria-expanded={menuOpen()}
+          >
+            <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+              <IpfsImage
+                src={user().avatar}
+                alt="User Avatar"
+                class="w-full h-full object-cover"
+                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+              />
+            </div>
+            <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+          </button>
+        )}
+      </Show>
+
+      <Show when={menuOpen()}>
+        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
+          <div class="py-1" role="menu" aria-orientation="vertical">
+            <a
+              href="#"
+              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+              role="menuitem"
+              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
+            >
+              Logout
+            </a>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/docs/DocsPager.jsx">
 // src/components/docs/DocsPager.jsx
 import { createMemo, createResource, Show } from "solid-js";
@@ -20257,141 +20562,6 @@ export default function DocsPager(props) {
       </nav>
     </Show>
   );
-}
-</file>
-
-<file path="src/components/docs/rehype-media-players.js">
-// src/components/docs/rehype-media-players.js
-import { visit } from "unist-util-visit";
-
-const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
-const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
-const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
-
-function isVideoUrl(url) {
-  return VIDEO_EXTENSIONS.test(url);
-}
-
-function isAudioUrl(url) {
-  return AUDIO_EXTENSIONS.test(url);
-}
-
-function getYouTubeId(url) {
-  const match = url.match(YOUTUBE_REGEX);
-  return match ? match[1] : null;
-}
-
-export function rehypeMediaPlayers() {
-  return (tree) => {
-    visit(tree, "element", (node) => {
-      if (node.tagName !== "img" || !node.properties?.src) {
-        return;
-      }
-
-      const url = node.properties.src;
-      const youtubeId = getYouTubeId(url);
-
-      if (youtubeId) {
-        node.tagName = "div";
-        node.properties = {
-          className: "youtube-container",
-          style: "position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%;"
-        };
-        node.children = [{
-          type: "element",
-          tagName: "iframe",
-          properties: {
-            src: `https://www.youtube.com/embed/${youtubeId}`,
-            frameborder: "0",
-            allowfullscreen: true,
-            style: "position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-          },
-          children: []
-        }];
-      } else if (isVideoUrl(url)) {
-        node.tagName = "video";
-        node.properties = {
-          src: url,
-          controls: true,
-          style: "width: 100%; border-radius: 0.5rem;"
-        };
-        node.children = [];
-      } else if (isAudioUrl(url)) {
-        node.tagName = "audio";
-        node.properties = {
-          src: url,
-          controls: true,
-          style: "width: 100%;"
-        };
-        node.children = [];
-      }
-    });
-    return tree; // Added this line
-  };
-}
-</file>
-
-<file path="src/components/docs/rehype-resolve-draft-urls.js">
-// src/components/docs/rehype-resolve-draft-urls.js
-import { visit } from "unist-util-visit";
-import { resolveDraftFileUrl } from "../../editor/storage.js";
-import { dbg } from "../../utils/debug.js";
-
-// A very small guard to avoid double-work and malformed inputs
-const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);
-
-/**
- * Resolve relative media URLs (img/video/audio + <a>) to blob: URLs from the
- * editor draft storage. Designed to be robust in async pipelines.
- *
- * Usage: pass the FACTORY (this function) to the unified pipeline, not the result.
- */
-export function rehypeResolveDraftUrls() {
-  return async (tree) => {
-    if (!tree || typeof tree !== "object") {
-      dbg.error("PreviewResolver", "Received invalid tree; skipping URL resolution.");
-      return tree;
-    }
-
-    dbg.log("PreviewResolver", "Resolving draft media URLs...");
-
-    const tasks = [];
-
-    visit(tree, "element", (node) => {
-      // media tags
-      if (node.tagName === "img" || node.tagName === "video" || node.tagName === "audio") {
-        const src = node.properties?.src;
-        if (isRelative(src)) {
-          tasks.push(
-            (async () => {
-              const blobUrl = await resolveDraftFileUrl(src);
-              if (blobUrl) node.properties.src = blobUrl;
-            })()
-          );
-        }
-      }
-
-      // links to local files (let users link to attachments)
-      if (node.tagName === "a") {
-        const href = node.properties?.href;
-        if (isRelative(href)) {
-          tasks.push(
-            (async () => {
-              const blobUrl = await resolveDraftFileUrl(href);
-              if (blobUrl) node.properties.href = blobUrl;
-            })()
-          );
-        }
-      }
-    });
-
-    if (tasks.length) {
-      await Promise.allSettled(tasks);
-      dbg.log("PreviewResolver", `Resolved ${tasks.length} URL(s) from draft storage`);
-    }
-
-    return tree;
-  };
 }
 </file>
 
@@ -20700,120 +20870,6 @@ export default function EditorFilesButton(props) {
 }
 </file>
 
-<file path="src/components/editor/EditorToolbar.jsx">
-// src/components/editor/EditorToolbar.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { applyMarkdownFormat } from "./text-utils.js";
-import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
-
-export default function EditorToolbar(props) {
-  const { t } = useApp();
-
-  const handleFormat = (format) => {
-    const textarea = props.getTextareaRef?.();
-    applyMarkdownFormat(textarea, format, props.onValueChange);
-  };
-
-  return (
-    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-      <div class="flex items-center">
-        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
-          <BoldIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
-          <ItalicIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
-          <LinkIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
-          <ImageIcon />
-        </ToolbarButton>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          onClick={props.onTogglePreview}
-          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
-        >
-          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
-        </button>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/FileGridItem.jsx">
-// src/components/editor/FileGridItem.jsx
-import { Show, createMemo } from "solid-js";
-import { formatBytes } from "../../utils/format.js";
-
-function VideoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-8 h-8 text-[hsl(var(--muted-foreground))]">
-      <path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-    </svg>
-  );
-}
-
-function AudioIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-8 h-8 text-[hsl(var(--muted-foreground))]">
-      <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-    </svg>
-  );
-}
-
-export default function FileGridItem(props) {
-  const fileType = createMemo(() => {
-    const name = props.file?.name?.toLowerCase() || "";
-    if (/\.(jpe?g|png|gif|webp)$/.test(name)) return "image";
-    if (/\.(mp4|webm|ogg)$/.test(name)) return "video";
-    if (/\.(mp3|wav|m4a)$/.test(name)) return "audio";
-    return "other";
-  });
-
-  const handleClick = (e) => {
-    e.preventDefault();
-    props.onMenuOpen?.({
-      file: props.file,
-      fileType: fileType(),
-      element: e.currentTarget,
-    });
-  };
-
-  return (
-    <div
-      class="relative group aspect-square rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] overflow-hidden cursor-pointer"
-      onClick={handleClick}
-      onContextMenu={handleClick}
-    >
-      <Show when={fileType() === 'image'}>
-        <img src={props.file.url} alt={props.file.name} class="w-full h-full object-cover" />
-      </Show>
-      <Show when={fileType() === 'video'}>
-        <div class="w-full h-full flex items-center justify-center">
-          <VideoIcon />
-        </div>
-      </Show>
-      <Show when={fileType() === 'audio'}>
-        <div class="w-full h-full flex items-center justify-center">
-          <AudioIcon />
-        </div>
-      </Show>
-
-      <span class="absolute top-0 right-0 z-10 text-white text-[10px] font-mono bg-black/40 px-1 rounded-sm">
-        {formatBytes(props.file.size, 0)}
-      </span>
-      
-      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center">
-        <span class="truncate">{props.file.name}</span>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/editor/MarkdownInput.jsx">
 // src/components/editor/MarkdownInput.jsx
 import { Show } from "solid-js";
@@ -20836,114 +20892,6 @@ export default function MarkdownInput(props) {
       </Show>
     </div>
   );
-}
-</file>
-
-<file path="src/components/editor/text-utils.js">
-// src/components/editor/text-utils.js
-
-/**
- * Inserts a given string of text at the current cursor position in a textarea.
- * @param {HTMLTextAreaElement} textarea - The textarea element.
- * @param {string} text - The text to insert.
- * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
- */
-export function insertTextAtCursor(textarea, text, onUpdate) {
-  if (!textarea || !text) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const fullText = textarea.value;
-
-  const newText = fullText.substring(0, start) + text + fullText.substring(end);
-  onUpdate(newText);
-
-  requestAnimationFrame(() => {
-    textarea.focus();
-    const newCursorPos = start + text.length;
-    textarea.setSelectionRange(newCursorPos, newCursorPos);
-  });
-}
-
-
-/**
- * Applies markdown formatting to the selected text in a textarea.
- * @param {HTMLTextAreaElement} textarea - The textarea element.
- * @param {'bold' | 'italic' | 'link' | 'image'} format - The markdown format to apply.
- * @param {function(string): void} onUpdate - Callback to update the signal holding the textarea's value.
- */
-export function applyMarkdownFormat(textarea, format, onUpdate) {
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const selectedText = textarea.value.substring(start, end);
-  const fullText = textarea.value;
-
-  let replacement;
-  let prefix, suffix, placeholder;
-
-  // Special handling for 'image' format
-  if (format === 'image') {
-    replacement = `![alt text](${selectedText || 'image_url'})`;
-  } else {
-    // Standard handling for other formats
-    switch (format) {
-      case 'bold':
-        prefix = '**';
-        suffix = '**';
-        placeholder = 'bold text';
-        break;
-      case 'italic':
-        prefix = '*';
-        suffix = '*';
-        placeholder = 'italic text';
-        break;
-      case 'link':
-        prefix = '[';
-        suffix = '](url)';
-        placeholder = 'link text';
-        break;
-      default:
-        return;
-    }
-    const textToWrap = selectedText || placeholder;
-    replacement = prefix + textToWrap + suffix;
-  }
-  
-  textarea.focus();
-  textarea.setSelectionRange(start, end);
-
-  const success = document.execCommand('insertText', false, replacement);
-
-  if (!success) {
-    const newText = fullText.substring(0, start) + replacement + fullText.substring(end);
-    onUpdate(newText);
-  }
-
-  requestAnimationFrame(() => {
-    textarea.focus();
-    
-    if (format === 'image') {
-      if (selectedText) {
-        const altTextStart = start + '!['.length;
-        const altTextEnd = altTextStart + 'alt text'.length;
-        textarea.setSelectionRange(altTextStart, altTextEnd);
-      } else {
-        const urlStart = start + '![alt text]('.length;
-        const urlEnd = urlStart + 'image_url'.length;
-        textarea.setSelectionRange(urlStart, urlEnd);
-      }
-    } else {
-      if (selectedText) {
-        textarea.setSelectionRange(start, start + replacement.length);
-      } else {
-        const cursorPosStart = start + prefix.length;
-        const cursorPosEnd = cursorPosStart + placeholder.length;
-        textarea.setSelectionRange(cursorPosStart, cursorPosEnd);
-      }
-    }
-  });
 }
 </file>
 
@@ -21363,6 +21311,99 @@ export default function ForYouTab(props) {
 }
 </file>
 
+<file path="src/components/ui/ContextMenu.jsx">
+// src/components/ui/ContextMenu.jsx
+import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+
+function MoreIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="currentColor">
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+    </svg>
+  );
+}
+
+export default function ContextMenu(props) {
+  const [isOpen, setIsOpen] = createSignal(false);
+  const [menuClass, setMenuClass] = createSignal("bottom-full right-0 mb-2"); // Default: above
+  let containerRef;
+
+  const handleClickOutside = (event) => {
+    if (containerRef && !containerRef.contains(event.target)) {
+      setIsOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  const handleItemClick = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    item.onClick?.();
+    setIsOpen(false);
+  };
+
+  const positionClass = props.positionClass || "absolute -bottom-2 -right-2 z-20";
+
+  const toggleMenu = () => {
+    const shouldOpen = !isOpen();
+
+    if (shouldOpen && containerRef) {
+      const buttonRect = containerRef.getBoundingClientRect();
+      const estimatedMenuHeight = 150; // A safe estimate for the menu's height in pixels
+
+      // If there's not enough space above the button, show the menu below it.
+      if (buttonRect.top < estimatedMenuHeight) {
+        setMenuClass("top-full right-0 mt-2"); // Position below
+      } else {
+        setMenuClass("bottom-full right-0 mb-2"); // Position above (default)
+      }
+    }
+    setIsOpen(shouldOpen);
+  };
+
+  return (
+    <div class={positionClass} ref={containerRef}>
+      <button
+        class="p-1 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleMenu();
+        }}
+        aria-haspopup="true"
+        aria-expanded={isOpen()}
+      >
+        <MoreIcon />
+      </button>
+
+      <Show when={isOpen()}>
+        <div
+          class={`absolute w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 ${menuClass()}`}
+        >
+          <ul class="py-1" role="menu">
+            <For each={props.items}>
+              {(item) => (
+                <li>
+                  <a
+                    href="#"
+                    class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+                    onClick={(e) => handleItemClick(e, item)}
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/PostReactions.jsx">
 // src/components/ui/PostReactions.jsx
 import { For, createMemo, Show } from "solid-js";
@@ -21403,79 +21444,6 @@ export default function PostReactions(props) {
       </div>
     </Show>
   );
-}
-</file>
-
-<file path="src/components/ui/toast.js">
-// src/components/ui/toast.js
-import { createSignal } from "solid-js";
-
-export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
-
-let counter = 0;
-
-export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
-  const id = ++counter;
-  const item = { id, type, message: String(message || ""), details, expanded: false };
-  setToasts((curr) => [...curr, item]);
-
-  // MODIFICATION: Removed '&& type !== "error"' to allow the timer to apply to all toast types.
-  if (autohideMs > 0) {
-    setTimeout(() => dismissToast(id), autohideMs);
-  }
-  return id;
-}
-
-export function dismissToast(id) {
-  setToasts((curr) => curr.filter((t) => t.id !== id));
-}
-
-export function toggleToast(id) {
-  setToasts((curr) =>
-    curr.map((t) => (t.id === id ? { ...t, expanded: !t.expanded } : t))
-  );
-}
-
-/** Convenience: turn any Error (or unknown) into a compact, useful details object */
-export function errorDetails(err, extra = {}) {
-  if (!err) return extra || {};
-  const base = {
-    name: err.name,
-    message: err.message,
-    code: err.code,
-    type: err.type,
-    status: err.status,
-    stack: err.stack,
-    cause: err.cause && typeof err.cause === "object" ? {
-      name: err.cause.name,
-      message: err.cause.message,
-      code: err.cause.code,
-      status: err.cause.status,
-    } : undefined,
-  };
-  
-  if (Array.isArray(err.causes)) {
-    base.causes = err.causes.map((e) => ({
-      name: e?.name,
-      message: e?.message,
-      code: e?.code,
-      status: e?.status,
-      url: e?.url 
-    }));
-  }
-  
-  return { ...base, ...extra };
-}
-
-/** push an error toast with extracted details */
-export function pushErrorToast(err, context = {}) {
-  return pushToast({
-    type: "error",
-    message: err?.message || "Unexpected error",
-    details: errorDetails(err, context),
-    // MODIFICATION: Changed from 0 to 60000ms (1 minute).
-    autohideMs: 60000,
-  });
 }
 </file>
 
@@ -21745,95 +21713,6 @@ export default function HtmlBlock(props) {
 }
 </file>
 
-<file path="src/context/useAppConnection.js">
-// src/context/useAppConnection.js
-import { createSignal, onMount } from "solid-js";
-import { parse } from "yaml";
-import { configureEndpoints } from "../net/endpoints";
-import { pushErrorToast } from "../components/ui/toast.js";
-
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-const OVERRIDE_KEY = "connect_override";
-
-function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
-function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
-function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { } }
-
-export function useAppConnection() {
-  const [config, setConfig] = createSignal(null);
-  const [info, setInfo] = createSignal(null);
-  const [error, setError] = createSignal(null);
-  const [loading, setLoading] = createSignal(true);
-  
-  async function fetchInfo(cfg) {
-    const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-    return await res.json();
-  }
-
-  async function applyConfig(nextCfg) {
-    setConfig(nextCfg);
-    const data = await fetchInfo(nextCfg);
-    setInfo(data);
-    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
-  }
-
-  async function init() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
-      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
-      const data = parse(await res.text()) || {};
-      if (!data.backendLink) throw new Error("Missing backendLink in config");
-
-      const baseCfg = { domain: data.domain || "", backendLink: ensureSlash(data.backendLink), gear: !!data.gear };
-      const merged = { ...baseCfg, ...loadOverride() };
-      await applyConfig(merged);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(init);
-
-  async function updateConnect(partial) {
-    try {
-      setLoading(true); setError(null);
-      const cur = config() || {};
-      const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
-      if (next.backendLink !== cur.backendLink) {
-        await applyConfig(next);
-      } else {
-        setConfig(next);
-        configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
-      }
-      saveOverride(next);
-    } catch (e) {
-      setError(e);
-      pushErrorToast(e, { op: "updateConnect" });
-    } finally { setLoading(false); }
-  }
-
-  function setDomain(nextDomain) {
-    const cur = config() || {};
-    const next = { ...cur, domain: nextDomain || "" };
-    setConfig(next);
-    saveOverride(next);
-    configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
-  }
-
-  async function clearConnectOverride() {
-    saveOverride(null);
-    await init();
-  }
-
-  return { config, info, error, loading, init, updateConnect, clearConnectOverride, setDomain };
-}
-</file>
-
 <file path="src/dev/AssetDebugTap.jsx">
 // src/dev/AssetDebugTap.jsx
 /* src/dev/AssetDebugTap.jsx */
@@ -22023,6 +21902,89 @@ export function useLocalIpfs(dependencies) {
     disableLocalIpfs,
     setLocalIpfsApiUrl,
   };
+}
+</file>
+
+<file path="src/ipfs/utils.js">
+// src/ipfs/utils.js
+
+/**
+ * Checks if a string looks like a v0 or v1 IPFS CID.
+ * This is a basic prefix/length check, not a full validation.
+ * @param {string} s The string to check.
+ * @returns {boolean}
+ */
+function isIpfsCid(s) {
+  if (typeof s !== 'string') return false;
+  // v0 CIDs start with "Qm" and are 46 characters long.
+  if (s.startsWith('Qm') && s.length === 46) {
+    return true;
+  }
+  // v1 CIDs in base32 commonly start with "bafy".
+  if (s.startsWith('bafy')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Determines the base CID for a post's content, supporting both new and legacy formats.
+ * @param {object} post - The raw post object from the API.
+ * @returns {string|null} The base CID for the content folder.
+ */
+export function getPostContentBaseCid(post) {
+  if (!post) return null;
+  // New format: data_cid is nested in savva_content.
+  if (post.savva_content?.data_cid) {
+    return post.savva_content.data_cid;
+  }
+  // Legacy format: the top-level ipfs field is the base CID.
+  return post.ipfs?.split('/')[0] || null;
+}
+
+/**
+ * Resolves a path that may be relative to a post's content folder into a full IPFS path.
+ * If the path already starts with any valid IPFS CID, it's returned as is.
+ * Otherwise, it's treated as a relative path and the post's base CID is prepended.
+ * @param {object} post - The raw post object from the API.
+ * @param {string} path - The relative path or full CID path.
+ * @returns {string|null} The full, resolvable IPFS path.
+ */
+export function resolvePostCidPath(post, path) {
+  if (!path) return null;
+
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  const firstSegment = cleanPath.split('/')[0];
+
+  // If the path already starts with any valid CID, treat it as absolute.
+  if (isIpfsCid(firstSegment)) {
+    return cleanPath;
+  }
+
+  // Otherwise, resolve it against the post's own base CID.
+  const baseCid = getPostContentBaseCid(post);
+  if (!baseCid) return null; // Cannot resolve a relative path without a base CID
+
+  return `${baseCid}/${cleanPath}`;
+}
+
+/**
+ * Determines the full IPFS path to a post's descriptor file (info.yaml),
+ * supporting both new and legacy formats.
+ * @param {object} post - The raw post object from the API.
+ * @returns {string|null} The full, resolvable IPFS path to the descriptor.
+ */
+export function getPostDescriptorPath(post) {
+  if (!post || !post.ipfs) return null;
+  
+  // If data_cid is in savva_content, it's the new format where `ipfs` is the direct path.
+  if (post.savva_content?.data_cid) {
+    return post.ipfs;
+  }
+  
+  // Otherwise, it's the legacy format where `ipfs` is the folder CID.
+  const baseCid = post.ipfs.split('/')[0];
+  return `${baseCid}/info.yaml`;
 }
 </file>
 
@@ -22725,356 +22687,117 @@ export function getChainMeta(chainId) {
 }
 </file>
 
-<file path="src/components/docs/rehype-rewrite-links.js">
-// src/components/docs/rehype-rewrite-links.js
-import { visit } from "unist-util-visit";
+<file path="src/components/editor/EditorToolbar.jsx">
+// src/components/editor/EditorToolbar.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { applyMarkdownFormat } from "../../editor/text-utils.js";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
 
-/**
- * A rehype plugin that rewrites relative image and link URLs to be absolute,
- * based on a provided base URL.
- * @param {object} options - The options object.
- * @param {string} options.base - The base URL to prepend to relative paths.
- */
-export function rehypeRewriteLinks(options = {}) {
-  return (tree) => {
-    // FIX: Always return the tree, even if there's no base URL.
-    if (!options.base) {
-      return tree;
-    }
-    
-    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
-    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
-    
-    visit(tree, "element", (node) => {
-      if (node.tagName === 'a' || node.tagName === 'img') {
-        const prop = node.tagName === 'a' ? 'href' : 'src';
-        const url = node.properties?.[prop];
-        if (typeof url === 'string' && isRelative(url)) {
-          node.properties[prop] = base + url;
-        }
-      }
-    });
+export default function EditorToolbar(props) {
+  const { t } = useApp();
 
-    return tree;
+  const handleFormat = (format) => {
+    const textarea = props.getTextareaRef?.();
+    applyMarkdownFormat(textarea, format, props.onValueChange);
   };
-}
-</file>
-
-<file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
-// src/components/editor/wizard_steps/StepUploadDescriptor.jsx
-import { createSignal, onMount, Show } from "solid-js";
-import { useApp } from "../../../context/AppContext.jsx";
-import Spinner from "../../ui/Spinner.jsx";
-import { stringify as toYaml } from "yaml";
-import { httpBase } from "../../../net/endpoints.js";
-import { dbg } from "../../../utils/debug.js";
-import { createTextPreview } from "../../../editor/preview-utils.js";
-
-export default function StepUploadDescriptor(props) {
-  const app = useApp();
-  const { t } = app;
-  const [error, setError] = createSignal(null);
-  const [isUploading, setIsUploading] = createSignal(true);
-
-  const uploadDescriptor = async () => {
-    const { postData, postParams, publishedData } = props;
-    const data_cid = publishedData().ipfsCid;
-
-    if (!data_cid) {
-      throw new Error("IPFS data CID is missing from the previous step.");
-    }
-
-    const descriptor = {
-      savva_spec_version: "2.0",
-      data_cid: data_cid,
-      locales: {}
-    };
-
-    const gateways = app.info()?.ipfs_gateways;
-    if (gateways && Array.isArray(gateways) && gateways.length > 0) {
-      descriptor.gateways = gateways;
-    }
-
-    const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
-    Object.assign(descriptor, otherParams);
-    
-    if (thumbnail) {
-      // The thumbnail path from params already includes "uploads/", so just prepend the data_cid.
-      descriptor.thumbnail = `${data_cid}/${thumbnail}`;
-    }
-
-    const content = postData();
-    for (const lang in content) {
-      const data = content[lang];
-      const hasTitle = data.title?.trim().length > 0;
-      const hasBody = data.body?.trim().length > 0;
-      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
-
-      if (!hasTitle && !hasBody && !hasChapters) {
-        continue;
-      }
-      
-      const langParams = paramLocales?.[lang] || {};
-      
-      const localeObject = {
-        title: data.title || "",
-        text_preview: createTextPreview(data.body || ""),
-        tags: langParams.tags || [],
-        categories: langParams.categories || [],
-        data_path: `${lang}/data.md`,
-        chapters: []
-      };
-
-      if (Array.isArray(data.chapters)) {
-        for (let i = 0; i < data.chapters.length; i++) {
-          const chapterParams = langParams.chapters?.[i] || {};
-          localeObject.chapters.push({
-            title: chapterParams.title || `Chapter ${i + 1}`,
-            data_path: `${lang}/chapters/${i + 1}.md`
-          });
-        }
-      }
-      
-      descriptor.locales[lang] = localeObject;
-    }
-    
-    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
-
-    const yamlStr = toYaml(descriptor);
-    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
-    const formData = new FormData();
-    formData.append('file', descriptorFile);
-
-    const url = `${httpBase()}store`;
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
-    }
-
-    const result = await response.json();
-    if (!result?.cid) {
-      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
-    }
-
-    return result.cid;
-  };
-
-  onMount(() => {
-    setTimeout(async () => {
-      try {
-        const descriptorCid = await uploadDescriptor();
-        props.onComplete?.(descriptorCid);
-      } catch (e) {
-        dbg.error("StepUploadDescriptor", "An error occurred:", e);
-        setError(e.message);
-      } finally {
-        setIsUploading(false);
-      }
-    }, 500);
-  });
 
   return (
-    <div class="flex flex-col items-center justify-center h-full">
-      <Show when={isUploading()}>
-        <Spinner />
-        <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
-      </Show>
-      <Show when={error()}>
-        <div class="text-center p-4">
-          <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
-          <p class="mt-2 text-sm">{error()}</p>
-          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-            {t("editor.publish.validation.backToEditor")}
-          </button>
-        </div>
-      </Show>
+    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <div class="flex items-center">
+        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
+          <BoldIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
+          <ItalicIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
+          <LinkIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
+          <ImageIcon />
+        </ToolbarButton>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          onClick={props.onTogglePreview}
+          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
+        >
+          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
+        </button>
+      </div>
     </div>
   );
 }
 </file>
 
-<file path="src/components/editor/EditorFilesDrawer.jsx">
-// src/components/editor/EditorFilesDrawer.jsx
-import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
-import FileGridItem from "./FileGridItem.jsx";
-import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
-import { pushToast, pushErrorToast } from "../ui/toast.js";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
-import FileContextMenu from "./FileContextMenu.jsx";
+<file path="src/components/editor/FileGridItem.jsx">
+// src/components/editor/FileGridItem.jsx
+import { Show, createMemo } from "solid-js";
 import { formatBytes } from "../../utils/format.js";
-function CloseIcon(props) {
+
+function VideoIcon() {
   return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"></line>
-      <line x1="6" y1="6" x2="18" y2="18"></line>
+    <svg viewBox="0 0 24 24" class="w-8 h-8 text-[hsl(var(--muted-foreground))]">
+      <path fill="currentColor" d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
     </svg>
   );
 }
 
-export default function EditorFilesDrawer(props) {
-  const { t } = useApp();
-  const [files, setFiles] = createSignal([]);
-  const [showUrlModal, setShowUrlModal] = createSignal(false);
-  const [fileToDelete, setFileToDelete] = createSignal(null);
-  const [menuData, setMenuData] = createSignal(null);
-  let fileInputRef;
-  let drawerContentRef;
+function AudioIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-8 h-8 text-[hsl(var(--muted-foreground))]">
+      <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+    </svg>
+  );
+}
 
-  const sortedFiles = createMemo(() => {
-    return [...files()].sort((a, b) => (b.size || 0) - (a.size || 0));
+export default function FileGridItem(props) {
+  const fileType = createMemo(() => {
+    const name = props.file?.name?.toLowerCase() || "";
+    if (/\.(jpe?g|png|gif|webp)$/.test(name)) return "image";
+    if (/\.(mp4|webm|ogg)$/.test(name)) return "video";
+    if (/\.(mp3|wav|m4a)$/.test(name)) return "audio";
+    return "other";
   });
 
-  const totalSize = createMemo(() => {
-    return files().reduce((acc, file) => acc + (file.size || 0), 0);
-  });
-
-  const refreshFiles = async () => {
-    const fileList = await listUploadedFiles();
-    setFiles(fileList);
+  const handleClick = (e) => {
+    e.preventDefault();
+    props.onMenuOpen?.({
+      file: props.file,
+      fileType: fileType(),
+      element: e.currentTarget,
+    });
   };
-
-  createEffect(on(() => props.isOpen, (isOpen) => {
-    if (isOpen) refreshFiles();
-    else setMenuData(null);
-  }));
-
-  const handleFileSelect = async (e) => {
-    const selectedFiles = Array.from(e.currentTarget.files);
-    if (selectedFiles.length === 0) return;
-    for (const file of selectedFiles) await addUploadedFile(file);
-    await refreshFiles();
-    if (fileInputRef) fileInputRef.value = "";
-  };
-
-  const handleUrlUpload = async (url) => {
-    try {
-      const file = await addUploadedFileFromUrl(url);
-      pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
-      await refreshFiles();
-    } catch (error) {
-      pushErrorToast(error, { context: t("editor.files.uploadError") });
-      throw error;
-    }
-  };
-
-  const handleDelete = (fileName) => setFileToDelete(fileName);
-  
-  const confirmDelete = async () => {
-    try {
-      await deleteUploadedFile(fileToDelete());
-      await refreshFiles();
-    } catch (error) {
-      pushErrorToast(error, { context: "File deletion failed" });
-    }
-  };
-
-  const handleMenuOpen = ({ file, fileType, element }) => {
-    const drawerRect = drawerContentRef.getBoundingClientRect();
-    const itemRect = element.getBoundingClientRect();
-    
-    let x = itemRect.left - drawerRect.left;
-    let y = element.offsetTop;
-
-    const menuWidth = 192;
-    const menuHeight = 150;
-    const padding = 16;
-
-    if (x + menuWidth > drawerRect.width - padding) {
-      x = drawerRect.width - menuWidth - padding;
-    }
-    if (y + menuHeight > drawerContentRef.scrollHeight) {
-      y = drawerContentRef.scrollHeight - menuHeight - 5;
-    }
-    
-    setMenuData({ file, fileType, x, y });
-  };
-
-  const menuItems = createMemo(() => {
-    const data = menuData();
-    if (!data) return [];
-    const { file, fileType } = data;
-    const items = [];
-    if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
-      items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
-    }
-    if (fileType === 'image') {
-      items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
-    }
-    items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });
-    items.push({ label: t("editor.files.menu.delete"), onClick: () => handleDelete(file.name) });
-    return items;
-  });
 
   return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col">
-          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
-            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
-            <button onClick={props.onClose} class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"><CloseIcon /></button>
-          </header>
-
-          <div class="p-4 border-b border-[hsl(var(--border))] space-y-2">
-            <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect} class="hidden" />
-            <button onClick={() => fileInputRef.click()} class="w-full text-sm px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
-              {t("editor.files.uploadFromDisk")}
-            </button>
-            <button onClick={() => setShowUrlModal(true)} class="w-full text-sm px-3 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-              {t("editor.files.uploadFromUrl")}
-            </button>
-          </div>
-
-          <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
-            <Show when={sortedFiles().length > 0} fallback={
-              <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
-                {t("editor.files.empty")}
-              </div>
-            }>
-              <div class="grid grid-cols-3 gap-2">
-                <For each={sortedFiles()}>
-                  {(file) => <FileGridItem 
-                    file={file}
-                    onMenuOpen={handleMenuOpen}
-                  />}
-                </For>
-              </div>
-            </Show>
-            <Show when={menuData()}>
-              <FileContextMenu 
-                x={menuData().x} 
-                y={menuData().y} 
-                items={menuItems()} 
-                onClose={() => setMenuData(null)} 
-              />
-            </Show>
-          </div>
-
-          <footer class="p-4 border-t border-[hsl(var(--border))] text-xs text-center text-[hsl(var(--muted-foreground))]">
-            Total Size: <strong>{formatBytes(totalSize())}</strong>
-          </footer>
+    <div
+      class="relative group aspect-square rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] overflow-hidden cursor-pointer"
+      onClick={handleClick}
+      onContextMenu={handleClick}
+      title={props.file.name}
+    >
+      <Show when={fileType() === 'image'}>
+        <img src={props.file.url} alt={props.file.name} class="w-full h-full object-cover" />
+      </Show>
+      <Show when={fileType() === 'video'}>
+        <div class="w-full h-full flex items-center justify-center">
+          <VideoIcon />
         </div>
+      </Show>
+      <Show when={fileType() === 'audio'}>
+        <div class="w-full h-full flex items-center justify-center">
+          <AudioIcon />
+        </div>
+      </Show>
+
+      <span class="absolute top-0 right-0 z-10 text-white text-[10px] font-mono bg-black/40 px-1 rounded-sm">
+        {formatBytes(props.file.size, 0)}
+      </span>
+      
+      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center">
+        <span class="truncate">{props.file.name}</span>
       </div>
-      <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>
-      <UploadFromUrlModal isOpen={showUrlModal()} onClose={() => setShowUrlModal(false)} onUpload={handleUrlUpload} />
-      <ConfirmModal
-        isOpen={!!fileToDelete()}
-        onClose={() => setFileToDelete(null)}
-        onConfirm={confirmDelete}
-        title={t("editor.files.confirmDeleteTitle")}
-        message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
-      />
-    </>
+    </div>
   );
 }
 </file>
@@ -23508,160 +23231,92 @@ export default function UserCard(props) {
 }
 </file>
 
-<file path="src/components/Toaster.jsx">
-// src/components/Toaster.jsx
-import { For, Show } from "solid-js";
-import { toasts, dismissToast, toggleToast } from "./ui/toast";
-
-const typeStyles = {
-  info:    "bg-blue-600",
-  success: "bg-emerald-600",
-  warning: "bg-amber-600",
-  error:   "bg-red-600",
-};
-
-function pretty(obj) {
-  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
-}
-
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); } catch {}
-}
-
-export default function Toaster() {
-  return (
-    // Full-width bottom bar container; toasts align right when compact.
-    // We disable pointer events on the container so it doesn't block the page,
-    // and re-enable them on each toast.
-    <div class="fixed inset-x-0 bottom-0 z-[1000] p-3 pointer-events-none">
-      <div class="flex flex-col gap-2 items-end">
-        <For each={toasts()}>
-          {(t) => {
-            const headerColor = typeStyles[t.type] || typeStyles.info;
-            return (
-              // When expanded: stretch to full width; when compact: hug right (max ~28rem)
-              <div
-                class={`pointer-events-auto w-full ${
-                  t.expanded ? "" : "sm:w-[28rem] max-w-[92vw]"
-                }`}
-              >
-                <div class="text-white rounded shadow overflow-hidden">
-                  {/* Header bar */}
-                  <div class={`flex items-center justify-between px-3 py-2 ${headerColor}`}>
-                    <span class="text-sm font-medium">{t.message}</span>
-                    <div class="flex items-center gap-1">
-                      <Show when={t.details}>
-                        <button
-                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                          onClick={() => toggleToast(t.id)}
-                          aria-expanded={t.expanded}
-                          title={t.expanded ? "Hide details" : "Show details"}
-                        >
-                          {t.expanded ? "Hide" : "Details"}
-                        </button>
-                      </Show>
-                      <button
-                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
-                        onClick={() => dismissToast(t.id)}
-                        aria-label="Close notification"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Details panel — takes full width, tall & scrollable */}
-                  <Show when={t.expanded && t.details}>
-                    <div class="bg-gray-900 text-gray-100 px-4 py-3 max-h-[60vh] overflow-auto">
-                      <pre class="whitespace-pre-wrap break-words text-[12px] leading-tight">
-{pretty(t.details)}
-                      </pre>
-                      <div class="mt-2 flex justify-end">
-                        <button
-                          class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
-                          onClick={() => copy(pretty(t.details))}
-                          title="Copy details to clipboard"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  </Show>
-                </div>
-              </div>
-            );
-          }}
-        </For>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/context/useAppAuth.js">
-// src/context/useAppAuth.js
+<file path="src/context/useAppConnection.js">
+// src/context/useAppConnection.js
 import { createSignal, onMount } from "solid-js";
-import { getWsClient, getWsApi } from "../net/wsRuntime.js";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast } from "../components/ui/toast.js";
+import { parse } from "yaml";
+import { configureEndpoints } from "../net/endpoints";
+import { pushErrorToast } from "../ui/toast.js";
 
-const AUTH_USER_KEY = "savva_auth_user";
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+const OVERRIDE_KEY = "connect_override";
 
-export function useAppAuth() {
-  const [authorizedUser, setAuthorizedUser] = createSignal(null);
+function pickPersistable(cfg) { if (!cfg) return null; return { domain: cfg.domain || "", backendLink: ensureSlash(cfg.backendLink || "") }; }
+function loadOverride() { try { const raw = localStorage.getItem(OVERRIDE_KEY); if (!raw) return null; return pickPersistable(JSON.parse(raw)); } catch { return null; } }
+function saveOverride(obj) { try { if (!obj) localStorage.removeItem(OVERRIDE_KEY); else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj))); } catch { } }
 
-  onMount(() => {
+export function useAppConnection() {
+  const [config, setConfig] = createSignal(null);
+  const [info, setInfo] = createSignal(null);
+  const [error, setError] = createSignal(null);
+  const [loading, setLoading] = createSignal(true);
+  
+  async function fetchInfo(cfg) {
+    const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+    return await res.json();
+  }
+
+  async function applyConfig(nextCfg) {
+    setConfig(nextCfg);
+    const data = await fetchInfo(nextCfg);
+    setInfo(data);
+    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
+  }
+
+  async function init() {
+    setLoading(true);
+    setError(null);
     try {
-      const savedUser = localStorage.getItem(AUTH_USER_KEY);
-      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
-    } catch (e) {
-      console.error("Failed to load authorized user:", e);
-      localStorage.removeItem(AUTH_USER_KEY);
-    }
-  });
+      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
+      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
+      const data = parse(await res.text()) || {};
+      if (!data.backendLink) throw new Error("Missing backendLink in config");
 
-  async function login(coreUserData) {
-    if (!coreUserData || !coreUserData.address) return;
-    setAuthorizedUser(coreUserData);
-    try {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
-      const checksummedAccount = toChecksumAddress(coreUserData.address);
-      const userProfile = await getWsApi().call('get-user', {
-        domain: coreUserData.domain,
-        user_addr: checksummedAccount,
-      });
-      const fullUserData = { ...coreUserData, ...userProfile };
-      setAuthorizedUser(fullUserData);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
+      const baseCfg = { domain: data.domain || "", backendLink: ensureSlash(data.backendLink), gear: !!data.gear };
+      const merged = { ...baseCfg, ...loadOverride() };
+      await applyConfig(merged);
     } catch (e) {
-      console.error("Failed to fetch/save user profile after login:", e);
-      pushErrorToast(e, { context: "Profile fetch failed" });
+      setError(e);
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function logout() {
+  onMount(init);
+
+  async function updateConnect(partial) {
     try {
-      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
-      await fetch(`${httpBase()}logout`, { credentials: 'include' });
+      setLoading(true); setError(null);
+      const cur = config() || {};
+      const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
+      if (next.backendLink !== cur.backendLink) {
+        await applyConfig(next);
+      } else {
+        setConfig(next);
+        configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
+      }
+      saveOverride(next);
     } catch (e) {
-      console.error("Logout API call failed, proceeding with client-side logout.", e);
-    }
-    setAuthorizedUser(null);
-    try {
-      localStorage.removeItem(AUTH_USER_KEY);
-    } catch (e) {
-      console.error("Failed to clear authorized user:", e);
-    }
-    getWsClient()?.reconnect('user-logged-out');
+      setError(e);
+      pushErrorToast(e, { op: "updateConnect" });
+    } finally { setLoading(false); }
   }
 
-  function handleAuthError() {
-    console.warn("Authorization error detected, logging out.");
-    logout();
+  function setDomain(nextDomain) {
+    const cur = config() || {};
+    const next = { ...cur, domain: nextDomain || "" };
+    setConfig(next);
+    saveOverride(next);
+    configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
   }
 
-  return { authorizedUser, login, logout, handleAuthError };
+  async function clearConnectOverride() {
+    saveOverride(null);
+    await init();
+  }
+
+  return { config, info, error, loading, init, updateConnect, clearConnectOverride, setDomain };
 }
 </file>
 
@@ -23826,76 +23481,6 @@ export function useTheme() {
   useTheme.theme = theme;
 
   return [theme, toggleTheme];
-}
-</file>
-
-<file path="src/net/WsConnector.jsx">
-// src/net/WsConnector.jsx
-import { onMount, onCleanup, createSignal } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
-import { wsUrl } from "./endpoints";
-import { pushToast } from "../components/ui/toast.js"; // Import the toast helper
-import { useI18n } from "../i18n/useI18n.js"; // Import i18n for the message
-
-let _mounted = false;
-
-export default function WsConnector() {
-  if (_mounted) return null;
-  _mounted = true;
-
-  const app = useApp();
-  const { t } = useI18n();
-
-  // Expose helpers from the singleton runtime
-  const ws = getWsClient();
-  const api = getWsApi();
-
-  app.ws = ws;
-  app.wsUrl = wsUrl;
-  app.wsStatus = () => ws.status();
-  app.wsConnected = () => ws.status() === "open";
-  app.wsReconnect = (r) => ws.reconnect(r || "manual");
-  app.wsCall = api.call;
-  app.wsMethod = api.method;
-  app.alertBus = { on: onAlert, off: offAlert };
-  app.onAlert = onAlert;
-  app.offAlert = offAlert;
-
-  onMount(() => {
-    ensureWsStarted("connector-mount");
-
-    // This logic prevents the toast from showing on every reconnect attempt.
-    // It only shows if the *initial* connection fails.
-    const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
-
-    const onOpen = () => {
-      setHasConnectedOnce(true);
-    };
-
-    const onClose = () => {
-      if (!hasConnectedOnce()) {
-        pushToast({
-          type: "warning", // A warning is less severe than a hard error
-          message: t("error.ws.title"),
-          details: t("error.ws.message"),
-          autohideMs: 15000, // Show for 15 seconds
-        });
-      }
-    };
-
-    // Attach listeners to the WebSocket client
-    ws.on("open", onOpen);
-    ws.on("close", onClose);
-
-    // Clean up listeners when the component is unmounted
-    onCleanup(() => {
-      ws.off("open", onOpen);
-      ws.off("close", onClose);
-    });
-  });
-
-  return null;
 }
 </file>
 
@@ -24526,6 +24111,320 @@ export default function DocsContent(props) {
 }
 </file>
 
+<file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
+// src/components/editor/wizard_steps/StepUploadDescriptor.jsx
+import { createSignal, onMount, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { stringify as toYaml } from "yaml";
+import { httpBase } from "../../../net/endpoints.js";
+import { dbg } from "../../../utils/debug.js";
+import { createTextPreview } from "../../../editor/preview-utils.js";
+
+export default function StepUploadDescriptor(props) {
+  const app = useApp();
+  const { t } = app;
+  const [error, setError] = createSignal(null);
+  const [isUploading, setIsUploading] = createSignal(true);
+
+  const uploadDescriptor = async () => {
+    const { postData, postParams, publishedData } = props;
+    const data_cid = publishedData().ipfsCid;
+
+    if (!data_cid) {
+      throw new Error("IPFS data CID is missing from the previous step.");
+    }
+
+    const descriptor = {
+      savva_spec_version: "2.0",
+      data_cid: data_cid,
+      locales: {}
+    };
+
+    const gateways = app.info()?.ipfs_gateways;
+    if (gateways && Array.isArray(gateways) && gateways.length > 0) {
+      descriptor.gateways = gateways;
+    }
+
+    const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
+    Object.assign(descriptor, otherParams);
+    
+    const content = postData();
+    for (const lang in content) {
+      const data = content[lang];
+      const hasTitle = data.title?.trim().length > 0;
+      const hasBody = data.body?.trim().length > 0;
+      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
+
+      if (!hasTitle && !hasBody && !hasChapters) {
+        continue;
+      }
+      
+      const langParams = paramLocales?.[lang] || {};
+      
+      const localeObject = {
+        title: data.title || "",
+        text_preview: createTextPreview(data.body || ""),
+        tags: langParams.tags || [],
+        categories: langParams.categories || [],
+        data_path: `${lang}/data.md`,
+        chapters: []
+      };
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterParams = langParams.chapters?.[i] || {};
+          localeObject.chapters.push({
+            title: chapterParams.title || `Chapter ${i + 1}`,
+            data_path: `${lang}/chapters/${i + 1}.md`
+          });
+        }
+      }
+      
+      descriptor.locales[lang] = localeObject;
+    }
+    
+    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
+
+    const yamlStr = toYaml(descriptor);
+    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
+    const formData = new FormData();
+    formData.append('file', descriptorFile);
+
+    const url = `${httpBase()}store`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
+    }
+
+    const result = await response.json();
+    if (!result?.cid) {
+      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
+    }
+
+    return result.cid;
+  };
+
+  onMount(() => {
+    setTimeout(async () => {
+      try {
+        const descriptorCid = await uploadDescriptor();
+        props.onComplete?.(descriptorCid);
+      } catch (e) {
+        dbg.error("StepUploadDescriptor", "An error occurred:", e);
+        setError(e.message);
+      } finally {
+        setIsUploading(false);
+      }
+    }, 500);
+  });
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full">
+      <Show when={isUploading()}>
+        <Spinner />
+        <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
+      </Show>
+      <Show when={error()}>
+        <div class="text-center p-4">
+          <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
+          <p class="mt-2 text-sm">{error()}</p>
+          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+            {t("editor.publish.validation.backToEditor")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorFilesDrawer.jsx">
+// src/components/editor/EditorFilesDrawer.jsx
+import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
+import FileGridItem from "./FileGridItem.jsx";
+import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
+import { pushToast, pushErrorToast } from "../../ui/toast.js";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import FileContextMenu from "./FileContextMenu.jsx";
+import { formatBytes } from "../../utils/format.js";
+function CloseIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  );
+}
+
+export default function EditorFilesDrawer(props) {
+  const { t } = useApp();
+  const [files, setFiles] = createSignal([]);
+  const [showUrlModal, setShowUrlModal] = createSignal(false);
+  const [fileToDelete, setFileToDelete] = createSignal(null);
+  const [menuData, setMenuData] = createSignal(null);
+  let fileInputRef;
+  let drawerContentRef;
+
+  const sortedFiles = createMemo(() => {
+    return [...files()].sort((a, b) => (b.size || 0) - (a.size || 0));
+  });
+
+  const totalSize = createMemo(() => {
+    return files().reduce((acc, file) => acc + (file.size || 0), 0);
+  });
+
+  const refreshFiles = async () => {
+    const fileList = await listUploadedFiles();
+    setFiles(fileList);
+  };
+
+  createEffect(on(() => props.isOpen, (isOpen) => {
+    if (isOpen) refreshFiles();
+    else setMenuData(null);
+  }));
+
+  const handleFileSelect = async (e) => {
+    const selectedFiles = Array.from(e.currentTarget.files);
+    if (selectedFiles.length === 0) return;
+    for (const file of selectedFiles) await addUploadedFile(file);
+    await refreshFiles();
+    if (fileInputRef) fileInputRef.value = "";
+  };
+
+  const handleUrlUpload = async (url) => {
+    try {
+      const file = await addUploadedFileFromUrl(url);
+      pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: t("editor.files.uploadError") });
+      throw error;
+    }
+  };
+
+  const handleDelete = (fileName) => setFileToDelete(fileName);
+  
+  const confirmDelete = async () => {
+    try {
+      await deleteUploadedFile(fileToDelete());
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: "File deletion failed" });
+    }
+  };
+
+  const handleMenuOpen = ({ file, fileType, element }) => {
+    const drawerRect = drawerContentRef.getBoundingClientRect();
+    const itemRect = element.getBoundingClientRect();
+    
+    let x = itemRect.left - drawerRect.left;
+    let y = element.offsetTop;
+
+    const menuWidth = 192;
+    const menuHeight = 150;
+    const padding = 16;
+
+    if (x + menuWidth > drawerRect.width - padding) {
+      x = drawerRect.width - menuWidth - padding;
+    }
+    if (y + menuHeight > drawerContentRef.scrollHeight) {
+      y = drawerContentRef.scrollHeight - menuHeight - 5;
+    }
+    
+    setMenuData({ file, fileType, x, y });
+  };
+
+  const menuItems = createMemo(() => {
+    const data = menuData();
+    if (!data) return [];
+    const { file, fileType } = data;
+    const items = [];
+    if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
+      items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
+    }
+    if (fileType === 'image') {
+      items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
+    }
+    items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });
+    items.push({ label: t("editor.files.menu.delete"), onClick: () => handleDelete(file.name) });
+    return items;
+  });
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col">
+          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
+            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
+            <button onClick={props.onClose} class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"><CloseIcon /></button>
+          </header>
+
+          <div class="p-4 border-b border-[hsl(var(--border))] space-y-2">
+            <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect} class="hidden" />
+            <button onClick={() => fileInputRef.click()} class="w-full text-sm px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+              {t("editor.files.uploadFromDisk")}
+            </button>
+            <button onClick={() => setShowUrlModal(true)} class="w-full text-sm px-3 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+              {t("editor.files.uploadFromUrl")}
+            </button>
+          </div>
+
+          <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
+            <Show when={sortedFiles().length > 0} fallback={
+              <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
+                {t("editor.files.empty")}
+              </div>
+            }>
+              <div class="grid grid-cols-3 gap-2">
+                <For each={sortedFiles()}>
+                  {(file) => <FileGridItem 
+                    file={file}
+                    onMenuOpen={handleMenuOpen}
+                  />}
+                </For>
+              </div>
+            </Show>
+            <Show when={menuData()}>
+              <FileContextMenu 
+                x={menuData().x} 
+                y={menuData().y} 
+                items={menuItems()} 
+                onClose={() => setMenuData(null)} 
+              />
+            </Show>
+          </div>
+
+          <footer class="p-4 border-t border-[hsl(var(--border))] text-xs text-center text-[hsl(var(--muted-foreground))]">
+            Total Size: <strong>{formatBytes(totalSize())}</strong>
+          </footer>
+        </div>
+      </div>
+      <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>
+      <UploadFromUrlModal isOpen={showUrlModal()} onClose={() => setShowUrlModal(false)} onUpload={handleUrlUpload} />
+      <ConfirmModal
+        isOpen={!!fileToDelete()}
+        onClose={() => setFileToDelete(null)}
+        onConfirm={confirmDelete}
+        title={t("editor.files.confirmDeleteTitle")}
+        message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
+      />
+    </>
+  );
+}
+</file>
+
 <file path="src/components/editor/PostSubmissionWizard.jsx">
 // src/components/editor/PostSubmissionWizard.jsx
 /*
@@ -24936,6 +24835,163 @@ export default function Tabs(props) {
       </For>
     </ul>
   );
+}
+</file>
+
+<file path="src/components/Toaster.jsx">
+// src/components/Toaster.jsx
+import { For, Show } from "solid-js";
+import { toasts, dismissToast, toggleToast } from "../ui/toast";
+
+const typeStyles = {
+  info:    "bg-blue-600",
+  success: "bg-emerald-600",
+  warning: "bg-amber-600",
+  error:   "bg-red-600",
+};
+
+function pretty(obj) {
+  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); } catch {}
+}
+
+export default function Toaster() {
+  return (
+    // Full-width bottom bar container; toasts align right when compact.
+    // We disable pointer events on the container so it doesn't block the page,
+    // and re-enable them on each toast.
+    <div class="fixed inset-x-0 bottom-0 z-[1000] p-3 pointer-events-none">
+      <div class="flex flex-col gap-2 items-end">
+        <For each={toasts()}>
+          {(t) => {
+            const headerColor = typeStyles[t.type] || typeStyles.info;
+            return (
+              // When expanded: stretch to full width; when compact: hug right (max ~28rem)
+              <div
+                class={`pointer-events-auto w-full ${
+                  t.expanded ? "" : "sm:w-[28rem] max-w-[92vw]"
+                }`}
+              >
+                <div class="text-white rounded shadow overflow-hidden">
+                  {/* Header bar */}
+                  <div class={`flex items-center justify-between px-3 py-2 ${headerColor}`}>
+                    <span class="text-sm font-medium">{t.message}</span>
+                    <div class="flex items-center gap-1">
+                      <Show when={t.details}>
+                        <button
+                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
+                          onClick={() => toggleToast(t.id)}
+                          aria-expanded={t.expanded}
+                          title={t.expanded ? "Hide details" : "Show details"}
+                        >
+                          {t.expanded ? "Hide" : "Details"}
+                        </button>
+                      </Show>
+                      <button
+                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
+                        onClick={() => dismissToast(t.id)}
+                        aria-label="Close notification"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Details panel — takes full width, tall & scrollable */}
+                  <Show when={t.expanded && t.details}>
+                    <div class="bg-gray-900 text-gray-100 px-4 py-3 max-h-[60vh] overflow-auto">
+                      <pre class="whitespace-pre-wrap break-words text-[12px] leading-tight">
+{pretty(t.details)}
+                      </pre>
+                      <div class="mt-2 flex justify-end">
+                        <button
+                          class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
+                          onClick={() => copy(pretty(t.details))}
+                          title="Copy details to clipboard"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/context/useAppAuth.js">
+// src/context/useAppAuth.js
+import { createSignal, onMount } from "solid-js";
+import { getWsClient, getWsApi } from "../net/wsRuntime.js";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast } from "../ui/toast.js";
+
+const AUTH_USER_KEY = "savva_auth_user";
+
+export function useAppAuth() {
+  const [authorizedUser, setAuthorizedUser] = createSignal(null);
+
+  onMount(() => {
+    try {
+      const savedUser = localStorage.getItem(AUTH_USER_KEY);
+      if (savedUser) setAuthorizedUser(JSON.parse(savedUser));
+    } catch (e) {
+      console.error("Failed to load authorized user:", e);
+      localStorage.removeItem(AUTH_USER_KEY);
+    }
+  });
+
+  async function login(coreUserData) {
+    if (!coreUserData || !coreUserData.address) return;
+    setAuthorizedUser(coreUserData);
+    try {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
+      const checksummedAccount = toChecksumAddress(coreUserData.address);
+      const userProfile = await getWsApi().call('get-user', {
+        domain: coreUserData.domain,
+        user_addr: checksummedAccount,
+      });
+      const fullUserData = { ...coreUserData, ...userProfile };
+      setAuthorizedUser(fullUserData);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUserData));
+    } catch (e) {
+      console.error("Failed to fetch/save user profile after login:", e);
+      pushErrorToast(e, { context: "Profile fetch failed" });
+    }
+  }
+
+  async function logout() {
+    try {
+      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
+      await fetch(`${httpBase()}logout`, { credentials: 'include' });
+    } catch (e) {
+      console.error("Logout API call failed, proceeding with client-side logout.", e);
+    }
+    setAuthorizedUser(null);
+    try {
+      localStorage.removeItem(AUTH_USER_KEY);
+    } catch (e) {
+      console.error("Failed to clear authorized user:", e);
+    }
+    getWsClient()?.reconnect('user-logged-out');
+  }
+
+  function handleAuthError() {
+    console.warn("Authorization error detected, logging out.");
+    logout();
+  }
+
+  return { authorizedUser, login, logout, handleAuthError };
 }
 </file>
 
@@ -25736,6 +25792,76 @@ export default class WsClient {
 }
 </file>
 
+<file path="src/net/WsConnector.jsx">
+// src/net/WsConnector.jsx
+import { onMount, onCleanup, createSignal } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
+import { wsUrl } from "./endpoints";
+import { pushToast } from "../ui/toast.js"; // Import the toast helper
+import { useI18n } from "../i18n/useI18n.js"; // Import i18n for the message
+
+let _mounted = false;
+
+export default function WsConnector() {
+  if (_mounted) return null;
+  _mounted = true;
+
+  const app = useApp();
+  const { t } = useI18n();
+
+  // Expose helpers from the singleton runtime
+  const ws = getWsClient();
+  const api = getWsApi();
+
+  app.ws = ws;
+  app.wsUrl = wsUrl;
+  app.wsStatus = () => ws.status();
+  app.wsConnected = () => ws.status() === "open";
+  app.wsReconnect = (r) => ws.reconnect(r || "manual");
+  app.wsCall = api.call;
+  app.wsMethod = api.method;
+  app.alertBus = { on: onAlert, off: offAlert };
+  app.onAlert = onAlert;
+  app.offAlert = offAlert;
+
+  onMount(() => {
+    ensureWsStarted("connector-mount");
+
+    // This logic prevents the toast from showing on every reconnect attempt.
+    // It only shows if the *initial* connection fails.
+    const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
+
+    const onOpen = () => {
+      setHasConnectedOnce(true);
+    };
+
+    const onClose = () => {
+      if (!hasConnectedOnce()) {
+        pushToast({
+          type: "warning", // A warning is less severe than a hard error
+          message: t("error.ws.title"),
+          details: t("error.ws.message"),
+          autohideMs: 15000, // Show for 15 seconds
+        });
+      }
+    };
+
+    // Attach listeners to the WebSocket client
+    ws.on("open", onOpen);
+    ws.on("close", onClose);
+
+    // Clean up listeners when the component is unmounted
+    onCleanup(() => {
+      ws.off("open", onOpen);
+      ws.off("close", onClose);
+    });
+  });
+
+  return null;
+}
+</file>
+
 <file path="src/pages/Docs.jsx">
 // src/pages/Docs.jsx
 import { createMemo } from "solid-js";
@@ -25836,128 +25962,6 @@ export default function Docs() {
 </body>
 
 </html>
-</file>
-
-<file path="src/components/editor/EditorFullPreview.jsx">
-// src/components/editor/EditorFullPreview.jsx
-import { createMemo, Show, createSignal } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import MarkdownView from "../docs/MarkdownView.jsx";
-import UserCard from "../ui/UserCard.jsx";
-import PostTags from "../post/PostTags.jsx";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
-import ChapterSelector from "../post/ChapterSelector.jsx";
-import ChapterPager from "../post/ChapterPager.jsx";
-import LangSelector from "../ui/LangSelector.jsx";
-
-export default function EditorFullPreview(props) {
-  const app = useApp();
-  const { t } = app;
-  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
-  const [previewLang, setPreviewLang] = createSignal(props.activeLang);
-
-  const author = () => app.authorizedUser();
-  const lang = () => previewLang();
-
-  const title = createMemo(() => props.postData?.[lang()]?.title || "");
-
-  const chapterList = createMemo(() => {
-    const prologue = { title: t("post.chapters.prologue") };
-    const currentChapters = props.chapters?.filter(c => props.postData[lang()]?.chapters.includes(c)) || [];
-    return [prologue, ...(props.chapters || [])];
-  });
-
-  const currentContent = createMemo(() => {
-    const data = props.postData?.[lang()];
-    if (!data) return "";
-    const index = selectedChapterIndex();
-    if (index === 0) {
-      return data.body || "";
-    }
-    return data.chapters?.[index - 1]?.body || "";
-  });
-
-  const postForTags = createMemo(() => ({
-    savva_content: {
-      locales: {
-        [lang()]: {
-          categories: props.postParams?.locales?.[lang()]?.categories || [],
-          tags: props.postParams?.locales?.[lang()]?.tags || [],
-        }
-      }
-    }
-  }));
-
-  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls]);
-
-  return (
-    <div class="max-w-5xl mx-auto space-y-4">
-      <div class="p-3 pr-4 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
-        <button onClick={props.onBack} class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
-          {t("editor.fullPreview.back")}
-        </button>
-        <div class="text-center text-[hsl(var(--card))]">
-          <h2 class="font-bold">{t("editor.fullPreview.title")}</h2>
-          <p class="text-xs opacity-90">{t("editor.fullPreview.help")}</p>
-        </div>
-        <button 
-          onClick={props.onContinue}
-          class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90"
-        >
-          {t("editor.fullPreview.publish")}
-        </button>
-      </div>
-      
-      <div class="bg-[hsl(var(--background))] p-4 rounded-lg border border-[hsl(var(--border))]">
-        <article class="space-y-4">
-          <header class="flex justify-between items-start gap-4">
-            <div class="flex-1 min-w-0 space-y-3">
-              <h1 class="text-2xl lg:text-3xl font-bold break-words">{title()}</h1>
-              <UserCard author={author()} />
-              <PostTags postData={postForTags()} />
-            </div>
-            <div class="w-48 flex-shrink-0 space-y-2">
-              <Show when={props.thumbnailUrl}>
-                <img src={props.thumbnailUrl} alt="Thumbnail preview" class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" />
-              </Show>
-              <Show when={(props.filledLangs || []).length > 1}>
-                <div class="flex justify-center">
-                    <LangSelector
-                        codes={props.filledLangs}
-                        value={previewLang()}
-                        onChange={setPreviewLang}
-                    />
-                </div>
-              </Show>
-            </div>
-          </header>
-
-          <div class="pt-4 border-t border-[hsl(var(--border))]">
-              <Show when={(chapterList()?.length || 0) > 1}>
-                  <div class="flex justify-end mb-4">
-                  <ChapterSelector 
-                      chapters={chapterList()} 
-                      selectedIndex={selectedChapterIndex()} 
-                      onSelect={setSelectedChapterIndex}
-                  />
-                  </div>
-              </Show>
-              <MarkdownView markdown={currentContent()} rehypePlugins={markdownPlugins()} />
-              <Show when={(chapterList()?.length || 0) > 1}>
-                  <ChapterPager 
-                      chapters={chapterList()}
-                      currentIndex={selectedChapterIndex()}
-                      onSelect={setSelectedChapterIndex}
-                  />
-              </Show>
-          </div>
-        </article>
-      </div>
-    </div>
-  );
-}
 </file>
 
 <file path="src/components/feed/ContentFeed.jsx">
@@ -26163,6 +26167,128 @@ render(() => (
     <App />
   </AppProvider>
 ), root);
+</file>
+
+<file path="src/components/editor/EditorFullPreview.jsx">
+// src/components/editor/EditorFullPreview.jsx
+import { createMemo, Show, createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import MarkdownView from "../docs/MarkdownView.jsx";
+import UserCard from "../ui/UserCard.jsx";
+import PostTags from "../post/PostTags.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import { rehypeResolveDraftUrls } from "../../docs/rehype-resolve-draft-urls.js";
+import ChapterSelector from "../post/ChapterSelector.jsx";
+import ChapterPager from "../post/ChapterPager.jsx";
+import LangSelector from "../ui/LangSelector.jsx";
+
+export default function EditorFullPreview(props) {
+  const app = useApp();
+  const { t } = app;
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+  const [previewLang, setPreviewLang] = createSignal(props.activeLang);
+
+  const author = () => app.authorizedUser();
+  const lang = () => previewLang();
+
+  const title = createMemo(() => props.postData?.[lang()]?.title || "");
+
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue") };
+    const currentChapters = props.chapters?.filter(c => props.postData[lang()]?.chapters.includes(c)) || [];
+    return [prologue, ...(props.chapters || [])];
+  });
+
+  const currentContent = createMemo(() => {
+    const data = props.postData?.[lang()];
+    if (!data) return "";
+    const index = selectedChapterIndex();
+    if (index === 0) {
+      return data.body || "";
+    }
+    return data.chapters?.[index - 1]?.body || "";
+  });
+
+  const postForTags = createMemo(() => ({
+    savva_content: {
+      locales: {
+        [lang()]: {
+          categories: props.postParams?.locales?.[lang()]?.categories || [],
+          tags: props.postParams?.locales?.[lang()]?.tags || [],
+        }
+      }
+    }
+  }));
+
+  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls]);
+
+  return (
+    <div class="max-w-5xl mx-auto space-y-4">
+      <div class="p-3 pr-4 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
+        <button onClick={props.onBack} class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
+          {t("editor.fullPreview.back")}
+        </button>
+        <div class="text-center text-[hsl(var(--card))]">
+          <h2 class="font-bold">{t("editor.fullPreview.title")}</h2>
+          <p class="text-xs opacity-90">{t("editor.fullPreview.help")}</p>
+        </div>
+        <button 
+          onClick={props.onContinue}
+          class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90"
+        >
+          {t("editor.fullPreview.publish")}
+        </button>
+      </div>
+      
+      <div class="bg-[hsl(var(--background))] p-4 rounded-lg border border-[hsl(var(--border))]">
+        <article class="space-y-4">
+          <header class="flex justify-between items-start gap-4">
+            <div class="flex-1 min-w-0 space-y-3">
+              <h1 class="text-2xl lg:text-3xl font-bold break-words">{title()}</h1>
+              <UserCard author={author()} />
+              <PostTags postData={postForTags()} />
+            </div>
+            <div class="w-48 flex-shrink-0 space-y-2">
+              <Show when={props.thumbnailUrl}>
+                <img src={props.thumbnailUrl} alt="Thumbnail preview" class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" />
+              </Show>
+              <Show when={(props.filledLangs || []).length > 1}>
+                <div class="flex justify-center">
+                    <LangSelector
+                        codes={props.filledLangs}
+                        value={previewLang()}
+                        onChange={setPreviewLang}
+                    />
+                </div>
+              </Show>
+            </div>
+          </header>
+
+          <div class="pt-4 border-t border-[hsl(var(--border))]">
+              <Show when={(chapterList()?.length || 0) > 1}>
+                  <div class="flex justify-end mb-4">
+                  <ChapterSelector 
+                      chapters={chapterList()} 
+                      selectedIndex={selectedChapterIndex()} 
+                      onSelect={setSelectedChapterIndex}
+                  />
+                  </div>
+              </Show>
+              <MarkdownView markdown={currentContent()} rehypePlugins={markdownPlugins()} />
+              <Show when={(chapterList()?.length || 0) > 1}>
+                  <ChapterPager 
+                      chapters={chapterList()}
+                      currentIndex={selectedChapterIndex()}
+                      onSelect={setSelectedChapterIndex}
+                  />
+              </Show>
+          </div>
+        </article>
+      </div>
+    </div>
+  );
+}
 </file>
 
 <file path="src/components/settings/DeveloperSection.jsx">
@@ -26669,6 +26795,136 @@ html.dark .sv-docs code[data-theme*=" "] span {
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
+<file path="src/i18n/useI18n.js">
+// src/i18n/useI18n.js
+import { createSignal } from "solid-js";
+import en from "./en";
+import ru from "./ru";
+import sr from "./sr";
+import ua from "./ua";
+import fr from "./fr";
+
+// Used by the Lang selector for labels
+export const LANG_INFO = {
+  en: { code: "EN", name: "English" },
+  ru: { code: "RU", name: "Русский" },
+  fr: { code: "FR", name: "Français" },
+  ua: { code: "UA", name: "Українська" },
+  sr: { code: "SR", name: "Српски" },
+};
+
+// All built-in application dictionaries. The keys must match LANG_INFO.
+const APP_DICTS = { en, ru, fr, ua, sr };
+
+const DEFAULT_LANG = "en";
+const LANG_KEY = "lang";
+const SHOW_KEYS_KEY = "i18n_show_keys";
+
+let i18nSingleton;
+
+// !!!!! special comment to include the keys generated automatically
+// !!!!! Do not edit this section manually
+// t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
+// t("tabs.title.new") t("tabs.title.for-you")
+
+function normalizeLang(code) {
+  const s = String(code || "").trim().toLowerCase();
+  const [base] = s.split(/[-_]/); // "en-US" -> "en"
+  return base || DEFAULT_LANG;
+}
+
+export function useI18n() {
+  if (!i18nSingleton) {
+    const [domainDicts, setDomainDicts] = createSignal({});
+    const [domainLangCodes, setDomainLangCodes] = createSignal([]);
+
+    const resolveKey = (lang, key) => {
+      const d = domainDicts();
+      const fromDomain = d[lang]?.[key];
+      if (fromDomain != null) return fromDomain;
+
+      const fromApp = APP_DICTS[lang]?.[key];
+      if (fromApp != null) return fromApp;
+
+      if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
+      return `[${key}]`;
+    }
+
+    const readInitialLang = () => {
+      try {
+        const v = localStorage.getItem(LANG_KEY);
+        return normalizeLang(v || DEFAULT_LANG);
+      } catch {
+        return DEFAULT_LANG;
+      }
+    };
+    const readInitialShowKeys = () => {
+      try {
+        return localStorage.getItem(SHOW_KEYS_KEY) === "1";
+      } catch {
+        return false;
+      }
+    };
+
+    const [lang, setLangSignal] = createSignal(readInitialLang());
+    const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
+
+    function setLang(next) {
+      const v = normalizeLang(next);
+      setLangSignal(v);
+      try { localStorage.setItem(LANG_KEY, v); } catch {}
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("lang", v);
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("savva:lang", { detail: { lang: v } }));
+      }
+    }
+
+    function setShowKeys(on) {
+      const v = !!on;
+      setShowKeysSignal(v);
+      try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch {}
+    }
+
+    const t = (key, params) => {
+      let base = resolveKey(lang(), key);
+      if (params) {
+        for (const [paramKey, paramValue] of Object.entries(params)) {
+          base = base.replace(`{${paramKey}}`, String(paramValue));
+        }
+      }
+      return showKeys() ? `${base} [${key}]` : base;
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (e) => {
+        if (e.key === LANG_KEY && e.newValue) setLangSignal(normalizeLang(e.newValue));
+        if (e.key === SHOW_KEYS_KEY) setShowKeysSignal(e.newValue === "1");
+      });
+    }
+
+    const available = () => {
+      const domainCodes = domainLangCodes();
+      if (domainCodes.length > 0) return domainCodes;
+      return Object.keys(APP_DICTS);
+    };
+
+    i18nSingleton = {
+      t,
+      lang,
+      setLang,
+      showKeys,
+      setShowKeys,
+      available,
+      setDomainDictionaries: (d) => setDomainDicts(d || {}),
+      setDomainLangCodes: (codes) => setDomainLangCodes(codes || []),
+    };
+  }
+  return i18nSingleton;
+}
+</file>
+
 <file path="src/editor/storage.js">
 // src/editor/storage.js
 import { dbg } from "../utils/debug";
@@ -26762,7 +27018,33 @@ export async function addUploadedFileFromUrl(url) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const blob = await response.blob();
-    const fileName = url.substring(url.lastIndexOf('/') + 1) || "downloaded_file";
+    
+    let fileName;
+    try {
+      // Decode any percent-encoded characters first (like %3F -> ?)
+      const decodedUrl = decodeURIComponent(url);
+      // Now, we can reliably parse the URL to separate the path from real query params.
+      const urlObj = new URL(decodedUrl);
+      
+      let name = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('/') + 1);
+
+      // Smartly append extension from 'filename' query param if the name lacks one.
+      const filenameParam = urlObj.searchParams.get('filename');
+      if (name && !name.includes('.') && filenameParam && filenameParam.startsWith('.')) {
+        name += filenameParam;
+      }
+      
+      // Sanitize the final name to ensure it's valid.
+      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    } catch (e) {
+      // Fallback for malformed URLs that the constructor can't handle.
+      const decodedUrl = decodeURIComponent(url);
+      const cleanUrl = decodedUrl.split('?')[0].split('#')[0];
+      let name = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
     const file = new File([blob], fileName, { type: blob.type });
     await addUploadedFile(file);
     return file;
@@ -26943,142 +27225,12 @@ export async function clearNewPostDraft() {
 }
 </file>
 
-<file path="src/i18n/useI18n.js">
-// src/i18n/useI18n.js
-import { createSignal } from "solid-js";
-import en from "./en";
-import ru from "./ru";
-import sr from "./sr";
-import ua from "./ua";
-import fr from "./fr";
-
-// Used by the Lang selector for labels
-export const LANG_INFO = {
-  en: { code: "EN", name: "English" },
-  ru: { code: "RU", name: "Русский" },
-  fr: { code: "FR", name: "Français" },
-  ua: { code: "UA", name: "Українська" },
-  sr: { code: "SR", name: "Српски" },
-};
-
-// All built-in application dictionaries. The keys must match LANG_INFO.
-const APP_DICTS = { en, ru, fr, ua, sr };
-
-const DEFAULT_LANG = "en";
-const LANG_KEY = "lang";
-const SHOW_KEYS_KEY = "i18n_show_keys";
-
-let i18nSingleton;
-
-// !!!!! special comment to include the keys generated automatically
-// !!!!! Do not edit this section manually
-// t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
-// t("tabs.title.new") t("tabs.title.for-you")
-
-function normalizeLang(code) {
-  const s = String(code || "").trim().toLowerCase();
-  const [base] = s.split(/[-_]/); // "en-US" -> "en"
-  return base || DEFAULT_LANG;
-}
-
-export function useI18n() {
-  if (!i18nSingleton) {
-    const [domainDicts, setDomainDicts] = createSignal({});
-    const [domainLangCodes, setDomainLangCodes] = createSignal([]);
-
-    const resolveKey = (lang, key) => {
-      const d = domainDicts();
-      const fromDomain = d[lang]?.[key];
-      if (fromDomain != null) return fromDomain;
-
-      const fromApp = APP_DICTS[lang]?.[key];
-      if (fromApp != null) return fromApp;
-
-      if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
-      return `[${key}]`;
-    }
-
-    const readInitialLang = () => {
-      try {
-        const v = localStorage.getItem(LANG_KEY);
-        return normalizeLang(v || DEFAULT_LANG);
-      } catch {
-        return DEFAULT_LANG;
-      }
-    };
-    const readInitialShowKeys = () => {
-      try {
-        return localStorage.getItem(SHOW_KEYS_KEY) === "1";
-      } catch {
-        return false;
-      }
-    };
-
-    const [lang, setLangSignal] = createSignal(readInitialLang());
-    const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
-
-    function setLang(next) {
-      const v = normalizeLang(next);
-      setLangSignal(v);
-      try { localStorage.setItem(LANG_KEY, v); } catch {}
-      if (typeof document !== "undefined") {
-        document.documentElement.setAttribute("lang", v);
-      }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("savva:lang", { detail: { lang: v } }));
-      }
-    }
-
-    function setShowKeys(on) {
-      const v = !!on;
-      setShowKeysSignal(v);
-      try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch {}
-    }
-
-    const t = (key, params) => {
-      let base = resolveKey(lang(), key);
-      if (params) {
-        for (const [paramKey, paramValue] of Object.entries(params)) {
-          base = base.replace(`{${paramKey}}`, String(paramValue));
-        }
-      }
-      return showKeys() ? `${base} [${key}]` : base;
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", (e) => {
-        if (e.key === LANG_KEY && e.newValue) setLangSignal(normalizeLang(e.newValue));
-        if (e.key === SHOW_KEYS_KEY) setShowKeysSignal(e.newValue === "1");
-      });
-    }
-
-    const available = () => {
-      const domainCodes = domainLangCodes();
-      if (domainCodes.length > 0) return domainCodes;
-      return Object.keys(APP_DICTS);
-    };
-
-    i18nSingleton = {
-      t,
-      lang,
-      setLang,
-      showKeys,
-      setShowKeys,
-      available,
-      setDomainDictionaries: (d) => setDomainDicts(d || {}),
-      setDomainLangCodes: (codes) => setDomainLangCodes(codes || []),
-    };
-  }
-  return i18nSingleton;
-}
-</file>
-
 <file path="src/components/docs/MarkdownView.jsx">
 // src/components/docs/MarkdownView.jsx
 import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
-import { rehypeMediaPlayers } from "./rehype-media-players.js";
+import { rehypeMediaPlayers } from "../../docs/rehype-media-players.js";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypePrettyCode from "rehype-pretty-code";
@@ -27227,561 +27379,6 @@ export default function MarkdownView(props) {
       innerHTML={html()}
       aria-label={t("docs.article")}
     />
-  );
-}
-</file>
-
-<file path="src/components/feed/PostCard.jsx">
-// src/components/feed/PostCard.jsx
-import { Show, createMemo, createSignal } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UserCard from "../ui/UserCard.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import PostInfo from "./PostInfo.jsx";
-import NftBadge from "../ui/icons/NftBadge.jsx";
-import PostFundBadge from "../ui/PostFundBadge.jsx";
-import { navigate } from "../../routing/hashRouter";
-import ContextMenu from "../ui/ContextMenu.jsx";
-import { pushToast } from "../ui/toast.js";
-import { resolvePostCidPath } from "../../ipfs/utils.js";
-
-function PinIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
-      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-      <g id="SVGRepo_iconCarrier">
-        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
-      </g>
-    </svg>
-  );
-}
-
-function getLocalizedField(locales, fieldName, currentLang) {
-  if (!locales || typeof locales !== 'object') return "";
-  if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
-  if (locales.en?.[fieldName]) return locales.en[fieldName];
-  const firstLocaleKey = Object.keys(locales)[0];
-  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
-    return locales[firstLocaleKey][fieldName];
-  }
-  return "";
-}
-
-export default function PostCard(props) {
-  const app = useApp();
-  const { t } = app;
-  const author = () => props.item._raw?.author;
-  const content = () => props.item._raw?.savva_content;
-  const fund = () => props.item._raw?.fund;
-  const isListMode = () => props.mode === 'list';
-  const [isHovered, setIsHovered] = createSignal(false);
-
-  const displayImageSrc = createMemo(() => {
-    const thumbnailPath = content()?.thumbnail;
-    if (thumbnailPath) {
-      return thumbnailPath;
-    }
-    return author()?.avatar;
-  });
-
-  const title = createMemo(() => {
-    return getLocalizedField(content()?.locales, "title", app.lang());
-  });
-
-  const textPreview = createMemo(() => {
-    return getLocalizedField(content()?.locales, "text_preview", app.lang());
-  });
-
-  const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.-bottom-2.-right-2')) {
-      return;
-    }
-    e.preventDefault();
-    const postId = props.item?.id; 
-    if (postId) {
-      app.setSavedScrollY(window.scrollY);
-      navigate(`/post/${postId}`);
-    } else {
-      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
-    }
-  };
-
-  const handleUserClick = (e) => {
-    e.stopPropagation();
-    console.log("User card clicked, navigating to profile for:", author()?.address);
-  };
-
-  const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text).then(() => {
-      pushToast({ type: "success", message: t("clipboard.copied", { label }) });
-    }).catch(err => {
-      console.error(`Failed to copy ${label}:`, err);
-    });
-  };
-
-  const finalContextMenuItems = createMemo(() => {
-    const propItems = props.contextMenuItems || [];
-    const baseAdminItems = [];
-    const raw = props.item?._raw;
-
-    if (raw) {
-      const savvaCid = props.item.id;
-      const ipfsCid = raw.data_cid || raw.ipfs?.split('/')[0];
-
-      if (savvaCid) {
-        baseAdminItems.push({
-          label: t("postcard.copySavvaCid"),
-          onClick: () => copyToClipboard(savvaCid, "SAVVA CID")
-        });
-      }
-      if (ipfsCid) {
-        baseAdminItems.push({
-          label: t("postcard.copyIpfsCid"),
-          onClick: () => copyToClipboard(ipfsCid, "IPFS CID")
-        });
-      }
-    }
-    
-    return [...propItems, ...baseAdminItems];
-  });
-
-  const articleClasses = createMemo(() => {
-    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
-    if (isListMode()) {
-      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
-    }
-    return `${base} flex-col`;
-  });
-
-  const imageContainerClasses = createMemo(() => {
-    const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
-    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
-  });
-  
-  const ImageBlock = () => {
-    const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
-    return (
-      <div class={imageContainerClasses()}>
-        <IpfsImage
-          src={displayImageSrc()}
-          class={roundingClass}
-          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
-        />
-        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
-          <div class="absolute bottom-2 right-0 z-10">
-            <PostFundBadge amount={fund()?.amount} />
-          </div>
-        </Show>
-      </div>
-    );
-  };
-
-  const contentContainerClasses = createMemo(() => {
-    return isListMode()
-      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
-      : "px-3 pb-3 flex-1 flex flex-col";
-  });
-
-  const textPreviewClasses = createMemo(() => {
-    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
-    if (isListMode()) {
-      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
-    }
-    return `${base} line-clamp-3`;
-  });
-
-  const ContentBlock = () => (
-    <div class={contentContainerClasses()}>
-      <div class="flex-1 space-y-1 min-h-0">
-        <Show when={title()}>
-          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
-            {title()}
-          </h4>
-        </Show>
-        <Show when={textPreview() && !props.compact}>
-          <p class={textPreviewClasses()}>
-            {textPreview()}
-          </p>
-        </Show>
-      </div>
-      
-      <div class="mt-1 user-card-container" onClick={handleUserClick}>
-        <UserCard author={author()} compact={props.compact} />
-      </div>
-
-      <Show when={!props.compact}>
-        <PostInfo item={props.item} mode={props.mode} />
-      </Show>
-    </div>
-  );
-
-  return (
-    <article 
-      class={articleClasses()} 
-      onClick={handleCardClick} 
-      style={{ cursor: 'pointer' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <Show when={props.item._raw?.pinned}>
-        <div class="absolute -top-2 -left-2 z-10">
-          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
-        </div>
-      </Show>
-
-      <Show when={props.item._raw?.nft?.owner}>
-        <div class="absolute -top-2 -right-2 z-10">
-          <NftBadge />
-        </div>
-      </Show>
-
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
-        <ContextMenu items={finalContextMenuItems()} />
-      </Show>
-
-      <Show
-        when={isListMode()}
-        fallback={
-          <>
-            <ImageBlock />
-            <ContentBlock />
-          </>
-        }
-      >
-        <ContentBlock />
-        <ImageBlock />
-      </Show>
-    </article>
-  );
-}
-</file>
-
-<file path="src/pages/PostPage.jsx">
-// src/pages/PostPage.jsx
-import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
-import { useHashRouter, navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import { ipfs } from "../ipfs/index.js";
-import { parse } from "yaml";
-import { dbg } from "../utils/debug.js";
-import ClosePageButton from "../components/ui/ClosePageButton";
-import Spinner from "../components/ui/Spinner.jsx";
-import { toChecksumAddress } from "../blockchain/utils.js";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UserCard from "../components/ui/UserCard.jsx";
-import PostInfo from "../components/feed/PostInfo.jsx";
-import MarkdownView from "../components/docs/MarkdownView.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import ChapterSelector from "../components/post/ChapterSelector.jsx";
-import ChapterPager from "../components/post/ChapterPager.jsx";
-import PostTags from "../components/post/PostTags.jsx";
-import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
-import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
-
-
-const getIdentifier = (route) => route().split('/')[2] || "";
-
-async function fetchPostByIdentifier(params) {
-  const { identifier, domain, app, lang } = params;
-  if (!identifier || !domain || !app.wsMethod) return null;
-  const contentList = app.wsMethod("content-list");
-  const requestParams = {
-    domain: domain,
-    lang: lang,
-    limit: 1,
-  };
-  if (identifier.startsWith("0x")) {
-    requestParams.savva_cid = identifier;
-  } else {
-    requestParams.short_cid = identifier;
-  }
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-  const res = await contentList(requestParams);
-  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-  return arr[0] || null;
-}
-
-async function fetchPostDetails(mainPost, app) {
-  if (!mainPost) return null;
-  
-  const descriptorPath = getPostDescriptorPath(mainPost);
-  const dataCidForContent = getPostContentBaseCid(mainPost);
-
-  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
-
-  if (!descriptorPath) {
-    return { descriptor: null, dataCidForContent };
-  }
-
-  try {
-    const { res } = await ipfs.fetchBest(app, descriptorPath);
-    const text = await res.text();
-    const descriptor = parse(text) || null;
-    return { descriptor, dataCidForContent };
-  } catch (error) {
-    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
-    return { descriptor: { error: error.message }, dataCidForContent };
-  }
-}
-
-async function fetchMainContent(details, app, lang, chapterIndex) {
-  if (!details?.descriptor || !lang) return "";
-
-  const { descriptor, dataCidForContent } = details;
-  const localizedDescriptor = descriptor.locales?.[lang];
-  if (!localizedDescriptor) return "";
-
-  let contentPath;
-  if (chapterIndex === 0) { // Prologue (main content)
-    if (localizedDescriptor.data) return localizedDescriptor.data;
-    if (localizedDescriptor.data_path) {
-      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
-    }
-  } else { // A specific chapter
-    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
-    if (chapter?.data_path) {
-      contentPath = `${dataCidForContent}/${chapter.data_path}`;
-    }
-  }
-
-  if (contentPath) {
-    try {
-      const postGateways = details.descriptor?.gateways || [];
-      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
-      return await res.text();
-    } catch (error) {
-      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
-      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
-    }
-  }
-  
-  return "";
-}
-
-export default function PostPage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-  const identifier = createMemo(() => getIdentifier(route));
-  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-
-  const [post] = createResource(
-    () => ({
-      identifier: identifier(),
-      domain: app.selectedDomainName(),
-      app,
-      lang: uiLang()
-    }),
-    fetchPostByIdentifier
-  );
-  
-  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
-  const [postLang, setPostLang] = createSignal(null);
-  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
-
-  const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
-    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
-  );
-
-  createEffect(() => {
-    const p = post();
-    const id = identifier();
-    if (p && id.startsWith("0x") && p.short_cid) {
-      const newPath = `/post/${p.short_cid}`;
-      navigate(newPath, { replace: true });
-    }
-  });
-
-  createEffect(() => {
-    const p = post();
-    if (p && !postLang()) {
-      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
-      if (availableLangs.length === 0) return;
-      const currentUiLang = uiLang();
-      let initialLang = availableLangs[0]; 
-      if (availableLangs.includes(currentUiLang)) {
-        initialLang = currentUiLang;
-      } else if (availableLangs.includes('en')) {
-        initialLang = 'en';
-      }
-      setPostLang(initialLang);
-    }
-  });
-
-  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
-  const thumbnail = createMemo(() => {
-    const d = details();
-    if (!d) return null;
-    const dataCid = d.dataCidForContent;
-    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
-    if (dataCid && thumbnailPath) {
-      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
-    }
-    return null;
-  });
-  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
-  
-  const chapterList = createMemo(() => {
-    const prologue = { title: t("post.chapters.prologue"), data_path: null };
-    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
-    return [prologue, ...chapters];
-  });
-
-  const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
-  const localizedMainContent = createMemo(() => mainContent());
-  const ipfsBaseUrl = createMemo(() => {
-    const d = details();
-    if (!d) return "";
-    const dataCid = d.dataCidForContent;
-    if (!dataCid) return "";
-    
-    let bestGateway;
-    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-      bestGateway = app.localIpfsGateway();
-    } else if (Array.isArray(postSpecificGateways()) && postSpecificGateways().length > 0) {
-      bestGateway = postSpecificGateways()[0];
-    } else {
-      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
-    }
-    
-    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
-    return `${gatewayUrl}ipfs/${dataCid}`;
-  });
-
-  const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
-  ]);
-
-  const RightPanel = () => (
-    <aside class="sticky top-16">
-      <div 
-        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
-        style={{ "max-height": `calc(100vh - 5rem)` }}
-      >
-        <div class="p-4 space-y-3 overflow-y-auto h-full">
-          <h4 class="font-semibold">Right Panel</h4>
-          <p class="text-sm text-[hsl(var(--muted-foreground))]">
-            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
-          </p>
-          <div class="text-xs space-y-2">
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
-            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
-            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
-            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
-            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-
-  return (
-    <main class="sv-container p-4">
-      <ClosePageButton />
-      <Switch>
-        <Match when={post.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
-        </Match>
-        <Match when={post.error || details()?.descriptor?.error}>
-          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
-          </div>
-        </Match>
-        <Match when={!post.loading && post() === null}>
-          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
-            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
-            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
-          </div>
-        </Match>
-        <Match when={post()}>
-          <div class="max-w-5xl mx-auto">
-            <article class="space-y-4">
-              <header class="flex justify-between items-start gap-4">
-                <div class="flex-1 min-w-0 space-y-3">
-                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
-                  <UserCard author={post().author} />
-                  <PostInfo 
-                    item={post()} 
-                    hideTopBorder={true} 
-                    timeFormat="long"
-                    rewardsAlign="left" 
-                  />
-                  <PostTags postData={post()} />
-                </div>
-                <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
-                  <Show when={thumbnail()}>
-                    {(src) => (
-                      <IpfsImage 
-                        src={src()} 
-                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
-                        alt="Post thumbnail"
-                        postGateways={postSpecificGateways()}
-                        fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
-                      />
-                    )}
-                  </Show>
-                  <LangSelector 
-                    codes={availableLocales()}
-                    value={postLang()}
-                    onChange={setPostLang}
-                  />
-                </div>
-              </header>
-
-              <div class="pt-4 border-t border-[hsl(var(--border))]">
-                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
-                  <div>
-                    <Show when={(chapterList()?.length || 0) > 1}>
-                      <div class="flex justify-end mb-4">
-                        <ChapterSelector 
-                          chapters={chapterList()} 
-                          selectedIndex={selectedChapterIndex()} 
-                          onSelect={setSelectedChapterIndex}
-                        />
-                      </div>
-                    </Show>
-                    <Switch>
-                      <Match when={details.loading || mainContent.loading}>
-                        <div class="flex justify-center p-8"><Spinner /></div>
-                      </Match>
-                      <Match when={mainContent.error}>
-                        <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
-                      </Match>
-                      <Match when={localizedMainContent()}>
-                        <MarkdownView 
-                          markdown={localizedMainContent()} 
-                          rehypePlugins={markdownPlugins()}
-                        />
-                        <Show when={(chapterList()?.length || 0) > 1}>
-                          <ChapterPager 
-                            chapters={chapterList()}
-                            currentIndex={selectedChapterIndex()}
-                            onSelect={setSelectedChapterIndex}
-                          />
-                        </Show>
-                      </Match>
-                    </Switch>
-                  </div>
-                  <RightPanel />
-                </div>
-              </div>
-            </article>
-          </div>
-        </Match>
-      </Switch>
-    </main>
   );
 }
 </file>
@@ -28398,6 +27995,546 @@ export default function SwitchConnectDialog(props) {
 }
 </file>
 
+<file path="src/components/feed/PostCard.jsx">
+// src/components/feed/PostCard.jsx
+import { Show, createMemo, createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UserCard from "../ui/UserCard.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import PostInfo from "./PostInfo.jsx";
+import NftBadge from "../ui/icons/NftBadge.jsx";
+import PostFundBadge from "../ui/PostFundBadge.jsx";
+import { navigate } from "../../routing/hashRouter";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { resolvePostCidPath } from "../../ipfs/utils.js";
+
+function PinIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
+      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+      <g id="SVGRepo_iconCarrier">
+        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
+      </g>
+    </svg>
+  );
+}
+
+function getLocalizedField(locales, fieldName, currentLang) {
+  if (!locales || typeof locales !== 'object') return "";
+  if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
+  if (locales.en?.[fieldName]) return locales.en[fieldName];
+  const firstLocaleKey = Object.keys(locales)[0];
+  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
+    return locales[firstLocaleKey][fieldName];
+  }
+  return "";
+}
+
+export default function PostCard(props) {
+  const app = useApp();
+  const { t } = app;
+  const author = () => props.item._raw?.author;
+  const content = () => props.item._raw?.savva_content;
+  const fund = () => props.item._raw?.fund;
+  const isListMode = () => props.mode === 'list';
+  const [isHovered, setIsHovered] = createSignal(false);
+
+  const displayImageSrc = createMemo(() => {
+    const thumbnailPath = content()?.thumbnail;
+    if (thumbnailPath) {
+      return resolvePostCidPath(props.item._raw, thumbnailPath);
+    }
+    return author()?.avatar;
+  });
+
+  const title = createMemo(() => {
+    return getLocalizedField(content()?.locales, "title", app.lang());
+  });
+
+  const textPreview = createMemo(() => {
+    return getLocalizedField(content()?.locales, "text_preview", app.lang());
+  });
+
+  const handleCardClick = (e) => {
+    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.-bottom-2.-right-2')) {
+      return;
+    }
+    e.preventDefault();
+    const postId = props.item?.id; 
+    if (postId) {
+      app.setSavedScrollY(window.scrollY);
+      navigate(`/post/${postId}`);
+    } else {
+      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
+    }
+  };
+
+  const handleUserClick = (e) => {
+    e.stopPropagation();
+    console.log("User card clicked, navigating to profile for:", author()?.address);
+  };
+
+  const finalContextMenuItems = createMemo(() => {
+    const propItems = props.contextMenuItems || [];
+    const adminItems = getPostAdminItems(props.item?._raw, t);
+    return [...propItems, ...adminItems];
+  });
+
+  const articleClasses = createMemo(() => {
+    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
+    if (isListMode()) {
+      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
+    }
+    return `${base} flex-col`;
+  });
+
+  const imageContainerClasses = createMemo(() => {
+    const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
+  });
+  
+  const ImageBlock = () => {
+    const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    return (
+      <div class={imageContainerClasses()}>
+        <IpfsImage
+          src={displayImageSrc()}
+          class={roundingClass}
+          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
+        />
+        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
+          <div class="absolute bottom-2 right-0 z-10">
+            <PostFundBadge amount={fund()?.amount} />
+          </div>
+        </Show>
+      </div>
+    );
+  };
+
+  const contentContainerClasses = createMemo(() => {
+    return isListMode()
+      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
+      : "px-3 pb-3 flex-1 flex flex-col";
+  });
+
+  const textPreviewClasses = createMemo(() => {
+    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
+    if (isListMode()) {
+      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
+    }
+    return `${base} line-clamp-3`;
+  });
+
+  const ContentBlock = () => (
+    <div class={contentContainerClasses()}>
+      <div class="flex-1 space-y-1 min-h-0">
+        <Show when={title()}>
+          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
+            {title()}
+          </h4>
+        </Show>
+        <Show when={textPreview() && !props.compact}>
+          <p class={textPreviewClasses()}>
+            {textPreview()}
+          </p>
+        </Show>
+      </div>
+      
+      <div class="mt-1 user-card-container" onClick={handleUserClick}>
+        <UserCard author={author()} compact={props.compact} />
+      </div>
+
+      <Show when={!props.compact}>
+        <PostInfo item={props.item} mode={props.mode} />
+      </Show>
+    </div>
+  );
+
+  return (
+    <article 
+      class={articleClasses()} 
+      onClick={handleCardClick} 
+      style={{ cursor: 'pointer' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Show when={props.item._raw?.pinned}>
+        <div class="absolute -top-2 -left-2 z-10">
+          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
+        </div>
+      </Show>
+
+      <Show when={props.item._raw?.nft?.owner}>
+        <div class="absolute -top-2 -right-2 z-10">
+          <NftBadge />
+        </div>
+      </Show>
+
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
+        <ContextMenu items={finalContextMenuItems()} />
+      </Show>
+
+      <Show
+        when={isListMode()}
+        fallback={
+          <>
+            <ImageBlock />
+            <ContentBlock />
+          </>
+        }
+      >
+        <ContentBlock />
+        <ImageBlock />
+      </Show>
+    </article>
+  );
+}
+</file>
+
+<file path="src/pages/PostPage.jsx">
+// src/pages/PostPage.jsx
+import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { parse } from "yaml";
+import { dbg } from "../utils/debug.js";
+import ClosePageButton from "../components/ui/ClosePageButton";
+import Spinner from "../components/ui/Spinner.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UserCard from "../components/ui/UserCard.jsx";
+import PostInfo from "../components/feed/PostInfo.jsx";
+import MarkdownView from "../components/docs/MarkdownView.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import ChapterSelector from "../components/post/ChapterSelector.jsx";
+import ChapterPager from "../components/post/ChapterPager.jsx";
+import PostTags from "../components/post/PostTags.jsx";
+import { getPostContentBaseCid, getPostDescriptorPath, resolvePostCidPath } from "../ipfs/utils.js";
+import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
+import ContextMenu from "../components/ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
+
+
+const getIdentifier = (route) => route().split('/')[2] || "";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, domain, app, lang } = params;
+  if (!identifier || !domain || !app.wsMethod) return null;
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: domain,
+    lang: lang,
+    limit: 1,
+  };
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  return arr[0] || null;
+}
+
+async function fetchPostDetails(mainPost, app) {
+  if (!mainPost) return null;
+  
+  const descriptorPath = getPostDescriptorPath(mainPost);
+  const dataCidForContent = getPostContentBaseCid(mainPost);
+
+  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
+
+  if (!descriptorPath) {
+    return { descriptor: null, dataCidForContent };
+  }
+
+  try {
+    const { res } = await ipfs.fetchBest(app, descriptorPath);
+    const text = await res.text();
+    const descriptor = parse(text) || null;
+    return { descriptor, dataCidForContent };
+  } catch (error) {
+    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
+    return { descriptor: { error: error.message }, dataCidForContent };
+  }
+}
+
+async function fetchMainContent(details, app, lang, chapterIndex) {
+  if (!details?.descriptor || !lang) return "";
+
+  const { descriptor, dataCidForContent } = details;
+  const localizedDescriptor = descriptor.locales?.[lang];
+  if (!localizedDescriptor) return "";
+
+  let contentPath;
+  if (chapterIndex === 0) { // Prologue (main content)
+    if (localizedDescriptor.data) return localizedDescriptor.data;
+    if (localizedDescriptor.data_path) {
+      contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
+    }
+  } else { // A specific chapter
+    const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
+    if (chapter?.data_path) {
+      contentPath = `${dataCidForContent}/${chapter.data_path}`;
+    }
+  }
+
+  if (contentPath) {
+    try {
+      const postGateways = details.descriptor?.gateways || [];
+      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
+      return await res.text();
+    } catch (error) {
+      dbg.error('PostPage', 'Failed to fetch main content', { path: contentPath, error });
+      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
+    }
+  }
+  
+  return "";
+}
+
+export default function PostPage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+  const identifier = createMemo(() => getIdentifier(route));
+  const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+
+  const [post] = createResource(
+    () => ({
+      identifier: identifier(),
+      domain: app.selectedDomainName(),
+      app,
+      lang: uiLang()
+    }),
+    fetchPostByIdentifier
+  );
+  
+  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
+  const [postLang, setPostLang] = createSignal(null);
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+
+  const [mainContent] = createResource(
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
+    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
+  );
+
+  createEffect(() => {
+    const p = post();
+    const id = identifier();
+    if (p && id.startsWith("0x") && p.short_cid) {
+      const newPath = `/post/${p.short_cid}`;
+      navigate(newPath, { replace: true });
+    }
+  });
+
+  createEffect(() => {
+    const p = post();
+    if (p && !postLang()) {
+      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
+      if (availableLangs.length === 0) return;
+      const currentUiLang = uiLang();
+      let initialLang = availableLangs[0]; 
+      if (availableLangs.includes(currentUiLang)) {
+        initialLang = currentUiLang;
+      } else if (availableLangs.includes('en')) {
+        initialLang = 'en';
+      }
+      setPostLang(initialLang);
+    }
+  });
+
+  const contextMenuItems = createMemo(() => {
+    const p = post();
+    if (!p) return [];
+    return getPostAdminItems(p, t);
+  });
+
+  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const thumbnail = createMemo(() => {
+    const p = post();
+    if (!p) return null;
+    const d = details();
+    const thumbnailPath = d?.descriptor?.thumbnail || p.savva_content?.thumbnail;
+    return resolvePostCidPath(p, thumbnailPath);
+  });
+  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
+  
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue"), data_path: null };
+    const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
+    return [prologue, ...chapters];
+  });
+
+  const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
+  const localizedMainContent = createMemo(() => mainContent());
+  const ipfsBaseUrl = createMemo(() => {
+    const d = details();
+    if (!d) return "";
+    const dataCid = d.dataCidForContent;
+    if (!dataCid) return "";
+    
+    let bestGateway;
+    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+      bestGateway = app.localIpfsGateway();
+    } else if (Array.isArray(postSpecificGateways()) && postSpecificGateways().length > 0) {
+      bestGateway = postSpecificGateways()[0];
+    } else {
+      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
+    }
+    
+    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
+    return `${gatewayUrl}ipfs/${dataCid}`;
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
+
+  const RightPanel = () => (
+    <aside class="sticky top-16">
+      <div 
+        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
+        style={{ "max-height": `calc(100vh - 5rem)` }}
+      >
+        <div class="p-4 space-y-3 overflow-y-auto h-full">
+          <h4 class="font-semibold">Right Panel</h4>
+          <p class="text-sm text-[hsl(var(--muted-foreground))]">
+            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
+          </p>
+          <div class="text-xs space-y-2">
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
+            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
+            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
+            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <main class="sv-container p-4">
+      <ClosePageButton />
+      <Switch>
+        <Match when={post.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={post.error || details()?.descriptor?.error}>
+          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
+            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
+          </div>
+        </Match>
+        <Match when={!post.loading && post() === null}>
+          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
+            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
+          </div>
+        </Match>
+        <Match when={post()}>
+          <div class="max-w-5xl mx-auto">
+            <article class="space-y-4">
+              <header class="flex justify-between items-start gap-4">
+                <div class="relative flex-1 min-w-0 space-y-3">
+                  <h1 class="text-2xl lg:text-3xl font-bold break-words pr-12">{title() || t('common.loading')}</h1>
+                  
+                  <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+                    <ContextMenu 
+                      items={contextMenuItems()}
+                      positionClass="absolute top-0 right-0 z-20"
+                    />
+                  </Show>
+
+                  <UserCard author={post().author} />
+                  <PostInfo 
+                    item={post()} 
+                    hideTopBorder={true} 
+                    timeFormat="long"
+                    rewardsAlign="left" 
+                  />
+                  <PostTags postData={post()} />
+                </div>
+                <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
+                  <Show when={thumbnail()}>
+                    {(src) => (
+                      <IpfsImage 
+                        src={src()} 
+                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                        alt="Post thumbnail"
+                        postGateways={postSpecificGateways()}
+                        fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    )}
+                  </Show>
+                  <LangSelector 
+                    codes={availableLocales()}
+                    value={postLang()}
+                    onChange={setPostLang}
+                  />
+                </div>
+              </header>
+
+              <div class="pt-4 border-t border-[hsl(var(--border))]">
+                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
+                  <div>
+                    <Show when={(chapterList()?.length || 0) > 1}>
+                      <div class="flex justify-end mb-4">
+                        <ChapterSelector 
+                          chapters={chapterList()} 
+                          selectedIndex={selectedChapterIndex()} 
+                          onSelect={setSelectedChapterIndex}
+                        />
+                      </div>
+                    </Show>
+                    <Switch>
+                      <Match when={details.loading || mainContent.loading}>
+                        <div class="flex justify-center p-8"><Spinner /></div>
+                      </Match>
+                      <Match when={mainContent.error}>
+                        <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
+                      </Match>
+                      <Match when={localizedMainContent()}>
+                        <MarkdownView 
+                          markdown={localizedMainContent()} 
+                          rehypePlugins={markdownPlugins()}
+                        />
+                        <Show when={(chapterList()?.length || 0) > 1}>
+                          <ChapterPager 
+                            chapters={chapterList()}
+                            currentIndex={selectedChapterIndex()}
+                            onSelect={setSelectedChapterIndex}
+                          />
+                        </Show>
+                      </Match>
+                    </Switch>
+                  </div>
+                  <RightPanel />
+                </div>
+              </div>
+            </article>
+          </div>
+        </Match>
+      </Switch>
+    </main>
+  );
+}
+</file>
+
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -28698,6 +28835,321 @@ export default function Header({ onTogglePane }) {
 }
 </file>
 
+<file path="src/version.js">
+// src/version.js
+export const APP_VERSION = "0.103";
+</file>
+
+<file path="src/components/main/TabsBar.jsx">
+// src/components/main/TabsBar.jsx
+import { createResource, Show, createMemo, createSignal, createEffect, batch, For } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { useI18n } from "../../i18n/useI18n";
+import { loadAssetResource } from "../../utils/assetLoader";
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+import Tabs from "../ui/Tabs.jsx";
+import { getTabComponent } from "../tabs";
+import RightRailLayout from "../tabs/RightRailLayout.jsx";
+import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
+
+const slug = (s) => String(s || "").trim().toLowerCase();
+const firstSeg = (path) => {
+  const p = String(path || "/");
+  const s = p.startsWith("/") ? p.slice(1) : p;
+  return s.split(/[?#/]/, 1)[0] || "";
+};
+const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
+
+function SvgIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {props.children}
+    </svg>
+  );
+}
+const TrophyIcon = () => <SvgIcon><path d="M8 21h8M12 17v4M7 4h10M7 8a5 5 0 0010 0M7 4a4 4 0 01-4 4M17 4a4 4 0 004 4"/></SvgIcon>;
+const BoltIcon = () => <SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>;
+const CommentIcon = () => <SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>;
+const SparklesIcon = () => <SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>;
+const HeartIcon = () => <SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>;
+const FallbackIcon = () => <SvgIcon><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></SvgIcon>;
+
+function iconForType(type) {
+  const k = slug(type);
+  if (k === "leaders") return <TrophyIcon />;
+  if (k === "actual") return <BoltIcon />;
+  if (k === "comments") return <CommentIcon />;
+  if (k === "new") return <SparklesIcon />;
+  if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  return <FallbackIcon />;
+}
+
+function iconFromSpec(spec) {
+  if (!spec) return null;
+  if (typeof spec === "string" && spec.startsWith("emoji:")) {
+    const ch = spec.slice("emoji:".length);
+    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
+  }
+  return null;
+}
+
+export default function TabsBar() {
+  const app = useApp();
+  const { t, domainAssetsConfig, setLastTabRoute } = app;
+  const { lang } = useI18n();
+  const { route } = useHashRouter();
+
+  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
+
+  const [tabsRaw] = createResource(
+    () => tabsPath(),
+    async (relPath) => {
+      if (!relPath) return [];
+      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
+      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
+      return list.map((x, i) => ({
+        id: x?.id ?? x?.type ?? `tab_${i}`,
+        type: x?.type ?? x?.id ?? `tab_${i}`,
+        _raw: x,
+      }));
+    }
+  );
+
+  const [selectedId, setSelectedId] = createSignal("");
+
+  const items = createMemo(() =>
+    (tabsRaw() || []).map((tab) => {
+      const label = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
+      const explicit = iconFromSpec(tab._raw.icon);
+      const auto = iconForType(tab.type);
+      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
+    })
+  );
+
+  createEffect(() => {
+    const list = tabsRaw();
+    if (!list || list.length === 0) return setSelectedId("");
+
+    const key = firstSeg(route());
+    const match = list.find(t => slug(t.id) === key || slug(t.type) === key);
+
+    if (match) {
+      if (selectedId() !== match.id) {
+        setSelectedId(match.id);
+        setLastTabRoute(route());
+      }
+    } else {
+      const r = route();
+      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs");
+      
+      if (isPageRoute) {
+        setSelectedId("");
+      } else {
+        const first = list[0];
+        const defaultPath = pathFor(first.type || first.id);
+        batch(() => {
+          setSelectedId(first.id);
+          navigate(defaultPath, { replace: true });
+          setLastTabRoute(defaultPath);
+        });
+      }
+    }
+  });
+
+  function handleTabChange(nextId) {
+    const entry = (tabsRaw() || []).find((t) => t.id === nextId);
+    if (!entry) return;
+    const newPath = pathFor(entry.type || entry.id);
+    if (route() !== newPath) {
+      navigate(newPath);
+    }
+  }
+  
+  return (
+    <section class="w-full">
+      <div class="sv-container sv-container--no-gutter">
+        <Show when={!tabsRaw.loading} fallback={<div class="p-4 text-sm text-center">{t("main.tabs.loading")}</div>}>
+          <Tabs items={items()} value={selectedId()} onChange={handleTabChange} compactWidth={768} />
+        </Show>
+
+        <div class="tabs_panel">
+          {/* --- FIX: Render all tabs and use `display` to show the active one --- */}
+          <For each={tabsRaw()}>
+            {(tab) => {
+              const Comp = getTabComponent(tab.type);
+              const title = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
+              const rightPanelConfig = tab._raw?.right_panel;
+              const isRailVisible = rightPanelConfig?.available;
+
+              return (
+                <div style={{ display: tab.id === selectedId() ? 'block' : 'none' }}>
+                  <RightRailLayout rightPanelConfig={rightPanelConfig}>
+                    <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
+                      <Comp title={title} tab={tab} isRailVisible={isRailVisible} />
+                    </Show>
+                  </RightRailLayout>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </div>
+    </section>
+  );
+}
+</file>
+
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "default.avatar": "Аватар",
+  "default.user": "Пользователь",
+  "docs.article": "Статья документации",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+  "error.connection.title": "Ошибка подключения",
+  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
+  "error.ws.title": "Ошибка подключения",
+  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
+  "ipfs.diag.cors.name": "Проверка CORS шлюза",
+  "ipfs.diag.cors.ok": "CORS настроен правильно.",
+  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
+  "ipfs.diag.fetch.name": "Получение из живого шлюза",
+  "ipfs.diag.fetch.ok": "Запрос успешен.",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
+  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
+  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
+  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Вариант 1 (Рекомендуется): Разрешить только текущий источник.",
+  "ipfs.diag.fix.gatewayTitle": "Ваша конфигурация шлюза, вероятно, мешает браузеру получать данные. Попробуйте одну из этих команд:",
+  "ipfs.diag.fix.gatewayWildcard": "Вариант 2 (Проще для разработчиков): Разрешить любой источник. Используйте с осторожностью на публичных узлах.",
+  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
+  "ipfs.diag.liveness.error": "Узел не отвечает.",
+  "ipfs.diag.liveness.name": "Проверка работоспособности API",
+  "ipfs.diag.liveness.ok": "Узел работает.",
+  "ipfs.diag.run": "Запустить диагностику",
+  "ipfs.diag.title": "Диагностика узла IPFS",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.group": "Просмотреть группу",
+  "newTab.view.list": "Список",
+  "post.chapters.prologue": "Пролог",
+  "post.chapters.title": "Содержание",
+  "post.notFound.message": "Пост, который вы ищете, не существует или был удален.",
+  "post.notFound.title": "Пост не найден",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
+  "stakerLevels.clam": "Моллюск",
+  "stakerLevels.dolphin": "Дельфин",
+  "stakerLevels.fish": "Рыба",
+  "stakerLevels.guest": "Гость",
+  "stakerLevels.orca": "Косатка",
+  "stakerLevels.seahorse": "Морской конек",
+  "stakerLevels.shark": "Акула",
+  "stakerLevels.shrimp": "Креветка",
+  "stakerLevels.stingray": "Скат",
+  "stakerLevels.whale": "Кит",
+  "tabs.aria": "Вкладки раздела",
+  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
+  "tabs.title.actual": "Текущие",
+  "tabs.title.comments": "Комментарии",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лидеры",
+  "tabs.title.new": "Новые",
+  "time.day.plural": "{n} дней назад",
+  "time.day.singular": "{n} день назад",
+  "time.hour.plural": "{n} часов назад",
+  "time.hour.singular": "{n} час назад",
+  "time.minute.plural": "{n} минут назад",
+  "time.minute.singular": "{n} минуту назад",
+  "time.now": "Сейчас",
+  "timeFrame.${frame}": "Период: {frame}",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети"
+};
+</file>
+
 <file path="src/pages/EditorPage.jsx">
 // src/pages/EditorPage.jsx
 import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, batch } from "solid-js";
@@ -28708,18 +29160,18 @@ import MarkdownInput from "../components/editor/MarkdownInput.jsx";
 import LangSelector from "../components/ui/LangSelector.jsx";
 import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
-import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
+import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
 import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
-import { insertTextAtCursor } from "../components/editor/text-utils.js";
+import { insertTextAtCursor } from "../editor/text-utils.js";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
-import { pushToast } from "../components/ui/toast.js";
+import { pushToast } from "../ui/toast.js";
 
 function TrashIcon(props) {
   return (
@@ -29185,321 +29637,6 @@ export default function EditorPage() {
 }
 </file>
 
-<file path="src/version.js">
-// src/version.js
-export const APP_VERSION = "0.103";
-</file>
-
-<file path="src/components/main/TabsBar.jsx">
-// src/components/main/TabsBar.jsx
-import { createResource, Show, createMemo, createSignal, createEffect, batch, For } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { useI18n } from "../../i18n/useI18n";
-import { loadAssetResource } from "../../utils/assetLoader";
-import { useHashRouter, navigate } from "../../routing/hashRouter";
-import Tabs from "../ui/Tabs.jsx";
-import { getTabComponent } from "../tabs";
-import RightRailLayout from "../tabs/RightRailLayout.jsx";
-import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
-
-const slug = (s) => String(s || "").trim().toLowerCase();
-const firstSeg = (path) => {
-  const p = String(path || "/");
-  const s = p.startsWith("/") ? p.slice(1) : p;
-  return s.split(/[?#/]/, 1)[0] || "";
-};
-const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
-
-function SvgIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      {props.children}
-    </svg>
-  );
-}
-const TrophyIcon = () => <SvgIcon><path d="M8 21h8M12 17v4M7 4h10M7 8a5 5 0 0010 0M7 4a4 4 0 01-4 4M17 4a4 4 0 004 4"/></SvgIcon>;
-const BoltIcon = () => <SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>;
-const CommentIcon = () => <SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>;
-const SparklesIcon = () => <SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>;
-const HeartIcon = () => <SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>;
-const FallbackIcon = () => <SvgIcon><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></SvgIcon>;
-
-function iconForType(type) {
-  const k = slug(type);
-  if (k === "leaders") return <TrophyIcon />;
-  if (k === "actual") return <BoltIcon />;
-  if (k === "comments") return <CommentIcon />;
-  if (k === "new") return <SparklesIcon />;
-  if (k === "for-you" || k === "foryou") return <HeartIcon />;
-  return <FallbackIcon />;
-}
-
-function iconFromSpec(spec) {
-  if (!spec) return null;
-  if (typeof spec === "string" && spec.startsWith("emoji:")) {
-    const ch = spec.slice("emoji:".length);
-    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
-  }
-  return null;
-}
-
-export default function TabsBar() {
-  const app = useApp();
-  const { t, domainAssetsConfig, setLastTabRoute } = app;
-  const { lang } = useI18n();
-  const { route } = useHashRouter();
-
-  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
-
-  const [tabsRaw] = createResource(
-    () => tabsPath(),
-    async (relPath) => {
-      if (!relPath) return [];
-      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
-      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
-      return list.map((x, i) => ({
-        id: x?.id ?? x?.type ?? `tab_${i}`,
-        type: x?.type ?? x?.id ?? `tab_${i}`,
-        _raw: x,
-      }));
-    }
-  );
-
-  const [selectedId, setSelectedId] = createSignal("");
-
-  const items = createMemo(() =>
-    (tabsRaw() || []).map((tab) => {
-      const label = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
-      const explicit = iconFromSpec(tab._raw.icon);
-      const auto = iconForType(tab.type);
-      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
-    })
-  );
-
-  createEffect(() => {
-    const list = tabsRaw();
-    if (!list || list.length === 0) return setSelectedId("");
-
-    const key = firstSeg(route());
-    const match = list.find(t => slug(t.id) === key || slug(t.type) === key);
-
-    if (match) {
-      if (selectedId() !== match.id) {
-        setSelectedId(match.id);
-        setLastTabRoute(route());
-      }
-    } else {
-      const r = route();
-      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs");
-      
-      if (isPageRoute) {
-        setSelectedId("");
-      } else {
-        const first = list[0];
-        const defaultPath = pathFor(first.type || first.id);
-        batch(() => {
-          setSelectedId(first.id);
-          navigate(defaultPath, { replace: true });
-          setLastTabRoute(defaultPath);
-        });
-      }
-    }
-  });
-
-  function handleTabChange(nextId) {
-    const entry = (tabsRaw() || []).find((t) => t.id === nextId);
-    if (!entry) return;
-    const newPath = pathFor(entry.type || entry.id);
-    if (route() !== newPath) {
-      navigate(newPath);
-    }
-  }
-  
-  return (
-    <section class="w-full">
-      <div class="sv-container sv-container--no-gutter">
-        <Show when={!tabsRaw.loading} fallback={<div class="p-4 text-sm text-center">{t("main.tabs.loading")}</div>}>
-          <Tabs items={items()} value={selectedId()} onChange={handleTabChange} compactWidth={768} />
-        </Show>
-
-        <div class="tabs_panel">
-          {/* --- FIX: Render all tabs and use `display` to show the active one --- */}
-          <For each={tabsRaw()}>
-            {(tab) => {
-              const Comp = getTabComponent(tab.type);
-              const title = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
-              const rightPanelConfig = tab._raw?.right_panel;
-              const isRailVisible = rightPanelConfig?.available;
-
-              return (
-                <div style={{ display: tab.id === selectedId() ? 'block' : 'none' }}>
-                  <RightRailLayout rightPanelConfig={rightPanelConfig}>
-                    <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
-                      <Comp title={title} tab={tab} isRailVisible={isRailVisible} />
-                    </Show>
-                  </RightRailLayout>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    </section>
-  );
-}
-</file>
-
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "default.avatar": "Аватар",
-  "default.user": "Пользователь",
-  "docs.article": "Статья документации",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
-  "error.connection.retry": "Обновить страницу",
-  "error.connection.title": "Ошибка подключения",
-  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
-  "error.ws.title": "Ошибка подключения",
-  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
-  "ipfs.diag.cors.name": "Проверка CORS шлюза",
-  "ipfs.diag.cors.ok": "CORS настроен правильно.",
-  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
-  "ipfs.diag.fetch.name": "Получение из живого шлюза",
-  "ipfs.diag.fetch.ok": "Запрос успешен.",
-  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
-  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
-  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
-  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
-  "ipfs.diag.fix.gatewaySingleOrigin": "Вариант 1 (Рекомендуется): Разрешить только текущий источник.",
-  "ipfs.diag.fix.gatewayTitle": "Ваша конфигурация шлюза, вероятно, мешает браузеру получать данные. Попробуйте одну из этих команд:",
-  "ipfs.diag.fix.gatewayWildcard": "Вариант 2 (Проще для разработчиков): Разрешить любой источник. Используйте с осторожностью на публичных узлах.",
-  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
-  "ipfs.diag.liveness.error": "Узел не отвечает.",
-  "ipfs.diag.liveness.name": "Проверка работоспособности API",
-  "ipfs.diag.liveness.ok": "Узел работает.",
-  "ipfs.diag.run": "Запустить диагностику",
-  "ipfs.diag.title": "Диагностика узла IPFS",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.group": "Просмотреть группу",
-  "newTab.view.list": "Список",
-  "post.chapters.prologue": "Пролог",
-  "post.chapters.title": "Содержание",
-  "post.notFound.message": "Пост, который вы ищете, не существует или был удален.",
-  "post.notFound.title": "Пост не найден",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
-  "stakerLevels.clam": "Моллюск",
-  "stakerLevels.dolphin": "Дельфин",
-  "stakerLevels.fish": "Рыба",
-  "stakerLevels.guest": "Гость",
-  "stakerLevels.orca": "Косатка",
-  "stakerLevels.seahorse": "Морской конек",
-  "stakerLevels.shark": "Акула",
-  "stakerLevels.shrimp": "Креветка",
-  "stakerLevels.stingray": "Скат",
-  "stakerLevels.whale": "Кит",
-  "tabs.aria": "Вкладки раздела",
-  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
-  "tabs.title.actual": "Текущие",
-  "tabs.title.comments": "Комментарии",
-  "tabs.title.for-you": "Для вас",
-  "tabs.title.leaders": "Лидеры",
-  "tabs.title.new": "Новые",
-  "time.day.plural": "{n} дней назад",
-  "time.day.singular": "{n} день назад",
-  "time.hour.plural": "{n} часов назад",
-  "time.hour.singular": "{n} час назад",
-  "time.minute.plural": "{n} минут назад",
-  "time.minute.singular": "{n} минуту назад",
-  "time.now": "Сейчас",
-  "timeFrame.${frame}": "Период: {frame}",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
-};
-</file>
-
 <file path="src/components/RightPane.jsx">
 // src/components/RightPane.jsx
 import { createSignal, Show, createMemo, createEffect } from "solid-js";
@@ -29641,7 +29778,7 @@ import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
 import { useAppConnection } from "./useAppConnection.js";
 import { useDomainAssets } from "./useDomainAssets.js";
-import { pushToast, pushErrorToast } from "../components/ui/toast.js";
+import { pushToast, pushErrorToast } from "../ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
 import { createWalletClient, custom } from "viem";
 
@@ -30021,8 +30158,11 @@ export default {
   "post.chapters.title": "Table of Contents",
   "post.notFound.message": "The post you're looking for doesn't exist or has been removed.",
   "post.notFound.title": "Post Not Found",
-  "postcard.copyIpfsCid": "Copy IPFS CID",
+  "postcard.copyDataCid": "Copy Data CID",
+  "postcard.copyDescriptorCid": "Copy Descriptor CID",
   "postcard.copySavvaCid": "Copy SAVVA CID",
+  "postcard.pin": "Pin Post",
+  "postcard.unpin": "Unpin Post",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
   "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
