@@ -7,8 +7,7 @@ import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
 import { pushToast, pushErrorToast } from "../ui/toast.js";
 import ConfirmModal from "../ui/ConfirmModal.jsx";
 import FileContextMenu from "./FileContextMenu.jsx";
-import { dbg } from "../../utils/debug.js";
-
+import { formatBytes } from "../../utils/format.js";
 function CloseIcon(props) {
   return (
     <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -26,6 +25,14 @@ export default function EditorFilesDrawer(props) {
   const [menuData, setMenuData] = createSignal(null);
   let fileInputRef;
   let drawerContentRef;
+
+  const sortedFiles = createMemo(() => {
+    return [...files()].sort((a, b) => (b.size || 0) - (a.size || 0));
+  });
+
+  const totalSize = createMemo(() => {
+    return files().reduce((acc, file) => acc + (file.size || 0), 0);
+  });
 
   const refreshFiles = async () => {
     const fileList = await listUploadedFiles();
@@ -74,10 +81,9 @@ export default function EditorFilesDrawer(props) {
     let x = itemRect.left - drawerRect.left;
     let y = element.offsetTop;
 
-    // --- Prevent menu from opening off-screen ---
-    const menuWidth = 192; // w-48 is 12rem = 192px
-    const menuHeight = 150; // Approximate height of the context menu
-    const padding = 16; // p-4 inside the drawer
+    const menuWidth = 192;
+    const menuHeight = 150;
+    const padding = 16;
 
     if (x + menuWidth > drawerRect.width - padding) {
       x = drawerRect.width - menuWidth - padding;
@@ -128,13 +134,13 @@ export default function EditorFilesDrawer(props) {
           </div>
 
           <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
-            <Show when={files().length > 0} fallback={
+            <Show when={sortedFiles().length > 0} fallback={
               <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
                 {t("editor.files.empty")}
               </div>
             }>
               <div class="grid grid-cols-3 gap-2">
-                <For each={files()}>
+                <For each={sortedFiles()}>
                   {(file) => <FileGridItem 
                     file={file}
                     onMenuOpen={handleMenuOpen}
@@ -151,6 +157,10 @@ export default function EditorFilesDrawer(props) {
               />
             </Show>
           </div>
+
+          <footer class="p-4 border-t border-[hsl(var(--border))] text-xs text-center text-[hsl(var(--muted-foreground))]">
+            Total Size: <strong>{formatBytes(totalSize())}</strong>
+          </footer>
         </div>
       </div>
       <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>

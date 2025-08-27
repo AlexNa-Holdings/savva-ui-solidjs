@@ -1,5 +1,6 @@
 // src/components/editor/FileGridItem.jsx
 import { Show, createMemo } from "solid-js";
+import { formatBytes } from "../../utils/format.js";
 
 function VideoIcon() {
   return (
@@ -54,9 +55,14 @@ export default function FileGridItem(props) {
           <AudioIcon />
         </div>
       </Show>
-      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center truncate">
-        {props.file.name}
+
+      <span class="absolute top-0 right-0 z-10 text-white text-[10px] font-mono bg-black/40 px-1 rounded-sm">
+        {formatBytes(props.file.size, 0)}
+      </span>
+      
+      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center">
+        <span class="truncate">{props.file.name}</span>
       </div>
     </div>
   );
-}
+} 

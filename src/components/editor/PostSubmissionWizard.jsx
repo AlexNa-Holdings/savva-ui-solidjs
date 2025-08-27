@@ -3,13 +3,17 @@ import { createSignal, createMemo, Show, For, Switch, Match } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import StepValidate from "./wizard_steps/StepValidate.jsx";
+import StepCheckRights from "./wizard_steps/StepCheckRights.jsx";
+import StepUploadIPFS from "./wizard_steps/StepUploadIPFS.jsx";
+import StepUploadDescriptor from "./wizard_steps/StepUploadDescriptor.jsx";
+import StepPublish from "./wizard_steps/StepPublish.jsx";
 
 const STEPS = [
   { id: "validate",      title: "editor.publish.steps.validate",      help: "editor.publish.steps.validate.help",      component: StepValidate },
-  { id: "ipfs",          title: "editor.publish.steps.ipfs",          help: "editor.publish.steps.ipfs.help" },
-  { id: "ipfs_publish",  title: "editor.publish.steps.ipfs_publish",  help: "editor.publish.steps.ipfs_publish.help" },
-  { id: "register",      title: "editor.publish.steps.register",      help: "editor.publish.steps.register.help" },
-  { id: "publish",       title: "editor.publish.steps.publish",       help: "editor.publish.steps.publish.help" },
+  { id: "check_rights",  title: "editor.publish.steps.check_rights",  help: "editor.publish.steps.check_rights.help",  component: StepCheckRights },
+  { id: "ipfs",          title: "editor.publish.steps.ipfs",          help: "editor.publish.steps.ipfs.help",          component: StepUploadIPFS },
+  { id: "ipfs_publish",  title: "editor.publish.steps.ipfs_publish",  help: "editor.publish.steps.ipfs_publish.help",  component: StepUploadDescriptor },
+  { id: "publish",       title: "editor.publish.steps.publish",       help: "editor.publish.steps.publish.help",       component: StepPublish },
 ];
 
 function CheckmarkIcon(props) {
@@ -33,11 +37,23 @@ function StepIcon(props) {
 export default function PostSubmissionWizard(props) {
   const { t } = useApp();
   const [currentStepIndex, setCurrentStepIndex] = createSignal(0);
+  const [publishedData, setPublishedData] = createSignal({});
 
   const activeComponent = createMemo(() => STEPS[currentStepIndex()]?.component);
 
-  const handleNextStep = () => {
-    if (currentStepIndex() < STEPS.length - 1) setCurrentStepIndex(currentStepIndex() + 1);
+  const handleNextStep = (stepResult) => {
+    const currentStep = STEPS[currentStepIndex()];
+    if (currentStep.id === 'ipfs') {
+      setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
+    } else if (currentStep.id === 'ipfs_publish') {
+      setPublishedData(prev => ({ ...prev, descriptorCid: stepResult }));
+    }
+
+    if (currentStepIndex() < STEPS.length - 1) {
+      setCurrentStepIndex(currentStepIndex() + 1);
+    } else {
+      props.onSuccess?.();
+    }
   };
 
   const getStepStatus = (index) => {
@@ -89,6 +105,7 @@ export default function PostSubmissionWizard(props) {
                     component={activeComponent()}
                     postData={props.postData}
                     postParams={props.postParams}
+                    publishedData={publishedData}
                     onComplete={handleNextStep}
                     onCancel={handleValidationBack}
                   />

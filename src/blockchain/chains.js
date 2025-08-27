@@ -6,7 +6,6 @@ export const CHAINS = {
     name: "PulseChain Testnet v4",
     rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
     nativeCurrency: { name: "Test Pulse", symbol: "tPLS", decimals: 18 },
-    // wallet_addEthereumChain expects an array of URLs, not objects
     blockExplorers: ["https://scan.v4.testnet.pulsechain.com"],
   },
   369: {
@@ -17,21 +16,12 @@ export const CHAINS = {
     nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
     blockExplorers: ["https://scan.pulsechain.com"],
   },
-  // Add more chains as needed
 };
 
-/**
- * Return chain meta in the shape expected by switchOrAddChain():
- * {
- *   chainId: number, name: string, nativeCurrency, rpcUrls: string[],
- *   blockExplorers: string[]
- * }
- */
 export function getChainMeta(chainId) {
   const raw = CHAINS[chainId];
   if (!raw) return null;
 
-  // normalize shapes to be resilient to older entries
   const chainIdNum = raw.chainId ?? raw.id ?? Number(chainId);
   const rpcUrls = Array.isArray(raw.rpcUrls)
     ? raw.rpcUrls
@@ -47,6 +37,7 @@ export function getChainMeta(chainId) {
   }
 
   return {
+    id: chainIdNum, // This is the required property for viem
     chainId: chainIdNum,
     name: raw.name,
     nativeCurrency: raw.nativeCurrency,

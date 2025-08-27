@@ -1,0 +1,154 @@
+// src/components/editor/wizard_steps/StepUploadIPFS.jsx
+import { createSignal, onMount, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { getAllUploadedFileNames, getUploadedFileAsFileObject } from "../../../editor/storage.js";
+import { stringify as toYaml } from "yaml";
+import { httpBase } from "../../../net/endpoints.js";
+import { dbg } from "../../../utils/debug.js";
+
+export default function StepUploadIPFS(props) {
+  const app = useApp();
+  const { t } = app;
+  const [error, setError] = createSignal(null);
+  const [isUploading, setIsUploading] = createSignal(true);
+  const [uploadProgress, setUploadProgress] = createSignal(0);
+
+  const uploadWithProgress = (url, formData) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.withCredentials = true;
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+          dbg.log("StepUploadIPFS", `Upload progress: ${percentComplete}%`);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(new Error("Failed to parse server response."));
+          }
+        } else {
+          if (xhr.status === 413) {
+            reject(new Error(t("editor.publish.ipfs.errorTooLarge")));
+          } else {
+            reject(new Error(`Server responded with status ${xhr.status}: ${xhr.responseText}`));
+          }
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error(t("editor.publish.ipfs.errorNetworkOrTooLarge")));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new Error("The upload request timed out."));
+      };
+
+      xhr.send(formData);
+    });
+  };
+
+  const uploadToIPFS = async () => {
+    dbg.log("StepUploadIPFS", "Starting IPFS upload process...");
+    const { postData } = props;
+    const formData = new FormData();
+
+    const descriptor = {
+      savva_spec_version: "2.0",
+      mime_type: "text/markdown",
+      locales: {}
+    };
+
+    const content = postData();
+    for (const lang in content) {
+      const data = content[lang];
+      const dataPath = `${lang}/data.md`;
+      
+      descriptor.locales[lang] = {
+        title: data.title || "",
+        text_preview: (data.body || "").substring(0, 200),
+        data_path: dataPath,
+        chapters: []
+      };
+      
+      const mdBodyFile = new File([data.body || ""], dataPath, { type: 'text/markdown' });
+      formData.append('file', mdBodyFile, dataPath);
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterContent = data.chapters[i];
+          const chapterPath = `${lang}/chapters/${i + 1}.md`;
+          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
+          
+          const mdChapterFile = new File([chapterContent.body || ""], chapterPath, { type: 'text/markdown' });
+          formData.append('file', mdChapterFile, chapterPath);
+        }
+      }
+    }
+
+    const yamlStr = toYaml(descriptor);
+    const infoFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
+    formData.append('file', infoFile, "info.yaml");
+
+    const assetFileNames = await getAllUploadedFileNames();
+    for (const fileName of assetFileNames) {
+      const file = await getUploadedFileAsFileObject(fileName);
+      if (file) {
+        formData.append('file', file, `uploads/${fileName}`);
+      }
+    }
+    
+    const url = `${httpBase()}store-dir`;
+    const result = await uploadWithProgress(url, formData);
+
+    if (!result?.cid) {
+      throw new Error("API did not return a 'cid' for the uploaded post.");
+    }
+    
+    return result.cid;
+  };
+
+  onMount(() => {
+    setTimeout(async () => {
+      try {
+        const cid = await uploadToIPFS();
+        props.onComplete?.(cid);
+      } catch (e) {
+        dbg.error("StepUploadIPFS", "An error occurred in the upload process:", e);
+        setError(e.message);
+      } finally {
+        setIsUploading(false);
+      }
+    }, 500);
+  });
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full">
+      <Show when={isUploading()}>
+        <Spinner />
+        <p class="mt-2 text-sm">{t("editor.publish.uploadingToIpfs")}...</p>
+        <div class="w-full max-w-sm bg-[hsl(var(--muted))] rounded-full h-2.5 mt-4">
+          <div class="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress()}%` }}></div>
+        </div>
+        <p class="text-xs mt-1">{uploadProgress()}%</p>
+      </Show>
+      <Show when={error()}>
+        <div class="text-center p-4">
+          <h4 class="font-bold text-red-600">{t("editor.publish.ipfs.errorTitle")}</h4>
+          <p class="mt-2 text-sm">{error()}</p>
+          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+            {t("editor.publish.validation.backToEditor")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}

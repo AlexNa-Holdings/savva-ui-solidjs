@@ -2,7 +2,7 @@
 import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, batch } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../routing/hashRouter.js";
 import MarkdownInput from "../components/editor/MarkdownInput.jsx";
 import LangSelector from "../components/ui/LangSelector.jsx";
 import EditorToolbar from "../components/editor/EditorToolbar.jsx";
@@ -18,6 +18,7 @@ import { insertTextAtCursor } from "../components/editor/text-utils.js";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
+import { pushToast } from "../components/ui/toast.js";
 
 function TrashIcon(props) {
   return (
@@ -29,7 +30,7 @@ function TrashIcon(props) {
 }
 
 export default function EditorPage() {
-  const { t, domainAssetsConfig } = useApp();
+  const { t, domainAssetsConfig, lastTabRoute } = useApp();
   const { route } = useHashRouter();
   let textareaRef;
 
@@ -76,10 +77,14 @@ export default function EditorPage() {
         const draft = await loadNewPostDraft();
         if (draft && draft.content) {
             setPostData(draft.content);
-            setPostParams(draft.params || {});
+            const params = draft.params || {};
+            if (!params.guid) {
+                params.guid = crypto.randomUUID();
+            }
+            setPostParams(params);
         } else {
             const newPostData = {};
-            const newPostParams = { locales: {} };
+            const newPostParams = { locales: {}, guid: crypto.randomUUID() };
             for (const langCode of domainLangCodes()) {
                 newPostData[langCode] = { title: "", body: "", chapters: [] };
                 newPostParams.locales[langCode] = { chapters: [] };
@@ -94,7 +99,7 @@ export default function EditorPage() {
     } catch (error) {
       dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
       setPostData({ en: { title: "", body: "", chapters: [] } });
-      setPostParams({});
+      setPostParams({ guid: crypto.randomUUID() });
     }
   });
 
@@ -129,6 +134,13 @@ export default function EditorPage() {
     setShowChapters(chapters.length > 0);
     setEditingChapterIndex(-1);
   }));
+
+  const handlePublishSuccess = () => {
+    pushToast({ type: "success", message: t("editor.publish.success") });
+    setShowPublishWizard(false);
+    // Draft clearing will be handled later based on a WebSocket event.
+    navigate(lastTabRoute() || "/");
+  };
 
   const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
 
@@ -462,10 +474,8 @@ export default function EditorPage() {
       />
       <PostSubmissionWizard 
         isOpen={showPublishWizard()}
-        onClose={() => {
-          console.log("[EditorPage] Wizard onClose triggered. Setting showPublishWizard to false.");
-          setShowPublishWizard(false);
-        }}
+        onClose={() => setShowPublishWizard(false)}
+        onSuccess={handlePublishSuccess}
         postData={postData}
         postParams={postParams}
       />

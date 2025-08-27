@@ -71,7 +71,7 @@ export async function listUploadedFiles() {
     if (entry.kind === 'file') {
       const file = await entry.getFile();
       const url = URL.createObjectURL(file);
-      files.push({ name: entry.name, url });
+      files.push({ name: entry.name, url, size: file.size });
     }
   }
   return files;
@@ -132,6 +132,34 @@ export async function resolveDraftFileUrl(relativePath) {
   }
 }
 
+export async function getAllUploadedFileNames() {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  if (!uploadsDirHandle) return [];
+  
+  const names = [];
+  for await (const entry of uploadsDirHandle.values()) {
+    if (entry.kind === 'file') {
+      names.push(entry.name);
+    }
+  }
+  return names;
+}
+
+export async function getUploadedFileAsFileObject(fileName) {
+  try {
+    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+    if (!uploadsDirHandle) return null;
+    
+    const fileHandle = await uploadsDirHandle.getFileHandle(fileName);
+    return await fileHandle.getFile();
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to get File object for ${fileName}`, e);
+    }
+    return null;
+  }
+}
+
 export async function loadNewPostDraft() {
   dbg.log("storage", "Loading new post draft...");
   const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
@@ -155,7 +183,6 @@ export async function loadNewPostDraft() {
         for (let i = 0; i < localeData.chapters.length; i++) {
           const chapterDesc = localeData.chapters[i];
           const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
-          // FIX: Only load the body here. Titles come from params.
           postData[lang].chapters.push({ body: chapterBody });
         }
       }
@@ -182,7 +209,6 @@ export async function saveNewPostDraft(draftData) {
   
   const { content, params } = draftData;
 
-  // Create a deep copy to avoid mutation issues.
   const finalParams = JSON.parse(JSON.stringify(params || {}));
   if (!finalParams.locales) finalParams.locales = {};
 
@@ -209,12 +235,10 @@ export async function saveNewPostDraft(draftData) {
       await writeFile(dirHandle, dataPath, data.body || "");
 
       if (Array.isArray(data.chapters)) {
-        // FIX: Read chapter titles from the `params` object, not the `content` object.
         const paramChapters = params?.locales?.[lang]?.chapters || [];
         
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterContent = data.chapters[i];
-          const chapterParams = paramChapters[i] || { title: "" };
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
           
           descriptor.locales[lang].chapters.push({ data_path: chapterPath });
@@ -228,4 +252,19 @@ export async function saveNewPostDraft(draftData) {
   
   await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
   dbg.log("storage", "Draft saved successfully.");
+}
+
+export async function clearNewPostDraft() {
+  dbg.log("storage", "Clearing new post draft...");
+  try {
+    if (navigator.storage && navigator.storage.getDirectory) {
+      const root = await navigator.storage.getDirectory();
+      await root.removeEntry(NEW_POST_DIR, { recursive: true });
+      dbg.log("storage", "Cleared draft directory from OPFS.");
+    }
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", "Failed to clear draft directory", e);
+    }
+  }
 }
