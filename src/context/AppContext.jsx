@@ -7,7 +7,7 @@ import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
 import { useAppConnection } from "./useAppConnection.js";
 import { useDomainAssets } from "./useDomainAssets.js";
-import { pushToast, pushErrorToast } from "../components/ui/toast.js";
+import { pushToast, pushErrorToast } from "../ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
 import { createWalletClient, custom } from "viem";
 

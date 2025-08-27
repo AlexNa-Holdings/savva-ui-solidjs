@@ -2,7 +2,7 @@
 import { createSignal, onMount } from "solid-js";
 import { parse } from "yaml";
 import { configureEndpoints } from "../net/endpoints";
-import { pushErrorToast } from "../components/ui/toast.js";
+import { pushErrorToast } from "../ui/toast.js";
 
 function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
 const OVERRIDE_KEY = "connect_override";

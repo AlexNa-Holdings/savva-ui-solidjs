@@ -6,7 +6,7 @@ import UserCard from "../ui/UserCard.jsx";
 import PostTags from "../post/PostTags.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
+import { rehypeResolveDraftUrls } from "../../docs/rehype-resolve-draft-urls.js";
 import ChapterSelector from "../post/ChapterSelector.jsx";
 import ChapterPager from "../post/ChapterPager.jsx";
 import LangSelector from "../ui/LangSelector.jsx";

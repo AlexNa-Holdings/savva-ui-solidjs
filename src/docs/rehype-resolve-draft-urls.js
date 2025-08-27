@@ -1,7 +1,7 @@
 // src/components/docs/rehype-resolve-draft-urls.js
 import { visit } from "unist-util-visit";
-import { resolveDraftFileUrl } from "../../editor/storage.js";
-import { dbg } from "../../utils/debug.js";
+import { resolveDraftFileUrl } from "../editor/storage.js";
+import { dbg } from "../utils/debug.js";
 
 // A very small guard to avoid double-work and malformed inputs
 const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);

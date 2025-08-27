@@ -3,7 +3,7 @@ import { createSignal, onMount } from "solid-js";
 import { getWsClient, getWsApi } from "../net/wsRuntime.js";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast } from "../components/ui/toast.js";
+import { pushErrorToast } from "../ui/toast.js";
 
 const AUTH_USER_KEY = "savva_auth_user";
 

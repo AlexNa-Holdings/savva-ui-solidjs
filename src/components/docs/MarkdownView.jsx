@@ -2,7 +2,7 @@
 import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
-import { rehypeMediaPlayers } from "./rehype-media-players.js";
+import { rehypeMediaPlayers } from "../../docs/rehype-media-players.js";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypePrettyCode from "rehype-pretty-code";

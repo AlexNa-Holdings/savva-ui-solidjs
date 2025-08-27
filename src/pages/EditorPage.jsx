@@ -7,18 +7,18 @@ import MarkdownInput from "../components/editor/MarkdownInput.jsx";
 import LangSelector from "../components/ui/LangSelector.jsx";
 import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
-import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
+import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
 import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
-import { insertTextAtCursor } from "../components/editor/text-utils.js";
+import { insertTextAtCursor } from "../editor/text-utils.js";
 import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
-import { pushToast } from "../components/ui/toast.js";
+import { pushToast } from "../ui/toast.js";
 
 function TrashIcon(props) {
   return (

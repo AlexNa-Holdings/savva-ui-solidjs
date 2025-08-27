@@ -3,7 +3,7 @@ import { createSignal, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 import { authorize } from "../../blockchain/auth.js";
-import { pushErrorToast } from "../ui/toast.js";
+import { pushErrorToast } from "../../ui/toast.js";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 

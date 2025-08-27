@@ -3,7 +3,7 @@ import { onMount, onCleanup, createSignal } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
 import { wsUrl } from "./endpoints";
-import { pushToast } from "../components/ui/toast.js"; // Import the toast helper
+import { pushToast } from "../ui/toast.js"; // Import the toast helper
 import { useI18n } from "../i18n/useI18n.js"; // Import i18n for the message
 
 let _mounted = false;

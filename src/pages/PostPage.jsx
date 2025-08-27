@@ -18,9 +18,9 @@ import ChapterSelector from "../components/post/ChapterSelector.jsx";
 import ChapterPager from "../components/post/ChapterPager.jsx";
 import PostTags from "../components/post/PostTags.jsx";
 import { getPostContentBaseCid, getPostDescriptorPath, resolvePostCidPath } from "../ipfs/utils.js";
-import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
+import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
 import ContextMenu from "../components/ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../components/ui/contextMenuBuilder.js";
+import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";

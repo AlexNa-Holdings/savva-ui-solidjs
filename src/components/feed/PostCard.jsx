@@ -9,7 +9,7 @@ import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
 import { navigate } from "../../routing/hashRouter";
 import ContextMenu from "../ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import { resolvePostCidPath } from "../../ipfs/utils.js";
 
 function PinIcon(props) {

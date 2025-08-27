@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
 import FileGridItem from "./FileGridItem.jsx";
 import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
-import { pushToast, pushErrorToast } from "../ui/toast.js";
+import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import ConfirmModal from "../ui/ConfirmModal.jsx";
 import FileContextMenu from "./FileContextMenu.jsx";
 import { formatBytes } from "../../utils/format.js";

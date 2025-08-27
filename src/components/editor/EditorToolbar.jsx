@@ -1,6 +1,6 @@
 // src/components/editor/EditorToolbar.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { applyMarkdownFormat } from "./text-utils.js";
+import { applyMarkdownFormat } from "../../editor/text-utils.js";
 import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
 
 export default function EditorToolbar(props) {

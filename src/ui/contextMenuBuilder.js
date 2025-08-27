@@ -1,6 +1,6 @@
 // src/components/ui/contextMenuBuilder.js
-import { pushToast } from "./toast.js";
-import { getPostDescriptorPath, getPostContentBaseCid } from "../../ipfs/utils.js";
+import { pushToast } from "../ui/toast.js";
+import { getPostDescriptorPath, getPostContentBaseCid } from "../ipfs/utils.js";
 
 // A helper to avoid rewriting the clipboard logic everywhere
 function copyToClipboard(text, label, t) {
