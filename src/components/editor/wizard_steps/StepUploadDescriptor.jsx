@@ -35,11 +35,6 @@ export default function StepUploadDescriptor(props) {
     const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
     Object.assign(descriptor, otherParams);
     
-    if (thumbnail) {
-      // The thumbnail path from params already includes "uploads/", so just prepend the data_cid.
-      descriptor.thumbnail = `${data_cid}/${thumbnail}`;
-    }
-
     const content = postData();
     for (const lang in content) {
       const data = content[lang];

@@ -9,7 +9,7 @@ import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
 import { navigate } from "../../routing/hashRouter";
 import ContextMenu from "../ui/ContextMenu.jsx";
-import { pushToast } from "../ui/toast.js";
+import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 import { resolvePostCidPath } from "../../ipfs/utils.js";
 
 function PinIcon(props) {
@@ -47,7 +47,7 @@ export default function PostCard(props) {
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
     if (thumbnailPath) {
-      return thumbnailPath;
+      return resolvePostCidPath(props.item._raw, thumbnailPath);
     }
     return author()?.avatar;
   });
@@ -79,38 +79,10 @@ export default function PostCard(props) {
     console.log("User card clicked, navigating to profile for:", author()?.address);
   };
 
-  const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text).then(() => {
-      pushToast({ type: "success", message: t("clipboard.copied", { label }) });
-    }).catch(err => {
-      console.error(`Failed to copy ${label}:`, err);
-    });
-  };
-
   const finalContextMenuItems = createMemo(() => {
     const propItems = props.contextMenuItems || [];
-    const baseAdminItems = [];
-    const raw = props.item?._raw;
-
-    if (raw) {
-      const savvaCid = props.item.id;
-      const ipfsCid = raw.data_cid || raw.ipfs?.split('/')[0];
-
-      if (savvaCid) {
-        baseAdminItems.push({
-          label: t("postcard.copySavvaCid"),
-          onClick: () => copyToClipboard(savvaCid, "SAVVA CID")
-        });
-      }
-      if (ipfsCid) {
-        baseAdminItems.push({
-          label: t("postcard.copyIpfsCid"),
-          onClick: () => copyToClipboard(ipfsCid, "IPFS CID")
-        });
-      }
-    }
-    
-    return [...propItems, ...baseAdminItems];
+    const adminItems = getPostAdminItems(props.item?._raw, t);
+    return [...propItems, ...adminItems];
   });
 
   const articleClasses = createMemo(() => {

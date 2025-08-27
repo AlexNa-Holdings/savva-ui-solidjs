@@ -1,6 +1,25 @@
 // src/ipfs/utils.js
 
 /**
+ * Checks if a string looks like a v0 or v1 IPFS CID.
+ * This is a basic prefix/length check, not a full validation.
+ * @param {string} s The string to check.
+ * @returns {boolean}
+ */
+function isIpfsCid(s) {
+  if (typeof s !== 'string') return false;
+  // v0 CIDs start with "Qm" and are 46 characters long.
+  if (s.startsWith('Qm') && s.length === 46) {
+    return true;
+  }
+  // v1 CIDs in base32 commonly start with "bafy".
+  if (s.startsWith('bafy')) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Determines the base CID for a post's content, supporting both new and legacy formats.
  * @param {object} post - The raw post object from the API.
  * @returns {string|null} The base CID for the content folder.
@@ -16,18 +35,29 @@ export function getPostContentBaseCid(post) {
 }
 
 /**
- * Resolves a relative path from a post's content folder into a full IPFS path.
+ * Resolves a path that may be relative to a post's content folder into a full IPFS path.
+ * If the path already starts with any valid IPFS CID, it's returned as is.
+ * Otherwise, it's treated as a relative path and the post's base CID is prepended.
  * @param {object} post - The raw post object from the API.
- * @param {string} relativePath - The relative path within the content folder (e.g., "thumbnail.jpg").
- * @returns {string|null} The full, resolvable IPFS path (e.g., "bafy.../thumbnail.jpg").
+ * @param {string} path - The relative path or full CID path.
+ * @returns {string|null} The full, resolvable IPFS path.
  */
-export function resolvePostCidPath(post, relativePath) {
-  if (!relativePath) return null;
+export function resolvePostCidPath(post, path) {
+  if (!path) return null;
+
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  const firstSegment = cleanPath.split('/')[0];
+
+  // If the path already starts with any valid CID, treat it as absolute.
+  if (isIpfsCid(firstSegment)) {
+    return cleanPath;
+  }
+
+  // Otherwise, resolve it against the post's own base CID.
   const baseCid = getPostContentBaseCid(post);
-  if (!baseCid) return null;
-  
-  const cleanRelativePath = relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
-  return `${baseCid}/${cleanRelativePath}`;
+  if (!baseCid) return null; // Cannot resolve a relative path without a base CID
+
+  return `${baseCid}/${cleanPath}`;
 }
 
 /**

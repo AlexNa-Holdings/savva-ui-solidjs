@@ -17,8 +17,10 @@ import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import ChapterSelector from "../components/post/ChapterSelector.jsx";
 import ChapterPager from "../components/post/ChapterPager.jsx";
 import PostTags from "../components/post/PostTags.jsx";
-import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
+import { getPostContentBaseCid, getPostDescriptorPath, resolvePostCidPath } from "../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
+import ContextMenu from "../components/ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../components/ui/contextMenuBuilder.js";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -154,16 +156,19 @@ export default function PostPage() {
     }
   });
 
+  const contextMenuItems = createMemo(() => {
+    const p = post();
+    if (!p) return [];
+    return getPostAdminItems(p, t);
+  });
+
   const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
   const thumbnail = createMemo(() => {
+    const p = post();
+    if (!p) return null;
     const d = details();
-    if (!d) return null;
-    const dataCid = d.dataCidForContent;
-    const thumbnailPath = d.descriptor?.thumbnail || post()?.savva_content?.thumbnail;
-    if (dataCid && thumbnailPath) {
-      return `${dataCid}/${thumbnailPath.replace(/^\//, '')}`;
-    }
-    return null;
+    const thumbnailPath = d?.descriptor?.thumbnail || p.savva_content?.thumbnail;
+    return resolvePostCidPath(p, thumbnailPath);
   });
   const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
   
@@ -248,8 +253,16 @@ export default function PostPage() {
           <div class="max-w-5xl mx-auto">
             <article class="space-y-4">
               <header class="flex justify-between items-start gap-4">
-                <div class="flex-1 min-w-0 space-y-3">
-                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
+                <div class="relative flex-1 min-w-0 space-y-3">
+                  <h1 class="text-2xl lg:text-3xl font-bold break-words pr-12">{title() || t('common.loading')}</h1>
+                  
+                  <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+                    <ContextMenu 
+                      items={contextMenuItems()}
+                      positionClass="absolute top-0 right-0 z-20"
+                    />
+                  </Show>
+
                   <UserCard author={post().author} />
                   <PostInfo 
                     item={post()} 

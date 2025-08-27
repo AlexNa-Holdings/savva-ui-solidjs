@@ -11,6 +11,7 @@ function MoreIcon(props) {
 
 export default function ContextMenu(props) {
   const [isOpen, setIsOpen] = createSignal(false);
+  const [menuClass, setMenuClass] = createSignal("bottom-full right-0 mb-2"); // Default: above
   let containerRef;
 
   const handleClickOutside = (event) => {
@@ -29,14 +30,33 @@ export default function ContextMenu(props) {
     setIsOpen(false);
   };
 
+  const positionClass = props.positionClass || "absolute -bottom-2 -right-2 z-20";
+
+  const toggleMenu = () => {
+    const shouldOpen = !isOpen();
+
+    if (shouldOpen && containerRef) {
+      const buttonRect = containerRef.getBoundingClientRect();
+      const estimatedMenuHeight = 150; // A safe estimate for the menu's height in pixels
+
+      // If there's not enough space above the button, show the menu below it.
+      if (buttonRect.top < estimatedMenuHeight) {
+        setMenuClass("top-full right-0 mt-2"); // Position below
+      } else {
+        setMenuClass("bottom-full right-0 mb-2"); // Position above (default)
+      }
+    }
+    setIsOpen(shouldOpen);
+  };
+
   return (
-    <div class="absolute -bottom-2 -right-2 z-20" ref={containerRef}>
+    <div class={positionClass} ref={containerRef}>
       <button
         class="p-1 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setIsOpen(!isOpen());
+          toggleMenu();
         }}
         aria-haspopup="true"
         aria-expanded={isOpen()}
@@ -45,7 +65,9 @@ export default function ContextMenu(props) {
       </button>
 
       <Show when={isOpen()}>
-        <div class="absolute bottom-full right-0 mb-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5">
+        <div
+          class={`absolute w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 ${menuClass()}`}
+        >
           <ul class="py-1" role="menu">
             <For each={props.items}>
               {(item) => (
