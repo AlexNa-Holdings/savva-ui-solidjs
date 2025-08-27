@@ -35,6 +35,10 @@ export function AppProvider(props) {
     }
   }, { defer: true }));
   
+  const [newFeedItems, setNewFeedItems] = Solid.createSignal([]);
+  const [newContentAvailable, setNewContentAvailable] = Solid.createSignal(null);
+  const [newTabRefreshKey, setNewTabRefreshKey] = Solid.createSignal(Date.now());
+
   const supportedDomains = Solid.createMemo(() => {
     const list = conn.info()?.domains || [];
     return [...new Set(list.map(d => (typeof d === "string" ? d : d?.name)).filter(Boolean))]
@@ -113,6 +117,9 @@ export function AppProvider(props) {
     i18nAvailable: i18n.available,
     lastTabRoute, setLastTabRoute,
     savedScrollY, setSavedScrollY,
+    newFeedItems, setNewFeedItems,
+    newContentAvailable, setNewContentAvailable,
+    newTabRefreshKey, setNewTabRefreshKey,
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,

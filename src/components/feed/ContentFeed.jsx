@@ -20,7 +20,13 @@ export default function ContentFeed(props) {
       const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
       dbg.log("ContentFeed", "page result length", chunk.length);
       if (!chunk.length) setHasMore(false);
-      setItems((prev) => prev.concat(chunk));
+      
+      setItems((prev) => {
+        const next = prev.concat(chunk);
+        props.onItemsChange?.(next);
+        return next;
+      });
+
       setPage(nextPage);
     } finally {
       setLoading(false);
@@ -28,7 +34,6 @@ export default function ContentFeed(props) {
   }
 
   onMount(() => {
-    // --- DEBUG: Log when the component mounts using dbg ---
     dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
     loadMore();
     const handleScroll = () => {
@@ -51,6 +56,7 @@ export default function ContentFeed(props) {
 
   createEffect(on(() => props.resetOn, () => {
     setItems([]);
+    props.onItemsChange?.([]);
     setPage(0);
     setHasMore(true);
     setLoading(false);

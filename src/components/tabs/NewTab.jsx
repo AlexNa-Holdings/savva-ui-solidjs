@@ -7,6 +7,8 @@ import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { dbg } from "../../utils/debug.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
+import { getNewPostDraftParams, clearNewPostDraft } from "../../editor/storage.js";
+import { pushToast } from "../../ui/toast.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -48,18 +50,15 @@ export default function NewTab(props) {
   };
   const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
 
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${app.newTabRefreshKey()}`);
 
   async function fetchPage(page, pageSize) {
     const limit = pageSize;
     const offset = (page - 1) * pageSize;
     try {
       dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
-
-      dbg.log("NewTab", `fetchPage(page=${page}) pre-wait, ws=${app.wsStatus?.()}`);
       await whenWsOpen();
       dbg.log("NewTab", "after whenWsOpen");
-
 
       if (!contentList) {
         dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
@@ -79,6 +78,16 @@ export default function NewTab(props) {
       dbg.log('NewTab', 'Fetching with params:', params);
       const res = await contentList(params);
       const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+
+      const draftParams = await getNewPostDraftParams();
+      if (draftParams?.guid) {
+        const newPostsHaveDraftGuid = arr.some(post => post.guid === draftParams.guid);
+        if (newPostsHaveDraftGuid) {
+          await clearNewPostDraft();
+          pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+        }
+      }
+
       return arr.map((it) => ({
         id: it?.savva_cid || it?.savvaCID || it?.id,
         _raw: it,
@@ -116,6 +125,7 @@ export default function NewTab(props) {
         pageSize={12}
         resetOn={feedResetKey()}
         isRailVisible={props.isRailVisible}
+        onItemsChange={app.setNewFeedItems}
       />
     </section>
   );

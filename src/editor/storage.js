@@ -230,6 +230,19 @@ export async function loadNewPostDraft() {
   return draft;
 }
 
+export async function getNewPostDraftParams() {
+  try {
+    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+    const paramsJson = await readFile(dirHandle, PARAMS_FILE);
+    return paramsJson ? JSON.parse(paramsJson) : null;
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to get draft params`, e);
+    }
+    return null;
+  }
+}
+
 export async function saveNewPostDraft(draftData) {
   dbg.log("storage", "Saving new post draft...", draftData);
   const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
