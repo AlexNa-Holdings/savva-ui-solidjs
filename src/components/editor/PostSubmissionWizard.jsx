@@ -1,4 +1,18 @@
 // src/components/editor/PostSubmissionWizard.jsx
+/*
+  i18n technical comment. Do not remove.
+  This is used by the i18n script to detect dynamically used keys.
+  t("editor.publish.steps.validate")
+  t("editor.publish.steps.validate.help")
+  t("editor.publish.steps.check_rights")
+  t("editor.publish.steps.check_rights.help")
+  t("editor.publish.steps.ipfs")
+  t("editor.publish.steps.ipfs.help")
+  t("editor.publish.steps.ipfs_publish")
+  t("editor.publish.steps.ipfs_publish.help")
+  t("editor.publish.steps.publish")
+  t("editor.publish.steps.publish.help")
+*/
 import { createSignal, createMemo, Show, For, Switch, Match } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";

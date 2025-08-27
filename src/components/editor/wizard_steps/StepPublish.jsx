@@ -7,11 +7,24 @@ import { toHexBytes32 } from "../../../blockchain/utils.js";
 import { dbg } from "../../../utils/debug.js";
 import { createPublicClient, http } from "viem";
 
+function parseViemError(e) {
+  if (e?.shortMessage) {
+    return e.shortMessage;
+  }
+  if (e?.message?.includes('User rejected the request')) {
+    return 'User rejected the request.';
+  }
+  if (e?.name === 'TransactionExecutionError' && e.cause?.shortMessage) {
+    return e.cause.shortMessage;
+  }
+  return e.message;
+}
+
 export default function StepPublish(props) {
   const app = useApp();
   const { t } = app;
   const [error, setError] = createSignal(null);
-  const [statusText, setStatusText] = createSignal(t("editor.publish.publishing.waitSignature"));
+  const [status, setStatus] = createSignal("waiting_signature");
   const [txHash, setTxHash] = createSignal(null);
 
   const publishPost = async () => {
@@ -30,7 +43,6 @@ export default function StepPublish(props) {
     const contract = await getSavvaContract(app, "ContentRegistry");
     const walletClient = app.getGuardedWalletClient();
     
-    // Explicitly define the transport with the chain's RPC URL
     const desiredChain = app.desiredChain();
     if (!desiredChain?.rpcUrls?.[0]) {
       throw new Error("RPC URL for the desired chain is not configured.");
@@ -42,6 +54,7 @@ export default function StepPublish(props) {
       transport: transport
     });
     
+    setStatus("waiting_signature");
     const hash = await walletClient.writeContract({
       address: contract.address,
       abi: contract.abi,
@@ -55,7 +68,7 @@ export default function StepPublish(props) {
       ]
     });
 
-    setStatusText(t("editor.publish.publishing.waitFinalize"));
+    setStatus("publishing");
     setTxHash(hash);
     dbg.log("StepPublish", "Transaction sent, hash:", hash);
 
@@ -75,7 +88,7 @@ export default function StepPublish(props) {
         props.onComplete?.();
       } catch (e) {
         dbg.error("StepPublish", "Publishing failed:", e);
-        setError(e.message);
+        setError(parseViemError(e));
       }
     }, 500);
   });
@@ -94,7 +107,15 @@ export default function StepPublish(props) {
         }
       >
         <Spinner />
-        <p class="mt-2 text-sm">{statusText()}</p>
+        <Show when={status() === 'waiting_signature'}>
+            <p class="mt-2 text-sm font-semibold">{t("editor.publish.publishing.waitSignature")}</p>
+            <p class="mt-1 text-xs text-[hsl(var(--muted-foreground))] max-w-sm">
+              {t("editor.publish.publishing.waitSignatureHelp")}
+            </p>
+        </Show>
+         <Show when={status() === 'publishing'}>
+            <p class="mt-2 text-sm">{t("editor.publish.publishing.waitFinalize")}</p>
+        </Show>
         <Show when={txHash()}>
           <div class="mt-4 text-xs text-[hsl(var(--muted-foreground))]">
             <p>{t("editor.publish.publishing.txHash")}:</p>

@@ -1,6 +1,7 @@
 // src/editor/storage.js
 import { dbg } from "../utils/debug";
 import { parse, stringify } from "yaml";
+import { createTextPreview } from "./preview-utils.js";
 
 const NEW_POST_DIR = "new_post";
 const UPLOAD_DIR = "uploads";
@@ -225,7 +226,7 @@ export async function saveNewPostDraft(draftData) {
       
       descriptor.locales[lang] = {
         title: data.title || "",
-        text_preview: (data.body || "").substring(0, 200),
+        text_preview: createTextPreview(data.body || ""),
         data_path: dataPath,
         chapters: []
       };

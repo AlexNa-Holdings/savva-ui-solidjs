@@ -5,6 +5,7 @@ import Spinner from "../../ui/Spinner.jsx";
 import { stringify as toYaml } from "yaml";
 import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
+import { createTextPreview } from "../../../editor/preview-utils.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
@@ -21,9 +22,15 @@ export default function StepUploadDescriptor(props) {
     }
 
     const descriptor = {
+      savva_spec_version: "2.0",
       data_cid: data_cid,
       locales: {}
     };
+
+    const gateways = app.info()?.ipfs_gateways;
+    if (gateways && Array.isArray(gateways) && gateways.length > 0) {
+      descriptor.gateways = gateways;
+    }
 
     const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
     Object.assign(descriptor, otherParams);
@@ -35,12 +42,37 @@ export default function StepUploadDescriptor(props) {
     const content = postData();
     for (const lang in content) {
       const data = content[lang];
-      descriptor.locales[lang] = {
+      const hasTitle = data.title?.trim().length > 0;
+      const hasBody = data.body?.trim().length > 0;
+      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
+
+      // Skip this language if it has no meaningful content
+      if (!hasTitle && !hasBody && !hasChapters) {
+        continue;
+      }
+      
+      const langParams = paramLocales?.[lang] || {};
+      
+      const localeObject = {
         title: data.title || "",
-        text_preview: (data.body || "").substring(0, 200),
-        tags: paramLocales?.[lang]?.tags || [],
-        categories: paramLocales?.[lang]?.categories || []
+        text_preview: createTextPreview(data.body || ""),
+        tags: langParams.tags || [],
+        categories: langParams.categories || [],
+        data_path: `${lang}/data.md`,
+        chapters: []
       };
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterParams = langParams.chapters?.[i] || {};
+          localeObject.chapters.push({
+            title: chapterParams.title || `Chapter ${i + 1}`,
+            data_path: `${lang}/chapters/${i + 1}.md`
+          });
+        }
+      }
+      
+      descriptor.locales[lang] = localeObject;
     }
     
     dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);

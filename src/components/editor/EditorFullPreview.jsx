@@ -65,7 +65,7 @@ export default function EditorFullPreview(props) {
           onClick={props.onContinue}
           class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90"
         >
-          {t("editor.fullPreview.continue")}
+          {t("editor.fullPreview.publish")}
         </button>
       </div>
       

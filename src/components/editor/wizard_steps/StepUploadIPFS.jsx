@@ -3,7 +3,6 @@ import { createSignal, onMount, Show } from "solid-js";
 import { useApp } from "../../../context/AppContext.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { getAllUploadedFileNames, getUploadedFileAsFileObject } from "../../../editor/storage.js";
-import { stringify as toYaml } from "yaml";
 import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
 
@@ -24,7 +23,6 @@ export default function StepUploadIPFS(props) {
         if (event.lengthComputable) {
           const percentComplete = Math.round((event.loaded / event.total) * 100);
           setUploadProgress(percentComplete);
-          dbg.log("StepUploadIPFS", `Upload progress: ${percentComplete}%`);
         }
       };
 
@@ -57,28 +55,24 @@ export default function StepUploadIPFS(props) {
   };
 
   const uploadToIPFS = async () => {
-    dbg.log("StepUploadIPFS", "Starting IPFS upload process...");
+    dbg.log("StepUploadIPFS", "Starting IPFS folder upload process...");
     const { postData } = props;
     const formData = new FormData();
-
-    const descriptor = {
-      savva_spec_version: "2.0",
-      mime_type: "text/markdown",
-      locales: {}
-    };
 
     const content = postData();
     for (const lang in content) {
       const data = content[lang];
+      const hasTitle = data.title?.trim().length > 0;
+      const hasBody = data.body?.trim().length > 0;
+      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
+
+      // Skip this language if it has no meaningful content
+      if (!hasTitle && !hasBody && !hasChapters) {
+        dbg.log("StepUploadIPFS", `Skipping empty language: ${lang}`);
+        continue;
+      }
+
       const dataPath = `${lang}/data.md`;
-      
-      descriptor.locales[lang] = {
-        title: data.title || "",
-        text_preview: (data.body || "").substring(0, 200),
-        data_path: dataPath,
-        chapters: []
-      };
-      
       const mdBodyFile = new File([data.body || ""], dataPath, { type: 'text/markdown' });
       formData.append('file', mdBodyFile, dataPath);
 
@@ -86,17 +80,11 @@ export default function StepUploadIPFS(props) {
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterContent = data.chapters[i];
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
-          
           const mdChapterFile = new File([chapterContent.body || ""], chapterPath, { type: 'text/markdown' });
           formData.append('file', mdChapterFile, chapterPath);
         }
       }
     }
-
-    const yamlStr = toYaml(descriptor);
-    const infoFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
-    formData.append('file', infoFile, "info.yaml");
 
     const assetFileNames = await getAllUploadedFileNames();
     for (const fileName of assetFileNames) {
@@ -110,7 +98,7 @@ export default function StepUploadIPFS(props) {
     const result = await uploadWithProgress(url, formData);
 
     if (!result?.cid) {
-      throw new Error("API did not return a 'cid' for the uploaded post.");
+      throw new Error("API did not return a 'cid' for the uploaded directory.");
     }
     
     return result.cid;
