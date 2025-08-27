@@ -17,6 +17,7 @@ import Spinner from "./components/ui/Spinner.jsx";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import PostPage from "./pages/PostPage";
 import EditorPage from "./pages/EditorPage.jsx";
+import AlertManager from "./alerts/AlertManager.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -88,6 +89,7 @@ export default function App() {
           <FaviconLoader />
           <GoogleAnalyticsLoader />
           <WsConnector />
+          <AlertManager />
           
           <Show when={domainRevision()} keyed>
             <>

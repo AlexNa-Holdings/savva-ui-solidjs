@@ -10,6 +10,7 @@ import { useDomainAssets } from "./useDomainAssets.js";
 import { pushToast, pushErrorToast } from "../ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
 import { createWalletClient, custom } from "viem";
+import { useTokenPrices } from "./useTokenPrices.js";
 
 const AppContext = Solid.createContext();
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
@@ -50,6 +51,7 @@ export function AppProvider(props) {
   
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
+  const prices = useTokenPrices({ info: conn.info });
 
   Solid.createEffect(() => {
     const cfg = assets.domainAssetsConfig();
@@ -105,7 +107,7 @@ export function AppProvider(props) {
   }
 
   const value = {
-    ...conn, ...auth, ...assets, ...ipfs,
+    ...conn, ...auth, ...assets, ...ipfs, ...prices,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
     showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,

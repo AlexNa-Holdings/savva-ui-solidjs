@@ -13,6 +13,7 @@ import BrandLogo from "./ui/BrandLogo.jsx";
 import Container from "./layout/Container";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
 import NewPostButton from "./main/NewPostButton.jsx";
+import TokenPrice from "./main/TokenPrice.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -90,6 +91,7 @@ export default function Header({ onTogglePane }) {
           {/* Left: brand */}
           <div class="flex items-center gap-4">
             <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+            <TokenPrice />
           </div>
 
           {/* Right: wallet + auth + menu */}
