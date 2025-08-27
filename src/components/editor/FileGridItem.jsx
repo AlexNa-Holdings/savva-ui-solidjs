@@ -41,6 +41,7 @@ export default function FileGridItem(props) {
       class="relative group aspect-square rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] overflow-hidden cursor-pointer"
       onClick={handleClick}
       onContextMenu={handleClick}
+      title={props.file.name}
     >
       <Show when={fileType() === 'image'}>
         <img src={props.file.url} alt={props.file.name} class="w-full h-full object-cover" />
@@ -65,4 +66,4 @@ export default function FileGridItem(props) {
       </div>
     </div>
   );
-} 
+}

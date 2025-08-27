@@ -90,7 +90,33 @@ export async function addUploadedFileFromUrl(url) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const blob = await response.blob();
-    const fileName = url.substring(url.lastIndexOf('/') + 1) || "downloaded_file";
+    
+    let fileName;
+    try {
+      // Decode any percent-encoded characters first (like %3F -> ?)
+      const decodedUrl = decodeURIComponent(url);
+      // Now, we can reliably parse the URL to separate the path from real query params.
+      const urlObj = new URL(decodedUrl);
+      
+      let name = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('/') + 1);
+
+      // Smartly append extension from 'filename' query param if the name lacks one.
+      const filenameParam = urlObj.searchParams.get('filename');
+      if (name && !name.includes('.') && filenameParam && filenameParam.startsWith('.')) {
+        name += filenameParam;
+      }
+      
+      // Sanitize the final name to ensure it's valid.
+      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    } catch (e) {
+      // Fallback for malformed URLs that the constructor can't handle.
+      const decodedUrl = decodeURIComponent(url);
+      const cleanUrl = decodedUrl.split('?')[0].split('#')[0];
+      let name = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
     const file = new File([blob], fileName, { type: blob.type });
     await addUploadedFile(file);
     return file;
