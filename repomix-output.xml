@@ -163,6 +163,7 @@ src/
     auth.js
     chainLogos.js
     chains.js
+    config.js
     contracts.js
     utils.js
     wallet.js
@@ -178,16 +179,20 @@ src/
       rehype-resolve-draft-urls.js
       rehype-rewrite-links.js
     editor/
+      wizard_steps/
+        StepValidate.jsx
       ChapterManager.jsx
       EditorChapterSelector.jsx
       EditorFilesButton.jsx
       EditorFilesDrawer.jsx
+      EditorFullPreview.jsx
       EditorSidebar.jsx
       EditorTocButton.jsx
       EditorToolbar.jsx
       FileContextMenu.jsx
       FileGridItem.jsx
       MarkdownInput.jsx
+      PostSubmissionWizard.jsx
       text-utils.js
       ToolbarIcons.jsx
       UploadFromUrlModal.jsx
@@ -16833,6 +16838,66 @@ main().catch((err) => { console.error(err); process.exit(1); });
 ]
 </file>
 
+<file path="src/blockchain/config.js">
+// src/blockchain/config.js
+import { getSavvaContract } from "./contracts.js";
+import { toHexBytes32 } from "./utils.js";
+import { dbg } from "../utils/debug.js";
+
+// A cache to store config values once they are fetched.
+const paramCache = new Map();
+
+// A simple way to determine the type of a parameter based on its name.
+function getParamType(name) {
+  if (name.startsWith("contract_") || name.endsWith("Address") || name === 'pulsex_factory' || name === 'pulsex_router' || name === 'WPLS') {
+    return 'address';
+  }
+  return 'uint';
+}
+
+/**
+ * Fetches a configuration parameter from the Config smart contract.
+ * Results are cached to avoid repeated blockchain calls.
+ *
+ * @param {object} app - The global application context from useApp().
+ * @param {string} name - The human-readable name of the parameter (e.g., "min_staked_to_post").
+ * @returns {Promise<string|number|bigint|null>} The value of the parameter.
+ */
+export async function getConfigParam(app, name) {
+  if (paramCache.has(name)) {
+    return paramCache.get(name);
+  }
+
+  try {
+    const configContract = await getSavvaContract(app, 'Config');
+    const keyHex = toHexBytes32(name);
+    const paramType = getParamType(name);
+
+    let value;
+    if (paramType === 'address') {
+      value = await configContract.read.getAddr([keyHex]);
+    } else {
+      value = await configContract.read.getUInt([keyHex]);
+    }
+
+    paramCache.set(name, value);
+    return value;
+  } catch (error) {
+    dbg.error("ConfigHelper", `Failed to fetch config parameter '${name}'`, error);
+    return null;
+  }
+}
+
+/**
+ * Clears the configuration parameter cache.
+ * This should be called when the network or backend changes.
+ */
+export function clearConfigCache() {
+    paramCache.clear();
+    dbg.log("ConfigHelper", "Configuration cache cleared.");
+}
+</file>
+
 <file path="src/blockchain/contracts.js">
 // src/blockchain/contracts.js
 import { createPublicClient, http, getContract } from "viem";
@@ -17079,6 +17144,72 @@ export default function DocsIndex(props) {
             {app.t("docs.sidebar.empty")}
           </div>
         </Show>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/wizard_steps/StepValidate.jsx">
+// src/components/editor/wizard_steps/StepValidate.jsx
+import { createSignal, onMount, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+
+export default function StepValidate(props) {
+  const { t } = useApp();
+  const [error, setError] = createSignal(null);
+  const [isValidating, setIsValidating] = createSignal(true);
+
+  const validate = () => {
+    const data = props.postData();
+    if (!data) {
+      throw new Error("Post data is missing or not a function.");
+    }
+
+    for (const langCode in data) {
+      const langData = data[langCode];
+      
+      const hasTitle = langData.title?.trim().length > 0;
+      const hasBody = langData.body?.trim().length > 0;
+      const hasChapters = langData.chapters?.some(c => c.body?.trim().length > 0);
+      
+      const hasAnyMeaningfulContent = hasTitle || hasBody || hasChapters;
+      const isComplete = hasTitle && (hasBody || hasChapters);
+
+      if (hasAnyMeaningfulContent && !isComplete) {
+        throw new Error(t("editor.publish.validation.errorIncomplete", { lang: langCode }));
+      }
+    }
+  };
+
+  onMount(() => {
+    setTimeout(() => {
+      try {
+        validate();
+        props.onComplete?.();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setIsValidating(false);
+      }
+    }, 500);
+  });
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full">
+      <Show when={isValidating()}>
+        <Spinner />
+        <p class="mt-2 text-sm">{t("common.checking")}...</p>
+      </Show>
+      <Show when={error()}>
+        <div class="text-center p-4">
+          <h4 class="font-bold text-red-600">{t("editor.publish.validation.errorTitle")}</h4>
+          <p class="mt-2 text-sm">{error()}</p>
+          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+            {t("editor.publish.validation.backToEditor")}
+          </button>
+        </div>
       </Show>
     </div>
   );
@@ -17472,6 +17603,112 @@ export default function FileGridItem(props) {
         {props.file.name}
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/PostSubmissionWizard.jsx">
+// src/components/editor/PostSubmissionWizard.jsx
+import { createSignal, Show, For, Switch, Match } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import StepValidate from "./wizard_steps/StepValidate.jsx";
+
+const STEPS = [
+  { id: 'validate', title: "editor.publish.steps.validate", help: "editor.publish.steps.validate.help", component: StepValidate },
+  { id: 'ipfs', title: "editor.publish.steps.ipfs", help: "editor.publish.steps.ipfs.help" },
+  { id: 'ipfs_publish', title: "editor.publish.steps.ipfs_publish", help: "editor.publish.steps.ipfs_publish.help" },
+  { id: 'register', title: "editor.publish.steps.register", help: "editor.publish.steps.register.help" },
+  { id: 'publish', title: "editor.publish.steps.publish", help: "editor.publish.steps.publish.help" },
+];
+
+function CheckmarkIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+    );
+}
+
+function StepIcon(props) {
+    return (
+        <div class={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${props.class}`}>
+            <Show when={props.status === 'completed'}><CheckmarkIcon class="text-white" /></Show>
+            <Show when={props.status === 'active'}><div class="w-4 h-4 rounded-full bg-blue-500" /></Show>
+            <Show when={props.status === 'pending'}><div class="w-2 h-2 rounded-full bg-gray-400" /></Show>
+        </div>
+    );
+}
+
+export default function PostSubmissionWizard(props) {
+  const { t } = useApp();
+  const [currentStepIndex, setCurrentStepIndex] = createSignal(0);
+  
+  const handleNextStep = () => {
+    if (currentStepIndex() < STEPS.length - 1) {
+      setCurrentStepIndex(currentStepIndex() + 1);
+    }
+  };
+
+  const getStepStatus = (index) => {
+    if (index < currentStepIndex()) return 'completed';
+    if (index === currentStepIndex()) return 'active';
+    return 'pending';
+  };
+
+  const ActiveStepComponent = () => STEPS[currentStepIndex()].component;
+
+  const handleValidationBack = () => {
+    props.onClose?.();
+  };
+
+  return (
+    <Show when={props.isOpen}>
+      <div class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" />
+        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-3xl p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <header class="flex items-center justify-between pb-3 border-b border-[hsl(var(--border))]">
+            <h3 class="text-lg font-semibold">{t("editor.publish.title")}</h3>
+            <button class="px-3 py-1 rounded hover:bg-[hsl(var(--accent))]" onClick={props.onClose}>
+              {t("common.cancel")}
+            </button>
+          </header>
+          
+          <div class="flex gap-6 py-4">
+            <div class="w-48 flex-shrink-0">
+              <For each={STEPS}>
+                {(step, index) => (
+                  <div class="flex items-start">
+                    <div class="flex flex-col items-center mr-4">
+                      <StepIcon status={getStepStatus(index())} class={getStepStatus(index()) === 'completed' ? 'bg-green-500 border-green-500' : 'border-gray-400'} />
+                      <Show when={index() < STEPS.length - 1}>
+                        <div class="w-px h-8 bg-gray-300" />
+                      </Show>
+                    </div>
+                    <div>
+                      <h4 class="font-semibold text-sm">{t(step.title)}</h4>
+                      <p class="text-xs text-[hsl(var(--muted-foreground))]">{t(step.help)}</p>
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+
+            <div class="flex-1 min-w-0 min-h-[20rem]">
+              <Switch>
+                <Match when={ActiveStepComponent()}>
+                  <ActiveStepComponent 
+                    postData={props.postData}
+                    postParams={props.postParams}
+                    onComplete={handleNextStep}
+                    onCancel={handleValidationBack}
+                  />
+                </Match>
+              </Switch>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Show>
   );
 }
 </file>
@@ -20266,39 +20503,6 @@ export function rehypeResolveDraftUrls() {
 }
 </file>
 
-<file path="src/components/docs/rehype-rewrite-links.js">
-// src/components/docs/rehype-rewrite-links.js
-import { visit } from "unist-util-visit";
-
-/**
- * A rehype plugin that rewrites relative image and link URLs to be absolute,
- * based on a provided base URL.
- * @param {object} options - The options object.
- * @param {string} options.base - The base URL to prepend to relative paths.
- */
-export function rehypeRewriteLinks(options = {}) {
-  return (tree) => {
-    if (!options.base) {
-      return;
-    }
-    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
-    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
-    
-    visit(tree, "element", (node) => {
-      if (node.tagName === 'a' || node.tagName === 'img') {
-        const prop = node.tagName === 'a' ? 'href' : 'src';
-        const url = node.properties?.[prop];
-        if (typeof url === 'string' && isRelative(url)) {
-          node.properties[prop] = base + url;
-        }
-      }
-    });
-
-    return tree;
-  };
-}
-</file>
-
 <file path="src/components/editor/EditorFilesButton.jsx">
 // src/components/editor/EditorFilesButton.jsx
 import { useApp } from "../../context/AppContext.jsx";
@@ -22400,6 +22604,41 @@ backendLink: https://ui.savva.app/api/
 gear: true
 </file>
 
+<file path="src/components/docs/rehype-rewrite-links.js">
+// src/components/docs/rehype-rewrite-links.js
+import { visit } from "unist-util-visit";
+
+/**
+ * A rehype plugin that rewrites relative image and link URLs to be absolute,
+ * based on a provided base URL.
+ * @param {object} options - The options object.
+ * @param {string} options.base - The base URL to prepend to relative paths.
+ */
+export function rehypeRewriteLinks(options = {}) {
+  return (tree) => {
+    // FIX: Always return the tree, even if there's no base URL.
+    if (!options.base) {
+      return tree;
+    }
+    
+    const base = options.base.endsWith('/') ? options.base : `${options.base}/`;
+    const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
+    
+    visit(tree, "element", (node) => {
+      if (node.tagName === 'a' || node.tagName === 'img') {
+        const prop = node.tagName === 'a' ? 'href' : 'src';
+        const url = node.properties?.[prop];
+        if (typeof url === 'string' && isRelative(url)) {
+          node.properties[prop] = base + url;
+        }
+      }
+    });
+
+    return tree;
+  };
+}
+</file>
+
 <file path="src/components/feed/PostInfo.jsx">
 // src/components/feed/PostInfo.jsx
 import { Show, createMemo } from "solid-js";
@@ -23073,237 +23312,6 @@ export function useDomainAssets(app) {
   }));
 
   return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl };
-}
-</file>
-
-<file path="src/editor/storage.js">
-// src/editor/storage.js
-import { dbg } from "../utils/debug";
-import { parse, stringify } from "yaml";
-
-const NEW_POST_DIR = "new_post";
-const UPLOAD_DIR = "uploads";
-const PARAMS_FILE = "new_post.json";
-
-async function getDirectoryHandle(path) {
-  try {
-    if (!navigator.storage || !navigator.storage.getDirectory) {
-      dbg.warn("storage", "Origin Private File System API not available.");
-      return null;
-    }
-    const root = await navigator.storage.getDirectory();
-    let currentHandle = root;
-    for (const part of path.split('/').filter(Boolean)) {
-      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
-    }
-    return currentHandle;
-  } catch (e) {
-    dbg.error("storage", `Failed to get directory handle for '${path}'`, e);
-    throw e;
-  }
-}
-
-async function readFile(dirHandle, path) {
-  if (!dirHandle) return null;
-  try {
-    const pathParts = path.split('/').filter(Boolean);
-    let currentHandle = dirHandle;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
-    }
-    const fileName = pathParts[pathParts.length - 1];
-    const fileHandle = await currentHandle.getFileHandle(fileName);
-    const file = await fileHandle.getFile();
-    return await file.text();
-  } catch (e) {
-    if (e.name === 'NotFoundError') return null;
-    dbg.error("storage", `Failed to read file: ${path}`, e);
-    throw e;
-  }
-}
-
-async function writeFile(dirHandle, path, content) {
-  if (!dirHandle) return;
-  try {
-    const pathParts = path.split('/').filter(Boolean);
-    let currentHandle = dirHandle;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i], { create: true });
-    }
-    const fileName = pathParts[pathParts.length - 1];
-    const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(content);
-    await writable.close();
-  } catch (e) {
-    dbg.error("storage", `Failed to write file: ${path}`, e);
-    throw e;
-  }
-}
-
-export async function listUploadedFiles() {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-  if (!uploadsDirHandle) return [];
-  
-  const files = [];
-  for await (const entry of uploadsDirHandle.values()) {
-    if (entry.kind === 'file') {
-      const file = await entry.getFile();
-      const url = URL.createObjectURL(file);
-      files.push({ name: entry.name, url });
-    }
-  }
-  return files;
-}
-
-export async function addUploadedFile(file) {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-  await writeFile(uploadsDirHandle, file.name, file);
-}
-
-export async function addUploadedFileFromUrl(url) {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const blob = await response.blob();
-    const fileName = url.substring(url.lastIndexOf('/') + 1) || "downloaded_file";
-    const file = new File([blob], fileName, { type: blob.type });
-    await addUploadedFile(file);
-    return file;
-  } catch (error) {
-    dbg.error("storage", "Failed to upload from URL", { url, error });
-    throw error;
-  }
-}
-
-export async function deleteUploadedFile(fileName) {
-  try {
-    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-    if (!uploadsDirHandle) return;
-    await uploadsDirHandle.removeEntry(fileName);
-    dbg.log("storage", `Deleted file: ${fileName}`);
-  } catch (error) {
-    dbg.error("storage", `Failed to delete file: ${fileName}`, error);
-    throw error;
-  }
-}
-
-export async function resolveDraftFileUrl(relativePath) {
-  if (!relativePath) return null;
-  try {
-    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
-    const pathParts = relativePath.split('/').filter(Boolean);
-    let currentHandle = dirHandle;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
-    }
-    const fileName = pathParts[pathParts.length - 1];
-    const fileHandle = await currentHandle.getFileHandle(fileName);
-    const file = await fileHandle.getFile();
-    return URL.createObjectURL(file);
-  } catch (e) {
-    if (e.name !== 'NotFoundError') {
-      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath}`, e);
-    }
-    return null;
-  }
-}
-
-export async function loadNewPostDraft() {
-  dbg.log("storage", "Loading new post draft...");
-  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
-  const descriptorYaml = await readFile(dirHandle, "info.yaml");
-  const paramsJson = await readFile(dirHandle, PARAMS_FILE);
-
-  const postData = {};
-  const params = paramsJson ? JSON.parse(paramsJson) : {};
-
-  if (descriptorYaml) {
-    const descriptor = parse(descriptorYaml);
-    for (const lang in descriptor.locales) {
-      const localeData = descriptor.locales[lang];
-      const chapterTitles = params.locales?.[lang]?.chapters || [];
-      
-      postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
-      
-      if (localeData.data_path) {
-        postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
-      }
-      
-      if (Array.isArray(localeData.chapters)) {
-        for (let i = 0; i < localeData.chapters.length; i++) {
-          const chapterDesc = localeData.chapters[i];
-          const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
-          const chapterTitle = chapterTitles[i]?.title || "";
-          postData[lang].chapters.push({ title: chapterTitle, body: chapterBody });
-        }
-      }
-    }
-  }
-
-  const draft = {
-    content: Object.keys(postData).length > 0 ? postData : { en: { title: "", body: "", chapters: [] } },
-    params: params
-  };
-
-  if (!draft.content && !Object.keys(draft.params).length) {
-    dbg.log("storage", "No draft found.");
-    return null;
-  }
-
-  dbg.log("storage", "Draft loaded successfully.", draft);
-  return draft;
-}
-
-export async function saveNewPostDraft(draftData) {
-  dbg.log("storage", "Saving new post draft...", draftData);
-  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
-  
-  const { content, params } = draftData;
-
-  const finalParams = { ...params, locales: {} };
-
-  const descriptor = {
-    savva_spec_version: "2.0",
-    mime_type: "text/markdown",
-    locales: {}
-  };
-
-  if (content) {
-    for (const lang in content) {
-      const data = content[lang];
-      const dataPath = `${lang}/data.md`;
-      
-      descriptor.locales[lang] = {
-        title: data.title || "",
-        text_preview: (data.body || "").substring(0, 200),
-        data_path: dataPath,
-        chapters: []
-      };
-
-      finalParams.locales[lang] = { chapters: [] };
-      
-      await writeFile(dirHandle, dataPath, data.body || "");
-
-      if (Array.isArray(data.chapters)) {
-        for (let i = 0; i < data.chapters.length; i++) {
-          const chapter = data.chapters[i];
-          const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          
-          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
-          finalParams.locales[lang].chapters.push({ title: chapter.title });
-          
-          await writeFile(dirHandle, chapterPath, chapter.body || "");
-        }
-      }
-    }
-    await writeFile(dirHandle, "info.yaml", stringify(descriptor));
-  }
-  
-  await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
-  dbg.log("storage", "Draft saved successfully.");
 }
 </file>
 
@@ -24073,6 +24081,128 @@ export default function DocsContent(props) {
         <MarkdownView markdown={doc()?.text || ""} />
         <DocsPager activeRelPath={props.relPath} onPick={props.onPick} />
       </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorFullPreview.jsx">
+// src/components/editor/EditorFullPreview.jsx
+import { createMemo, Show, createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import MarkdownView from "../docs/MarkdownView.jsx";
+import UserCard from "../ui/UserCard.jsx";
+import PostTags from "../post/PostTags.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
+import ChapterSelector from "../post/ChapterSelector.jsx";
+import ChapterPager from "../post/ChapterPager.jsx";
+import LangSelector from "../ui/LangSelector.jsx";
+
+export default function EditorFullPreview(props) {
+  const app = useApp();
+  const { t } = app;
+  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
+  const [previewLang, setPreviewLang] = createSignal(props.activeLang);
+
+  const author = () => app.authorizedUser();
+  const lang = () => previewLang();
+
+  const title = createMemo(() => props.postData?.[lang()]?.title || "");
+
+  const chapterList = createMemo(() => {
+    const prologue = { title: t("post.chapters.prologue") };
+    const currentChapters = props.chapters?.filter(c => props.postData[lang()]?.chapters.includes(c)) || [];
+    return [prologue, ...(props.chapters || [])];
+  });
+
+  const currentContent = createMemo(() => {
+    const data = props.postData?.[lang()];
+    if (!data) return "";
+    const index = selectedChapterIndex();
+    if (index === 0) {
+      return data.body || "";
+    }
+    return data.chapters?.[index - 1]?.body || "";
+  });
+
+  const postForTags = createMemo(() => ({
+    savva_content: {
+      locales: {
+        [lang()]: {
+          categories: props.postParams?.locales?.[lang()]?.categories || [],
+          tags: props.postParams?.locales?.[lang()]?.tags || [],
+        }
+      }
+    }
+  }));
+
+  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls]);
+
+  return (
+    <div class="max-w-5xl mx-auto space-y-4">
+      <div class="p-3 pr-4 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
+        <button onClick={props.onBack} class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
+          {t("editor.fullPreview.back")}
+        </button>
+        <div class="text-center text-[hsl(var(--card))]">
+          <h2 class="font-bold">{t("editor.fullPreview.title")}</h2>
+          <p class="text-xs opacity-90">{t("editor.fullPreview.help")}</p>
+        </div>
+        <button 
+          onClick={props.onContinue}
+          class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90"
+        >
+          {t("editor.fullPreview.continue")}
+        </button>
+      </div>
+      
+      <div class="bg-[hsl(var(--background))] p-4 rounded-lg border border-[hsl(var(--border))]">
+        <article class="space-y-4">
+          <header class="flex justify-between items-start gap-4">
+            <div class="flex-1 min-w-0 space-y-3">
+              <h1 class="text-2xl lg:text-3xl font-bold break-words">{title()}</h1>
+              <UserCard author={author()} />
+              <PostTags postData={postForTags()} />
+            </div>
+            <div class="w-48 flex-shrink-0 space-y-2">
+              <Show when={props.thumbnailUrl}>
+                <img src={props.thumbnailUrl} alt="Thumbnail preview" class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" />
+              </Show>
+              <Show when={(props.filledLangs || []).length > 1}>
+                <div class="flex justify-center">
+                    <LangSelector
+                        codes={props.filledLangs}
+                        value={previewLang()}
+                        onChange={setPreviewLang}
+                    />
+                </div>
+              </Show>
+            </div>
+          </header>
+
+          <div class="pt-4 border-t border-[hsl(var(--border))]">
+              <Show when={(chapterList()?.length || 0) > 1}>
+                  <div class="flex justify-end mb-4">
+                  <ChapterSelector 
+                      chapters={chapterList()} 
+                      selectedIndex={selectedChapterIndex()} 
+                      onSelect={setSelectedChapterIndex}
+                  />
+                  </div>
+              </Show>
+              <MarkdownView markdown={currentContent()} rehypePlugins={markdownPlugins()} />
+              <Show when={(chapterList()?.length || 0) > 1}>
+                  <ChapterPager 
+                      chapters={chapterList()}
+                      currentIndex={selectedChapterIndex()}
+                      onSelect={setSelectedChapterIndex}
+                  />
+              </Show>
+          </div>
+        </article>
+      </div>
     </div>
   );
 }
@@ -25349,6 +25479,240 @@ export default function MainView() {
 }
 </file>
 
+<file path="src/editor/storage.js">
+// src/editor/storage.js
+import { dbg } from "../utils/debug";
+import { parse, stringify } from "yaml";
+
+const NEW_POST_DIR = "new_post";
+const UPLOAD_DIR = "uploads";
+const PARAMS_FILE = "new_post.json";
+
+async function getDirectoryHandle(path) {
+  try {
+    if (!navigator.storage || !navigator.storage.getDirectory) {
+      dbg.warn("storage", "Origin Private File System API not available.");
+      return null;
+    }
+    const root = await navigator.storage.getDirectory();
+    let currentHandle = root;
+    for (const part of path.split('/').filter(Boolean)) {
+      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+    }
+    return currentHandle;
+  } catch (e) {
+    dbg.error("storage", `Failed to get directory handle for '${path}'`, e);
+    throw e;
+  }
+}
+
+async function readFile(dirHandle, path) {
+  if (!dirHandle) return null;
+  try {
+    const pathParts = path.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return await file.text();
+  } catch (e) {
+    if (e.name === 'NotFoundError') return null;
+    dbg.error("storage", `Failed to read file: ${path}`, e);
+    throw e;
+  }
+}
+
+async function writeFile(dirHandle, path, content) {
+  if (!dirHandle) return;
+  try {
+    const pathParts = path.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i], { create: true });
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+  } catch (e) {
+    dbg.error("storage", `Failed to write file: ${path}`, e);
+    throw e;
+  }
+}
+
+export async function listUploadedFiles() {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  if (!uploadsDirHandle) return [];
+  
+  const files = [];
+  for await (const entry of uploadsDirHandle.values()) {
+    if (entry.kind === 'file') {
+      const file = await entry.getFile();
+      const url = URL.createObjectURL(file);
+      files.push({ name: entry.name, url });
+    }
+  }
+  return files;
+}
+
+export async function addUploadedFile(file) {
+  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+  await writeFile(uploadsDirHandle, file.name, file);
+}
+
+export async function addUploadedFileFromUrl(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const fileName = url.substring(url.lastIndexOf('/') + 1) || "downloaded_file";
+    const file = new File([blob], fileName, { type: blob.type });
+    await addUploadedFile(file);
+    return file;
+  } catch (error) {
+    dbg.error("storage", "Failed to upload from URL", { url, error });
+    throw error;
+  }
+}
+
+export async function deleteUploadedFile(fileName) {
+  try {
+    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+    if (!uploadsDirHandle) return;
+    await uploadsDirHandle.removeEntry(fileName);
+    dbg.log("storage", `Deleted file: ${fileName}`);
+  } catch (error) {
+    dbg.error("storage", `Failed to delete file: ${fileName}`, error);
+    throw error;
+  }
+}
+
+export async function resolveDraftFileUrl(relativePath) {
+  if (!relativePath) return null;
+  try {
+    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+    const pathParts = relativePath.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return URL.createObjectURL(file);
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath}`, e);
+    }
+    return null;
+  }
+}
+
+export async function loadNewPostDraft() {
+  dbg.log("storage", "Loading new post draft...");
+  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+  const descriptorYaml = await readFile(dirHandle, "info.yaml");
+  const paramsJson = await readFile(dirHandle, PARAMS_FILE);
+
+  const postData = {};
+  const params = paramsJson ? JSON.parse(paramsJson) : {};
+
+  if (descriptorYaml) {
+    const descriptor = parse(descriptorYaml);
+    for (const lang in descriptor.locales) {
+      const localeData = descriptor.locales[lang];
+      postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
+      
+      if (localeData.data_path) {
+        postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
+      }
+      
+      if (Array.isArray(localeData.chapters)) {
+        for (let i = 0; i < localeData.chapters.length; i++) {
+          const chapterDesc = localeData.chapters[i];
+          const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
+          // FIX: Only load the body here. Titles come from params.
+          postData[lang].chapters.push({ body: chapterBody });
+        }
+      }
+    }
+  }
+
+  const draft = {
+    content: Object.keys(postData).length > 0 ? postData : { en: { title: "", body: "", chapters: [] } },
+    params: params
+  };
+
+  if (!draft.content && !Object.keys(draft.params).length) {
+    dbg.log("storage", "No draft found.");
+    return null;
+  }
+
+  dbg.log("storage", "Draft loaded successfully.", draft);
+  return draft;
+}
+
+export async function saveNewPostDraft(draftData) {
+  dbg.log("storage", "Saving new post draft...", draftData);
+  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+  
+  const { content, params } = draftData;
+
+  // Create a deep copy to avoid mutation issues.
+  const finalParams = JSON.parse(JSON.stringify(params || {}));
+  if (!finalParams.locales) finalParams.locales = {};
+
+  const descriptor = {
+    savva_spec_version: "2.0",
+    mime_type: "text/markdown",
+    locales: {}
+  };
+
+  if (content) {
+    for (const lang in content) {
+      const data = content[lang];
+      const dataPath = `${lang}/data.md`;
+      
+      descriptor.locales[lang] = {
+        title: data.title || "",
+        text_preview: (data.body || "").substring(0, 200),
+        data_path: dataPath,
+        chapters: []
+      };
+
+      if (!finalParams.locales[lang]) finalParams.locales[lang] = { chapters: [] };
+      
+      await writeFile(dirHandle, dataPath, data.body || "");
+
+      if (Array.isArray(data.chapters)) {
+        // FIX: Read chapter titles from the `params` object, not the `content` object.
+        const paramChapters = params?.locales?.[lang]?.chapters || [];
+        
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterContent = data.chapters[i];
+          const chapterParams = paramChapters[i] || { title: "" };
+          const chapterPath = `${lang}/chapters/${i + 1}.md`;
+          
+          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
+          
+          await writeFile(dirHandle, chapterPath, chapterContent.body || "");
+        }
+      }
+    }
+    await writeFile(dirHandle, "info.yaml", stringify(descriptor));
+  }
+  
+  await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
+  dbg.log("storage", "Draft saved successfully.");
+}
+</file>
+
 <file path="src/ipfs/index.js">
 // src/ipfs/index.js
 import { fetchWithTimeout } from "../utils/net.js";
@@ -25549,344 +25913,6 @@ export default function IpfsImage(props) {
         </Match>
       </Switch>
     </div>
-  );
-}
-</file>
-
-<file path="src/pages/EditorPage.jsx">
-// src/pages/EditorPage.jsx
-import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
-import MarkdownInput from "../components/editor/MarkdownInput.jsx";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import EditorToolbar from "../components/editor/EditorToolbar.jsx";
-import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
-import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
-import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
-import { dbg } from "../utils/debug.js";
-import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
-import EditorTocButton from "../components/editor/EditorTocButton.jsx";
-import ConfirmModal from "../components/ui/ConfirmModal.jsx";
-import { insertTextAtCursor } from "../components/editor/text-utils.js";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-
-export default function EditorPage() {
-  const { t, domainAssetsConfig } = useApp();
-  const { route } = useHashRouter();
-  let textareaRef;
-
-  const [postData, setPostData] = createSignal(null);
-  const [postParams, setPostParams] = createSignal({});
-  const [activeLang, setActiveLang] = createSignal("en");
-  const [showPreview, setShowPreview] = createSignal(false);
-  const [showFiles, setShowFiles] = createSignal(false);
-  const [showChapters, setShowChapters] = createSignal(false);
-  const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
-  const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
-  const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
-
-  let autoSaveTimeoutId;
-  onCleanup(() => clearTimeout(autoSaveTimeoutId));
-
-  const editorMode = createMemo(() => {
-    const path = route();
-    if (path.startsWith("/editor/new")) return "new_post";
-    if (path.startsWith("/editor/edit/")) return "edit_post";
-    if (path.startsWith("/editor/comment/")) return "comment";
-    return "unknown";
-  });
-
-  onMount(async () => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        setShowFiles(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
-
-    try {
-      if (editorMode() === "new_post") {
-        const draft = await loadNewPostDraft();
-        const initialData = draft?.content || { en: { title: "", body: "", chapters: [] } };
-        const initialParams = draft?.params || {};
-        setPostData(initialData);
-        setPostParams(initialParams);
-
-        if ((initialData[activeLang()]?.chapters || []).length > 0) {
-          setShowChapters(true);
-        }
-      } else {
-        setPostData({ en: { title: "", body: "", chapters: [] } });
-        setPostParams({});
-      }
-    } catch (error) {
-      dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
-      setPostData({ en: { title: "", body: "", chapters: [] } });
-      setPostParams({});
-    }
-  });
-
-  createEffect(on([postData, postParams], ([data, params]) => {
-    if (data === null || editorMode() !== "new_post") return;
-    clearTimeout(autoSaveTimeoutId);
-    autoSaveTimeoutId = setTimeout(() => {
-      saveNewPostDraft({ content: data, params: params });
-    }, 500);
-  }, { defer: true }));
-
-  createEffect(async () => {
-    const thumbPath = postParams()?.thumbnail;
-    if (thumbPath) {
-      const url = await resolveDraftFileUrl(thumbPath);
-      setThumbnailUrl(url);
-    } else {
-      setThumbnailUrl(null);
-    }
-  });
-
-  createEffect(on(activeLang, (lang) => {
-    if (!postData()) return;
-    const chapters = postData()[lang]?.chapters || [];
-    setShowChapters(chapters.length > 0);
-    setEditingChapterIndex(-1);
-  }));
-
-  const domainLangCodes = () => {
-    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
-    return fromDomain.length > 0 ? fromDomain : ["en"];
-  };
-
-  const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
-
-  const updateField = (field, value) => {
-    setPostData(prev => ({
-      ...prev,
-      [activeLang()]: {
-        ...(prev?.[activeLang()] || { chapters: [] }),
-        [field]: value
-      }
-    }));
-  };
-
-  const updateChapterTitle = (index, newTitle) => {
-    setPostParams(prev => {
-      const lang = activeLang();
-      const newLocales = { ...(prev.locales || {}) };
-      const newChapters = [...(newLocales[lang]?.chapters || [])];
-      newChapters[index] = { ...newChapters[index], title: newTitle };
-      newLocales[lang] = { ...newLocales[lang], chapters: newChapters };
-      return { ...prev, locales: newLocales };
-    });
-  };
-
-  const handleAddChapter = () => {
-    const newChapterContent = { body: "" };
-    const newChapterParams = { title: "" };
-    
-    setPostData(prev => {
-      const lang = activeLang();
-      const chapters = [...(prev[lang]?.chapters || []), newChapterContent];
-      return { ...prev, [lang]: { ...prev[lang], chapters } };
-    });
-
-    setPostParams(prev => {
-      const lang = activeLang();
-      const newLocales = { ...(prev.locales || {}) };
-      const newChapters = [...(newLocales[lang]?.chapters || []), newChapterParams];
-      newLocales[lang] = { ...newLocales[lang], chapters: newChapters };
-      return { ...prev, locales: newLocales };
-    });
-
-    setEditingChapterIndex(currentLangData().chapters.length);
-  };
-
-  const handleRemoveChapter = () => {
-    if (editingChapterIndex() === -1) return;
-    setShowConfirmDelete(true);
-  };
-  
-  const confirmRemoveChapter = () => {
-    const indexToRemove = editingChapterIndex();
-    
-    setPostData(prev => {
-      const lang = activeLang();
-      const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
-      return { ...prev, [lang]: { ...prev[lang], chapters } };
-    });
-
-    setPostParams(prev => {
-      const lang = activeLang();
-      const newLocales = { ...(prev.locales || {}) };
-      const chapters = (newLocales[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
-      newLocales[lang] = { ...newLocales[lang], chapters };
-      return { ...prev, locales: newLocales };
-    });
-
-    setEditingChapterIndex(indexToRemove - 1);
-    if (currentLangData().chapters.length - 1 === 0) {
-      setShowChapters(false);
-    }
-  };
-
-  const currentEditorContent = createMemo(() => {
-    const langData = currentLangData();
-    const index = editingChapterIndex();
-    if (index === -1) return langData.body;
-    return langData.chapters?.[index]?.body || "";
-  });
-  
-  const handleEditorInput = (value) => {
-    const index = editingChapterIndex();
-    if (index === -1) {
-      updateField('body', value);
-    } else {
-        const lang = activeLang();
-        const chapters = [...(postData()[lang]?.chapters || [])];
-        chapters[index] = { ...chapters[index], body: value };
-        updateField('chapters', chapters);
-    }
-  };
-
-  const handleInsertFile = (fileName, fileType) => {
-    const url = `uploads/${fileName}`;
-    let markdown;
-    if (fileType === 'image') {
-      markdown = `![${fileName}](${url})`;
-    } else {
-      markdown = `[${fileName}](${url})`;
-    }
-    insertTextAtCursor(textareaRef, markdown, handleEditorInput);
-  };
-
-  const handleSetThumbnail = (fileName) => {
-    const relativePath = `uploads/${fileName}`;
-    setPostParams(prev => ({ ...prev, thumbnail: relativePath }));
-  };
-
-  const handleInsertUrl = (fileName) => {
-    insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
-  };
-
-  const title = createMemo(() => {
-    switch (editorMode()) {
-      case "new_post": return t("editor.titleNewPost");
-      case "edit_post": return t("editor.titleEditPost");
-      case "comment": return t("editor.titleComment");
-      default: return t("editor.title");
-    }
-  });
-
-  const markdownPlugins = createMemo(() => {
-    dbg.log("EditorPage", "Creating markdown plugins for preview.");
-    return [rehypeResolveDraftUrls];
-  });
-
-  const combinedChapters = createMemo(() => {
-    const contentChapters = currentLangData().chapters || [];
-    const paramChapters = postParams()?.locales?.[activeLang()]?.chapters || [];
-    return contentChapters.map((c, i) => ({
-      ...c,
-      title: paramChapters[i]?.title || ""
-    }));
-  });
-
-  return (
-    <main class="p-4 max-w-7xl mx-auto space-y-4">
-      <ClosePageButton />
-
-      <header class="flex justify-between items-start gap-4">
-        <div class="flex-1 min-w-0">
-          <h2 class="text-2xl font-semibold">{title()}</h2>
-          <p class="text-sm text-[hsl(var(--muted-foreground))]">
-            Mode: <strong>{editorMode()}</strong>
-          </p>
-        </div>
-        <div class="w-48 flex-shrink-0 space-y-2">
-          <div class="aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-            <Show when={thumbnailUrl()}
-              fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
-            >
-              <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
-            </Show>
-          </div>
-          <LangSelector
-            codes={domainLangCodes()}
-            value={activeLang()}
-            onChange={setActiveLang}
-          />
-        </div>
-      </header>
-
-      <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
-        <div>
-          <div class="flex items-center gap-4 mb-4">
-            <input
-              type="text"
-              value={currentLangData().title}
-              onInput={(e) => updateField('title', e.currentTarget.value)}
-              placeholder={t("editor.titlePlaceholder")}
-              class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
-            />
-            <div class="flex-shrink-0 flex items-center gap-2">
-              <Show when={!showChapters()}>
-                <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
-              </Show>
-              <Show when={!showFiles()}>
-                <EditorFilesButton onClick={() => setShowFiles(true)} />
-              </Show>
-            </div>
-          </div>
-          
-          <Show when={showChapters()}>
-            <div class="mb-4">
-                <EditorChapterSelector
-                    chapters={combinedChapters()}
-                    activeIndex={editingChapterIndex()}
-                    onSelectIndex={setEditingChapterIndex}
-                    onAdd={handleAddChapter}
-                    onRemove={handleRemoveChapter}
-                    onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
-                />
-            </div>
-          </Show>
-          
-          <EditorToolbar
-            isPreview={showPreview()}
-            onTogglePreview={() => setShowPreview(!showPreview())}
-            getTextareaRef={() => textareaRef}
-            onValueChange={handleEditorInput}
-          />
-          <MarkdownInput
-            editorRef={(el) => (textareaRef = el)}
-            value={currentEditorContent()}
-            onInput={handleEditorInput}
-            placeholder={t("editor.bodyPlaceholder")}
-            showPreview={showPreview()}
-            rehypePlugins={markdownPlugins()} 
-          />
-        </div>
-      </Show>
-
-      <EditorFilesDrawer 
-        isOpen={showFiles()}
-        onClose={() => setShowFiles(false)}
-        onInsert={handleInsertFile}
-        onSetThumbnail={handleSetThumbnail}
-        onInsertUrl={handleInsertUrl}
-      />
-      <ConfirmModal
-        isOpen={showConfirmDelete()}
-        onClose={() => setShowConfirmDelete(false)}
-        onConfirm={confirmRemoveChapter}
-        title={t("editor.chapters.confirmDeleteTitle")}
-        message={t("editor.chapters.confirmDeleteMessage")}
-      />
-    </main>
   );
 }
 </file>
@@ -26439,6 +26465,7 @@ import { rehypeMediaPlayers } from "./rehype-media-players.js";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypePrettyCode from "rehype-pretty-code";
+import remarkBreaks from "remark-breaks";
 
 function rehypeCopyButton() {
   return (tree) =>
@@ -26495,11 +26522,13 @@ export default function MarkdownView(props) {
       const processor = unified()
         .use(remarkParse)
         .use(remarkGfm)
+        .use(remarkBreaks)
         .use(remarkRehype, { allowDangerousHtml: true });
   
       if (props.rehypePlugins) {
         for (const plugin of props.rehypePlugins) {
-          processor.use(plugin);
+          // This robustly handles both [plugin, options] and just plugin
+          processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
         }
       }
   
@@ -26635,7 +26664,7 @@ export default function PostCard(props) {
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
     if (thumbnailPath) {
-      return resolvePostCidPath(props.item._raw, thumbnailPath);
+      return thumbnailPath;
     }
     return author()?.avatar;
   });
@@ -26835,6 +26864,7 @@ import PostTags from "../components/post/PostTags.jsx";
 import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../components/docs/rehype-rewrite-links.js";
 
+
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
@@ -27009,7 +27039,7 @@ export default function PostPage() {
   });
 
   const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }],
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
   ]);
 
   const RightPanel = () => (
@@ -28012,6 +28042,483 @@ export default function Header({ onTogglePane }) {
 }
 </file>
 
+<file path="src/pages/EditorPage.jsx">
+// src/pages/EditorPage.jsx
+import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, batch } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import { useHashRouter } from "../routing/hashRouter.js";
+import MarkdownInput from "../components/editor/MarkdownInput.jsx";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import EditorToolbar from "../components/editor/EditorToolbar.jsx";
+import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
+import { rehypeResolveDraftUrls } from "../components/docs/rehype-resolve-draft-urls.js";
+import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
+import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
+import { dbg } from "../utils/debug.js";
+import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
+import EditorTocButton from "../components/editor/EditorTocButton.jsx";
+import ConfirmModal from "../components/ui/ConfirmModal.jsx";
+import { insertTextAtCursor } from "../components/editor/text-utils.js";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
+import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
+
+function TrashIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  );
+}
+
+export default function EditorPage() {
+  const { t, domainAssetsConfig } = useApp();
+  const { route } = useHashRouter();
+  let textareaRef;
+
+  const [postData, setPostData] = createSignal(null);
+  const [postParams, setPostParams] = createSignal({});
+  const [activeLang, setActiveLang] = createSignal("en");
+  const [showPreview, setShowPreview] = createSignal(false);
+  const [showFiles, setShowFiles] = createSignal(false);
+  const [showChapters, setShowChapters] = createSignal(false);
+  const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
+  const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
+  const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
+  const [showFullPreview, setShowFullPreview] = createSignal(false);
+  const [showPublishWizard, setShowPublishWizard] = createSignal(false);
+
+  let autoSaveTimeoutId;
+  onCleanup(() => clearTimeout(autoSaveTimeoutId));
+
+  const editorMode = createMemo(() => {
+    const path = route();
+    if (path.startsWith("/editor/new")) return "new_post";
+    if (path.startsWith("/editor/edit/")) return "edit_post";
+    if (path.startsWith("/editor/comment/")) return "comment";
+    return "unknown";
+  });
+  
+  const domainLangCodes = createMemo(() => {
+    const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
+  });
+
+  onMount(async () => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowFiles(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
+
+    try {
+      if (editorMode() === "new_post") {
+        const draft = await loadNewPostDraft();
+        if (draft && draft.content) {
+            setPostData(draft.content);
+            setPostParams(draft.params || {});
+        } else {
+            const newPostData = {};
+            const newPostParams = { locales: {} };
+            for (const langCode of domainLangCodes()) {
+                newPostData[langCode] = { title: "", body: "", chapters: [] };
+                newPostParams.locales[langCode] = { chapters: [] };
+            }
+            setPostData(newPostData);
+            setPostParams(newPostParams);
+        }
+      } else {
+        setPostData({ en: { title: "", body: "", chapters: [] } });
+        setPostParams({});
+      }
+    } catch (error) {
+      dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
+      setPostData({ en: { title: "", body: "", chapters: [] } });
+      setPostParams({});
+    }
+  });
+
+  createEffect(on([postData, postParams], ([data, params]) => {
+    if (data === null || editorMode() !== "new_post") return;
+    clearTimeout(autoSaveTimeoutId);
+    autoSaveTimeoutId = setTimeout(() => {
+      saveNewPostDraft({ content: data, params: params });
+    }, 500);
+  }, { defer: true }));
+
+  createEffect(async () => {
+    const thumbPath = postParams()?.thumbnail;
+    if (thumbPath) {
+      const url = await resolveDraftFileUrl(thumbPath);
+      setThumbnailUrl(url);
+    } else {
+      setThumbnailUrl(null);
+    }
+  });
+
+  createEffect(on(activeLang, (lang) => {
+    if (!postData()?.[lang]) {
+        setPostData(p => ({...p, [lang]: { title: "", body: "", chapters: [] }}));
+        setPostParams(p => {
+            const locales = {...(p.locales || {})};
+            if (!locales[lang]) locales[lang] = { chapters: [] };
+            return {...p, locales};
+        });
+    }
+    const chapters = postData()?.[lang]?.chapters || [];
+    setShowChapters(chapters.length > 0);
+    setEditingChapterIndex(-1);
+  }));
+
+  const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
+
+  const updateField = (field, value) => {
+    setPostData(prev => ({
+      ...prev,
+      [activeLang()]: {
+        ...(prev?.[activeLang()] || { chapters: [] }),
+        [field]: value
+      }
+    }));
+  };
+
+  const updateParam = (field, value) => {
+    setPostParams(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateChapterTitle = (index, newTitle) => {
+    setPostParams(prev => {
+      const lang = activeLang();
+      const locales = { ...(prev.locales || {}) };
+      const langParams = locales[lang] || { chapters: [] };
+      const chapters = [...(langParams.chapters || [])];
+      if (index >= 0 && index < chapters.length) {
+        chapters[index] = { ...chapters[index], title: newTitle };
+      }
+      locales[lang] = { ...langParams, chapters };
+      return { ...prev, locales };
+    });
+  };
+
+  const handleAddChapter = () => {
+    const newChapterContent = { body: "" };
+    const newChapterParams = { title: t("editor.chapters.newChapterTitle") || "New Chapter" };
+    const newIndex = (postData()[activeLang()]?.chapters || []).length;
+
+    batch(() => {
+      setPostData(prev => {
+        const lang = activeLang();
+        const langData = prev[lang] || { title: "", body: "", chapters: [] };
+        const chapters = [...(langData.chapters || []), newChapterContent];
+        return { ...prev, [lang]: { ...langData, chapters } };
+      });
+
+      setPostParams(prev => {
+        const lang = activeLang();
+        const locales = { ...(prev.locales || {}) };
+        const langParams = locales[lang] || { chapters: [] };
+        const chapters = [...(langParams.chapters || []), newChapterParams];
+        locales[lang] = { ...langParams, chapters };
+        return { ...prev, locales };
+      });
+    });
+    setEditingChapterIndex(newIndex);
+  };
+
+  const handleRemoveChapter = () => {
+    if (editingChapterIndex() === -1) return;
+    setShowConfirmDelete(true);
+  };
+  
+  const confirmRemoveChapter = () => {
+    const indexToRemove = editingChapterIndex();
+    
+    batch(() => {
+      setPostData(prev => {
+        const lang = activeLang();
+        const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
+        return { ...prev, [lang]: { ...prev[lang], chapters } };
+      });
+
+      setPostParams(prev => {
+        const lang = activeLang();
+        const newLocales = { ...(prev.locales || {}) };
+        if (newLocales[lang]?.chapters) {
+          const chapters = (newLocales[lang].chapters || []).filter((_, i) => i !== indexToRemove);
+          newLocales[lang] = { ...newLocales[lang], chapters };
+        }
+        return { ...prev, locales: newLocales };
+      });
+    });
+
+    setEditingChapterIndex(indexToRemove >= 1 ? indexToRemove - 1 : -1);
+    if (postData()[activeLang()]?.chapters.length === 0) {
+      setShowChapters(false);
+    }
+  };
+
+  const currentEditorContent = createMemo(() => {
+    const langData = currentLangData();
+    const index = editingChapterIndex();
+    if (index === -1) return langData.body;
+    return langData.chapters?.[index]?.body || "";
+  });
+  
+  const handleEditorInput = (value) => {
+    const index = editingChapterIndex();
+    if (index === -1) {
+      updateField('body', value);
+    } else {
+        const lang = activeLang();
+        const chapters = [...(postData()[lang]?.chapters || [])];
+        chapters[index] = { ...chapters[index], body: value };
+        updateField('chapters', chapters);
+    }
+  };
+
+  const handleInsertFile = (fileName, fileType) => {
+    const url = `uploads/${fileName}`;
+    let markdown;
+    if (fileType === 'image') {
+      markdown = `![${fileName}](${url})`;
+    } else {
+      markdown = `[${fileName}](${url})`;
+    }
+    insertTextAtCursor(textareaRef, markdown, handleEditorInput);
+  };
+
+  const handleSetThumbnail = (fileName) => {
+    const relativePath = `uploads/${fileName}`;
+    setPostParams(prev => ({ ...prev, thumbnail: relativePath }));
+  };
+
+  const handleDeleteThumbnail = () => {
+    setPostParams(prev => {
+      const { thumbnail, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const handleInsertUrl = (fileName) => {
+    insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
+  };
+
+  const title = createMemo(() => {
+    switch (editorMode()) {
+      case "new_post": return t("editor.titleNewPost");
+      case "edit_post": return t("editor.titleEditPost");
+      case "comment": return t("editor.titleComment");
+      default: return t("editor.title");
+    }
+  });
+
+  const markdownPlugins = createMemo(() => {
+    dbg.log("EditorPage", "Creating markdown plugins for preview.");
+    return [rehypeResolveDraftUrls];
+  });
+
+  const combinedChapters = createMemo(() => {
+    const contentChapters = currentLangData().chapters || [];
+    const paramChapters = postParams()?.locales?.[activeLang()]?.chapters || [];
+    return contentChapters.map((c, i) => ({
+      ...c,
+      title: paramChapters?.[i]?.title || ""
+    }));
+  });
+
+  const filledLangs = createMemo(() => {
+    const data = postData();
+    if (!data) return [];
+    return domainLangCodes().filter(langCode => {
+        const langData = data[langCode];
+        return langData && langData.title?.trim() && langData.body?.trim();
+    });
+  });
+
+  return (
+    <main class="p-4 max-w-7xl mx-auto space-y-4">
+      <Show
+        when={!showFullPreview()}
+        fallback={
+          <EditorFullPreview 
+            postData={postData()}
+            postParams={postParams()}
+            activeLang={activeLang()}
+            thumbnailUrl={thumbnailUrl()}
+            chapters={combinedChapters()}
+            filledLangs={filledLangs()}
+            onBack={() => setShowFullPreview(false)}
+            onContinue={() => {
+              setShowFullPreview(false);
+              setShowPublishWizard(true);
+            }}
+          />
+        }
+      >
+        <>
+          <ClosePageButton />
+          <header class="flex justify-between items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <h2 class="text-2xl font-semibold">{title()}</h2>
+              <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                Mode: <strong>{editorMode()}</strong>
+              </p>
+            </div>
+            <div class="w-48 flex-shrink-0 space-y-2">
+              <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+                <Show when={thumbnailUrl()}
+                  fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+                >
+                  <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button 
+                      onClick={handleDeleteThumbnail}
+                      title={t("editor.thumbnail.delete")}
+                      class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
+                    >
+                      <TrashIcon class="w-5 h-5" />
+                    </button>
+                  </div>
+                </Show>
+              </div>
+              <div class="flex justify-center">
+                <LangSelector
+                    codes={domainLangCodes()}
+                    value={activeLang()}
+                    onChange={setActiveLang}
+                />
+              </div>
+            </div>
+          </header>
+
+          <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
+            <div>
+              <div class="flex items-center gap-4 mb-4">
+                <input
+                  type="text"
+                  value={currentLangData().title}
+                  onInput={(e) => updateField('title', e.currentTarget.value)}
+                  placeholder={t("editor.titlePlaceholder")}
+                  class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+                />
+                <div class="flex-shrink-0 flex items-center gap-2">
+                  <Show when={!showChapters()}>
+                    <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                  </Show>
+                  <Show when={!showFiles()}>
+                    <EditorFilesButton onClick={() => setShowFiles(true)} />
+                  </Show>
+                </div>
+              </div>
+              
+              <Show when={showChapters()}>
+                <div class="mb-4">
+                    <EditorChapterSelector
+                        chapters={combinedChapters()}
+                        activeIndex={editingChapterIndex()}
+                        onSelectIndex={setEditingChapterIndex}
+                        onAdd={handleAddChapter}
+                        onRemove={handleRemoveChapter}
+                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                    />
+                </div>
+              </Show>
+              
+              <EditorToolbar
+                isPreview={showPreview()}
+                onTogglePreview={() => setShowPreview(!showPreview())}
+                getTextareaRef={() => textareaRef}
+                onValueChange={handleEditorInput}
+              />
+              <MarkdownInput
+                editorRef={(el) => (textareaRef = el)}
+                value={currentEditorContent()}
+                onInput={handleEditorInput}
+                placeholder={t("editor.bodyPlaceholder")}
+                showPreview={showPreview()}
+                rehypePlugins={markdownPlugins()} 
+              />
+
+              <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
+                <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+                  <div class="justify-self-start self-start">
+                    <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
+                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                      {t("editor.params.nsfw.help")}
+                    </p>
+                  </div>
+                  <div class="justify-self-start">
+                    <input
+                      id="nsfw-checkbox"
+                      type="checkbox"
+                      class="h-5 w-5"
+                      checked={postParams().nsfw || false}
+                      onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
+                    />
+                  </div>
+
+                  <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+                  <div class="justify-self-start">
+                    <input
+                      id="fundraiser-id"
+                      type="number"
+                      value={postParams().fundraiser || 0}
+                      onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                      class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 flex justify-end">
+                <button 
+                  onClick={() => setShowFullPreview(true)}
+                  class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
+                >
+                  {t("editor.previewPost")}
+                </button>
+              </div>
+
+            </div>
+          </Show>
+        </>
+      </Show>
+
+      <EditorFilesDrawer 
+        isOpen={showFiles()}
+        onClose={() => setShowFiles(false)}
+        onInsert={handleInsertFile}
+        onSetThumbnail={handleSetThumbnail}
+        onInsertUrl={handleInsertUrl}
+      />
+      <ConfirmModal
+        isOpen={showConfirmDelete()}
+        onClose={() => setFileToDelete(null)}
+        onConfirm={confirmRemoveChapter}
+        title={t("editor.chapters.confirmDeleteTitle")}
+        message={t("editor.chapters.confirmDeleteMessage")}
+      />
+      <PostSubmissionWizard 
+        isOpen={showPublishWizard()}
+        onClose={() => {
+          console.log("[EditorPage] Wizard onClose triggered. Setting showPublishWizard to false.");
+          setShowPublishWizard(false);
+        }}
+        postData={postData}
+        postParams={postParams}
+      />
+    </main>
+  );
+}
+</file>
+
 <file path="src/index.css">
 /* src/index.css */
 @import "tailwindcss";
@@ -28937,6 +29444,34 @@ export default {
   "editor.files.menu.insert": "Insert",
   "editor.files.menu.insertUrl": "Insert URL",
   "editor.files.menu.setThumbnail": "Set as Thumbnail",
+    "editor.params.title": "Additional Parameters",
+  "editor.params.nsfw.label": "NSFW",
+  "editor.params.nsfw.help": "Content contains explicit language or images.",
+  "editor.params.fundraiser.label": "Promoted Fundrising Campaign ID",
+  "editor.previewPost": "Preview Post",
+    "editor.fullPreview.title": "Final Check",
+  "editor.fullPreview.help": "This is a preview of how your post will look once published. Review it carefully before proceeding.",
+  "editor.fullPreview.back": "Back to Editing",
+  "editor.fullPreview.continue": "Continue",
+   "editor.thumbnail.delete": "Delete thumbnail",
+   "editor.publish.title": "Publish Post",
+     "editor.publish.title": "Publish Post",
+  "editor.publish.steps.validate": "Validating Post",
+  "editor.publish.steps.validate.help": "Checking post structure",
+  "editor.publish.steps.ipfs": "Upload to IPFS",
+  "editor.publish.steps.ipfs.help": "Saving data to IPFS",
+  "editor.publish.steps.ipfs_publish": "IPFS Publishing",
+  "editor.publish.steps.ipfs_publish.help": "Waiting for content availability",
+  "editor.publish.steps.register": "Registering",
+  "editor.publish.steps.register.help": "Registering in blockchain",
+  "editor.publish.steps.publish": "Publishing",
+  "editor.publish.steps.publish.help": "Publishing to feed",
+  "editor.publish.validation.errorTitle": "Validation Error",
+  "editor.publish.validation.errorIncomplete": "Language '{lang}' is incomplete. It must have both a title and some content in the prologue.",
+  "editor.publish.validation.backToEditor": "Back to Editor",
+  "editor.publish.validation.unexpectedError": "An unexpected error occurred during validation: {message}",
+  
+  
 };
 </file>
 

@@ -462,7 +462,10 @@ export default function EditorPage() {
       />
       <PostSubmissionWizard 
         isOpen={showPublishWizard()}
-        onClose={() => setShowPublishWizard(false)}
+        onClose={() => {
+          console.log("[EditorPage] Wizard onClose triggered. Setting showPublishWizard to false.");
+          setShowPublishWizard(false);
+        }}
         postData={postData}
         postParams={postParams}
       />
