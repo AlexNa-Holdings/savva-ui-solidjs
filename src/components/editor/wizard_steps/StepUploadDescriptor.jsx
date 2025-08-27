@@ -36,7 +36,8 @@ export default function StepUploadDescriptor(props) {
     Object.assign(descriptor, otherParams);
     
     if (thumbnail) {
-      descriptor.thumbnail = `${data_cid}/${thumbnail.replace(/uploads\//, '')}`;
+      // The thumbnail path from params already includes "uploads/", so just prepend the data_cid.
+      descriptor.thumbnail = `${data_cid}/${thumbnail}`;
     }
 
     const content = postData();
@@ -46,7 +47,6 @@ export default function StepUploadDescriptor(props) {
       const hasBody = data.body?.trim().length > 0;
       const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
 
-      // Skip this language if it has no meaningful content
       if (!hasTitle && !hasBody && !hasChapters) {
         continue;
       }
