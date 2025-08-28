@@ -240,5 +240,7 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
   "wallet.error.addressMismatch": "Wallet address mismatch. Please switch to the authorized account to proceed.",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+  "editor.params.publishAsNew.label": "Publish as new post",
+"editor.params.publishAsNew.help": "If checked, this will be published as a new post with an updated timestamp, appearing at the top of feeds.",
 };

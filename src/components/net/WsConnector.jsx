@@ -1,10 +1,10 @@
-// src/net/WsConnector.jsx
+// src/components/net/WsConnector.jsx
 import { onMount, onCleanup, createSignal } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "./wsRuntime";
-import { wsUrl } from "./endpoints";
-import { pushToast } from "../ui/toast.js"; // Import the toast helper
-import { useI18n } from "../i18n/useI18n.js"; // Import i18n for the message
+import { useApp } from "../../context/AppContext.jsx";
+import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "../../net/wsRuntime";
+import { wsUrl } from "../../net/endpoints";
+import { pushToast } from "../../ui/toast.js";
+import { useI18n } from "../../i18n/useI18n.js";
 
 let _mounted = false;
 
@@ -33,8 +33,6 @@ export default function WsConnector() {
   onMount(() => {
     ensureWsStarted("connector-mount");
 
-    // This logic prevents the toast from showing on every reconnect attempt.
-    // It only shows if the *initial* connection fails.
     const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
 
     const onOpen = () => {
@@ -44,19 +42,17 @@ export default function WsConnector() {
     const onClose = () => {
       if (!hasConnectedOnce()) {
         pushToast({
-          type: "warning", // A warning is less severe than a hard error
+          type: "warning",
           message: t("error.ws.title"),
           details: t("error.ws.message"),
-          autohideMs: 15000, // Show for 15 seconds
+          autohideMs: 15000,
         });
       }
     };
 
-    // Attach listeners to the WebSocket client
     ws.on("open", onOpen);
     ws.on("close", onClose);
 
-    // Clean up listeners when the component is unmounted
     onCleanup(() => {
       ws.off("open", onOpen);
       ws.off("close", onClose);

@@ -21,6 +21,8 @@ import { getPostContentBaseCid, getPostDescriptorPath, resolvePostCidPath } from
 import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
 import ContextMenu from "../components/ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
+import { preparePostForEditing } from "../editor/postImporter.js";
+import { pushErrorToast } from "../ui/toast.js";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -103,6 +105,47 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
   }
   
   return "";
+}
+
+function PostControls(props) {
+  const app = useApp();
+  const { t } = app;
+  const [isPreparing, setIsPreparing] = createSignal(false);
+
+  const isAuthor = createMemo(() => {
+    const userAddr = app.authorizedUser()?.address?.toLowerCase();
+    const authorAddr = props.post?.author?.address?.toLowerCase();
+    return !!userAddr && userAddr === authorAddr;
+  });
+
+  const handleEdit = async () => {
+    setIsPreparing(true);
+    try {
+      await preparePostForEditing(props.post, app);
+      navigate(`/editor/edit/${props.post.savva_cid}`);
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to prepare post for editing." });
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  return (
+    <Show when={isAuthor()}>
+      <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center gap-4">
+        <button
+          onClick={handleEdit}
+          disabled={isPreparing()}
+          class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+        >
+          {isPreparing() ? t("common.loading") : "Edit Post"}
+        </button>
+        <button class="px-4 py-2 text-sm rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]" disabled>
+          Promote
+        </button>
+      </div>
+    </Show>
+  );
 }
 
 export default function PostPage() {
@@ -214,17 +257,6 @@ export default function PostPage() {
           <p class="text-sm text-[hsl(var(--muted-foreground))]">
             This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
           </p>
-          <div class="text-xs space-y-2">
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-            <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-            <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-            <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.</p>
-            <p>Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
-            <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.</p>
-            <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.</p>
-            <p>Sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.</p>
-          </div>
         </div>
       </div>
     </aside>
@@ -329,6 +361,7 @@ export default function PostPage() {
                   <RightPanel />
                 </div>
               </div>
+              <PostControls post={post()} />
             </article>
           </div>
         </Match>

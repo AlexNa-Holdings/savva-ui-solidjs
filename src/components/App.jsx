@@ -1,23 +1,23 @@
-// src/App.jsx
+// src/components/App.jsx
 import { createSignal, onMount, Show, Match, Switch, createMemo, createEffect, on } from "solid-js";
-import Header from "./components/Header";
-import RightPane from "./components/RightPane";
-import Settings from "./pages/Settings";
-import Docs from "./pages/Docs";
-import { useHashRouter, navigate } from "./routing/hashRouter";
-import { useApp } from "./context/AppContext.jsx";
-import Toaster from "./components/Toaster";
-import MainView from "./components/main/MainView";
-import DomainCssLoader from "./theme/DomainCssLoader.jsx";
-import FaviconLoader from "./theme/FaviconLoader.jsx";
-import GoogleAnalyticsLoader from "./theme/GoogleAnalyticsLoader.jsx";
+import Header from "./Header";
+import RightPane from "./RightPane";
+import Settings from "../pages/Settings";
+import Docs from "../pages/Docs";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import Toaster from "./Toaster";
+import MainView from "./main/MainView";
+import DomainCssLoader from "../theme/DomainCssLoader.jsx";
+import FaviconLoader from "../theme/FaviconLoader.jsx";
+import GoogleAnalyticsLoader from "../theme/GoogleAnalyticsLoader.jsx";
 import WsConnector from "./net/WsConnector.jsx";
-import ConnectionError from "./components/main/ConnectionError.jsx";
-import Spinner from "./components/ui/Spinner.jsx";
-import AssetDebugTap from "./dev/AssetDebugTap.jsx";
-import PostPage from "./pages/PostPage";
-import EditorPage from "./pages/EditorPage.jsx";
-import AlertManager from "./alerts/AlertManager.jsx";
+import ConnectionError from "./main/ConnectionError.jsx";
+import Spinner from "./ui/Spinner.jsx";
+import AssetDebugTap from "../dev/AssetDebugTap.jsx";
+import PostPage from "../pages/PostPage";
+import EditorPage from "../pages/EditorPage.jsx";
+import AlertManager from "../alerts/AlertManager.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -63,7 +63,6 @@ export default function App() {
     if (view === 'main') {
       requestAnimationFrame(() => {
         const y = app.savedScrollY();
-        console.log(`%c[App.jsx] Restoring scroll position to: ${y}`, 'color: green; font-weight: bold;');
         window.scrollTo(0, y);
       });
     }

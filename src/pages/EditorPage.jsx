@@ -15,7 +15,6 @@ import EditorChapterSelector from "../components/editor/EditorChapterSelector.js
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
 import { insertTextAtCursor } from "../editor/text-utils.js";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
 import { pushToast } from "../ui/toast.js";
@@ -54,7 +53,6 @@ export default function EditorPage() {
     const path = route();
     if (path.startsWith("/editor/new")) return "new_post";
     if (path.startsWith("/editor/edit/")) return "edit_post";
-    if (path.startsWith("/editor/comment/")) return "comment";
     return "unknown";
   });
   
@@ -67,62 +65,62 @@ export default function EditorPage() {
     return fromDomain.length > 0 ? fromDomain : ["en"];
   });
 
-  onMount(async () => {
+  const loadEditorContent = async () => {
+    try {
+      const draft = await loadDraft(baseDir());
+      if (draft && draft.content) {
+          batch(() => {
+            setPostData(draft.content);
+            const params = draft.params || {};
+            if (editorMode() === "new_post" && !params.guid) {
+                params.guid = crypto.randomUUID();
+            }
+            setPostParams(params);
+          });
+      } else if (editorMode() === "new_post") {
+          const newPostData = {};
+          const newPostParams = { locales: {}, guid: crypto.randomUUID() };
+          for (const langCode of domainLangCodes()) {
+              newPostData[langCode] = { title: "", body: "", chapters: [] };
+              newPostParams.locales[langCode] = { chapters: [] };
+          }
+          batch(() => {
+            setPostData(newPostData);
+            setPostParams(newPostParams);
+          });
+      } else {
+        dbg.error("EditorPage", `Draft not found for edit mode in '${baseDir()}', navigating back.`);
+        navigate(lastTabRoute() || "/");
+      }
+    } catch (error) {
+      dbg.error("EditorPage", "Failed to load draft, navigating away.", error);
+      navigate(lastTabRoute() || "/");
+    }
+  };
+
+  // This effect now correctly handles both initial load and subsequent changes in mode.
+  createEffect(on(baseDir, (currentBaseDir) => {
+    if (currentBaseDir && currentBaseDir !== "unknown") {
+      loadEditorContent();
+    }
+  }));
+
+  onMount(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
-          case 'f':
-            e.preventDefault();
-            setShowFiles(prev => !prev);
-            break;
-          case 'p':
-            e.preventDefault();
-            setShowPreview(prev => !prev);
-            break;
-          case 'm':
-            e.preventDefault();
-            setIsFullScreen(prev => !prev);
-            break;
+          case 'f': e.preventDefault(); setShowFiles(p => !p); break;
+          case 'p': e.preventDefault(); setShowPreview(p => !p); break;
+          case 'm': e.preventDefault(); setIsFullScreen(p => !p); break;
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
-
-    try {
-      if (editorMode() === "new_post") {
-        const draft = await loadDraft(baseDir());
-        if (draft && draft.content) {
-            setPostData(draft.content);
-            const params = draft.params || {};
-            if (!params.guid) {
-                params.guid = crypto.randomUUID();
-            }
-            setPostParams(params);
-        } else {
-            const newPostData = {};
-            const newPostParams = { locales: {}, guid: crypto.randomUUID() };
-            for (const langCode of domainLangCodes()) {
-                newPostData[langCode] = { title: "", body: "", chapters: [] };
-                newPostParams.locales[langCode] = { chapters: [] };
-            }
-            setPostData(newPostData);
-            setPostParams(newPostParams);
-        }
-      } else {
-        // TODO: Logic for loading existing posts will go here
-        setPostData({ en: { title: "", body: "", chapters: [] } });
-        setPostParams({});
-      }
-    } catch (error) {
-      dbg.error("EditorPage", "Failed to load draft, starting fresh.", error);
-      setPostData({ en: { title: "", body: "", chapters: [] } });
-      setPostParams({ guid: crypto.randomUUID() });
-    }
   });
 
   createEffect(on([postData, postParams], ([data, params]) => {
-    if (data === null || editorMode() !== "new_post") return;
+    if (data === null) return;
     clearTimeout(autoSaveTimeoutId);
     autoSaveTimeoutId = setTimeout(() => {
       saveDraft(baseDir(), { content: data, params: params });
@@ -156,7 +154,6 @@ export default function EditorPage() {
   const handlePublishSuccess = () => {
     pushToast({ type: "success", message: t("editor.publish.success") });
     setShowPublishWizard(false);
-    // Draft clearing will be handled later based on a WebSocket event.
     navigate(lastTabRoute() || "/");
   };
 
@@ -297,15 +294,11 @@ export default function EditorPage() {
     switch (editorMode()) {
       case "new_post": return t("editor.titleNewPost");
       case "edit_post": return t("editor.titleEditPost");
-      case "comment": return t("editor.titleComment");
       default: return t("editor.title");
     }
   });
 
-  const markdownPlugins = createMemo(() => {
-    dbg.log("EditorPage", "Creating markdown plugins for preview.");
-    return [rehypeResolveDraftUrls(baseDir())];
-  });
+  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls(baseDir())]);
 
   const combinedChapters = createMemo(() => {
     const contentChapters = currentLangData().chapters || [];
@@ -321,7 +314,7 @@ export default function EditorPage() {
     if (!data) return [];
     return domainLangCodes().filter(langCode => {
         const langData = data[langCode];
-        return langData && langData.title?.trim() && langData.body?.trim();
+        return langData && langData.title?.trim() && (langData.body?.trim() || langData.chapters?.some(c => c.body?.trim()));
     });
   });
 
@@ -354,9 +347,6 @@ export default function EditorPage() {
             <header class="flex justify-between items-start gap-4">
               <div class="flex-1 min-w-0">
                 <h2 class="text-2xl font-semibold">{title()}</h2>
-                <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                  Mode: <strong>{editorMode()}</strong>
-                </p>
               </div>
               <div class="w-48 flex-shrink-0 space-y-2">
                 <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
@@ -473,6 +463,23 @@ export default function EditorPage() {
                           min="0"
                         />
                       </div>
+                      <Show when={editorMode() === 'edit_post'}>
+                    <div class="justify-self-start self-start">
+                      <label for="publish-as-new-checkbox" class="font-medium">{t("editor.params.publishAsNew.label")}</label>
+                      <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                        {t("editor.params.publishAsNew.help")}
+                      </p>
+                    </div>
+                    <div class="justify-self-start">
+                      <input
+                        id="publish-as-new-checkbox"
+                        type="checkbox"
+                        class="h-5 w-5"
+                        checked={postParams().publishAsNewPost || false}
+                        onInput={(e) => updateParam('publishAsNewPost', e.currentTarget.checked)}
+                      />
+                    </div>
+                  </Show>
                     </div>
                   </div>
 

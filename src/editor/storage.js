@@ -6,9 +6,9 @@ import { createTextPreview } from "./preview-utils.js";
 export const DRAFT_DIRS = {
   NEW_POST: "new_post",
   EDIT: "post",
+  UPLOADS: "uploads",
 };
-const UPLOAD_DIR = "uploads";
-const PARAMS_FILE = "params.json"; // Renamed for generic use
+const PARAMS_FILE = "params.json";
 
 async function getDirectoryHandle(path) {
   try {
@@ -47,7 +47,7 @@ async function readFile(dirHandle, path) {
   }
 }
 
-async function writeFile(dirHandle, path, content) {
+export async function writeFile(dirHandle, path, content) {
   if (!dirHandle) return;
   try {
     const pathParts = path.split('/').filter(Boolean);
@@ -66,9 +66,8 @@ async function writeFile(dirHandle, path, content) {
   }
 }
 
-// All functions below now accept a `baseDir` parameter
 export async function listUploadedFiles(baseDir) {
-  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${DRAFT_DIRS.UPLOADS}`);
   if (!uploadsDirHandle) return [];
   
   const files = [];
@@ -83,7 +82,7 @@ export async function listUploadedFiles(baseDir) {
 }
 
 export async function addUploadedFile(baseDir, file) {
-  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${DRAFT_DIRS.UPLOADS}`);
   await writeFile(uploadsDirHandle, file.name, file);
 }
 
@@ -125,7 +124,7 @@ export async function addUploadedFileFromUrl(baseDir, url) {
 
 export async function deleteUploadedFile(baseDir, fileName) {
   try {
-    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${DRAFT_DIRS.UPLOADS}`);
     if (!uploadsDirHandle) return;
     await uploadsDirHandle.removeEntry(fileName);
     dbg.log("storage", `Deleted file: ${fileName} from ${baseDir}`);
@@ -157,7 +156,7 @@ export async function resolveDraftFileUrl(baseDir, relativePath) {
 }
 
 export async function getAllUploadedFileNames(baseDir) {
-  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${DRAFT_DIRS.UPLOADS}`);
   if (!uploadsDirHandle) return [];
   
   const names = [];
@@ -171,7 +170,7 @@ export async function getAllUploadedFileNames(baseDir) {
 
 export async function getUploadedFileAsFileObject(baseDir, fileName) {
   try {
-    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${DRAFT_DIRS.UPLOADS}`);
     if (!uploadsDirHandle) return null;
     
     const fileHandle = await uploadsDirHandle.getFileHandle(fileName);
@@ -184,7 +183,6 @@ export async function getUploadedFileAsFileObject(baseDir, fileName) {
   }
 }
 
-// Renamed from loadNewPostDraft
 export async function loadDraft(baseDir) {
   dbg.log("storage", `Loading draft from '${baseDir}'...`);
   const dirHandle = await getDirectoryHandle(baseDir);
@@ -228,7 +226,6 @@ export async function loadDraft(baseDir) {
   return draft;
 }
 
-// Renamed from getNewPostDraftParams
 export async function getDraftParams(baseDir) {
   try {
     const dirHandle = await getDirectoryHandle(baseDir);
@@ -242,7 +239,6 @@ export async function getDraftParams(baseDir) {
   }
 }
 
-// Renamed from saveNewPostDraft
 export async function saveDraft(baseDir, draftData) {
   dbg.log("storage", `Saving draft to '${baseDir}'...`, draftData);
   const dirHandle = await getDirectoryHandle(baseDir);
@@ -292,7 +288,6 @@ export async function saveDraft(baseDir, draftData) {
   dbg.log("storage", `Draft saved successfully to '${baseDir}'.`);
 }
 
-// Renamed from clearNewPostDraft
 export async function clearDraft(baseDir) {
   dbg.log("storage", `Clearing draft directory '${baseDir}'...`);
   try {
