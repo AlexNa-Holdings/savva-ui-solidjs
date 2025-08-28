@@ -28,8 +28,8 @@ export function AppProvider(props) {
   const { route } = useHashRouter();
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
-    const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
-    const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
+    const isCurrentlyOnMainFeed = !/^\/(post|settings|docs|editor)/.test(prevRoute);
+    const isNavigatingToPage = /^\/(post|settings|docs|editor)/.test(nextRoute);
     if (isCurrentlyOnMainFeed && isNavigatingToPage) {
       setSavedScrollY(window.scrollY);
     }
@@ -84,28 +84,53 @@ export function AppProvider(props) {
     }
   });
 
-  function getGuardedWalletClient() {
+  // --- State and handlers for the Switch Account Modal ---
+  const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
+  const [requiredAccount, setRequiredAccount] = Solid.createSignal(null);
+  let switchAccountResolver = null;
+  let switchAccountRejecter = null;
+
+  function promptSwitchAccount(requiredAddress) {
+    return new Promise((resolve, reject) => {
+      setRequiredAccount(requiredAddress);
+      setIsSwitchAccountModalOpen(true);
+      switchAccountResolver = resolve;
+      switchAccountRejecter = reject;
+    });
+  }
+
+  const resolveSwitchAccountPrompt = () => {
+    setIsSwitchAccountModalOpen(false);
+    if (switchAccountResolver) switchAccountResolver();
+  };
+
+  const rejectSwitchAccountPrompt = () => {
+    setIsSwitchAccountModalOpen(false);
+    if (switchAccountRejecter) switchAccountRejecter(new Error("User canceled the action."));
+  };
+  
+  async function getGuardedWalletClient() {
     const walletAcc = walletAccount();
     const authorizedAcc = auth.authorizedUser()?.address;
 
-    if (authorizedAcc && walletAcc && walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
-      const errText = i18n.t("wallet.error.addressMismatch");
-      pushErrorToast(new Error(errText));
-      throw new Error(errText);
+    if (!isWalletAvailable()) throw new Error("Wallet is not available.");
+    if (!authorizedAcc) throw new Error("User is not authorized.");
+    if (!walletAcc) throw new Error("Wallet is not connected.");
+
+    if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
+      try {
+        await promptSwitchAccount(authorizedAcc);
+      } catch (e) {
+        throw new Error("Wrong account selected in wallet.");
+      }
     }
     
-    if (!isWalletAvailable()) {
-      throw new Error("Wallet is not available.");
-    }
-
     const chain = desiredChain();
-    if (!chain) {
-      throw new Error("Target chain is not configured.");
-    }
+    if (!chain) throw new Error("Target chain is not configured.");
 
     return createWalletClient({
       chain: chain,
-      account: walletAcc,
+      account: walletAccount(), // Use the live signal to get the newly switched account
       transport: custom(window.ethereum)
     });
   }
@@ -126,6 +151,10 @@ export function AppProvider(props) {
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
     getGuardedWalletClient,
+    isSwitchAccountModalOpen,
+    requiredAccount,
+    resolveSwitchAccountPrompt,
+    rejectSwitchAccountPrompt,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

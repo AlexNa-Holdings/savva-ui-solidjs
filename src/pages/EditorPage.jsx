@@ -98,7 +98,6 @@ export default function EditorPage() {
     }
   };
 
-  // This effect now correctly handles both initial load and subsequent changes in mode.
   createEffect(on(baseDir, (currentBaseDir) => {
     if (currentBaseDir && currentBaseDir !== "unknown") {
       loadEditorContent();
@@ -435,7 +434,7 @@ export default function EditorPage() {
                 <>
                   <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
                     <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
-                    <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+                    <div class="grid grid-cols-[24rem_auto] items-center gap-x-4 gap-y-4">
                       <div class="justify-self-start self-start">
                         <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
                         <p class="text-xs text-[hsl(var(--muted-foreground))]">
@@ -464,22 +463,22 @@ export default function EditorPage() {
                         />
                       </div>
                       <Show when={editorMode() === 'edit_post'}>
-                    <div class="justify-self-start self-start">
-                      <label for="publish-as-new-checkbox" class="font-medium">{t("editor.params.publishAsNew.label")}</label>
-                      <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                        {t("editor.params.publishAsNew.help")}
-                      </p>
-                    </div>
-                    <div class="justify-self-start">
-                      <input
-                        id="publish-as-new-checkbox"
-                        type="checkbox"
-                        class="h-5 w-5"
-                        checked={postParams().publishAsNewPost || false}
-                        onInput={(e) => updateParam('publishAsNewPost', e.currentTarget.checked)}
-                      />
-                    </div>
-                  </Show>
+                        <div class="justify-self-start self-start">
+                          <label for="publish-as-new-checkbox" class="font-medium">{t("editor.params.publishAsNew.label")}</label>
+                          <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                            {t("editor.params.publishAsNew.help")}
+                          </p>
+                        </div>
+                        <div class="justify-self-start">
+                          <input
+                            id="publish-as-new-checkbox"
+                            type="checkbox"
+                            class="h-5 w-5"
+                            checked={postParams().publishAsNewPost || false}
+                            onInput={(e) => updateParam('publishAsNewPost', e.currentTarget.checked)}
+                          />
+                        </div>
+                      </Show>
                     </div>
                   </div>
 

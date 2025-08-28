@@ -1,5 +1,5 @@
 // src/components/App.jsx
-import { createSignal, onMount, Show, Match, Switch, createMemo, createEffect, on } from "solid-js";
+import { createSignal, onMount, Show, createMemo, createEffect, on } from "solid-js";
 import Header from "./Header";
 import RightPane from "./RightPane";
 import Settings from "../pages/Settings";
@@ -18,6 +18,7 @@ import AssetDebugTap from "../dev/AssetDebugTap.jsx";
 import PostPage from "../pages/PostPage";
 import EditorPage from "../pages/EditorPage.jsx";
 import AlertManager from "../alerts/AlertManager.jsx";
+import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -115,6 +116,13 @@ export default function App() {
           <RightPane isOpen={isPaneOpen} onClose={togglePane} />
           <Toaster />
           <AssetDebugTap />
+          
+          <SwitchAccountModal
+            isOpen={app.isSwitchAccountModalOpen()}
+            requiredAddress={app.requiredAccount()}
+            onSuccess={app.resolveSwitchAccountPrompt}
+            onCancel={app.rejectSwitchAccountPrompt}
+          />
         </div>
       </Show>
     </Show>
