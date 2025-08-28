@@ -84,7 +84,6 @@ export function AppProvider(props) {
     }
   });
 
-  // --- State and handlers for the Switch Account Modal ---
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
   const [requiredAccount, setRequiredAccount] = Solid.createSignal(null);
   let switchAccountResolver = null;
@@ -121,7 +120,7 @@ export function AppProvider(props) {
       try {
         await promptSwitchAccount(authorizedAcc);
       } catch (e) {
-        throw new Error("Wrong account selected in wallet.");
+        throw new Error(i18n.t("wallet.error.userCanceled"));
       }
     }
     
@@ -130,7 +129,7 @@ export function AppProvider(props) {
 
     return createWalletClient({
       chain: chain,
-      account: walletAccount(), // Use the live signal to get the newly switched account
+      account: walletAccount(),
       transport: custom(window.ethereum)
     });
   }

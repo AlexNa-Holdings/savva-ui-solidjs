@@ -150,7 +150,7 @@ export default function PostCard(props) {
       </div>
 
       <Show when={!props.compact}>
-        <PostInfo item={props.item} mode={props.mode} />
+        <PostInfo item={props.item} mode={props.mode} timeFormat="long" />
       </Show>
     </div>
   );

@@ -43,28 +43,32 @@ export default function StepPublish(props) {
         throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
       }
 
-      dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid });
+      const publishAsNew = postParams().publishAsNewPost || false;
+      const contentType = publishAsNew ? "post" : "post-edit";
 
-      const contract = await getSavvaContract(app, "ContentRegistry");
-      const walletClient = app.getGuardedWalletClient();
-      const desiredChain = app.desiredChain();
+      dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid, contentType });
+
+      // Request a write-enabled contract instance
+      const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
       
+      const hash = await contract.write.reg([
+        domain,
+        user.address,
+        guid,
+        descriptorCid,
+        toHexBytes32(contentType)
+      ]);
+
+      setStatus("publishing");
+      setTxHash(hash);
+      dbg.log("StepPublish", "Transaction sent, hash:", hash);
+
+      const desiredChain = app.desiredChain();
       if (!desiredChain?.rpcUrls?.[0]) {
         throw new Error("RPC URL for the desired chain is not configured.");
       }
       const transport = http(desiredChain.rpcUrls[0]);
       const publicClient = createPublicClient({ chain: desiredChain, transport: transport });
-
-      const hash = await walletClient.writeContract({
-        address: contract.address,
-        abi: contract.abi,
-        functionName: 'reg',
-        args: [domain, user.address, guid, descriptorCid, toHexBytes32("post")]
-      });
-
-      setStatus("publishing");
-      setTxHash(hash);
-      dbg.log("StepPublish", "Transaction sent, hash:", hash);
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') {

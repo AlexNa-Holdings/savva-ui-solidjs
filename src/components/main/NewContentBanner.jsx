@@ -17,7 +17,7 @@ export default function NewContentBanner() {
   };
 
   return (
-    <div class="fixed top-14 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-none">
+    <div class="fixed top-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-none">
       <Show when={app.newContentAvailable()}>
         <div class="pointer-events-auto">
           <button

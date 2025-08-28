@@ -33,9 +33,11 @@ function getPublicClient(chainId) {
  * Dynamically loads an ABI and creates a viem contract instance.
  * @param {object} app - The application context from useApp().
  * @param {string} contractName - The name of the contract (e.g., "Post", "Config").
+ * @param {object} [options] - Optional settings.
+ * @param {boolean} [options.write=false] - If true, gets a write-enabled instance using the wallet client.
  * @returns {Promise<import("viem").Contract>} A promise that resolves to a viem contract instance.
  */
-export async function getSavvaContract(app, contractName) {
+export async function getSavvaContract(app, contractName, options = {}) {
   const info = app.info();
   if (!info) {
     throw new Error("Backend /info not loaded yet.");
@@ -51,15 +53,19 @@ export async function getSavvaContract(app, contractName) {
     throw new Error(`Address for contract "${contractName}" not found in /info response.`);
   }
 
-  // Dynamically import the ABI JSON file from the new folder.
   const abiModule = await import(`./abi/${contractName}.json`);
   const abi = abiModule.default;
 
-  const publicClient = getPublicClient(chainId);
+  let client;
+  if (options.write) {
+    client = await app.getGuardedWalletClient();
+  } else {
+    client = getPublicClient(chainId);
+  }
 
   return getContract({
     address: contractInfo.address,
     abi,
-    client: publicClient,
+    client,
   });
 }

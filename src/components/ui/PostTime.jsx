@@ -30,7 +30,7 @@ export default function PostTime(props) {
     if (!d) return "";
     return new Intl.DateTimeFormat(lang(), {
       dateStyle: 'long',
-      timeStyle: 'short',
+      // timeStyle: 'short',
     }).format(d);
   });
 
