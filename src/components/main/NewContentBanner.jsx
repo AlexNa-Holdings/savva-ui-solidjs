@@ -2,7 +2,6 @@
 import { Show } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { navigate } from "../../routing/hashRouter";
-import { tabPath } from "../../routing/tabRoutes";
 
 export default function NewContentBanner() {
   const app = useApp();
@@ -10,7 +9,7 @@ export default function NewContentBanner() {
 
   const handleClick = () => {
     app.setNewContentAvailable(null);
-    const newPath = tabPath("new");
+    const newPath = "/new"; // Use the simple, non-prefixed path
     if (window.location.hash.slice(1) !== newPath) {
       navigate(newPath);
     }
