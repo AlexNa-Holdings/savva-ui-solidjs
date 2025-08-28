@@ -1,5 +1,5 @@
 // src/components/feed/PostCard.jsx
-import { Show, createMemo, createSignal } from "solid-js";
+import { Show, createMemo, createSignal, createEffect, on } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -38,16 +38,30 @@ function getLocalizedField(locales, fieldName, currentLang) {
 export default function PostCard(props) {
   const app = useApp();
   const { t } = app;
-  const author = () => props.item._raw?.author;
-  const content = () => props.item._raw?.savva_content;
-  const fund = () => props.item._raw?.fund;
-  const isListMode = () => props.mode === 'list';
   const [isHovered, setIsHovered] = createSignal(false);
+  const [item, setItem] = createSignal(props.item);
+
+  createEffect(on(() => props.item, (newItem) => setItem(newItem)));
+
+  createEffect(() => {
+    const update = app.postUpdate();
+    if (update?.data?.savva_cid && update.object_type === 0 && update.object_id === item().id) {
+      setItem(prev => ({
+        ...prev,
+        _raw: update.data
+      }));
+    }
+  });
+  
+  const author = () => item()._raw?.author;
+  const content = () => item()._raw?.savva_content;
+  const fund = () => item()._raw?.fund;
+  const isListMode = () => props.mode === 'list';
 
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
     if (thumbnailPath) {
-      return resolvePostCidPath(props.item._raw, thumbnailPath);
+      return resolvePostCidPath(item()._raw, thumbnailPath);
     }
     return author()?.avatar;
   });
@@ -61,27 +75,26 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container') || e.target.closest('.absolute.-bottom-2.-right-2')) {
+    if (e.target.closest('.user-card-container') || e.target.closest('.context-menu-container')) {
       return;
     }
     e.preventDefault();
-    const postId = props.item?.id; 
+    const postId = item()?.id; 
     if (postId) {
       app.setSavedScrollY(window.scrollY);
       navigate(`/post/${postId}`);
     } else {
-      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
+      console.warn("PostCard: Could not find post ID to navigate.", { item: item() });
     }
   };
 
   const handleUserClick = (e) => {
     e.stopPropagation();
-    console.log("User card clicked, navigating to profile for:", author()?.address);
   };
 
   const finalContextMenuItems = createMemo(() => {
     const propItems = props.contextMenuItems || [];
-    const adminItems = getPostAdminItems(props.item?._raw, t);
+    const adminItems = getPostAdminItems(item()?._raw, t);
     return [...propItems, ...adminItems];
   });
 
@@ -94,17 +107,18 @@ export default function PostCard(props) {
   });
 
   const imageContainerClasses = createMemo(() => {
-    const listModeRounding = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
-    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-l" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
+    const listModeRounding = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
+    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-r" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
   });
   
   const ImageBlock = () => {
-    const roundingClass = isListMode() ? "rounded-r-lg" : "rounded-t-lg";
+    const roundingClass = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
     return (
       <div class={imageContainerClasses()}>
         <IpfsImage
           src={displayImageSrc()}
           class={roundingClass}
+          postGateways={item()._raw?.gateways || []}
           fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
         />
         <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
@@ -150,7 +164,7 @@ export default function PostCard(props) {
       </div>
 
       <Show when={!props.compact}>
-        <PostInfo item={props.item} mode={props.mode} timeFormat="long" />
+        <PostInfo item={item()} mode={props.mode} timeFormat="long" />
       </Show>
     </div>
   );
@@ -163,20 +177,22 @@ export default function PostCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Show when={props.item._raw?.pinned}>
+      <Show when={item()._raw?.pinned}>
         <div class="absolute -top-2 -left-2 z-10">
           <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
         </div>
       </Show>
 
-      <Show when={props.item._raw?.nft?.owner}>
+      <Show when={item()._raw?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
           <NftBadge />
         </div>
       </Show>
 
       <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
-        <ContextMenu items={finalContextMenuItems()} />
+        <div class="context-menu-container">
+          <ContextMenu items={finalContextMenuItems()} />
+        </div>
       </Show>
 
       <Show
@@ -188,8 +204,17 @@ export default function PostCard(props) {
           </>
         }
       >
-        <ContentBlock />
-        <ImageBlock />
+        {isListMode() ? (
+          <>
+            <ContentBlock />
+            <ImageBlock />
+          </>
+        ) : (
+          <>
+            <ImageBlock />
+            <ContentBlock />
+          </>
+        )}
       </Show>
     </article>
   );

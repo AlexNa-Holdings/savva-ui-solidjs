@@ -1,9 +1,6 @@
 // src/components/auth/AuthorizedUser.jsx
 import { createSignal, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
-import { authorize } from "../../blockchain/auth.js";
-import { pushErrorToast } from "../../ui/toast.js";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 
@@ -17,22 +14,10 @@ function ChevronDownIcon(props) {
 
 export default function AuthorizedUser() {
   const app = useApp();
-  const { t } = app;
   const [menuOpen, setMenuOpen] = createSignal(false);
-  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
   let menuRef;
-
-  const handleLoginClick = async () => {
-    setIsLoggingIn(true);
-    try {
-      await authorize(app);
-    } catch (e) {
-      console.error("Authorization failed:", e);
-      pushErrorToast(e, { context: "Login failed" });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
+  
+  const user = () => app.authorizedUser();
 
   const handleLogoutClick = () => {
     app.logout();
@@ -45,48 +30,28 @@ export default function AuthorizedUser() {
     }
   };
 
-  onMount(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-  });
-
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  });
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
 
   return (
     <div class="relative" ref={menuRef}>
-      <Show
-        when={app.authorizedUser()}
-        fallback={
-          <Show when={walletAccount()}>
-            <button
-              class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70"
-              onClick={handleLoginClick}
-              disabled={isLoggingIn()}
-            >
-              {isLoggingIn() ? t("common.checking") : "Login"}
-            </button>
-          </Show>
-        }
-      >
-        {(user) => (
-          <button
-            class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
-            onClick={() => setMenuOpen(!menuOpen())}
-            aria-haspopup="true"
-            aria-expanded={menuOpen()}
-          >
-            <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-              <IpfsImage
-                src={user().avatar}
-                alt="User Avatar"
-                class="w-full h-full object-cover"
-                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-              />
-            </div>
-            <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-          </button>
-        )}
+      <Show when={user()}>
+        <button
+          class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
+          onClick={() => setMenuOpen(!menuOpen())}
+          aria-haspopup="true"
+          aria-expanded={menuOpen()}
+        >
+          <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+            <IpfsImage
+              src={user().avatar}
+              alt="User Avatar"
+              class="w-full h-full object-cover"
+              fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+            />
+          </div>
+          <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+        </button>
       </Show>
 
       <Show when={menuOpen()}>

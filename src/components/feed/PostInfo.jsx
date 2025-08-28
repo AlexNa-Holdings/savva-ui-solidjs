@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
 import PostTime from "../ui/PostTime.jsx";
 import PostReactions from "../ui/PostReactions.jsx";
+import ReactionInput from "../post/ReactionInput.jsx";
 
 function PostComments(props) {
   const count = () => props.item?._raw?.total_childs || props.item?.total_childs || 0;
@@ -45,7 +46,8 @@ function PostRewards(props) {
 }
 
 export default function PostInfo(props) {
-  const { lang } = useApp();
+  const app = useApp();
+  const { lang } = app;
   const isListMode = () => props.mode === 'list';
   const postData = createMemo(() => props.item?._raw || props.item || {});
 
@@ -56,8 +58,10 @@ export default function PostInfo(props) {
         format={props.timeFormat || "short"} 
       />
       <PostReactions item={props.item} />
+      {/* <Show when={app.authorizedUser() && !isListMode()}>
+        <ReactionInput post={props.item} />
+      </Show> */}
       <PostComments item={props.item} />
-      {/* --- MODIFICATION: Rewards alignment is now conditional --- */}
       <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
         <PostRewards item={props.item} lang={lang} />
       </div>

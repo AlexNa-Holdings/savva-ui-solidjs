@@ -243,4 +243,14 @@ export default {
   "wallet.onRequiredNetwork": "On required network",
   "editor.params.publishAsNew.label": "Publish as new post",
 "editor.params.publishAsNew.help": "If checked, this will be published as a new post with an updated timestamp, appearing at the top of feeds.",
+"reactions.like": "Like",
+"reactions.super": "Super",
+"reactions.ha_ha": "Haha",
+"reactions.sad": "Sad",
+"reactions.angry": "Angry",
+"reactions.wow": "Wow",
+"reactions.trophy": "Trophy",
+"reactions.hot": "Hot",
+"reactions.clap": "Clap",
+"reactions.dislike": "Dislike"
 };

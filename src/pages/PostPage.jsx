@@ -21,8 +21,7 @@ import { getPostContentBaseCid, getPostDescriptorPath, resolvePostCidPath } from
 import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
 import ContextMenu from "../components/ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
-import { preparePostForEditing } from "../editor/postImporter.js";
-import { pushErrorToast } from "../ui/toast.js";
+import PostControls from "../components/post/PostControls.jsx";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -107,47 +106,6 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
   return "";
 }
 
-function PostControls(props) {
-  const app = useApp();
-  const { t } = app;
-  const [isPreparing, setIsPreparing] = createSignal(false);
-
-  const isAuthor = createMemo(() => {
-    const userAddr = app.authorizedUser()?.address?.toLowerCase();
-    const authorAddr = props.post?.author?.address?.toLowerCase();
-    return !!userAddr && userAddr === authorAddr;
-  });
-
-  const handleEdit = async () => {
-    setIsPreparing(true);
-    try {
-      await preparePostForEditing(props.post, app);
-      navigate(`/editor/edit/${props.post.savva_cid}`);
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to prepare post for editing." });
-    } finally {
-      setIsPreparing(false);
-    }
-  };
-
-  return (
-    <Show when={isAuthor()}>
-      <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center gap-4">
-        <button
-          onClick={handleEdit}
-          disabled={isPreparing()}
-          class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-        >
-          {isPreparing() ? t("common.loading") : "Edit Post"}
-        </button>
-        <button class="px-4 py-2 text-sm rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]" disabled>
-          Promote
-        </button>
-      </div>
-    </Show>
-  );
-}
-
 export default function PostPage() {
   const app = useApp();
   const { t } = app;
@@ -155,7 +113,7 @@ export default function PostPage() {
   const identifier = createMemo(() => getIdentifier(route));
   const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
 
-  const [post] = createResource(
+  const [post, { mutate }] = createResource(
     () => ({
       identifier: identifier(),
       domain: app.selectedDomainName(),
@@ -180,6 +138,15 @@ export default function PostPage() {
     if (p && id.startsWith("0x") && p.short_cid) {
       const newPath = `/post/${p.short_cid}`;
       navigate(newPath, { replace: true });
+    }
+  });
+
+  createEffect(() => {
+    const update = app.postUpdate();
+    if (update?.data?.savva_cid && update.object_type === 0 && update.object_id === post()?.savva_cid) {
+      // Added log for debugging
+      dbg.log("PostPage:react", "Applying reaction update from alert", { update });
+      mutate(update.data);
     }
   });
 
@@ -357,11 +324,11 @@ export default function PostPage() {
                         </Show>
                       </Match>
                     </Switch>
+                    <PostControls post={post()} />
                   </div>
                   <RightPanel />
                 </div>
               </div>
-              <PostControls post={post()} />
             </article>
           </div>
         </Match>

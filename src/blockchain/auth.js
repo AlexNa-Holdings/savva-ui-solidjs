@@ -24,7 +24,8 @@ export async function authorize(app) {
 
   const messageToSign = textToSign + modifierString;
   
-  const walletClient = app.getGuardedWalletClient();
+  // Use the raw (unguarded) client for signing the login message
+  const walletClient = app.getRawWalletClient();
   const signature = await walletClient.signMessage({ account, message: messageToSign });
   
   const currentDomain = app.config().domain;

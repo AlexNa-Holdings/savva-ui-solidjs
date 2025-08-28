@@ -10,4 +10,5 @@ export const alertRegistry = {
   content_processed: h.handleContentProcessed,
   ping: h.handlePing,
   pong: h.handlePong,
+  react: h.handleReact,
 };

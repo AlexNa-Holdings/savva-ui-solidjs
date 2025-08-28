@@ -21,6 +21,7 @@ export function AppProvider(props) {
   const auth = useAppAuth();
   const conn = useAppConnection();
   const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
+  const [postUpdate, setPostUpdate] = Solid.createSignal(null);
   
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
@@ -107,31 +108,40 @@ export function AppProvider(props) {
     setIsSwitchAccountModalOpen(false);
     if (switchAccountRejecter) switchAccountRejecter(new Error("User canceled the action."));
   };
-  
-  async function getGuardedWalletClient() {
+
+  function getRawWalletClient() {
     const walletAcc = walletAccount();
-    const authorizedAcc = auth.authorizedUser()?.address;
-
     if (!isWalletAvailable()) throw new Error("Wallet is not available.");
-    if (!authorizedAcc) throw new Error("User is not authorized.");
     if (!walletAcc) throw new Error("Wallet is not connected.");
-
-    if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
-      try {
-        await promptSwitchAccount(authorizedAcc);
-      } catch (e) {
-        throw new Error(i18n.t("wallet.error.userCanceled"));
-      }
-    }
     
     const chain = desiredChain();
     if (!chain) throw new Error("Target chain is not configured.");
 
     return createWalletClient({
       chain: chain,
-      account: walletAccount(),
+      account: walletAcc,
       transport: custom(window.ethereum)
     });
+  }
+  
+  async function getGuardedWalletClient() {
+    const authorizedAcc = auth.authorizedUser()?.address;
+    if (!authorizedAcc) throw new Error("User is not authorized.");
+    
+    const walletClient = getRawWalletClient(); // Uses the raw client internally
+    const walletAcc = walletClient.account.address;
+
+    if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
+      try {
+        await promptSwitchAccount(authorizedAcc);
+        // After success, the walletAccount() signal is updated, so we need a fresh client.
+        return getRawWalletClient();
+      } catch (e) {
+        throw new Error(i18n.t("wallet.error.userCanceled"));
+      }
+    }
+    
+    return walletClient;
   }
 
   const value = {
@@ -147,9 +157,11 @@ export function AppProvider(props) {
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
+    postUpdate, setPostUpdate,
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
     getGuardedWalletClient,
+    getRawWalletClient,
     isSwitchAccountModalOpen,
     requiredAccount,
     resolveSwitchAccountPrompt,

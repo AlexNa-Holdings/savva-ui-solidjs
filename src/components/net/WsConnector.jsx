@@ -15,7 +15,6 @@ export default function WsConnector() {
   const app = useApp();
   const { t } = useI18n();
 
-  // Expose helpers from the singleton runtime
   const ws = getWsClient();
   const api = getWsApi();
 
@@ -50,12 +49,18 @@ export default function WsConnector() {
       }
     };
 
+    const onAuthError = () => {
+      app.handleAuthError?.();
+    };
+
     ws.on("open", onOpen);
     ws.on("close", onClose);
+    ws.on("auth_error", onAuthError);
 
     onCleanup(() => {
       ws.off("open", onOpen);
       ws.off("close", onClose);
+      ws.off("auth_error", onAuthError);
     });
   });
 

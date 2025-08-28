@@ -1,4 +1,4 @@
-// File: src/net/WsClient.js
+// src/net/WsClient.js
 import { dbg } from "../utils/debug";
 import { wsUrl as endpointsWsUrl } from "./endpoints";
 
@@ -126,7 +126,7 @@ export default class WsClient {
         if (this._shouldReconnect && !this._manualClose) {
           this._scheduleReconnect();
         }
-        this._manualClose = false; // Reset the flag after handling the close event.
+        this._manualClose = false;
       });
     } catch (e) {
       dbg.error("ws", "Connect exception", e);
@@ -169,11 +169,6 @@ export default class WsClient {
     this.send(JSON.stringify(obj));
   }
 
-  /** Backend dialect:
-   * send: { id: number, name: "<handler>", data: {...} }
-   * ok:   { id, data, [type] }
-   * err:  { id, error: "<string>", [type] }
-   */
   call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
     const numericId = Number.isFinite(id) ? id : this._nextId++;
     const callId = String(numericId);
@@ -209,7 +204,6 @@ export default class WsClient {
     if (set.size === 0) this._listeners.delete(type);
   }
 
-  // ─── internals ────────────────────────────────────────────────────────────────
   _setStatus(s) {
     if (this._status !== s) {
       this._status = s;
@@ -230,12 +224,10 @@ export default class WsClient {
   }
 
   _onMessage(ev) {
-    let data = ev.data;
     try {
-      const obj = JSON.parse(data);
+      const obj = JSON.parse(ev.data);
 
-      // Correlated response: match (stringified) id
-      if (obj && obj.id != null) {
+      if (obj && obj.id > 0) {
         const key = String(obj.id);
         const entry = this._pending.get(key);
         if (entry) {
@@ -243,39 +235,32 @@ export default class WsClient {
           this._pending.delete(key);
 
           if (typeof obj.error === "string" && obj.error) {
+            if (obj.error.toLowerCase() === "not authenticated") {
+              this._emit("auth_error", obj);
+            }
             const err = new Error(obj.error || "WS error");
             err.code = "WS_ERROR";
             entry.reject(err);
-            return;
-          }
-
-          if ("data" in obj) {
+          } else if ("data" in obj) {
             entry.resolve(obj.data);
-            return;
-          }
-          // if backend someday returns {result: ...}, accept that too
-          if ("result" in obj) {
+          } else if ("result" in obj) {
             entry.resolve(obj.result);
-            return;
+          } else {
+            entry.resolve(obj);
           }
-
-          entry.resolve(obj);
-          return;
+        } else {
+          dbg.warn("ws", "Received response for untracked call ID", { id: obj.id });
+        }
+      } else {
+        if (obj && obj.type) {
+          this._emit(obj.type, obj.data ?? obj);
+          this._emit("message", obj);
+        } else {
+          this._emit("message", obj);
         }
       }
-
-      // Alerts / broadcasts: frames with a type and no matching id
-      if (obj && obj.type) {
-        // forward both the whole obj on "message" and the typed payload
-        this._emit(obj.type, obj.data ?? obj);
-        this._emit("message", obj);
-        return;
-      }
-
-      // Fallback
-      this._emit("message", obj);
     } catch {
-      this._emit("raw", data);
+      this._emit("raw", ev.data);
     }
   }
 

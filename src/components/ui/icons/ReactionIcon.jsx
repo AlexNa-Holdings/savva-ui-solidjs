@@ -14,6 +14,8 @@ const REACTION_MAP = {
   dislike: "👎",
 };
 
+export const REACTION_TYPES = Object.keys(REACTION_MAP);
+
 export default function ReactionIcon(props) {
   const emoji = () => REACTION_MAP[props.type];
   return (
