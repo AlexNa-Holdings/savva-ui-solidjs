@@ -127,6 +127,10 @@ scripts/
   i18n.mjs
   release.mjs
 src/
+  alerts/
+    AlertManager.jsx
+    handlers.js
+    registry.js
   assets/
     solid.svg
   blockchain/
@@ -208,8 +212,10 @@ src/
     main/
       ConnectionError.jsx
       MainView.jsx
+      NewContentBanner.jsx
       NewPostButton.jsx
       TabsBar.jsx
+      TokenPrice.jsx
     post/
       ChapterPager.jsx
       ChapterSelector.jsx
@@ -267,6 +273,7 @@ src/
     useAppAuth.js
     useAppConnection.js
     useDomainAssets.js
+    useTokenPrices.js
   dev/
     AssetDebugTap.jsx
   docs/
@@ -343,6 +350,104 @@ vite.config.js
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/assets/solid.svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
+</file>
+
+<file path="src/vite-env.d.js">
+/// <reference types="vite/client" />
+</file>
+
+<file path="README.md">
+## Usage
+
+```bash
+$ npm install # or pnpm install or yarn install
+```
+
+### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
+
+## Available Scripts
+
+In the project directory, you can run:
+
+### `npm run dev`
+
+Runs the app in the development mode.<br>
+Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
+
+### `npm run build`
+
+Builds the app for production to the `dist` folder.<br>
+It correctly bundles Solid in production mode and optimizes the build for the best performance.
+
+The build is minified and the filenames include the hashes.<br>
+Your app is ready to be deployed!
+
+## Deployment
+
+Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)
+</file>
+
+<file path="tsconfig.app.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
+</file>
+
+<file path="tsconfig.node.json">
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.js"]
+}
+</file>
 
 <file path="assets/chain_logos/ethereum.svg">
 <?xml version="1.0" encoding="UTF-8"?>
@@ -4564,8 +4669,38 @@ async function main() {
 main().catch((err) => { console.error(err); process.exit(1); });
 </file>
 
-<file path="src/assets/solid.svg">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
+<file path="src/alerts/AlertManager.jsx">
+// src/alerts/AlertManager.jsx
+import { onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { alertRegistry } from "./registry.js";
+import { dbg } from "../utils/debug.js";
+
+export default function AlertManager() {
+  const app = useApp();
+
+  onMount(() => {
+    // Subscribe to all events from the WebSocket bus.
+    const unsubscribe = app.alertBus.on("*", ({ type, payload }) => {
+      const handler = alertRegistry[type];
+      if (handler) {
+        try {
+          handler(app, payload);
+        } catch (error) {
+          dbg.error("AlertManager", `Error in handler for '${type}':`, error);
+        }
+      } else {
+        // Optional: Log unhandled events for development purposes.
+        dbg.log("AlertManager", `No handler for alert type: '${type}'`);
+      }
+    });
+
+    // The component doesn't unmount in this app, but this is good practice.
+    return () => unsubscribe();
+  });
+
+  return null; // This component does not render anything.
+}
 </file>
 
 <file path="src/blockchain/abi/AuthorOfTheMonth.json">
@@ -17509,65 +17644,6 @@ export default function FileContextMenu(props) {
 }
 </file>
 
-<file path="src/components/editor/ToolbarIcons.jsx">
-// src/components/editor/ToolbarIcons.jsx
-
-// A generic wrapper for toolbar buttons
-export function ToolbarButton(props) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      title={props.title}
-      class="p-2 rounded-md hover:bg-[hsl(var(--accent))]"
-      aria-label={props.title}
-    >
-      {props.children}
-    </button>
-  );
-}
-
-// --- SVG Icons ---
-
-export function BoldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-      <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-    </svg>
-  );
-}
-
-export function ItalicIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="19" y1="4" x2="10" y2="4"></line>
-      <line x1="14" y1="20" x2="5" y2="20"></line>
-      <line x1="15" y1="4" x2="9" y2="20"></line>
-    </svg>
-  );
-}
-
-export function LinkIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
-    </svg>
-  );
-}
-
-export function ImageIcon() {
-  return (
-    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-      <polyline points="21 15 16 10 5 21"></polyline>
-    </svg>
-  );
-}
-</file>
-
 <file path="src/components/editor/UploadFromUrlModal.jsx">
 // src/components/editor/UploadFromUrlModal.jsx
 import { createSignal, Show } from "solid-js";
@@ -17683,39 +17759,74 @@ export default function ConnectionError(props) {
 }
 </file>
 
-<file path="src/components/main/NewPostButton.jsx">
-// src/components/main/NewPostButton.jsx
-import { navigate } from "../../routing/hashRouter";
+<file path="src/components/main/TokenPrice.jsx">
+// src/components/main/TokenPrice.jsx
+import { createSignal, createEffect, on, Show } from "solid-js";
 import { useApp } from "../../context/AppContext";
+import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon";
 
-function NewPostIcon(props) {
-  // This SVG is from your request, cleaned up for use as a component.
+function UpArrow() {
   return (
-    <svg viewBox="0 0 32 32" class={props.class || "w-5 h-5"} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <g transform="translate(-516 -99)">
-        <path d="M527.786,122.02 L522.414,125.273 C521.925,125.501 521.485,125.029 521.713,124.571 L524.965,119.195 L527.786,122.02 L527.786,122.02 Z M537.239,106.222 L540.776,109.712 L529.536,120.959 C528.22,119.641 526.397,117.817 526.024,117.444 L537.239,106.222 L537.239,106.222 Z M540.776,102.683 C541.164,102.294 541.793,102.294 542.182,102.683 L544.289,104.791 C544.677,105.18 544.677,105.809 544.289,106.197 L542.182,108.306 L538.719,104.74 L540.776,102.683 L540.776,102.683 Z M524.11,117.068 L519.81,125.773 C519.449,126.754 520.233,127.632 521.213,127.177 L529.912,122.874 C530.287,122.801 530.651,122.655 530.941,122.365 L546.396,106.899 C547.172,106.124 547.172,104.864 546.396,104.088 L542.884,100.573 C542.107,99.797 540.85,99.797 540.074,100.573 L524.619,116.038 C524.328,116.329 524.184,116.693 524.11,117.068 L524.11,117.068 Z M546,111 L546,127 C546,128.099 544.914,129.012 543.817,129.012 L519.974,129.012 C518.877,129.012 517.987,128.122 517.987,127.023 L517.987,103.165 C517.987,102.066 518.902,101 520,101 L536,101 L536,99 L520,99 C517.806,99 516,100.969 516,103.165 L516,127.023 C516,129.22 517.779,131 519.974,131 L543.817,131 C546.012,131 548,129.196 548,127 L548,111 L546,111 L546,111 Z" />
-      </g>
+    <svg viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 19V5M5 12l7-7 7 7" />
     </svg>
   );
 }
 
-export default function NewPostButton() {
-  const app = useApp();
-  const { t } = app;
+function DownArrow() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 5v14M19 12l-7 7-7-7" />
+    </svg>
+  );
+}
 
-  const handleNewPost = () => {
-    app.setSavedScrollY(window.scrollY);
-    navigate("/editor/new");
+export default function TokenPrice() {
+  const app = useApp();
+  const [isAnimating, setIsAnimating] = createSignal(false);
+
+  const priceData = () => app.savvaTokenPrice();
+
+  const triggerAnimation = () => {
+    setIsAnimating(false);
+    requestAnimationFrame(() => {
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 300);
+    });
+  };
+
+  createEffect(on(priceData, triggerAnimation, { defer: true }));
+
+  const formatPrice = (price) => {
+    if (typeof price !== 'number') return '$0.0000';
+    return `$${price.toFixed(4)}`;
+  };
+
+  const formatGain = (gain) => {
+    if (typeof gain !== 'number') return '0.00%';
+    return `${gain.toFixed(2)}%`;
   };
 
   return (
-    <button
-      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
-      onClick={handleNewPost}
-      title={t("header.newPost")}
-    >
-      <NewPostIcon class="w-5 h-5" />
-    </button>
+    <Show when={priceData()}>
+      {(data) => (
+        <div 
+          class="flex items-center gap-2 cursor-pointer"
+          onClick={triggerAnimation}
+        >
+          <SavvaTokenIcon class="w-5 h-5" />
+          <div classList={{ "price-animation": isAnimating() }} class="flex items-center gap-2 text-sm">
+            <span class="font-semibold">{formatPrice(data().price)}</span>
+            <div classList={{ "text-emerald-500": data().gain >= 0, "text-red-500": data().gain < 0 }} class="flex items-center gap-1 text-xs">
+              <Show when={data().gain >= 0} fallback={<DownArrow />}>
+                <UpArrow />
+              </Show>
+              <span>{formatGain(data().gain)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </Show>
   );
 }
 </file>
@@ -18819,6 +18930,52 @@ export default function RightPaneFooter() {
 }
 </file>
 
+<file path="src/context/useTokenPrices.js">
+// src/context/useTokenPrices.js
+import { createSignal, onMount, onCleanup } from "solid-js";
+import { whenWsOpen, getWsApi } from "../net/wsRuntime";
+import { dbg } from "../utils/debug";
+
+export function useTokenPrices(app) {
+  const [prices, setPrices] = createSignal(null);
+
+  const updatePrices = (data) => {
+    if (!data || !data.tokens) return;
+    const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
+    if (!savvaTokenAddress) return;
+
+    const savvaPriceData = data.tokens[savvaTokenAddress];
+    if (savvaPriceData) {
+      setPrices({
+        price: savvaPriceData.price,
+        gain: savvaPriceData.gain
+      });
+    }
+  };
+
+  const fetchInitialPrices = async () => {
+    try {
+      await whenWsOpen();
+      const api = getWsApi();
+      const data = await api.call("get-token-prices");
+      dbg.log("TokenPrices", "Fetched initial prices", data);
+      updatePrices(data);
+    } catch (error) {
+      dbg.error("TokenPrices", "Failed to fetch initial token prices", error);
+    }
+  };
+
+  onMount(() => {
+    fetchInitialPrices();
+  });
+
+  return {
+    savvaTokenPrice: prices,
+    updateTokenPrices: updatePrices
+  };
+}
+</file>
+
 <file path="src/docs/rehype-media-players.js">
 // src/components/docs/rehype-media-players.js
 import { visit } from "unist-util-visit";
@@ -18886,70 +19043,6 @@ export function rehypeMediaPlayers() {
       }
     });
     return tree; // Added this line
-  };
-}
-</file>
-
-<file path="src/docs/rehype-resolve-draft-urls.js">
-// src/components/docs/rehype-resolve-draft-urls.js
-import { visit } from "unist-util-visit";
-import { resolveDraftFileUrl } from "../editor/storage.js";
-import { dbg } from "../utils/debug.js";
-
-// A very small guard to avoid double-work and malformed inputs
-const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);
-
-/**
- * Resolve relative media URLs (img/video/audio + <a>) to blob: URLs from the
- * editor draft storage. Designed to be robust in async pipelines.
- *
- * Usage: pass the FACTORY (this function) to the unified pipeline, not the result.
- */
-export function rehypeResolveDraftUrls() {
-  return async (tree) => {
-    if (!tree || typeof tree !== "object") {
-      dbg.error("PreviewResolver", "Received invalid tree; skipping URL resolution.");
-      return tree;
-    }
-
-    dbg.log("PreviewResolver", "Resolving draft media URLs...");
-
-    const tasks = [];
-
-    visit(tree, "element", (node) => {
-      // media tags
-      if (node.tagName === "img" || node.tagName === "video" || node.tagName === "audio") {
-        const src = node.properties?.src;
-        if (isRelative(src)) {
-          tasks.push(
-            (async () => {
-              const blobUrl = await resolveDraftFileUrl(src);
-              if (blobUrl) node.properties.src = blobUrl;
-            })()
-          );
-        }
-      }
-
-      // links to local files (let users link to attachments)
-      if (node.tagName === "a") {
-        const href = node.properties?.href;
-        if (isRelative(href)) {
-          tasks.push(
-            (async () => {
-              const blobUrl = await resolveDraftFileUrl(href);
-              if (blobUrl) node.properties.href = blobUrl;
-            })()
-          );
-        }
-      }
-    });
-
-    if (tasks.length) {
-      await Promise.allSettled(tasks);
-      dbg.log("PreviewResolver", `Resolved ${tasks.length} URL(s) from draft storage`);
-    }
-
-    return tree;
   };
 }
 </file>
@@ -19642,98 +19735,58 @@ export function formatBytes(bytes, decimals = 2) {
 }
 </file>
 
-<file path="src/vite-env.d.js">
-/// <reference types="vite/client" />
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 </file>
 
-<file path="README.md">
-## Usage
-
-```bash
-$ npm install # or pnpm install or yarn install
-```
-
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
-
-## Available Scripts
-
-In the project directory, you can run:
-
-### `npm run dev`
-
-Runs the app in the development mode.<br>
-Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
-
-### `npm run build`
-
-Builds the app for production to the `dist` folder.<br>
-It correctly bundles Solid in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
-
-## Deployment
-
-Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)
-</file>
-
-<file path="tsconfig.app.json">
-{
-  "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+<file path="postcss.config.js">
+// postcss.config.js
+export default {
+  plugins: {
+    '@tailwindcss/postcss': { config: './tailwind.config.js' },
+    autoprefixer: {},
   },
-  "include": ["src"]
-}
+};
 </file>
 
-<file path="tsconfig.node.json">
-{
-  "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "target": "ES2023",
-    "lib": ["ES2023"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+<file path="vite.config.js">
+// vite.config.js
+import { defineConfig } from 'vite';
+import solid from 'vite-plugin-solid';
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+export default defineConfig({
+  plugins: [solid()],
+  server: {
+    port: 5173,
   },
-  "include": ["vite.config.js"]
-}
+  build: {
+    target: 'esnext',
+  },
+});
 </file>
 
 <file path="public/dev_docs/en/core-concepts/showing-posts.md">
@@ -20102,6 +20155,20 @@ function deploy() {
   console.error(err);
   process.exit(1);
 });
+</file>
+
+<file path="src/alerts/registry.js">
+// src/alerts/registry.js
+import * as h from "./handlers.js";
+
+/**
+ * A map of WebSocket alert types to their handler functions.
+ * The AlertManager uses this to delegate incoming messages.
+ */
+export const alertRegistry = {
+  token_price_changed: h.handleTokenPriceChanged,
+  content_processed: h.handleContentProcessed,
+};
 </file>
 
 <file path="src/blockchain/auth.js">
@@ -20870,27 +20937,77 @@ export default function EditorFilesButton(props) {
 }
 </file>
 
-<file path="src/components/editor/MarkdownInput.jsx">
-// src/components/editor/MarkdownInput.jsx
-import { Show } from "solid-js";
-import MarkdownView from "../docs/MarkdownView.jsx";
+<file path="src/components/editor/ToolbarIcons.jsx">
+// src/components/editor/ToolbarIcons.jsx
 
-export default function MarkdownInput(props) {
+// A generic wrapper for toolbar buttons
+export function ToolbarButton(props) {
   return (
-    <div class={`grid gap-4 h-[60vh] min-h-[400px] ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-      <textarea
-        ref={props.editorRef}
-        value={props.value}
-        onInput={(e) => props.onInput(e.currentTarget.value)}
-        class="w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-        placeholder={props.placeholder}
-      />
-      <Show when={props.showPreview}>
-        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-          <MarkdownView markdown={props.value} rehypePlugins={props.rehypePlugins} />
-        </div>
-      </Show>
-    </div>
+    <button
+      type="button"
+      onClick={props.onClick}
+      title={props.title}
+      class="p-2 rounded-md hover:bg-[hsl(var(--accent))]"
+      aria-label={props.title}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+// --- SVG Icons ---
+
+export function BoldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+      <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+    </svg>
+  );
+}
+
+export function ItalicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="19" y1="4" x2="10" y2="4"></line>
+      <line x1="14" y1="20" x2="5" y2="20"></line>
+      <line x1="15" y1="4" x2="9" y2="20"></line>
+    </svg>
+  );
+}
+
+export function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
+    </svg>
+  );
+}
+
+export function ImageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+      <polyline points="21 15 16 10 5 21"></polyline>
+    </svg>
+  );
+}
+
+export function MaximizeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+    </svg>
+  );
+}
+
+export function MinimizeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+    </svg>
   );
 }
 </file>
@@ -20917,6 +21034,41 @@ export default function RightRail(props) {
         </Switch>
       )}
     </For>
+  );
+}
+</file>
+
+<file path="src/components/main/NewPostButton.jsx">
+// src/components/main/NewPostButton.jsx
+import { navigate } from "../../routing/hashRouter";
+import { useApp } from "../../context/AppContext";
+
+function NewPostIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class={props.class || "w-5 h-5"}>
+      <path d="M7 5C5.34315 5 4 6.34315 4 8V16C4 17.6569 5.34315 19 7 19H17C18.6569 19 20 17.6569 20 16V12.5C20 11.9477 20.4477 11.5 21 11.5C21.5523 11.5 22 11.9477 22 12.5V16C22 18.7614 19.7614 21 17 21H7C4.23858 21 2 18.7614 2 16V8C2 5.23858 4.23858 3 7 3H10.5C11.0523 3 11.5 3.44772 11.5 4C11.5 4.55228 11.0523 5 10.5 5H7Z"></path>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M18.8431 3.58579C18.0621 2.80474 16.7957 2.80474 16.0147 3.58579L11.6806 7.91992L11.0148 11.9455C10.8917 12.6897 11.537 13.3342 12.281 13.21L16.3011 12.5394L20.6347 8.20582C21.4158 7.42477 21.4158 6.15844 20.6347 5.37739L18.8431 3.58579ZM13.1933 11.0302L13.5489 8.87995L17.4289 5L19.2205 6.7916L15.34 10.6721L13.1933 11.0302Z"></path>
+    </svg>
+  );
+}
+
+export default function NewPostButton() {
+  const app = useApp();
+  const { t } = app;
+
+  const handleNewPost = () => {
+    app.setSavedScrollY(window.scrollY);
+    navigate("/editor/new");
+  };
+
+  return (
+    <button
+      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+      onClick={handleNewPost}
+      title={t("header.newPost")}
+    >
+      <NewPostIcon class="w-5 h-5" />
+    </button>
   );
 }
 </file>
@@ -21805,6 +21957,52 @@ export default function AssetDebugTap() {
 }
 </file>
 
+<file path="src/docs/rehype-resolve-draft-urls.js">
+// src/docs/rehype-resolve-draft-urls.js
+import { visit } from "unist-util-visit";
+import { resolveDraftFileUrl } from "../editor/storage.js";
+import { dbg } from "../utils/debug.js";
+
+const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);
+
+/**
+ * A factory that returns a rehype plugin. The plugin resolves relative media URLs 
+ * from the specified draft storage directory.
+ * @param {string} baseDir - The base draft directory (e.g., "new_post").
+ */
+export function rehypeResolveDraftUrls(baseDir) {
+  return async (tree) => {
+    if (!tree || typeof tree !== "object" || !baseDir) {
+      dbg.warn("PreviewResolver", "Invalid tree or missing baseDir; skipping URL resolution.");
+      return tree;
+    }
+
+    const tasks = [];
+
+    visit(tree, "element", (node) => {
+      const prop = (node.tagName === 'a') ? 'href' : 'src';
+      if (node.properties && prop in node.properties) {
+        const url = node.properties[prop];
+        if (isRelative(url)) {
+          tasks.push(
+            (async () => {
+              const blobUrl = await resolveDraftFileUrl(baseDir, url);
+              if (blobUrl) node.properties[prop] = blobUrl;
+            })()
+          );
+        }
+      }
+    });
+
+    if (tasks.length) {
+      await Promise.allSettled(tasks);
+    }
+
+    return tree;
+  };
+}
+</file>
+
 <file path="src/hooks/useLocalIpfs.js">
 // src/hooks/useLocalIpfs.js
 import { createSignal, onCleanup, createEffect } from "solid-js";
@@ -22328,58 +22526,14 @@ export async function fetchWithTimeout(
 }
 </file>
 
-<file path=".gitignore">
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-.env
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-</file>
-
-<file path="postcss.config.js">
-// postcss.config.js
+<file path="tailwind.config.js">
+// tailwind.config.js
 export default {
-  plugins: {
-    '@tailwindcss/postcss': { config: './tailwind.config.js' },
-    autoprefixer: {},
-  },
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
 };
-</file>
-
-<file path="vite.config.js">
-// vite.config.js
-import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
-
-export default defineConfig({
-  plugins: [solid()],
-  server: {
-    port: 5173,
-  },
-  build: {
-    target: 'esnext',
-  },
-});
 </file>
 
 <file path="public/dev_docs/en/getting-started.md">
@@ -22637,6 +22791,42 @@ backendLink: https://ui.savva.app/api/
 gear: true
 </file>
 
+<file path="src/alerts/handlers.js">
+// src/alerts/handlers.js
+import { dbg } from "../utils/debug";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
+import { pushToast } from "../ui/toast";
+
+export function handleTokenPriceChanged(app, payload) {
+  dbg.log("Alerts:token_price_changed", payload);
+  app.updateTokenPrices?.(payload);
+}
+
+export async function handleContentProcessed(app, payload) {
+  const { content } = payload.data || {}; // Correctly get content from the nested data object
+  if (!content || !content.guid) {
+    return; // Silently ignore if the payload is not what we expect
+  }
+
+  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
+
+  // Check against saved draft
+  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
+  if (draftParams && draftParams.guid === content.guid) {
+    await clearDraft(DRAFT_DIRS.NEW_POST);
+    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+  }
+
+  // Check if new content should trigger the banner
+  const currentItems = app.newFeedItems();
+  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
+  
+  if (!isAlreadyVisible) {
+    app.setNewContentAvailable(content);
+  }
+}
+</file>
+
 <file path="src/blockchain/chains.js">
 // src/blockchain/chains.js
 export const CHAINS = {
@@ -22684,49 +22874,6 @@ export function getChainMeta(chainId) {
     rpcUrls,
     blockExplorers: explorers,
   };
-}
-</file>
-
-<file path="src/components/editor/EditorToolbar.jsx">
-// src/components/editor/EditorToolbar.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { applyMarkdownFormat } from "../../editor/text-utils.js";
-import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon } from "./ToolbarIcons.jsx";
-
-export default function EditorToolbar(props) {
-  const { t } = useApp();
-
-  const handleFormat = (format) => {
-    const textarea = props.getTextareaRef?.();
-    applyMarkdownFormat(textarea, format, props.onValueChange);
-  };
-
-  return (
-    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-      <div class="flex items-center">
-        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
-          <BoldIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
-          <ItalicIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
-          <LinkIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
-          <ImageIcon />
-        </ToolbarButton>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          onClick={props.onTogglePreview}
-          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
-        >
-          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
-        </button>
-      </div>
-    </div>
-  );
 }
 </file>
 
@@ -22797,6 +22944,31 @@ export default function FileGridItem(props) {
       <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center">
         <span class="truncate">{props.file.name}</span>
       </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/MarkdownInput.jsx">
+// src/components/editor/MarkdownInput.jsx
+import { Show } from "solid-js";
+import MarkdownView from "../docs/MarkdownView.jsx";
+
+export default function MarkdownInput(props) {
+  return (
+    <div class={`grid gap-4 ${props.isFullScreen ? 'flex-grow' : 'h-[400px]'} ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+      <textarea
+        ref={props.editorRef}
+        value={props.value}
+        onInput={(e) => props.onInput(e.currentTarget.value)}
+        class="w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+        placeholder={props.placeholder}
+      />
+      <Show when={props.showPreview}>
+        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+          <MarkdownView markdown={props.value} rehypePlugins={props.rehypePlugins} />
+        </div>
+      </Show>
     </div>
   );
 }
@@ -22893,6 +23065,46 @@ export default function PostListView(props) {
       <For each={props.items}>
         {(item) => <PostCard item={item} mode={mode()} />}
       </For>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/main/NewContentBanner.jsx">
+// src/components/main/NewContentBanner.jsx
+import { Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { navigate } from "../../routing/hashRouter";
+
+export default function NewContentBanner() {
+  const app = useApp();
+  const { t } = app;
+
+  const handleClick = () => {
+    app.setNewContentAvailable(null);
+    const newPath = "/new"; // Use the simple, non-prefixed path
+    if (window.location.hash.slice(1) !== newPath) {
+      navigate(newPath);
+    }
+    app.setNewTabRefreshKey(Date.now());
+  };
+
+  return (
+    <div class="fixed top-14 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-none">
+      <Show when={app.newContentAvailable()}>
+        <div class="pointer-events-auto">
+          <button
+            onClick={handleClick}
+            class="w-full px-4 py-2 rounded-lg shadow-lg text-sm font-semibold transition-transform duration-300 ease-out"
+            style={{ 
+              background: "var(--gradient)", 
+              color: "hsl(var(--card))"
+            }}
+          >
+            {t("main.newContentAvailable")}
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }
@@ -23639,14 +23851,59 @@ export const dbg = {
 export default dbg;
 </file>
 
-<file path="tailwind.config.js">
-// tailwind.config.js
-export default {
-  darkMode: "class",
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-  theme: { extend: {} },
-  plugins: [],
-};
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVVA · SolidJS</title>
+
+  <!-- Preload theme to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      } catch { }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
+      if (!location.hash) {
+        let path = location.pathname;
+        let newHash = "";
+
+        // NEW: Check for legacy /content/ URL
+        if (path.startsWith("/content/")) {
+          const savvaId = path.substring("/content/".length);
+          newHash = "#/post/" + savvaId;
+        } else if (path !== "/") {
+          newHash = "#" + path + location.search;
+        }
+
+        if (newHash) {
+          history.replaceState(null, "", "/" + newHash);
+        }
+      }
+    })();
+  </script>
+
+
+  <!-- Load app after theme class is set -->
+  <script type="module" src="/src/index.jsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
 </file>
 
 <file path="public/dev_docs/en/sidebar.yaml">
@@ -24245,182 +24502,54 @@ export default function StepUploadDescriptor(props) {
 }
 </file>
 
-<file path="src/components/editor/EditorFilesDrawer.jsx">
-// src/components/editor/EditorFilesDrawer.jsx
-import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
+<file path="src/components/editor/EditorToolbar.jsx">
+// src/components/editor/EditorToolbar.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
-import FileGridItem from "./FileGridItem.jsx";
-import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
-import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
-import FileContextMenu from "./FileContextMenu.jsx";
-import { formatBytes } from "../../utils/format.js";
-function CloseIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"></line>
-      <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-  );
-}
+import { applyMarkdownFormat } from "../../editor/text-utils.js";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon, MaximizeIcon, MinimizeIcon } from "./ToolbarIcons.jsx";
+import { Show } from "solid-js";
 
-export default function EditorFilesDrawer(props) {
+export default function EditorToolbar(props) {
   const { t } = useApp();
-  const [files, setFiles] = createSignal([]);
-  const [showUrlModal, setShowUrlModal] = createSignal(false);
-  const [fileToDelete, setFileToDelete] = createSignal(null);
-  const [menuData, setMenuData] = createSignal(null);
-  let fileInputRef;
-  let drawerContentRef;
 
-  const sortedFiles = createMemo(() => {
-    return [...files()].sort((a, b) => (b.size || 0) - (a.size || 0));
-  });
-
-  const totalSize = createMemo(() => {
-    return files().reduce((acc, file) => acc + (file.size || 0), 0);
-  });
-
-  const refreshFiles = async () => {
-    const fileList = await listUploadedFiles();
-    setFiles(fileList);
+  const handleFormat = (format) => {
+    const textarea = props.getTextareaRef?.();
+    applyMarkdownFormat(textarea, format, props.onValueChange);
   };
-
-  createEffect(on(() => props.isOpen, (isOpen) => {
-    if (isOpen) refreshFiles();
-    else setMenuData(null);
-  }));
-
-  const handleFileSelect = async (e) => {
-    const selectedFiles = Array.from(e.currentTarget.files);
-    if (selectedFiles.length === 0) return;
-    for (const file of selectedFiles) await addUploadedFile(file);
-    await refreshFiles();
-    if (fileInputRef) fileInputRef.value = "";
-  };
-
-  const handleUrlUpload = async (url) => {
-    try {
-      const file = await addUploadedFileFromUrl(url);
-      pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
-      await refreshFiles();
-    } catch (error) {
-      pushErrorToast(error, { context: t("editor.files.uploadError") });
-      throw error;
-    }
-  };
-
-  const handleDelete = (fileName) => setFileToDelete(fileName);
-  
-  const confirmDelete = async () => {
-    try {
-      await deleteUploadedFile(fileToDelete());
-      await refreshFiles();
-    } catch (error) {
-      pushErrorToast(error, { context: "File deletion failed" });
-    }
-  };
-
-  const handleMenuOpen = ({ file, fileType, element }) => {
-    const drawerRect = drawerContentRef.getBoundingClientRect();
-    const itemRect = element.getBoundingClientRect();
-    
-    let x = itemRect.left - drawerRect.left;
-    let y = element.offsetTop;
-
-    const menuWidth = 192;
-    const menuHeight = 150;
-    const padding = 16;
-
-    if (x + menuWidth > drawerRect.width - padding) {
-      x = drawerRect.width - menuWidth - padding;
-    }
-    if (y + menuHeight > drawerContentRef.scrollHeight) {
-      y = drawerContentRef.scrollHeight - menuHeight - 5;
-    }
-    
-    setMenuData({ file, fileType, x, y });
-  };
-
-  const menuItems = createMemo(() => {
-    const data = menuData();
-    if (!data) return [];
-    const { file, fileType } = data;
-    const items = [];
-    if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
-      items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
-    }
-    if (fileType === 'image') {
-      items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
-    }
-    items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });
-    items.push({ label: t("editor.files.menu.delete"), onClick: () => handleDelete(file.name) });
-    return items;
-  });
 
   return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col">
-          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
-            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
-            <button onClick={props.onClose} class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"><CloseIcon /></button>
-          </header>
-
-          <div class="p-4 border-b border-[hsl(var(--border))] space-y-2">
-            <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect} class="hidden" />
-            <button onClick={() => fileInputRef.click()} class="w-full text-sm px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
-              {t("editor.files.uploadFromDisk")}
-            </button>
-            <button onClick={() => setShowUrlModal(true)} class="w-full text-sm px-3 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-              {t("editor.files.uploadFromUrl")}
-            </button>
-          </div>
-
-          <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
-            <Show when={sortedFiles().length > 0} fallback={
-              <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
-                {t("editor.files.empty")}
-              </div>
-            }>
-              <div class="grid grid-cols-3 gap-2">
-                <For each={sortedFiles()}>
-                  {(file) => <FileGridItem 
-                    file={file}
-                    onMenuOpen={handleMenuOpen}
-                  />}
-                </For>
-              </div>
-            </Show>
-            <Show when={menuData()}>
-              <FileContextMenu 
-                x={menuData().x} 
-                y={menuData().y} 
-                items={menuItems()} 
-                onClose={() => setMenuData(null)} 
-              />
-            </Show>
-          </div>
-
-          <footer class="p-4 border-t border-[hsl(var(--border))] text-xs text-center text-[hsl(var(--muted-foreground))]">
-            Total Size: <strong>{formatBytes(totalSize())}</strong>
-          </footer>
-        </div>
+    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <div class="flex items-center">
+        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
+          <BoldIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
+          <ItalicIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
+          <LinkIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
+          <ImageIcon />
+        </ToolbarButton>
       </div>
-      <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>
-      <UploadFromUrlModal isOpen={showUrlModal()} onClose={() => setShowUrlModal(false)} onUpload={handleUrlUpload} />
-      <ConfirmModal
-        isOpen={!!fileToDelete()}
-        onClose={() => setFileToDelete(null)}
-        onConfirm={confirmDelete}
-        title={t("editor.files.confirmDeleteTitle")}
-        message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
-      />
-    </>
+      <div class="flex items-center gap-2">
+        <button
+          onClick={props.onTogglePreview}
+          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
+        >
+          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
+        </button>
+        <ToolbarButton
+          onClick={props.onToggleFullScreen}
+          title={props.isFullScreen ? t("editor.toolbar.minimize") : t("editor.toolbar.maximize")}
+        >
+          <Show when={props.isFullScreen} fallback={<MaximizeIcon />}>
+            <MinimizeIcon />
+          </Show>
+        </ToolbarButton>
+      </div>
+    </div>
   );
 }
 </file>
@@ -25909,153 +26038,202 @@ export default function Docs() {
 }
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="en">
+<file path="src/index.jsx">
+// src/index.jsx
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./App";
+import { AppProvider } from "./context/AppContext.jsx";
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAVVA · SolidJS</title>
+const root = document.getElementById("root");
 
-  <!-- Preload theme to avoid flash -->
-  <script>
-    (function () {
-      try {
-        const saved = localStorage.getItem("theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved || (systemDark ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", theme === "dark");
-      } catch { }
-    })();
-  </script>
-
-  <script>
-    (function () {
-      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
-      if (!location.hash) {
-        let path = location.pathname;
-        let newHash = "";
-
-        // NEW: Check for legacy /content/ URL
-        if (path.startsWith("/content/")) {
-          const savvaId = path.substring("/content/".length);
-          newHash = "#/post/" + savvaId;
-        } else if (path !== "/") {
-          newHash = "#" + path + location.search;
-        }
-
-        if (newHash) {
-          history.replaceState(null, "", "/" + newHash);
-        }
-      }
-    })();
-  </script>
-
-
-  <!-- Load app after theme class is set -->
-  <script type="module" src="/src/index.jsx"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-</body>
-
-</html>
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
 </file>
 
-<file path="src/components/feed/ContentFeed.jsx">
-// src/components/feed/ContentFeed.jsx
-import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+<file path="src/components/editor/EditorFilesDrawer.jsx">
+// src/components/editor/EditorFilesDrawer.jsx
+import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import PostListView from "./PostListView.jsx";
-import { dbg } from "../../utils/debug.js";
-
-export default function ContentFeed(props) {
-  const { t } = useApp();
-  const [items, setItems] = createSignal([]);
-  const [page, setPage] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
-
-  async function loadMore() {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-    try {
-      const nextPage = page() + 1;
-      dbg.log("ContentFeed", "loadMore → page", nextPage);
-      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
-      dbg.log("ContentFeed", "page result length", chunk.length);
-      if (!chunk.length) setHasMore(false);
-      setItems((prev) => prev.concat(chunk));
-      setPage(nextPage);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  onMount(() => {
-    // --- DEBUG: Log when the component mounts using dbg ---
-    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
-    loadMore();
-    const handleScroll = () => {
-      const scrollThreshold = 600;
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (scrolledToBottom) loadMore();
-    };
-    let timeoutId = null;
-    const throttledHandleScroll = () => {
-      if (timeoutId === null) {
-        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
-      }
-    };
-    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
-    onCleanup(() => {
-      window.removeEventListener('scroll', throttledHandleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    });
-  });
-
-  createEffect(on(() => props.resetOn, () => {
-    setItems([]);
-    setPage(0);
-    setHasMore(true);
-    setLoading(false);
-    queueMicrotask(loadMore);
-  }, { defer: true }));
-
+import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
+import FileGridItem from "./FileGridItem.jsx";
+import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
+import { pushToast, pushErrorToast } from "../../ui/toast.js";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import FileContextMenu from "./FileContextMenu.jsx";
+import { formatBytes } from "../../utils/format.js";
+function CloseIcon(props) {
   return (
-    <div class="w-full">
-      <PostListView
-        items={items()}
-        mode={props.mode}
-        isRailVisible={props.isRailVisible}
-      />
-      <Show when={loading()}>
-        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
-      </Show>
-    </div>
+    <svg viewBox="0 0 24 24" class={props.class || "w-6 h-6"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
   );
 }
-</file>
 
-<file path="src/components/main/MainView.jsx">
-// src/components/main/MainView.jsx
-import { useApp } from "../../context/AppContext";
-import TabsBar from "./TabsBar";
-import Container from "../layout/Container";
-import ToTopButton from "../ui/ToTopButton";
+export default function EditorFilesDrawer(props) {
+ const { t } = useApp();
+  const [files, setFiles] = createSignal([]);
+  const [showUrlModal, setShowUrlModal] = createSignal(false);
+  const [fileToDelete, setFileToDelete] = createSignal(null);
+  const [menuData, setMenuData] = createSignal(null);
+  let fileInputRef;
+  let drawerContentRef;
 
-export default function MainView() {
-  const { t } = useApp();
+   const baseDir = () => props.baseDir;
+
+  const sortedFiles = createMemo(() => {
+    return [...files()].sort((a, b) => (b.size || 0) - (a.size || 0));
+  });
+
+  const totalSize = createMemo(() => {
+    return files().reduce((acc, file) => acc + (file.size || 0), 0);
+  });
+
+  const refreshFiles = async () => {
+    if (!baseDir()) return;
+    const fileList = await listUploadedFiles(baseDir());
+    setFiles(fileList);
+  };
+
+  createEffect(on(() => props.isOpen, (isOpen) => {
+    if (isOpen) refreshFiles();
+    else setMenuData(null);
+  }));
+
+  const handleFileSelect = async (e) => {
+    const selectedFiles = Array.from(e.currentTarget.files);
+    if (selectedFiles.length === 0) return;
+    for (const file of selectedFiles) await addUploadedFile(baseDir(), file);
+    await refreshFiles();
+    if (fileInputRef) fileInputRef.value = "";
+  };
+
+  const handleUrlUpload = async (url) => {
+    try {
+      const file = await addUploadedFileFromUrl(baseDir(), url);
+      pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: t("editor.files.uploadError") });
+      throw error;
+    }
+  };
+
+  const handleDelete = (fileName) => setFileToDelete(fileName);
+  
+  const confirmDelete = async () => {
+    try {
+      await deleteUploadedFile(baseDir(), fileToDelete());
+      await refreshFiles();
+    } catch (error) {
+      pushErrorToast(error, { context: "File deletion failed" });
+    }
+  };
+
+
+  const handleMenuOpen = ({ file, fileType, element }) => {
+    const drawerRect = drawerContentRef.getBoundingClientRect();
+    const itemRect = element.getBoundingClientRect();
+    
+    let x = itemRect.left - drawerRect.left;
+    let y = element.offsetTop;
+
+    const menuWidth = 192;
+    const menuHeight = 150;
+    const padding = 16;
+
+    if (x + menuWidth > drawerRect.width - padding) {
+      x = drawerRect.width - menuWidth - padding;
+    }
+    if (y + menuHeight > drawerContentRef.scrollHeight) {
+      y = drawerContentRef.scrollHeight - menuHeight - 5;
+    }
+    
+    setMenuData({ file, fileType, x, y });
+  };
+
+  const menuItems = createMemo(() => {
+    const data = menuData();
+    if (!data) return [];
+    const { file, fileType } = data;
+    const items = [];
+    if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
+      items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
+    }
+    if (fileType === 'image') {
+      items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
+    }
+    items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });
+    items.push({ label: t("editor.files.menu.delete"), onClick: () => handleDelete(file.name) });
+    return items;
+  });
 
   return (
-    <Container>
-      <ToTopButton />
-      <div class="w-full">
-        <TabsBar />
+    <>
+      <div
+        class={`fixed top-0 right-0 w-80 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-50 transition-transform duration-300 ${props.isOpen ? "translate-x-0" : "translate-x-full"}`}
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col">
+          <header class="flex items-center justify-between p-4 border-b border-[hsl(var(--border))]">
+            <h3 class="font-semibold">{t("editor.sidebar.files")}</h3>
+            <button onClick={props.onClose} class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"><CloseIcon /></button>
+          </header>
+
+          <div class="p-4 border-b border-[hsl(var(--border))] space-y-2">
+            <input type="file" ref={fileInputRef} multiple onChange={handleFileSelect} class="hidden" />
+            <button onClick={() => fileInputRef.click()} class="w-full text-sm px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+              {t("editor.files.uploadFromDisk")}
+            </button>
+            <button onClick={() => setShowUrlModal(true)} class="w-full text-sm px-3 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+              {t("editor.files.uploadFromUrl")}
+            </button>
+          </div>
+
+          <div ref={drawerContentRef} class="flex-1 p-4 overflow-y-auto relative">
+            <Show when={sortedFiles().length > 0} fallback={
+              <div class="h-full flex items-center justify-center text-center text-xs text-[hsl(var(--muted-foreground))]">
+                {t("editor.files.empty")}
+              </div>
+            }>
+              <div class="grid grid-cols-3 gap-2">
+                <For each={sortedFiles()}>
+                  {(file) => <FileGridItem 
+                    file={file}
+                    onMenuOpen={handleMenuOpen}
+                  />}
+                </For>
+              </div>
+            </Show>
+            <Show when={menuData()}>
+              <FileContextMenu 
+                x={menuData().x} 
+                y={menuData().y} 
+                items={menuItems()} 
+                onClose={() => setMenuData(null)} 
+              />
+            </Show>
+          </div>
+
+          <footer class="p-4 border-t border-[hsl(var(--border))] text-xs text-center text-[hsl(var(--muted-foreground))]">
+            Total Size: <strong>{formatBytes(totalSize())}</strong>
+          </footer>
+        </div>
       </div>
-    </Container>
+      <Show when={props.isOpen}><div class="fixed inset-0 z-40 bg-black/20" onClick={props.onClose} /></Show>
+      <UploadFromUrlModal isOpen={showUrlModal()} onClose={() => setShowUrlModal(false)} onUpload={handleUrlUpload} />
+      <ConfirmModal
+        isOpen={!!fileToDelete()}
+        onClose={() => setFileToDelete(null)}
+        onConfirm={confirmDelete}
+        title={t("editor.files.confirmDeleteTitle")}
+        message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
+      />
+    </>
   );
 }
 </file>
@@ -26151,22 +26329,6 @@ export const ipfs = {
   normalizeInput,
   buildUrl,
 };
-</file>
-
-<file path="src/index.jsx">
-// src/index.jsx
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./App";
-import { AppProvider } from "./context/AppContext.jsx";
-
-const root = document.getElementById("root");
-
-render(() => (
-  <AppProvider>
-    <App />
-  </AppProvider>
-), root);
 </file>
 
 <file path="src/components/editor/EditorFullPreview.jsx">
@@ -26287,6 +26449,110 @@ export default function EditorFullPreview(props) {
         </article>
       </div>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/feed/ContentFeed.jsx">
+// src/components/feed/ContentFeed.jsx
+import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import PostListView from "./PostListView.jsx";
+import { dbg } from "../../utils/debug.js";
+
+export default function ContentFeed(props) {
+  const { t } = useApp();
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    try {
+      const nextPage = page() + 1;
+      dbg.log("ContentFeed", "loadMore → page", nextPage);
+      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
+      dbg.log("ContentFeed", "page result length", chunk.length);
+      if (!chunk.length) setHasMore(false);
+      
+      setItems((prev) => {
+        const next = prev.concat(chunk);
+        props.onItemsChange?.(next);
+        return next;
+      });
+
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  onMount(() => {
+    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
+    loadMore();
+    const handleScroll = () => {
+      const scrollThreshold = 600;
+      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
+      if (scrolledToBottom) loadMore();
+    };
+    let timeoutId = null;
+    const throttledHandleScroll = () => {
+      if (timeoutId === null) {
+        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
+      }
+    };
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+    onCleanup(() => {
+      window.removeEventListener('scroll', throttledHandleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  });
+
+  createEffect(on(() => props.resetOn, () => {
+    setItems([]);
+    props.onItemsChange?.([]);
+    setPage(0);
+    setHasMore(true);
+    setLoading(false);
+    queueMicrotask(loadMore);
+  }, { defer: true }));
+
+  return (
+    <div class="w-full">
+      <PostListView
+        items={items()}
+        mode={props.mode}
+        isRailVisible={props.isRailVisible}
+      />
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/main/MainView.jsx">
+// src/components/main/MainView.jsx
+import { useApp } from "../../context/AppContext";
+import TabsBar from "./TabsBar";
+import Container from "../layout/Container";
+import ToTopButton from "../ui/ToTopButton";
+import NewContentBanner from "./NewContentBanner.jsx";
+
+export default function MainView() {
+  const { t } = useApp();
+
+  return (
+    <Container>
+      <ToTopButton />
+      <NewContentBanner />
+      <div class="w-full">
+        <TabsBar />
+      </div>
+    </Container>
   );
 }
 </file>
@@ -26925,306 +27191,6 @@ export function useI18n() {
 }
 </file>
 
-<file path="src/editor/storage.js">
-// src/editor/storage.js
-import { dbg } from "../utils/debug";
-import { parse, stringify } from "yaml";
-import { createTextPreview } from "./preview-utils.js";
-
-const NEW_POST_DIR = "new_post";
-const UPLOAD_DIR = "uploads";
-const PARAMS_FILE = "new_post.json";
-
-async function getDirectoryHandle(path) {
-  try {
-    if (!navigator.storage || !navigator.storage.getDirectory) {
-      dbg.warn("storage", "Origin Private File System API not available.");
-      return null;
-    }
-    const root = await navigator.storage.getDirectory();
-    let currentHandle = root;
-    for (const part of path.split('/').filter(Boolean)) {
-      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
-    }
-    return currentHandle;
-  } catch (e) {
-    dbg.error("storage", `Failed to get directory handle for '${path}'`, e);
-    throw e;
-  }
-}
-
-async function readFile(dirHandle, path) {
-  if (!dirHandle) return null;
-  try {
-    const pathParts = path.split('/').filter(Boolean);
-    let currentHandle = dirHandle;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
-    }
-    const fileName = pathParts[pathParts.length - 1];
-    const fileHandle = await currentHandle.getFileHandle(fileName);
-    const file = await fileHandle.getFile();
-    return await file.text();
-  } catch (e) {
-    if (e.name === 'NotFoundError') return null;
-    dbg.error("storage", `Failed to read file: ${path}`, e);
-    throw e;
-  }
-}
-
-async function writeFile(dirHandle, path, content) {
-  if (!dirHandle) return;
-  try {
-    const pathParts = path.split('/').filter(Boolean);
-    let currentHandle = dirHandle;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i], { create: true });
-    }
-    const fileName = pathParts[pathParts.length - 1];
-    const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(content);
-    await writable.close();
-  } catch (e) {
-    dbg.error("storage", `Failed to write file: ${path}`, e);
-    throw e;
-  }
-}
-
-export async function listUploadedFiles() {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-  if (!uploadsDirHandle) return [];
-  
-  const files = [];
-  for await (const entry of uploadsDirHandle.values()) {
-    if (entry.kind === 'file') {
-      const file = await entry.getFile();
-      const url = URL.createObjectURL(file);
-      files.push({ name: entry.name, url, size: file.size });
-    }
-  }
-  return files;
-}
-
-export async function addUploadedFile(file) {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-  await writeFile(uploadsDirHandle, file.name, file);
-}
-
-export async function addUploadedFileFromUrl(url) {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const blob = await response.blob();
-    
-    let fileName;
-    try {
-      // Decode any percent-encoded characters first (like %3F -> ?)
-      const decodedUrl = decodeURIComponent(url);
-      // Now, we can reliably parse the URL to separate the path from real query params.
-      const urlObj = new URL(decodedUrl);
-      
-      let name = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('/') + 1);
-
-      // Smartly append extension from 'filename' query param if the name lacks one.
-      const filenameParam = urlObj.searchParams.get('filename');
-      if (name && !name.includes('.') && filenameParam && filenameParam.startsWith('.')) {
-        name += filenameParam;
-      }
-      
-      // Sanitize the final name to ensure it's valid.
-      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
-
-    } catch (e) {
-      // Fallback for malformed URLs that the constructor can't handle.
-      const decodedUrl = decodeURIComponent(url);
-      const cleanUrl = decodedUrl.split('?')[0].split('#')[0];
-      let name = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
-      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
-    }
-
-    const file = new File([blob], fileName, { type: blob.type });
-    await addUploadedFile(file);
-    return file;
-  } catch (error) {
-    dbg.error("storage", "Failed to upload from URL", { url, error });
-    throw error;
-  }
-}
-
-export async function deleteUploadedFile(fileName) {
-  try {
-    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-    if (!uploadsDirHandle) return;
-    await uploadsDirHandle.removeEntry(fileName);
-    dbg.log("storage", `Deleted file: ${fileName}`);
-  } catch (error) {
-    dbg.error("storage", `Failed to delete file: ${fileName}`, error);
-    throw error;
-  }
-}
-
-export async function resolveDraftFileUrl(relativePath) {
-  if (!relativePath) return null;
-  try {
-    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
-    const pathParts = relativePath.split('/').filter(Boolean);
-    let currentHandle = dirHandle;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
-    }
-    const fileName = pathParts[pathParts.length - 1];
-    const fileHandle = await currentHandle.getFileHandle(fileName);
-    const file = await fileHandle.getFile();
-    return URL.createObjectURL(file);
-  } catch (e) {
-    if (e.name !== 'NotFoundError') {
-      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath}`, e);
-    }
-    return null;
-  }
-}
-
-export async function getAllUploadedFileNames() {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-  if (!uploadsDirHandle) return [];
-  
-  const names = [];
-  for await (const entry of uploadsDirHandle.values()) {
-    if (entry.kind === 'file') {
-      names.push(entry.name);
-    }
-  }
-  return names;
-}
-
-export async function getUploadedFileAsFileObject(fileName) {
-  try {
-    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
-    if (!uploadsDirHandle) return null;
-    
-    const fileHandle = await uploadsDirHandle.getFileHandle(fileName);
-    return await fileHandle.getFile();
-  } catch (e) {
-    if (e.name !== 'NotFoundError') {
-      dbg.error("storage", `Failed to get File object for ${fileName}`, e);
-    }
-    return null;
-  }
-}
-
-export async function loadNewPostDraft() {
-  dbg.log("storage", "Loading new post draft...");
-  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
-  const descriptorYaml = await readFile(dirHandle, "info.yaml");
-  const paramsJson = await readFile(dirHandle, PARAMS_FILE);
-
-  const postData = {};
-  const params = paramsJson ? JSON.parse(paramsJson) : {};
-
-  if (descriptorYaml) {
-    const descriptor = parse(descriptorYaml);
-    for (const lang in descriptor.locales) {
-      const localeData = descriptor.locales[lang];
-      postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
-      
-      if (localeData.data_path) {
-        postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
-      }
-      
-      if (Array.isArray(localeData.chapters)) {
-        for (let i = 0; i < localeData.chapters.length; i++) {
-          const chapterDesc = localeData.chapters[i];
-          const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
-          postData[lang].chapters.push({ body: chapterBody });
-        }
-      }
-    }
-  }
-
-  const draft = {
-    content: Object.keys(postData).length > 0 ? postData : { en: { title: "", body: "", chapters: [] } },
-    params: params
-  };
-
-  if (!draft.content && !Object.keys(draft.params).length) {
-    dbg.log("storage", "No draft found.");
-    return null;
-  }
-
-  dbg.log("storage", "Draft loaded successfully.", draft);
-  return draft;
-}
-
-export async function saveNewPostDraft(draftData) {
-  dbg.log("storage", "Saving new post draft...", draftData);
-  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
-  
-  const { content, params } = draftData;
-
-  const finalParams = JSON.parse(JSON.stringify(params || {}));
-  if (!finalParams.locales) finalParams.locales = {};
-
-  const descriptor = {
-    savva_spec_version: "2.0",
-    mime_type: "text/markdown",
-    locales: {}
-  };
-
-  if (content) {
-    for (const lang in content) {
-      const data = content[lang];
-      const dataPath = `${lang}/data.md`;
-      
-      descriptor.locales[lang] = {
-        title: data.title || "",
-        text_preview: createTextPreview(data.body || ""),
-        data_path: dataPath,
-        chapters: []
-      };
-
-      if (!finalParams.locales[lang]) finalParams.locales[lang] = { chapters: [] };
-      
-      await writeFile(dirHandle, dataPath, data.body || "");
-
-      if (Array.isArray(data.chapters)) {
-        const paramChapters = params?.locales?.[lang]?.chapters || [];
-        
-        for (let i = 0; i < data.chapters.length; i++) {
-          const chapterContent = data.chapters[i];
-          const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          
-          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
-          
-          await writeFile(dirHandle, chapterPath, chapterContent.body || "");
-        }
-      }
-    }
-    await writeFile(dirHandle, "info.yaml", stringify(descriptor));
-  }
-  
-  await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
-  dbg.log("storage", "Draft saved successfully.");
-}
-
-export async function clearNewPostDraft() {
-  dbg.log("storage", "Clearing new post draft...");
-  try {
-    if (navigator.storage && navigator.storage.getDirectory) {
-      const root = await navigator.storage.getDirectory();
-      await root.removeEntry(NEW_POST_DIR, { recursive: true });
-      dbg.log("storage", "Cleared draft directory from OPFS.");
-    }
-  } catch (e) {
-    if (e.name !== 'NotFoundError') {
-      dbg.error("storage", "Failed to clear draft directory", e);
-    }
-  }
-}
-</file>
-
 <file path="src/components/docs/MarkdownView.jsx">
 // src/components/docs/MarkdownView.jsx
 import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
@@ -27584,131 +27550,6 @@ ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOr
 }
 </file>
 
-<file path="src/components/tabs/NewTab.jsx">
-// src/components/tabs/NewTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-import { dbg } from "../../utils/debug.js";
-import { whenWsOpen } from "../../net/wsRuntime.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-export default function NewTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
-
-      dbg.log("NewTab", `fetchPage(page=${page}) pre-wait, ws=${app.wsStatus?.()}`);
-      await whenWsOpen();
-      dbg.log("NewTab", "after whenWsOpen");
-
-
-      if (!contentList) {
-        dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
-        return [];
-      }
-      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-
-      const user = app.authorizedUser();
-      if (user?.address) {
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      dbg.log('NewTab', 'Fetching with params:', params);
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      dbg.error('NewTab', "fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
-          </Show>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-      />
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/SwitchConnectDialog.jsx">
 // File: src/components/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
@@ -27992,6 +27833,365 @@ export default function SwitchConnectDialog(props) {
       </div>
     </Show>
   );
+}
+</file>
+
+<file path="src/editor/storage.js">
+// src/editor/storage.js
+import { dbg } from "../utils/debug";
+import { parse, stringify } from "yaml";
+import { createTextPreview } from "./preview-utils.js";
+
+export const DRAFT_DIRS = {
+  NEW_POST: "new_post",
+  EDIT: "post",
+};
+const UPLOAD_DIR = "uploads";
+const PARAMS_FILE = "params.json"; // Renamed for generic use
+
+async function getDirectoryHandle(path) {
+  try {
+    if (!navigator.storage || !navigator.storage.getDirectory) {
+      dbg.warn("storage", "Origin Private File System API not available.");
+      return null;
+    }
+    const root = await navigator.storage.getDirectory();
+    let currentHandle = root;
+    for (const part of path.split('/').filter(Boolean)) {
+      currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+    }
+    return currentHandle;
+  } catch (e) {
+    dbg.error("storage", `Failed to get directory handle for '${path}'`, e);
+    throw e;
+  }
+}
+
+async function readFile(dirHandle, path) {
+  if (!dirHandle) return null;
+  try {
+    const pathParts = path.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return await file.text();
+  } catch (e) {
+    if (e.name === 'NotFoundError') return null;
+    dbg.error("storage", `Failed to read file: ${path}`, e);
+    throw e;
+  }
+}
+
+async function writeFile(dirHandle, path, content) {
+  if (!dirHandle) return;
+  try {
+    const pathParts = path.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i], { create: true });
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+  } catch (e) {
+    dbg.error("storage", `Failed to write file: ${path}`, e);
+    throw e;
+  }
+}
+
+// All functions below now accept a `baseDir` parameter
+export async function listUploadedFiles(baseDir) {
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+  if (!uploadsDirHandle) return [];
+  
+  const files = [];
+  for await (const entry of uploadsDirHandle.values()) {
+    if (entry.kind === 'file') {
+      const file = await entry.getFile();
+      const url = URL.createObjectURL(file);
+      files.push({ name: entry.name, url, size: file.size });
+    }
+  }
+  return files;
+}
+
+export async function addUploadedFile(baseDir, file) {
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+  await writeFile(uploadsDirHandle, file.name, file);
+}
+
+export async function addUploadedFileFromUrl(baseDir, url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    
+    let fileName;
+    try {
+      const decodedUrl = decodeURIComponent(url);
+      const urlObj = new URL(decodedUrl);
+      
+      let name = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('/') + 1);
+      const filenameParam = urlObj.searchParams.get('filename');
+      if (name && !name.includes('.') && filenameParam && filenameParam.startsWith('.')) {
+        name += filenameParam;
+      }
+      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    } catch (e) {
+      const decodedUrl = decodeURIComponent(url);
+      const cleanUrl = decodedUrl.split('?')[0].split('#')[0];
+      let name = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+      fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
+    const file = new File([blob], fileName, { type: blob.type });
+    await addUploadedFile(baseDir, file);
+    return file;
+  } catch (error) {
+    dbg.error("storage", "Failed to upload from URL", { url, error });
+    throw error;
+  }
+}
+
+export async function deleteUploadedFile(baseDir, fileName) {
+  try {
+    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+    if (!uploadsDirHandle) return;
+    await uploadsDirHandle.removeEntry(fileName);
+    dbg.log("storage", `Deleted file: ${fileName} from ${baseDir}`);
+  } catch (error) {
+    dbg.error("storage", `Failed to delete file: ${fileName} from ${baseDir}`, error);
+    throw error;
+  }
+}
+
+export async function resolveDraftFileUrl(baseDir, relativePath) {
+  if (!relativePath) return null;
+  try {
+    const dirHandle = await getDirectoryHandle(baseDir);
+    const pathParts = relativePath.split('/').filter(Boolean);
+    let currentHandle = dirHandle;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+    }
+    const fileName = pathParts[pathParts.length - 1];
+    const fileHandle = await currentHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return URL.createObjectURL(file);
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath} in ${baseDir}`, e);
+    }
+    return null;
+  }
+}
+
+export async function getAllUploadedFileNames(baseDir) {
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+  if (!uploadsDirHandle) return [];
+  
+  const names = [];
+  for await (const entry of uploadsDirHandle.values()) {
+    if (entry.kind === 'file') {
+      names.push(entry.name);
+    }
+  }
+  return names;
+}
+
+export async function getUploadedFileAsFileObject(baseDir, fileName) {
+  try {
+    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
+    if (!uploadsDirHandle) return null;
+    
+    const fileHandle = await uploadsDirHandle.getFileHandle(fileName);
+    return await fileHandle.getFile();
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to get File object for ${fileName} in ${baseDir}`, e);
+    }
+    return null;
+  }
+}
+
+// Renamed from loadNewPostDraft
+export async function loadDraft(baseDir) {
+  dbg.log("storage", `Loading draft from '${baseDir}'...`);
+  const dirHandle = await getDirectoryHandle(baseDir);
+  const descriptorYaml = await readFile(dirHandle, "info.yaml");
+  const paramsJson = await readFile(dirHandle, PARAMS_FILE);
+
+  const postData = {};
+  const params = paramsJson ? JSON.parse(paramsJson) : {};
+
+  if (descriptorYaml) {
+    const descriptor = parse(descriptorYaml);
+    for (const lang in descriptor.locales) {
+      const localeData = descriptor.locales[lang];
+      postData[lang] = { title: localeData.title || "", body: "", chapters: [] };
+      
+      if (localeData.data_path) {
+        postData[lang].body = await readFile(dirHandle, localeData.data_path) || "";
+      }
+      
+      if (Array.isArray(localeData.chapters)) {
+        for (let i = 0; i < localeData.chapters.length; i++) {
+          const chapterDesc = localeData.chapters[i];
+          const chapterBody = await readFile(dirHandle, chapterDesc.data_path) || "";
+          postData[lang].chapters.push({ body: chapterBody });
+        }
+      }
+    }
+  }
+
+  const draft = {
+    content: Object.keys(postData).length > 0 ? postData : { en: { title: "", body: "", chapters: [] } },
+    params: params
+  };
+
+  if (!draft.content && !Object.keys(draft.params).length) {
+    dbg.log("storage", `No draft found in '${baseDir}'.`);
+    return null;
+  }
+
+  dbg.log("storage", `Draft loaded successfully from '${baseDir}'.`, draft);
+  return draft;
+}
+
+// Renamed from getNewPostDraftParams
+export async function getDraftParams(baseDir) {
+  try {
+    const dirHandle = await getDirectoryHandle(baseDir);
+    const paramsJson = await readFile(dirHandle, PARAMS_FILE);
+    return paramsJson ? JSON.parse(paramsJson) : null;
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to get draft params from '${baseDir}'`, e);
+    }
+    return null;
+  }
+}
+
+// Renamed from saveNewPostDraft
+export async function saveDraft(baseDir, draftData) {
+  dbg.log("storage", `Saving draft to '${baseDir}'...`, draftData);
+  const dirHandle = await getDirectoryHandle(baseDir);
+  
+  const { content, params } = draftData;
+
+  const finalParams = JSON.parse(JSON.stringify(params || {}));
+  if (!finalParams.locales) finalParams.locales = {};
+
+  const descriptor = {
+    savva_spec_version: "2.0",
+    mime_type: "text/markdown",
+    locales: {}
+  };
+
+  if (content) {
+    for (const lang in content) {
+      const data = content[lang];
+      const dataPath = `${lang}/data.md`;
+      
+      descriptor.locales[lang] = {
+        title: data.title || "",
+        text_preview: createTextPreview(data.body || ""),
+        data_path: dataPath,
+        chapters: []
+      };
+
+      if (!finalParams.locales[lang]) finalParams.locales[lang] = { chapters: [] };
+      
+      await writeFile(dirHandle, dataPath, data.body || "");
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterContent = data.chapters[i];
+          const chapterPath = `${lang}/chapters/${i + 1}.md`;
+          
+          descriptor.locales[lang].chapters.push({ data_path: chapterPath });
+          
+          await writeFile(dirHandle, chapterPath, chapterContent.body || "");
+        }
+      }
+    }
+    await writeFile(dirHandle, "info.yaml", stringify(descriptor));
+  }
+  
+  await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
+  dbg.log("storage", `Draft saved successfully to '${baseDir}'.`);
+}
+
+// Renamed from clearNewPostDraft
+export async function clearDraft(baseDir) {
+  dbg.log("storage", `Clearing draft directory '${baseDir}'...`);
+  try {
+    if (navigator.storage && navigator.storage.getDirectory) {
+      const root = await navigator.storage.getDirectory();
+      await root.removeEntry(baseDir, { recursive: true });
+      dbg.log("storage", `Cleared draft directory '${baseDir}' from OPFS.`);
+    }
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      dbg.error("storage", `Failed to clear draft directory '${baseDir}'`, e);
+    }
+  }
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "release": "node scripts/release.mjs",
+    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
+  },
+  "dependencies": {
+    "@shikijs/themes": "^3.11.0",
+    "@solidjs/router": "^0.15.3",
+    "dompurify": "^3.2.6",
+    "dotenv": "^17.2.1",
+    "js-yaml": "^4.1.0",
+    "marked": "^16.2.0",
+    "openai": "^5.12.2",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-pretty-code": "^0.14.1",
+    "rehype-slug": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "shiki": "^3.11.0",
+    "solid-js": "^1.9.8",
+    "unified": "^11.0.5",
+    "viem": "^2.33.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
 }
 </file>
 
@@ -28564,50 +28764,138 @@ export default function Settings() {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "release": "node scripts/release.mjs",
-    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
-  },
-  "dependencies": {
-    "@shikijs/themes": "^3.11.0",
-    "@solidjs/router": "^0.15.3",
-    "dompurify": "^3.2.6",
-    "dotenv": "^17.2.1",
-    "js-yaml": "^4.1.0",
-    "marked": "^16.2.0",
-    "openai": "^5.12.2",
-    "rehype-autolink-headings": "^7.1.0",
-    "rehype-pretty-code": "^0.14.1",
-    "rehype-slug": "^6.0.0",
-    "rehype-stringify": "^10.0.1",
-    "remark-breaks": "^4.0.0",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2",
-    "shiki": "^3.11.0",
-    "solid-js": "^1.9.8",
-    "unified": "^11.0.5",
-    "viem": "^2.33.3",
-    "yaml": "^2.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
+<file path="src/components/tabs/NewTab.jsx">
+// src/components/tabs/NewTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { dbg } from "../../utils/debug.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../../editor/storage.js";
+import { pushToast } from "../../ui/toast.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+export default function NewTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${app.newTabRefreshKey()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
+      await whenWsOpen();
+      dbg.log("NewTab", "after whenWsOpen");
+
+      if (!contentList) {
+        dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
+        return [];
+      }
+      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      dbg.log('NewTab', 'Fetching with params:', params);
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+
+      const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
+      if (draftParams?.guid) {
+        const newPostsHaveDraftGuid = arr.some(post => post.guid === draftParams.guid);
+        if (newPostsHaveDraftGuid) {
+          await clearDraft(DRAFT_DIRS.NEW_POST);
+          pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+        }
+      }
+
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      dbg.error('NewTab', "fetchPage error:", err);
+      return [];
+    }
   }
+
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={category()}
+            onInput={(e) => setCategory(e.currentTarget.value)}
+            aria-label={app.t("newTab.category")}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+            </For>
+          </select>
+          <Show when={categoriesRes.loading}>
+            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+          </Show>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+        onItemsChange={app.setNewFeedItems}
+      />
+    </section>
+  );
 }
 </file>
 
@@ -28627,6 +28915,7 @@ import BrandLogo from "./ui/BrandLogo.jsx";
 import Container from "./layout/Container";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
 import NewPostButton from "./main/NewPostButton.jsx";
+import TokenPrice from "./main/TokenPrice.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -28704,6 +28993,7 @@ export default function Header({ onTogglePane }) {
           {/* Left: brand */}
           <div class="flex items-center gap-4">
             <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+            <TokenPrice />
           </div>
 
           {/* Right: wallet + auth + menu */}
@@ -28833,11 +29123,173 @@ export default function Header({ onTogglePane }) {
 .animate-bounce-short {
   animation: bounce-short 0.3s ease-in-out;
 }
+
+/* General purpose update animation */
+@keyframes price-update-animation {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.price-animation {
+  animation: price-update-animation 0.3s ease-in-out;
+}
 </file>
 
 <file path="src/version.js">
 // src/version.js
 export const APP_VERSION = "0.103";
+</file>
+
+<file path="src/i18n/ru.js">
+// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
+export default {
+  "app.versionLabel": "Версия",
+  "brand.name": "SAVVA",
+  "categories.all": "Все категории",
+  "common.apply": "Применить",
+  "common.applying": "Применение…",
+  "common.cancel": "Отмена",
+  "common.checking": "Проверка…",
+  "common.error": "Ошибка",
+  "common.exists": "Существует",
+  "common.fail": "Ошибка",
+  "common.loading": "Загрузка…",
+  "common.notFound": "Не найдено",
+  "common.ok": "ОК",
+  "default.avatar": "Аватар",
+  "default.user": "Пользователь",
+  "docs.article": "Статья документации",
+  "docs.nav": "Документация",
+  "docs.next": "Вперед",
+  "docs.prev": "Назад",
+  "docs.section": "Раздел",
+  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
+  "docs.title": "Документация разработчика",
+  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
+  "error.connection.retry": "Обновить страницу",
+  "error.connection.title": "Ошибка подключения",
+  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
+  "error.ws.title": "Ошибка подключения",
+  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
+  "ipfs.diag.cors.name": "Проверка CORS шлюза",
+  "ipfs.diag.cors.ok": "CORS настроен правильно.",
+  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
+  "ipfs.diag.fetch.name": "Получение из живого шлюза",
+  "ipfs.diag.fetch.ok": "Запрос успешен.",
+  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
+  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
+  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
+  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
+  "ipfs.diag.fix.gatewaySingleOrigin": "Вариант 1 (Рекомендуется): Разрешить только текущий источник.",
+  "ipfs.diag.fix.gatewayTitle": "Ваша конфигурация шлюза, вероятно, мешает браузеру получать данные. Попробуйте одну из этих команд:",
+  "ipfs.diag.fix.gatewayWildcard": "Вариант 2 (Проще для разработчиков): Разрешить любой источник. Используйте с осторожностью на публичных узлах.",
+  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
+  "ipfs.diag.liveness.error": "Узел не отвечает.",
+  "ipfs.diag.liveness.name": "Проверка работоспособности API",
+  "ipfs.diag.liveness.ok": "Узел работает.",
+  "ipfs.diag.run": "Запустить диагностику",
+  "ipfs.diag.title": "Диагностика узла IPFS",
+  "main.tabs.empty": "Эта вкладка пока пуста.",
+  "main.tabs.loading": "Загрузка вкладок…",
+  "main.tabs.untitled": "Без названия",
+  "menu.open": "Открыть меню",
+  "newTab.category": "Категория",
+  "newTab.view.grid": "Сетка",
+  "newTab.view.group": "Просмотреть группу",
+  "newTab.view.list": "Список",
+  "post.chapters.prologue": "Пролог",
+  "post.chapters.title": "Содержание",
+  "post.notFound.message": "Пост, который вы ищете, не существует или был удален.",
+  "post.notFound.title": "Пост не найден",
+  "rightPane.language": "Язык",
+  "rightPane.settings": "Настройки",
+  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
+  "rightPane.switch.backend.label": "URL бэкенда",
+  "rightPane.switch.backend.placeholder": "https://example.com/api/",
+  "rightPane.switch.domain.label": "Домен",
+  "rightPane.switch.domain.website": "Вебсайт",
+  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
+  "rightPane.switch.open": "Сменить бэкенд / домен",
+  "rightPane.switch.reload": "Загрузить домены",
+  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
+  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.title": "Сменить бэкенд / домен",
+  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
+  "rightPane.theme": "Тема",
+  "settings.back": "Назад",
+  "settings.dev.assets.baseUrl": "Базовый URL активов",
+  "settings.dev.assets.configUrl": "URL конфигурации",
+  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
+  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
+  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
+  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
+  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
+  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
+  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
+  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
+  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
+  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
+  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
+  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
+  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
+  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
+  "settings.dev.assets.diagnostics.title": "Диагностика активов",
+  "settings.dev.assets.domain": "Домен",
+  "settings.dev.assets.env": "Среда",
+  "settings.dev.assets.env.prod": "Продакшн",
+  "settings.dev.assets.env.test": "Тест",
+  "settings.dev.assets.prefix.active": "Активный префикс",
+  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
+  "settings.dev.assets.source": "Источник",
+  "settings.dev.assets.title": "Активы",
+  "settings.developer.debug.enable": "Включить отладочный логгинг",
+  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.title": "Разработчик",
+  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
+  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
+  "settings.localIpfs.disable": "Отключить",
+  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
+  "settings.localIpfs.gateway.label": "Шлюз",
+  "settings.localIpfs.status.label": "Статус",
+  "settings.localIpfs.testEnable": "Тестировать и включить",
+  "settings.localIpfs.title": "Локальный IPFS",
+  "settings.title": "Настройки",
+  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
+  "stakerLevels.clam": "Моллюск",
+  "stakerLevels.dolphin": "Дельфин",
+  "stakerLevels.fish": "Рыба",
+  "stakerLevels.guest": "Гость",
+  "stakerLevels.orca": "Косатка",
+  "stakerLevels.seahorse": "Морской конек",
+  "stakerLevels.shark": "Акула",
+  "stakerLevels.shrimp": "Креветка",
+  "stakerLevels.stingray": "Скат",
+  "stakerLevels.whale": "Кит",
+  "tabs.aria": "Вкладки раздела",
+  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
+  "tabs.title.actual": "Текущие",
+  "tabs.title.comments": "Комментарии",
+  "tabs.title.for-you": "Для вас",
+  "tabs.title.leaders": "Лидеры",
+  "tabs.title.new": "Новые",
+  "time.day.plural": "{n} дней назад",
+  "time.day.singular": "{n} день назад",
+  "time.hour.plural": "{n} часов назад",
+  "time.hour.singular": "{n} час назад",
+  "time.minute.plural": "{n} минут назад",
+  "time.minute.singular": "{n} минуту назад",
+  "time.now": "Сейчас",
+  "timeFrame.${frame}": "Период: {frame}",
+  "ui.mode.dark": "Тёмная тема",
+  "ui.mode.light": "Светлая тема",
+  "ui.toTop": "Наверх",
+  "wallet.changeChain": "Сменить сеть",
+  "wallet.connect": "Подключить кошелек",
+  "wallet.copyAddress": "Скопировать адрес",
+  "wallet.onRequiredNetwork": "В требуемой сети"
+};
 </file>
 
 <file path="src/components/main/TabsBar.jsx">
@@ -28999,157 +29451,6 @@ export default function TabsBar() {
 }
 </file>
 
-<file path="src/i18n/ru.js">
-// Auto-generated by scripts/i18n.mjs. Do not edit by hand.
-export default {
-  "app.versionLabel": "Версия",
-  "brand.name": "SAVVA",
-  "categories.all": "Все категории",
-  "common.apply": "Применить",
-  "common.applying": "Применение…",
-  "common.cancel": "Отмена",
-  "common.checking": "Проверка…",
-  "common.error": "Ошибка",
-  "common.exists": "Существует",
-  "common.fail": "Ошибка",
-  "common.loading": "Загрузка…",
-  "common.notFound": "Не найдено",
-  "common.ok": "ОК",
-  "default.avatar": "Аватар",
-  "default.user": "Пользователь",
-  "docs.article": "Статья документации",
-  "docs.nav": "Документация",
-  "docs.next": "Вперед",
-  "docs.prev": "Назад",
-  "docs.section": "Раздел",
-  "docs.sidebar.empty": "Доков пока нет. Добавьте sidebar.yaml в dev_docs/<lang>/",
-  "docs.title": "Документация разработчика",
-  "error.connection.message": "Приложение не смогло подключиться к серверу. Возможно, он временно недоступен. Пожалуйста, попробуйте позже.",
-  "error.connection.retry": "Обновить страницу",
-  "error.connection.title": "Ошибка подключения",
-  "error.ws.message": "Не удалось подключиться. Пожалуйста, попробуйте еще раз.",
-  "error.ws.title": "Ошибка подключения",
-  "ipfs.diag.cors.error": "Проблема с конфигурацией CORS.",
-  "ipfs.diag.cors.name": "Проверка CORS шлюза",
-  "ipfs.diag.cors.ok": "CORS настроен правильно.",
-  "ipfs.diag.fetch.errorFirewall": "Запрос не удался из-за брандмауэра.",
-  "ipfs.diag.fetch.name": "Получение из живого шлюза",
-  "ipfs.diag.fetch.ok": "Запрос успешен.",
-  "ipfs.diag.fetch.warnSkipped": "Пропущено: ABI CID не найден в ответе /info.",
-  "ipfs.diag.fix.browser": "Если он запущен, проверьте ваш браузер. Для Brave отключите щиты для этого сайта. Для других браузеров, таких как Chrome, возможно, вам нужно будет 'Разрешить небезопасный контент' в настройках сайта.",
-  "ipfs.diag.fix.cors": "Если это не помогло, выполните эту команду, чтобы исправить политику CORS API:",
-  "ipfs.diag.fix.daemon": "Сначала убедитесь, что ваш IPFS-демон запущен в терминале:",
-  "ipfs.diag.fix.gatewaySingleOrigin": "Вариант 1 (Рекомендуется): Разрешить только текущий источник.",
-  "ipfs.diag.fix.gatewayTitle": "Ваша конфигурация шлюза, вероятно, мешает браузеру получать данные. Попробуйте одну из этих команд:",
-  "ipfs.diag.fix.gatewayWildcard": "Вариант 2 (Проще для разработчиков): Разрешить любой источник. Используйте с осторожностью на публичных узлах.",
-  "ipfs.diag.fix.title": "Чтобы исправить, выполните это в вашем терминале (затем перезапустите демон):",
-  "ipfs.diag.liveness.error": "Узел не отвечает.",
-  "ipfs.diag.liveness.name": "Проверка работоспособности API",
-  "ipfs.diag.liveness.ok": "Узел работает.",
-  "ipfs.diag.run": "Запустить диагностику",
-  "ipfs.diag.title": "Диагностика узла IPFS",
-  "main.tabs.empty": "Эта вкладка пока пуста.",
-  "main.tabs.loading": "Загрузка вкладок…",
-  "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
-  "newTab.category": "Категория",
-  "newTab.view.grid": "Сетка",
-  "newTab.view.group": "Просмотреть группу",
-  "newTab.view.list": "Список",
-  "post.chapters.prologue": "Пролог",
-  "post.chapters.title": "Содержание",
-  "post.notFound.message": "Пост, который вы ищете, не существует или был удален.",
-  "post.notFound.title": "Пост не найден",
-  "rightPane.language": "Язык",
-  "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
-  "rightPane.switch.backend.label": "URL бэкенда",
-  "rightPane.switch.backend.placeholder": "https://example.com/api/",
-  "rightPane.switch.domain.label": "Домен",
-  "rightPane.switch.domain.website": "Вебсайт",
-  "rightPane.switch.noDomains": "Бэкенд не вернул домены. Вы все равно можете подать заявку, но домен будет пустым.",
-  "rightPane.switch.open": "Сменить бэкенд / домен",
-  "rightPane.switch.reload": "Загрузить домены",
-  "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
-  "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
-  "rightPane.switch.title": "Сменить бэкенд / домен",
-  "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
-  "rightPane.theme": "Тема",
-  "settings.back": "Назад",
-  "settings.dev.assets.baseUrl": "Базовый URL активов",
-  "settings.dev.assets.configUrl": "URL конфигурации",
-  "settings.dev.assets.configUrl.computed": "Сгенерированный URL",
-  "settings.dev.assets.configUrl.open": "Открыть URL конфигурации",
-  "settings.dev.assets.diagnostics.default": "Конфигурация по умолчанию",
-  "settings.dev.assets.diagnostics.error": "Ошибка диагностики",
-  "settings.dev.assets.diagnostics.hasCategories": "Имеет категории",
-  "settings.dev.assets.diagnostics.hasConfig": "Имеет конфигурацию",
-  "settings.dev.assets.diagnostics.hasFavicon": "Обнаружен фавикон",
-  "settings.dev.assets.diagnostics.hasLocales": "Имеет локали",
-  "settings.dev.assets.diagnostics.hasLogos": "Имеет логотипы",
-  "settings.dev.assets.diagnostics.hasTabs": "Имеет вкладки",
-  "settings.dev.assets.diagnostics.noteNetwork": "Проверьте ваше сетевое соединение.",
-  "settings.dev.assets.diagnostics.primary": "Основная конфигурация",
-  "settings.dev.assets.diagnostics.run": "Запустить диагностику",
-  "settings.dev.assets.diagnostics.sampleFetches": "Примеры выборок",
-  "settings.dev.assets.diagnostics.title": "Диагностика активов",
-  "settings.dev.assets.domain": "Домен",
-  "settings.dev.assets.env": "Среда",
-  "settings.dev.assets.env.prod": "Продакшн",
-  "settings.dev.assets.env.test": "Тест",
-  "settings.dev.assets.prefix.active": "Активный префикс",
-  "settings.dev.assets.prefix.computed": "Вычисленный префикс",
-  "settings.dev.assets.source": "Источник",
-  "settings.dev.assets.title": "Активы",
-  "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
-  "settings.developer.title": "Разработчик",
-  "settings.ipfs.localDisabled": "Локальный IPFS отключен",
-  "settings.localIpfs.apiUrl.label": "URL API локального IPFS",
-  "settings.localIpfs.disable": "Отключить",
-  "settings.localIpfs.enableCheckbox": "Использовать локальный узел IPFS",
-  "settings.localIpfs.gateway.label": "Шлюз",
-  "settings.localIpfs.status.label": "Статус",
-  "settings.localIpfs.testEnable": "Тестировать и включить",
-  "settings.localIpfs.title": "Локальный IPFS",
-  "settings.title": "Настройки",
-  "stakerLevels.${l.key}": "Уровень стейкера {l.key}",
-  "stakerLevels.clam": "Моллюск",
-  "stakerLevels.dolphin": "Дельфин",
-  "stakerLevels.fish": "Рыба",
-  "stakerLevels.guest": "Гость",
-  "stakerLevels.orca": "Косатка",
-  "stakerLevels.seahorse": "Морской конек",
-  "stakerLevels.shark": "Акула",
-  "stakerLevels.shrimp": "Креветка",
-  "stakerLevels.stingray": "Скат",
-  "stakerLevels.whale": "Кит",
-  "tabs.aria": "Вкладки раздела",
-  "tabs.title.${slug(tab.type)}": "Вкладка: {tab.type}",
-  "tabs.title.actual": "Текущие",
-  "tabs.title.comments": "Комментарии",
-  "tabs.title.for-you": "Для вас",
-  "tabs.title.leaders": "Лидеры",
-  "tabs.title.new": "Новые",
-  "time.day.plural": "{n} дней назад",
-  "time.day.singular": "{n} день назад",
-  "time.hour.plural": "{n} часов назад",
-  "time.hour.singular": "{n} час назад",
-  "time.minute.plural": "{n} минут назад",
-  "time.minute.singular": "{n} минуту назад",
-  "time.now": "Сейчас",
-  "timeFrame.${frame}": "Период: {frame}",
-  "ui.mode.dark": "Тёмная тема",
-  "ui.mode.light": "Светлая тема",
-  "ui.toTop": "Наверх",
-  "wallet.changeChain": "Сменить сеть",
-  "wallet.connect": "Подключить кошелек",
-  "wallet.copyAddress": "Скопировать адрес",
-  "wallet.onRequiredNetwork": "В требуемой сети"
-};
-</file>
-
 <file path="src/pages/EditorPage.jsx">
 // src/pages/EditorPage.jsx
 import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, batch } from "solid-js";
@@ -29162,7 +29463,7 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
+import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
@@ -29198,6 +29499,7 @@ export default function EditorPage() {
   const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
   const [showFullPreview, setShowFullPreview] = createSignal(false);
   const [showPublishWizard, setShowPublishWizard] = createSignal(false);
+  const [isFullScreen, setIsFullScreen] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -29210,6 +29512,10 @@ export default function EditorPage() {
     return "unknown";
   });
   
+  const baseDir = createMemo(() => {
+    return editorMode() === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
+  });
+
   const domainLangCodes = createMemo(() => {
     const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
     return fromDomain.length > 0 ? fromDomain : ["en"];
@@ -29217,9 +29523,21 @@ export default function EditorPage() {
 
   onMount(async () => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        setShowFiles(prev => !prev);
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 'f':
+            e.preventDefault();
+            setShowFiles(prev => !prev);
+            break;
+          case 'p':
+            e.preventDefault();
+            setShowPreview(prev => !prev);
+            break;
+          case 'm':
+            e.preventDefault();
+            setIsFullScreen(prev => !prev);
+            break;
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -29227,7 +29545,7 @@ export default function EditorPage() {
 
     try {
       if (editorMode() === "new_post") {
-        const draft = await loadNewPostDraft();
+        const draft = await loadDraft(baseDir());
         if (draft && draft.content) {
             setPostData(draft.content);
             const params = draft.params || {};
@@ -29246,6 +29564,7 @@ export default function EditorPage() {
             setPostParams(newPostParams);
         }
       } else {
+        // TODO: Logic for loading existing posts will go here
         setPostData({ en: { title: "", body: "", chapters: [] } });
         setPostParams({});
       }
@@ -29260,14 +29579,14 @@ export default function EditorPage() {
     if (data === null || editorMode() !== "new_post") return;
     clearTimeout(autoSaveTimeoutId);
     autoSaveTimeoutId = setTimeout(() => {
-      saveNewPostDraft({ content: data, params: params });
+      saveDraft(baseDir(), { content: data, params: params });
     }, 500);
   }, { defer: true }));
 
   createEffect(async () => {
     const thumbPath = postParams()?.thumbnail;
     if (thumbPath) {
-      const url = await resolveDraftFileUrl(thumbPath);
+      const url = await resolveDraftFileUrl(baseDir(), thumbPath);
       setThumbnailUrl(url);
     } else {
       setThumbnailUrl(null);
@@ -29439,7 +29758,7 @@ export default function EditorPage() {
 
   const markdownPlugins = createMemo(() => {
     dbg.log("EditorPage", "Creating markdown plugins for preview.");
-    return [rehypeResolveDraftUrls];
+    return [rehypeResolveDraftUrls(baseDir())];
   });
 
   const combinedChapters = createMemo(() => {
@@ -29461,7 +29780,10 @@ export default function EditorPage() {
   });
 
   return (
-    <main class="p-4 max-w-7xl mx-auto space-y-4">
+    <main classList={{
+      "p-4 max-w-7xl mx-auto space-y-4": !isFullScreen(),
+      "h-[calc(100vh-3rem)] flex flex-col": isFullScreen()
+    }}>
       <Show
         when={!showFullPreview()}
         fallback={
@@ -29481,72 +29803,78 @@ export default function EditorPage() {
         }
       >
         <>
-          <ClosePageButton />
-          <header class="flex justify-between items-start gap-4">
-            <div class="flex-1 min-w-0">
-              <h2 class="text-2xl font-semibold">{title()}</h2>
-              <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                Mode: <strong>{editorMode()}</strong>
-              </p>
-            </div>
-            <div class="w-48 flex-shrink-0 space-y-2">
-              <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-                <Show when={thumbnailUrl()}
-                  fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
-                >
-                  <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
-                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button 
-                      onClick={handleDeleteThumbnail}
-                      title={t("editor.thumbnail.delete")}
-                      class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
-                    >
-                      <TrashIcon class="w-5 h-5" />
-                    </button>
-                  </div>
-                </Show>
+          <Show when={!isFullScreen()}>
+            <ClosePageButton />
+            <header class="flex justify-between items-start gap-4">
+              <div class="flex-1 min-w-0">
+                <h2 class="text-2xl font-semibold">{title()}</h2>
+                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                  Mode: <strong>{editorMode()}</strong>
+                </p>
               </div>
-              <div class="flex justify-center">
-                <LangSelector
-                    codes={domainLangCodes()}
-                    value={activeLang()}
-                    onChange={setActiveLang}
-                />
+              <div class="w-48 flex-shrink-0 space-y-2">
+                <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+                  <Show when={thumbnailUrl()}
+                    fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+                  >
+                    <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button 
+                        onClick={handleDeleteThumbnail}
+                        title={t("editor.thumbnail.delete")}
+                        class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
+                      >
+                        <TrashIcon class="w-5 h-5" />
+                      </button>
+                    </div>
+                  </Show>
+                </div>
+                <div class="flex justify-center">
+                  <LangSelector
+                      codes={domainLangCodes()}
+                      value={activeLang()}
+                      onChange={setActiveLang}
+                  />
+                </div>
               </div>
-            </div>
-          </header>
+            </header>
+          </Show>
 
           <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
-            <div>
-              <div class="flex items-center gap-4 mb-4">
-                <input
-                  type="text"
-                  value={currentLangData().title}
-                  onInput={(e) => updateField('title', e.currentTarget.value)}
-                  placeholder={t("editor.titlePlaceholder")}
-                  class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
-                />
-                <div class="flex-shrink-0 flex items-center gap-2">
-                  <Show when={!showChapters()}>
-                    <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
-                  </Show>
-                  <Show when={!showFiles()}>
-                    <EditorFilesButton onClick={() => setShowFiles(true)} />
-                  </Show>
-                </div>
-              </div>
-              
-              <Show when={showChapters()}>
-                <div class="mb-4">
-                    <EditorChapterSelector
-                        chapters={combinedChapters()}
-                        activeIndex={editingChapterIndex()}
-                        onSelectIndex={setEditingChapterIndex}
-                        onAdd={handleAddChapter}
-                        onRemove={handleRemoveChapter}
-                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+            <div classList={{ "h-full flex flex-col": isFullScreen() }}>
+              <Show when={!isFullScreen()}>
+                <>
+                  <div class="flex items-center gap-4 mb-4">
+                    <input
+                      type="text"
+                      value={currentLangData().title}
+                      onInput={(e) => updateField('title', e.currentTarget.value)}
+                      placeholder={t("editor.titlePlaceholder")}
+                      class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
                     />
-                </div>
+                    <div class="flex-shrink-0 flex items-center gap-2">
+                      <Show when={!showChapters()}>
+                        <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                      </Show>
+                      <Show when={!showFiles()}>
+                        <EditorFilesButton onClick={() => setShowFiles(true)} />
+                      </Show>
+                    </div>
+                  </div>
+                  
+                  <Show when={showChapters()}>
+                    <div class="mb-4">
+                        <EditorChapterSelector
+                            chapters={combinedChapters()}
+                            activeIndex={editingChapterIndex()}
+                            onSelectIndex={setEditingChapterIndex}
+                            onAdd={handleAddChapter}
+                            onRemove={handleRemoveChapter}
+                            onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                        />
+                    </div>
+                  </Show>
+                </>
               </Show>
               
               <EditorToolbar
@@ -29554,6 +29882,8 @@ export default function EditorPage() {
                 onTogglePreview={() => setShowPreview(!showPreview())}
                 getTextareaRef={() => textareaRef}
                 onValueChange={handleEditorInput}
+                isFullScreen={isFullScreen()}
+                onToggleFullScreen={() => setIsFullScreen(p => !p)}
               />
               <MarkdownInput
                 editorRef={(el) => (textareaRef = el)}
@@ -29561,51 +29891,55 @@ export default function EditorPage() {
                 onInput={handleEditorInput}
                 placeholder={t("editor.bodyPlaceholder")}
                 showPreview={showPreview()}
-                rehypePlugins={markdownPlugins()} 
+                rehypePlugins={markdownPlugins()}
+                isFullScreen={isFullScreen()}
               />
 
-              <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
-                <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
-                  <div class="justify-self-start self-start">
-                    <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
-                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                      {t("editor.params.nsfw.help")}
-                    </p>
-                  </div>
-                  <div class="justify-self-start">
-                    <input
-                      id="nsfw-checkbox"
-                      type="checkbox"
-                      class="h-5 w-5"
-                      checked={postParams().nsfw || false}
-                      onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
-                    />
+              <Show when={!isFullScreen()}>
+                <>
+                  <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                    <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
+                    <div class="grid grid-cols-[max-content_1fr] items-center gap-x-4 gap-y-4">
+                      <div class="justify-self-start self-start">
+                        <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                          {t("editor.params.nsfw.help")}
+                        </p>
+                      </div>
+                      <div class="justify-self-start">
+                        <input
+                          id="nsfw-checkbox"
+                          type="checkbox"
+                          class="h-5 w-5"
+                          checked={postParams().nsfw || false}
+                          onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
+                        />
+                      </div>
+
+                      <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+                      <div class="justify-self-start">
+                        <input
+                          id="fundraiser-id"
+                          type="number"
+                          value={postParams().fundraiser || 0}
+                          onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                          class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                          min="0"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
-                  <div class="justify-self-start">
-                    <input
-                      id="fundraiser-id"
-                      type="number"
-                      value={postParams().fundraiser || 0}
-                      onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
-                      class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                      min="0"
-                    />
+                  <div class="mt-6 flex justify-end">
+                    <button 
+                      onClick={() => setShowFullPreview(true)}
+                      class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
+                    >
+                      {t("editor.previewPost")}
+                    </button>
                   </div>
-                </div>
-              </div>
-
-              <div class="mt-6 flex justify-end">
-                <button 
-                  onClick={() => setShowFullPreview(true)}
-                  class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
-                >
-                  {t("editor.previewPost")}
-                </button>
-              </div>
-
+                </>
+              </Show>
             </div>
           </Show>
         </>
@@ -29614,6 +29948,7 @@ export default function EditorPage() {
       <EditorFilesDrawer 
         isOpen={showFiles()}
         onClose={() => setShowFiles(false)}
+        baseDir={baseDir()}
         onInsert={handleInsertFile}
         onSetThumbnail={handleSetThumbnail}
         onInsertUrl={handleInsertUrl}
@@ -29768,139 +30103,6 @@ export default function RightPane({ isOpen, onClose }) {
 }
 </file>
 
-<file path="src/context/AppContext.jsx">
-// src/context/AppContext.jsx
-import * as Solid from "solid-js";
-import { getChainMeta } from "../blockchain/chains";
-import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet";
-import { useI18n } from "../i18n/useI18n";
-import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
-import { useAppAuth } from "./useAppAuth.js";
-import { useAppConnection } from "./useAppConnection.js";
-import { useDomainAssets } from "./useDomainAssets.js";
-import { pushToast, pushErrorToast } from "../ui/toast.js";
-import { useHashRouter } from "../routing/hashRouter.js";
-import { createWalletClient, custom } from "viem";
-
-const AppContext = Solid.createContext();
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-
-export function AppProvider(props) {
-  const i18n = useI18n();
-  const auth = useAppAuth();
-  const conn = useAppConnection();
-  const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
-  
-  const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
-  const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
-
-  const { route } = useHashRouter();
-  Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
-    if (!prevRoute) return;
-    const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
-    const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
-    if (isCurrentlyOnMainFeed && isNavigatingToPage) {
-      setSavedScrollY(window.scrollY);
-    }
-  }, { defer: true }));
-  
-  const supportedDomains = Solid.createMemo(() => {
-    const list = conn.info()?.domains || [];
-    return [...new Set(list.map(d => (typeof d === "string" ? d : d?.name)).filter(Boolean))]
-      .map(name => ({ name, website: list.find(d => d.name === name)?.website || "" }));
-  });
-
-  const selectedDomain = Solid.createMemo(() => {
-    const explicit = String(conn.config()?.domain || "").trim();
-    if (explicit) {
-      return supportedDomains().find(d => eq(d.name, explicit)) || explicit;
-    }
-    return supportedDomains()[0] || "";
-  });
-  
-  const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
-  const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
-
-  Solid.createEffect(() => {
-    const cfg = assets.domainAssetsConfig();
-    const lang = i18n.lang();
-    if (!cfg) return;
-
-    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
-    const currentLocale = locales.find(l => l.code === lang) || locales.find(l => l.code === 'en') || locales[0];
-    
-    if (currentLocale?.title) {
-      document.title = currentLocale.title;
-    }
-  });
-
-  const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
-  const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
-  async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
-  
-  const remoteIpfsGateways = Solid.createMemo(() => (conn.info()?.ipfs_gateways || []).map(g => g.trim().endsWith("/") ? g : `${g}/`));
-  const activeIpfsGateways = Solid.createMemo(() => (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) ? [ipfs.localIpfsGateway()] : remoteIpfsGateways());
-  
-  Solid.createEffect(() => {
-    if (auth.authorizedUser() && conn.config() && auth.authorizedUser().domain !== conn.config().domain) {
-      auth.logout();
-      pushToast({ type: 'info', message: 'Logged out due to domain change.' });
-    }
-  });
-
-  function getGuardedWalletClient() {
-    const walletAcc = walletAccount();
-    const authorizedAcc = auth.authorizedUser()?.address;
-
-    if (authorizedAcc && walletAcc && walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
-      const errText = i18n.t("wallet.error.addressMismatch");
-      pushErrorToast(new Error(errText));
-      throw new Error(errText);
-    }
-    
-    if (!isWalletAvailable()) {
-      throw new Error("Wallet is not available.");
-    }
-
-    const chain = desiredChain();
-    if (!chain) {
-      throw new Error("Target chain is not configured.");
-    }
-
-    return createWalletClient({
-      chain: chain,
-      account: walletAcc,
-      transport: custom(window.ethereum)
-    });
-  }
-
-  const value = {
-    ...conn, ...auth, ...assets, ...ipfs,
-    i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
-    showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys,
-    i18nAvailable: i18n.available,
-    lastTabRoute, setLastTabRoute,
-    savedScrollY, setSavedScrollY,
-    supportedDomains, selectedDomain, selectedDomainName,
-    desiredChainId, desiredChain, ensureWalletOnDesiredChain,
-    remoteIpfsGateways, activeIpfsGateways,
-    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
-    clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
-    getGuardedWalletClient,
-  };
-
-  return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
-}
-
-export function useApp() {
-  const ctx = Solid.useContext(AppContext);
-  if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
-  if (typeof window !== "undefined") window.__app = ctx;
-  return ctx;
-}
-</file>
-
 <file path="src/App.jsx">
 // src/App.jsx
 import { createSignal, onMount, Show, Switch, Match, createMemo, createEffect, on } from "solid-js";
@@ -29921,6 +30123,7 @@ import Spinner from "./components/ui/Spinner.jsx";
 import AssetDebugTap from "./dev/AssetDebugTap.jsx";
 import PostPage from "./pages/PostPage";
 import EditorPage from "./pages/EditorPage.jsx";
+import AlertManager from "./alerts/AlertManager.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -29992,6 +30195,7 @@ export default function App() {
           <FaviconLoader />
           <GoogleAnalyticsLoader />
           <WsConnector />
+          <AlertManager />
           
           <Show when={domainRevision()} keyed>
             <>
@@ -30013,6 +30217,148 @@ export default function App() {
       </Show>
     </Show>
   );
+}
+</file>
+
+<file path="src/context/AppContext.jsx">
+// src/context/AppContext.jsx
+import * as Solid from "solid-js";
+import { getChainMeta } from "../blockchain/chains";
+import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet";
+import { useI18n } from "../i18n/useI18n";
+import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
+import { useAppAuth } from "./useAppAuth.js";
+import { useAppConnection } from "./useAppConnection.js";
+import { useDomainAssets } from "./useDomainAssets.js";
+import { pushToast, pushErrorToast } from "../ui/toast.js";
+import { useHashRouter } from "../routing/hashRouter.js";
+import { createWalletClient, custom } from "viem";
+import { useTokenPrices } from "./useTokenPrices.js";
+
+const AppContext = Solid.createContext();
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
+export function AppProvider(props) {
+  const i18n = useI18n();
+  const auth = useAppAuth();
+  const conn = useAppConnection();
+  const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
+  
+  const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
+  const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
+
+  const { route } = useHashRouter();
+  Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
+    if (!prevRoute) return;
+    const isCurrentlyOnMainFeed = !/^\/(post|settings|docs)/.test(prevRoute);
+    const isNavigatingToPage = /^\/(post|settings|docs)/.test(nextRoute);
+    if (isCurrentlyOnMainFeed && isNavigatingToPage) {
+      setSavedScrollY(window.scrollY);
+    }
+  }, { defer: true }));
+  
+  const [newFeedItems, setNewFeedItems] = Solid.createSignal([]);
+  const [newContentAvailable, setNewContentAvailable] = Solid.createSignal(null);
+  const [newTabRefreshKey, setNewTabRefreshKey] = Solid.createSignal(Date.now());
+
+  const supportedDomains = Solid.createMemo(() => {
+    const list = conn.info()?.domains || [];
+    return [...new Set(list.map(d => (typeof d === "string" ? d : d?.name)).filter(Boolean))]
+      .map(name => ({ name, website: list.find(d => d.name === name)?.website || "" }));
+  });
+
+  const selectedDomain = Solid.createMemo(() => {
+    const explicit = String(conn.config()?.domain || "").trim();
+    if (explicit) {
+      return supportedDomains().find(d => eq(d.name, explicit)) || explicit;
+    }
+    return supportedDomains()[0] || "";
+  });
+  
+  const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
+  const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
+  const prices = useTokenPrices({ info: conn.info });
+
+  Solid.createEffect(() => {
+    const cfg = assets.domainAssetsConfig();
+    const lang = i18n.lang();
+    if (!cfg) return;
+
+    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+    const currentLocale = locales.find(l => l.code === lang) || locales.find(l => l.code === 'en') || locales[0];
+    
+    if (currentLocale?.title) {
+      document.title = currentLocale.title;
+    }
+  });
+
+  const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
+  const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
+  async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
+  
+  const remoteIpfsGateways = Solid.createMemo(() => (conn.info()?.ipfs_gateways || []).map(g => g.trim().endsWith("/") ? g : `${g}/`));
+  const activeIpfsGateways = Solid.createMemo(() => (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) ? [ipfs.localIpfsGateway()] : remoteIpfsGateways());
+  
+  Solid.createEffect(() => {
+    if (auth.authorizedUser() && conn.config() && auth.authorizedUser().domain !== conn.config().domain) {
+      auth.logout();
+      pushToast({ type: 'info', message: 'Logged out due to domain change.' });
+    }
+  });
+
+  function getGuardedWalletClient() {
+    const walletAcc = walletAccount();
+    const authorizedAcc = auth.authorizedUser()?.address;
+
+    if (authorizedAcc && walletAcc && walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
+      const errText = i18n.t("wallet.error.addressMismatch");
+      pushErrorToast(new Error(errText));
+      throw new Error(errText);
+    }
+    
+    if (!isWalletAvailable()) {
+      throw new Error("Wallet is not available.");
+    }
+
+    const chain = desiredChain();
+    if (!chain) {
+      throw new Error("Target chain is not configured.");
+    }
+
+    return createWalletClient({
+      chain: chain,
+      account: walletAcc,
+      transport: custom(window.ethereum)
+    });
+  }
+
+  const value = {
+    ...conn, ...auth, ...assets, ...ipfs, ...prices,
+    i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
+    showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys,
+    i18nAvailable: i18n.available,
+    lastTabRoute, setLastTabRoute,
+    savedScrollY, setSavedScrollY,
+    newFeedItems, setNewFeedItems,
+    newContentAvailable, setNewContentAvailable,
+    newTabRefreshKey, setNewTabRefreshKey,
+    supportedDomains, selectedDomain, selectedDomainName,
+    desiredChainId, desiredChain, ensureWalletOnDesiredChain,
+    remoteIpfsGateways, activeIpfsGateways,
+    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
+    clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
+    getGuardedWalletClient,
+  };
+
+  return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
+}
+
+export function useApp() {
+  const ctx = Solid.useContext(AppContext);
+  if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
+  if (typeof window !== "undefined") window.__app = ctx;
+  return ctx;
 }
 </file>
 
@@ -30076,6 +30422,7 @@ export default {
   "editor.params.title": "Additional Parameters",
   "editor.previewPost": "Preview Post",
   "editor.publish.descriptor.errorTitle": "Descriptor Upload Failed",
+  "editor.publish.draftCleared": "Draft cleared.",
   "editor.publish.ipfs.errorNetworkOrTooLarge": "A network error occurred. This can happen if the post is too large for the server to accept. If you want to post very large content, please consider using your own PIN services.",
   "editor.publish.ipfs.errorTitle": "IPFS Upload Failed",
   "editor.publish.ipfs.errorTooLarge": "This is too big post, if you want to post very large content please consider using your own PIN services.",
@@ -30120,6 +30467,8 @@ export default {
   "editor.toolbar.image": "Image",
   "editor.toolbar.italic": "Italic",
   "editor.toolbar.link": "Link",
+  "editor.toolbar.maximize": "Maximize",
+  "editor.toolbar.minimize": "Minimize",
   "editor.toolbar.showPreview": "Show Preview",
   "error.connection.message": "Unable to connect. Check your internet connection.",
   "error.connection.retry": "Retry",
@@ -30146,6 +30495,7 @@ export default {
   "ipfs.diag.liveness.ok": "Node is live.",
   "ipfs.diag.run": "Run Diagnostics",
   "ipfs.diag.title": "IPFS Node Diagnostics",
+  "main.newContentAvailable": "New content is available!",
   "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",

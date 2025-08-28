@@ -97,11 +97,11 @@ export default function TabsBar() {
       }
     } else {
       const r = route();
-      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs");
+      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs") || r.startsWith("/editor/");
       
       if (isPageRoute) {
         setSelectedId("");
-      } else {
+      } else if (r === "/") { // ONLY redirect for the root path.
         const first = list[0];
         const defaultPath = pathFor(first.type || first.id);
         batch(() => {
@@ -130,7 +130,6 @@ export default function TabsBar() {
         </Show>
 
         <div class="tabs_panel">
-          {/* --- FIX: Render all tabs and use `display` to show the active one --- */}
           <For each={tabsRaw()}>
             {(tab) => {
               const Comp = getTabComponent(tab.type);

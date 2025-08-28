@@ -27,70 +27,60 @@ export default function StepPublish(props) {
   const [status, setStatus] = createSignal("waiting_signature");
   const [txHash, setTxHash] = createSignal(null);
 
-  const publishPost = async () => {
-    const { postParams, publishedData } = props;
-    const user = app.authorizedUser();
-    const domain = app.selectedDomainName();
-    const descriptorCid = publishedData().descriptorCid;
-    const guid = postParams().guid;
-
-    if (!user?.address || !domain || !descriptorCid || !guid) {
-      throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
-    }
-    
-    dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid });
-
-    const contract = await getSavvaContract(app, "ContentRegistry");
-    const walletClient = app.getGuardedWalletClient();
-    
-    const desiredChain = app.desiredChain();
-    if (!desiredChain?.rpcUrls?.[0]) {
-      throw new Error("RPC URL for the desired chain is not configured.");
-    }
-    const transport = http(desiredChain.rpcUrls[0]);
-
-    const publicClient = createPublicClient({
-      chain: desiredChain,
-      transport: transport
-    });
-    
+  const attemptPublish = async () => {
+    setError(null);
+    setTxHash(null);
     setStatus("waiting_signature");
-    const hash = await walletClient.writeContract({
-      address: contract.address,
-      abi: contract.abi,
-      functionName: 'reg',
-      args: [
-        domain,
-        user.address,
-        guid,
-        descriptorCid,
-        toHexBytes32("post")
-      ]
-    });
 
-    setStatus("publishing");
-    setTxHash(hash);
-    dbg.log("StepPublish", "Transaction sent, hash:", hash);
+    try {
+      const { postParams, publishedData } = props;
+      const user = app.authorizedUser();
+      const domain = app.selectedDomainName();
+      const descriptorCid = publishedData().descriptorCid;
+      const guid = postParams().guid;
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    
-    if (receipt.status !== 'success') {
-      throw new Error(`Transaction failed with status: ${receipt.status}`);
+      if (!user?.address || !domain || !descriptorCid || !guid) {
+        throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
+      }
+
+      dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid });
+
+      const contract = await getSavvaContract(app, "ContentRegistry");
+      const walletClient = app.getGuardedWalletClient();
+      const desiredChain = app.desiredChain();
+      
+      if (!desiredChain?.rpcUrls?.[0]) {
+        throw new Error("RPC URL for the desired chain is not configured.");
+      }
+      const transport = http(desiredChain.rpcUrls[0]);
+      const publicClient = createPublicClient({ chain: desiredChain, transport: transport });
+
+      const hash = await walletClient.writeContract({
+        address: contract.address,
+        abi: contract.abi,
+        functionName: 'reg',
+        args: [domain, user.address, guid, descriptorCid, toHexBytes32("post")]
+      });
+
+      setStatus("publishing");
+      setTxHash(hash);
+      dbg.log("StepPublish", "Transaction sent, hash:", hash);
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') {
+        throw new Error(`Transaction failed with status: ${receipt.status}`);
+      }
+
+      dbg.log("StepPublish", "Transaction confirmed:", receipt);
+      props.onComplete?.();
+    } catch (e) {
+      dbg.error("StepPublish", "Publishing failed:", e);
+      setError(parseViemError(e));
     }
-
-    dbg.log("StepPublish", "Transaction confirmed:", receipt);
   };
 
   onMount(() => {
-    setTimeout(async () => {
-      try {
-        await publishPost();
-        props.onComplete?.();
-      } catch (e) {
-        dbg.error("StepPublish", "Publishing failed:", e);
-        setError(parseViemError(e));
-      }
-    }, 500);
+    setTimeout(attemptPublish, 500);
   });
 
   return (
@@ -100,9 +90,14 @@ export default function StepPublish(props) {
           <>
             <h4 class="font-bold text-red-600">{t("editor.publish.publishing.errorTitle")}</h4>
             <p class="mt-2 text-sm break-all">{error()}</p>
-            <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-              {t("editor.publish.validation.backToEditor")}
-            </button>
+            <div class="mt-4 flex gap-2 justify-center">
+              <button onClick={props.onCancel} class="px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+                {t("editor.publish.validation.backToEditor")}
+              </button>
+              <button onClick={attemptPublish} class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">
+                {t("common.retry")}
+              </button>
+            </div>
           </>
         }
       >

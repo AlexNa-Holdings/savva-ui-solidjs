@@ -31,3 +31,11 @@ export async function handleContentProcessed(app, payload) {
     app.setNewContentAvailable(content);
   }
 }
+
+export function handlePing(app) {
+  app.ws?.sendJson({ type: 'pong' });
+}
+
+export function handlePong() {
+  // Do nothing
+}

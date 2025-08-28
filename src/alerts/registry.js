@@ -8,4 +8,6 @@ import * as h from "./handlers.js";
 export const alertRegistry = {
   token_price_changed: h.handleTokenPriceChanged,
   content_processed: h.handleContentProcessed,
+  ping: h.handlePing,
+  pong: h.handlePong,
 };

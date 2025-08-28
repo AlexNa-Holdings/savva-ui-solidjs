@@ -1,5 +1,5 @@
 // src/App.jsx
-import { createSignal, onMount, Show, Switch, Match, createMemo, createEffect, on } from "solid-js";
+import { createSignal, onMount, Show, Match, Switch, createMemo, createEffect, on } from "solid-js";
 import Header from "./components/Header";
 import RightPane from "./components/RightPane";
 import Settings from "./pages/Settings";
@@ -94,13 +94,22 @@ export default function App() {
           <Show when={domainRevision()} keyed>
             <>
               <Header onTogglePane={togglePane} />
-              <Switch>
-                <Match when={currentView() === 'main'}><MainView /></Match>
-                <Match when={currentView() === 'post'}><PostPage /></Match>
-                <Match when={currentView() === 'settings'}><Settings /></Match>
-                <Match when={currentView() === 'docs'}><Docs /></Match>
-                <Match when={currentView() === 'editor'}><EditorPage /></Match>
-              </Switch>
+              
+              <div style={{ display: currentView() === 'main' ? 'block' : 'none' }}>
+                <MainView />
+              </div>
+              <div style={{ display: currentView() === 'post' ? 'block' : 'none' }}>
+                <PostPage />
+              </div>
+              <div style={{ display: currentView() === 'settings' ? 'block' : 'none' }}>
+                <Settings />
+              </div>
+              <div style={{ display: currentView() === 'docs' ? 'block' : 'none' }}>
+                <Docs />
+              </div>
+              <div style={{ display: currentView() === 'editor' ? 'block' : 'none' }}>
+                <EditorPage />
+              </div>
             </>
           </Show>
           

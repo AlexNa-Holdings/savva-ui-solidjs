@@ -17,6 +17,7 @@ export default {
   "common.notFound": "Not found",
   "common.ok": "OK",
   "common.remove": "Remove",
+  "common.retry": "Retry",
   "default.avatar": "avatar",
   "default.user": "user",
   "docs.article": "Documentation article",
