@@ -73,6 +73,7 @@ export default function TabsBar() {
   );
 
   const [selectedId, setSelectedId] = createSignal("");
+  const [activatedTabs, setActivatedTabs] = createSignal(new Set());
 
   const items = createMemo(() =>
     (tabsRaw() || []).map((tab) => {
@@ -92,8 +93,11 @@ export default function TabsBar() {
 
     if (match) {
       if (selectedId() !== match.id) {
-        setSelectedId(match.id);
-        setLastTabRoute(route());
+        batch(() => {
+          setSelectedId(match.id);
+          setLastTabRoute(route());
+          setActivatedTabs(prev => new Set(prev).add(match.id));
+        });
       }
     } else {
       const r = route();
@@ -101,13 +105,14 @@ export default function TabsBar() {
       
       if (isPageRoute) {
         setSelectedId("");
-      } else if (r === "/") { // ONLY redirect for the root path.
+      } else if (r === "/") {
         const first = list[0];
         const defaultPath = pathFor(first.type || first.id);
         batch(() => {
           setSelectedId(first.id);
           navigate(defaultPath, { replace: true });
           setLastTabRoute(defaultPath);
+          setActivatedTabs(prev => new Set(prev).add(first.id));
         });
       }
     }
@@ -141,7 +146,12 @@ export default function TabsBar() {
                 <div style={{ display: tab.id === selectedId() ? 'block' : 'none' }}>
                   <RightRailLayout rightPanelConfig={rightPanelConfig}>
                     <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
-                      <Comp title={title} tab={tab} isRailVisible={isRailVisible} />
+                      <Comp 
+                        title={title} 
+                        tab={tab} 
+                        isRailVisible={isRailVisible}
+                        isActivated={activatedTabs().has(tab.id)}
+                      />
                     </Show>
                   </RightRailLayout>
                 </div>

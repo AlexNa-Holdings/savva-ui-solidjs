@@ -104,6 +104,7 @@ export default function ForYouTab(props) {
         pageSize={12}
         resetOn={feedResetKey()}
         isRailVisible={props.isRailVisible}
+        isActivated={props.isActivated}
       />
     </section>
   );

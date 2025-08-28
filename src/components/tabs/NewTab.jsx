@@ -126,6 +126,7 @@ export default function NewTab(props) {
         resetOn={feedResetKey()}
         isRailVisible={props.isRailVisible}
         onItemsChange={app.setNewFeedItems}
+        isActivated={props.isActivated}
       />
     </section>
   );

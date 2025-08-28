@@ -112,6 +112,7 @@ export default function ActualTab(props) {
         pageSize={12}
         resetOn={feedResetKey()}
         isRailVisible={props.isRailVisible}
+        isActivated={props.isActivated}
       />
     </section>
   );

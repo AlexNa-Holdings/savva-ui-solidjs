@@ -10,6 +10,7 @@ export default function ContentFeed(props) {
   const [page, setPage] = createSignal(0);
   const [hasMore, setHasMore] = createSignal(true);
   const [loading, setLoading] = createSignal(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
 
   async function loadMore() {
     if (loading() || !hasMore()) return;
@@ -33,10 +34,19 @@ export default function ContentFeed(props) {
     }
   }
 
+  createEffect(() => {
+    // This effect triggers the very first load once the component is activated.
+    if (props.isActivated && !hasLoadedOnce()) {
+      dbg.log('ContentFeed', 'Component activated. Firing initial loadMore().');
+      setHasLoadedOnce(true);
+      loadMore();
+    }
+  });
+
   onMount(() => {
-    dbg.log('ContentFeed', 'Component mounted. Firing initial loadMore().');
-    loadMore();
     const handleScroll = () => {
+      // Only load more content if the feed has been activated.
+      if (!props.isActivated) return;
       const scrollThreshold = 600;
       const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
       if (scrolledToBottom) loadMore();
@@ -60,7 +70,16 @@ export default function ContentFeed(props) {
     setPage(0);
     setHasMore(true);
     setLoading(false);
-    queueMicrotask(loadMore);
+    setHasLoadedOnce(false); // Reset the load trigger
+
+    // If the component is already active when a reset occurs, load immediately.
+    // Otherwise, the activation effect will handle the load.
+    if (props.isActivated) {
+      queueMicrotask(() => {
+          setHasLoadedOnce(true);
+          loadMore();
+      });
+    }
   }, { defer: true }));
 
   return (
