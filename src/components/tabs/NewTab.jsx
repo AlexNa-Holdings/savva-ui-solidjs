@@ -7,7 +7,7 @@ import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { dbg } from "../../utils/debug.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
-import { getNewPostDraftParams, clearNewPostDraft } from "../../editor/storage.js";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../../editor/storage.js";
 import { pushToast } from "../../ui/toast.js";
 
 function useDomainCategories(app) {
@@ -79,11 +79,11 @@ export default function NewTab(props) {
       const res = await contentList(params);
       const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
 
-      const draftParams = await getNewPostDraftParams();
+      const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
       if (draftParams?.guid) {
         const newPostsHaveDraftGuid = arr.some(post => post.guid === draftParams.guid);
         if (newPostsHaveDraftGuid) {
-          await clearNewPostDraft();
+          await clearDraft(DRAFT_DIRS.NEW_POST);
           pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
         }
       }

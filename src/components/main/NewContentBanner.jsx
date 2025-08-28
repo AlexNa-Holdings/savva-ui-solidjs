@@ -9,12 +9,12 @@ export default function NewContentBanner() {
   const { t } = app;
 
   const handleClick = () => {
+    app.setNewContentAvailable(null);
     const newPath = tabPath("new");
     if (window.location.hash.slice(1) !== newPath) {
       navigate(newPath);
     }
     app.setNewTabRefreshKey(Date.now());
-    app.setNewContentAvailable(null);
   };
 
   return (

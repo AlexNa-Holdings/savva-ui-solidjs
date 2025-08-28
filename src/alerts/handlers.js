@@ -1,29 +1,32 @@
 // src/alerts/handlers.js
 import { dbg } from "../utils/debug";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
+import { pushToast } from "../ui/toast";
 
-/**
- * Handles live token price updates from the WebSocket.
- */
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
   app.updateTokenPrices?.(payload);
 }
 
 export async function handleContentProcessed(app, payload) {
-  dbg.log("Alerts:content_processed", payload);
-  const { content } = payload;
-  if (!content || !content.guid) return;
+  const { content } = payload.data || {}; // Correctly get content from the nested data object
+  if (!content || !content.guid) {
+    return; // Silently ignore if the payload is not what we expect
+  }
 
-  // Check if this processed content matches the user's saved draft
-  const draftParams = await getNewPostDraftParams();
+  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
+
+  // Check against saved draft
+  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
   if (draftParams && draftParams.guid === content.guid) {
-    await clearNewPostDraft();
+    await clearDraft(DRAFT_DIRS.NEW_POST);
     pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
   }
 
-  // Check if the new content is already visible in the "New" feed
+  // Check if new content should trigger the banner
   const currentItems = app.newFeedItems();
   const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
+  
   if (!isAlreadyVisible) {
     app.setNewContentAvailable(content);
   }

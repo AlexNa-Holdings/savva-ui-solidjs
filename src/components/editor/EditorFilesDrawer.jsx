@@ -18,13 +18,15 @@ function CloseIcon(props) {
 }
 
 export default function EditorFilesDrawer(props) {
-  const { t } = useApp();
+ const { t } = useApp();
   const [files, setFiles] = createSignal([]);
   const [showUrlModal, setShowUrlModal] = createSignal(false);
   const [fileToDelete, setFileToDelete] = createSignal(null);
   const [menuData, setMenuData] = createSignal(null);
   let fileInputRef;
   let drawerContentRef;
+
+   const baseDir = () => props.baseDir;
 
   const sortedFiles = createMemo(() => {
     return [...files()].sort((a, b) => (b.size || 0) - (a.size || 0));
@@ -35,7 +37,8 @@ export default function EditorFilesDrawer(props) {
   });
 
   const refreshFiles = async () => {
-    const fileList = await listUploadedFiles();
+    if (!baseDir()) return;
+    const fileList = await listUploadedFiles(baseDir());
     setFiles(fileList);
   };
 
@@ -47,14 +50,14 @@ export default function EditorFilesDrawer(props) {
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.currentTarget.files);
     if (selectedFiles.length === 0) return;
-    for (const file of selectedFiles) await addUploadedFile(file);
+    for (const file of selectedFiles) await addUploadedFile(baseDir(), file);
     await refreshFiles();
     if (fileInputRef) fileInputRef.value = "";
   };
 
   const handleUrlUpload = async (url) => {
     try {
-      const file = await addUploadedFileFromUrl(url);
+      const file = await addUploadedFileFromUrl(baseDir(), url);
       pushToast({ type: "success", message: t("editor.files.uploadSuccess", { name: file.name }) });
       await refreshFiles();
     } catch (error) {
@@ -67,12 +70,13 @@ export default function EditorFilesDrawer(props) {
   
   const confirmDelete = async () => {
     try {
-      await deleteUploadedFile(fileToDelete());
+      await deleteUploadedFile(baseDir(), fileToDelete());
       await refreshFiles();
     } catch (error) {
       pushErrorToast(error, { context: "File deletion failed" });
     }
   };
+
 
   const handleMenuOpen = ({ file, fileType, element }) => {
     const drawerRect = drawerContentRef.getBoundingClientRect();

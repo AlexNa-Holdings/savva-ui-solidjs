@@ -8,14 +8,11 @@ import Tabs from "../ui/Tabs.jsx";
 import { getTabComponent } from "../tabs";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";
 import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
+import { tabKeyFromRoute, tabPath } from "../../routing/tabRoutes";
 
 const slug = (s) => String(s || "").trim().toLowerCase();
-const firstSeg = (path) => {
-  const p = String(path || "/");
-  const s = p.startsWith("/") ? p.slice(1) : p;
-  return s.split(/[?#/]/, 1)[0] || "";
-};
-const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
+
+const pathFor = (idOrType) => tabPath(idOrType).substring(1); // Use tabPath helper
 
 function SvgIcon(props) {
   return (
@@ -87,7 +84,7 @@ export default function TabsBar() {
     const list = tabsRaw();
     if (!list || list.length === 0) return setSelectedId("");
 
-    const key = firstSeg(route());
+    const key = tabKeyFromRoute(route());
     const match = list.find(t => slug(t.id) === key || slug(t.type) === key);
 
     if (match) {
@@ -97,7 +94,7 @@ export default function TabsBar() {
       }
     } else {
       const r = route();
-      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs");
+      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs") || r.startsWith("/editor/");
       
       if (isPageRoute) {
         setSelectedId("");
@@ -130,7 +127,6 @@ export default function TabsBar() {
         </Show>
 
         <div class="tabs_panel">
-          {/* --- FIX: Render all tabs and use `display` to show the active one --- */}
           <For each={tabsRaw()}>
             {(tab) => {
               const Comp = getTabComponent(tab.type);

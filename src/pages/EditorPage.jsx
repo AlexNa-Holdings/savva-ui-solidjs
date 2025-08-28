@@ -9,7 +9,7 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadNewPostDraft, saveNewPostDraft, resolveDraftFileUrl } from "../editor/storage.js";
+import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
@@ -58,6 +58,10 @@ export default function EditorPage() {
     return "unknown";
   });
   
+  const baseDir = createMemo(() => {
+    return editorMode() === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
+  });
+
   const domainLangCodes = createMemo(() => {
     const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
     return fromDomain.length > 0 ? fromDomain : ["en"];
@@ -87,7 +91,7 @@ export default function EditorPage() {
 
     try {
       if (editorMode() === "new_post") {
-        const draft = await loadNewPostDraft();
+        const draft = await loadDraft(baseDir());
         if (draft && draft.content) {
             setPostData(draft.content);
             const params = draft.params || {};
@@ -106,6 +110,7 @@ export default function EditorPage() {
             setPostParams(newPostParams);
         }
       } else {
+        // TODO: Logic for loading existing posts will go here
         setPostData({ en: { title: "", body: "", chapters: [] } });
         setPostParams({});
       }
@@ -120,14 +125,14 @@ export default function EditorPage() {
     if (data === null || editorMode() !== "new_post") return;
     clearTimeout(autoSaveTimeoutId);
     autoSaveTimeoutId = setTimeout(() => {
-      saveNewPostDraft({ content: data, params: params });
+      saveDraft(baseDir(), { content: data, params: params });
     }, 500);
   }, { defer: true }));
 
   createEffect(async () => {
     const thumbPath = postParams()?.thumbnail;
     if (thumbPath) {
-      const url = await resolveDraftFileUrl(thumbPath);
+      const url = await resolveDraftFileUrl(baseDir(), thumbPath);
       setThumbnailUrl(url);
     } else {
       setThumbnailUrl(null);
@@ -299,7 +304,7 @@ export default function EditorPage() {
 
   const markdownPlugins = createMemo(() => {
     dbg.log("EditorPage", "Creating markdown plugins for preview.");
-    return [rehypeResolveDraftUrls];
+    return [rehypeResolveDraftUrls(baseDir())];
   });
 
   const combinedChapters = createMemo(() => {
@@ -489,6 +494,7 @@ export default function EditorPage() {
       <EditorFilesDrawer 
         isOpen={showFiles()}
         onClose={() => setShowFiles(false)}
+        baseDir={baseDir()}
         onInsert={handleInsertFile}
         onSetThumbnail={handleSetThumbnail}
         onInsertUrl={handleInsertUrl}

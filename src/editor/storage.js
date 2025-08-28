@@ -3,9 +3,12 @@ import { dbg } from "../utils/debug";
 import { parse, stringify } from "yaml";
 import { createTextPreview } from "./preview-utils.js";
 
-const NEW_POST_DIR = "new_post";
+export const DRAFT_DIRS = {
+  NEW_POST: "new_post",
+  EDIT: "post",
+};
 const UPLOAD_DIR = "uploads";
-const PARAMS_FILE = "new_post.json";
+const PARAMS_FILE = "params.json"; // Renamed for generic use
 
 async function getDirectoryHandle(path) {
   try {
@@ -63,8 +66,9 @@ async function writeFile(dirHandle, path, content) {
   }
 }
 
-export async function listUploadedFiles() {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+// All functions below now accept a `baseDir` parameter
+export async function listUploadedFiles(baseDir) {
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
   if (!uploadsDirHandle) return [];
   
   const files = [];
@@ -78,12 +82,12 @@ export async function listUploadedFiles() {
   return files;
 }
 
-export async function addUploadedFile(file) {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+export async function addUploadedFile(baseDir, file) {
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
   await writeFile(uploadsDirHandle, file.name, file);
 }
 
-export async function addUploadedFileFromUrl(url) {
+export async function addUploadedFileFromUrl(baseDir, url) {
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -93,24 +97,17 @@ export async function addUploadedFileFromUrl(url) {
     
     let fileName;
     try {
-      // Decode any percent-encoded characters first (like %3F -> ?)
       const decodedUrl = decodeURIComponent(url);
-      // Now, we can reliably parse the URL to separate the path from real query params.
       const urlObj = new URL(decodedUrl);
       
       let name = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('/') + 1);
-
-      // Smartly append extension from 'filename' query param if the name lacks one.
       const filenameParam = urlObj.searchParams.get('filename');
       if (name && !name.includes('.') && filenameParam && filenameParam.startsWith('.')) {
         name += filenameParam;
       }
-      
-      // Sanitize the final name to ensure it's valid.
       fileName = (name || "downloaded_file").replace(/[^a-zA-Z0-9._-]/g, '_');
 
     } catch (e) {
-      // Fallback for malformed URLs that the constructor can't handle.
       const decodedUrl = decodeURIComponent(url);
       const cleanUrl = decodedUrl.split('?')[0].split('#')[0];
       let name = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
@@ -118,7 +115,7 @@ export async function addUploadedFileFromUrl(url) {
     }
 
     const file = new File([blob], fileName, { type: blob.type });
-    await addUploadedFile(file);
+    await addUploadedFile(baseDir, file);
     return file;
   } catch (error) {
     dbg.error("storage", "Failed to upload from URL", { url, error });
@@ -126,22 +123,22 @@ export async function addUploadedFileFromUrl(url) {
   }
 }
 
-export async function deleteUploadedFile(fileName) {
+export async function deleteUploadedFile(baseDir, fileName) {
   try {
-    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
     if (!uploadsDirHandle) return;
     await uploadsDirHandle.removeEntry(fileName);
-    dbg.log("storage", `Deleted file: ${fileName}`);
+    dbg.log("storage", `Deleted file: ${fileName} from ${baseDir}`);
   } catch (error) {
-    dbg.error("storage", `Failed to delete file: ${fileName}`, error);
+    dbg.error("storage", `Failed to delete file: ${fileName} from ${baseDir}`, error);
     throw error;
   }
 }
 
-export async function resolveDraftFileUrl(relativePath) {
+export async function resolveDraftFileUrl(baseDir, relativePath) {
   if (!relativePath) return null;
   try {
-    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+    const dirHandle = await getDirectoryHandle(baseDir);
     const pathParts = relativePath.split('/').filter(Boolean);
     let currentHandle = dirHandle;
     for (let i = 0; i < pathParts.length - 1; i++) {
@@ -153,14 +150,14 @@ export async function resolveDraftFileUrl(relativePath) {
     return URL.createObjectURL(file);
   } catch (e) {
     if (e.name !== 'NotFoundError') {
-      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath}`, e);
+      dbg.error("storage", `Failed to resolve draft file URL for ${relativePath} in ${baseDir}`, e);
     }
     return null;
   }
 }
 
-export async function getAllUploadedFileNames() {
-  const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+export async function getAllUploadedFileNames(baseDir) {
+  const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
   if (!uploadsDirHandle) return [];
   
   const names = [];
@@ -172,24 +169,25 @@ export async function getAllUploadedFileNames() {
   return names;
 }
 
-export async function getUploadedFileAsFileObject(fileName) {
+export async function getUploadedFileAsFileObject(baseDir, fileName) {
   try {
-    const uploadsDirHandle = await getDirectoryHandle(`${NEW_POST_DIR}/${UPLOAD_DIR}`);
+    const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${UPLOAD_DIR}`);
     if (!uploadsDirHandle) return null;
     
     const fileHandle = await uploadsDirHandle.getFileHandle(fileName);
     return await fileHandle.getFile();
   } catch (e) {
     if (e.name !== 'NotFoundError') {
-      dbg.error("storage", `Failed to get File object for ${fileName}`, e);
+      dbg.error("storage", `Failed to get File object for ${fileName} in ${baseDir}`, e);
     }
     return null;
   }
 }
 
-export async function loadNewPostDraft() {
-  dbg.log("storage", "Loading new post draft...");
-  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+// Renamed from loadNewPostDraft
+export async function loadDraft(baseDir) {
+  dbg.log("storage", `Loading draft from '${baseDir}'...`);
+  const dirHandle = await getDirectoryHandle(baseDir);
   const descriptorYaml = await readFile(dirHandle, "info.yaml");
   const paramsJson = await readFile(dirHandle, PARAMS_FILE);
 
@@ -222,30 +220,32 @@ export async function loadNewPostDraft() {
   };
 
   if (!draft.content && !Object.keys(draft.params).length) {
-    dbg.log("storage", "No draft found.");
+    dbg.log("storage", `No draft found in '${baseDir}'.`);
     return null;
   }
 
-  dbg.log("storage", "Draft loaded successfully.", draft);
+  dbg.log("storage", `Draft loaded successfully from '${baseDir}'.`, draft);
   return draft;
 }
 
-export async function getNewPostDraftParams() {
+// Renamed from getNewPostDraftParams
+export async function getDraftParams(baseDir) {
   try {
-    const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+    const dirHandle = await getDirectoryHandle(baseDir);
     const paramsJson = await readFile(dirHandle, PARAMS_FILE);
     return paramsJson ? JSON.parse(paramsJson) : null;
   } catch (e) {
     if (e.name !== 'NotFoundError') {
-      dbg.error("storage", `Failed to get draft params`, e);
+      dbg.error("storage", `Failed to get draft params from '${baseDir}'`, e);
     }
     return null;
   }
 }
 
-export async function saveNewPostDraft(draftData) {
-  dbg.log("storage", "Saving new post draft...", draftData);
-  const dirHandle = await getDirectoryHandle(NEW_POST_DIR);
+// Renamed from saveNewPostDraft
+export async function saveDraft(baseDir, draftData) {
+  dbg.log("storage", `Saving draft to '${baseDir}'...`, draftData);
+  const dirHandle = await getDirectoryHandle(baseDir);
   
   const { content, params } = draftData;
 
@@ -275,8 +275,6 @@ export async function saveNewPostDraft(draftData) {
       await writeFile(dirHandle, dataPath, data.body || "");
 
       if (Array.isArray(data.chapters)) {
-        const paramChapters = params?.locales?.[lang]?.chapters || [];
-        
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterContent = data.chapters[i];
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
@@ -291,20 +289,21 @@ export async function saveNewPostDraft(draftData) {
   }
   
   await writeFile(dirHandle, PARAMS_FILE, JSON.stringify(finalParams, null, 2));
-  dbg.log("storage", "Draft saved successfully.");
+  dbg.log("storage", `Draft saved successfully to '${baseDir}'.`);
 }
 
-export async function clearNewPostDraft() {
-  dbg.log("storage", "Clearing new post draft...");
+// Renamed from clearNewPostDraft
+export async function clearDraft(baseDir) {
+  dbg.log("storage", `Clearing draft directory '${baseDir}'...`);
   try {
     if (navigator.storage && navigator.storage.getDirectory) {
       const root = await navigator.storage.getDirectory();
-      await root.removeEntry(NEW_POST_DIR, { recursive: true });
-      dbg.log("storage", "Cleared draft directory from OPFS.");
+      await root.removeEntry(baseDir, { recursive: true });
+      dbg.log("storage", `Cleared draft directory '${baseDir}' from OPFS.`);
     }
   } catch (e) {
     if (e.name !== 'NotFoundError') {
-      dbg.error("storage", "Failed to clear draft directory", e);
+      dbg.error("storage", `Failed to clear draft directory '${baseDir}'`, e);
     }
   }
 }
