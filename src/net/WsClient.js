@@ -122,7 +122,12 @@ export default class WsClient {
         this._stopHeartbeat();
         this._setStatus("closed");
         this._emit("close", ev);
-        this._failInflight(new Error("WS closed"));
+        
+        // Only fail inflight requests on unexpected closures.
+        if (!this._manualClose) {
+          this._failInflight(new Error("WS closed"));
+        }
+        
         if (this._shouldReconnect && !this._manualClose) {
           this._scheduleReconnect();
         }

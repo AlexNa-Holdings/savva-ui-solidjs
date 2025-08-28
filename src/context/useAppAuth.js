@@ -25,6 +25,11 @@ export function useAppAuth() {
     setAuthorizedUser(coreUserData);
     try {
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(coreUserData));
+
+      // This explicitly closes the old connection and opens a new one,
+      // which will attach the new authentication cookie.
+      getWsClient()?.reconnect('user-logged-in');
+
       const checksummedAccount = toChecksumAddress(coreUserData.address);
       const userProfile = await getWsApi().call('get-user', {
         domain: coreUserData.domain,
@@ -41,7 +46,6 @@ export function useAppAuth() {
 
   async function logout() {
     try {
-      // --- MODIFICATION: Changed method from 'POST' to the default 'GET' ---
       await fetch(`${httpBase()}logout`, { credentials: 'include' });
     } catch (e) {
       console.error("Logout API call failed, proceeding with client-side logout.", e);

@@ -360,142 +360,6 @@ This section contains the contents of the repository's files.
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
 </file>
 
-<file path="src/components/post/PostControls.jsx">
-// src/components/post/PostControls.jsx
-import { createSignal, Show, createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { navigate } from "../../routing/hashRouter.js";
-import { preparePostForEditing } from "../../editor/postImporter.js";
-import { pushErrorToast } from "../../ui/toast.js";
-import ReactionInput from "./ReactionInput.jsx";
-
-export default function PostControls(props) {
-  const app = useApp();
-  const { t } = app;
-  const [isPreparing, setIsPreparing] = createSignal(false);
-
-  const isAuthor = createMemo(() => {
-    const userAddr = app.authorizedUser()?.address?.toLowerCase();
-    const authorAddr = props.post?.author?.address?.toLowerCase();
-    return !!userAddr && userAddr === authorAddr;
-  });
-
-  const handleEdit = async () => {
-    setIsPreparing(true);
-    try {
-      await preparePostForEditing(props.post, app);
-      navigate(`/editor/edit/${props.post.savva_cid}`);
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to prepare post for editing." });
-    } finally {
-      setIsPreparing(false);
-    }
-  };
-
-  return (
-    <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center justify-between">
-      {/* Left Side: Reaction Input for any logged-in user */}
-      <div>
-        <Show when={app.authorizedUser()}>
-          <ReactionInput post={props.post} />
-        </Show>
-      </div>
-
-      {/* Right Side: Author-only buttons */}
-      <div>
-        <Show when={isAuthor()}>
-          <div class="flex items-center gap-4">
-            <button
-              onClick={handleEdit}
-              disabled={isPreparing()}
-              class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-            >
-              {isPreparing() ? t("common.loading") : "Edit Post"}
-            </button>
-            <button class="px-4 py-2 text-sm rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]" disabled>
-              Promote
-            </button>
-          </div>
-        </Show>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/post/ReactionInput.jsx">
-// src/components/post/ReactionInput.jsx
-import { createMemo, Show, createSignal } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import ReactionIcon, { REACTION_TYPES } from "../ui/icons/ReactionIcon.jsx";
-import { pushErrorToast } from "../../ui/toast.js";
-import { dbg } from "../../utils/debug.js";
-
-export default function ReactionInput(props) {
-  const app = useApp();
-  const { t, wsCall } = app;
-  const [isProcessing, setIsProcessing] = createSignal(false);
-
-  const myReactionIndex = createMemo(() => {
-    // Handle both wrapped objects (from feeds) and raw objects (from PostPage)
-    return props.post?._raw?.my_reaction ?? props.post?.my_reaction ?? -1;
-  });
-
-  const hasReacted = createMemo(() => myReactionIndex() >= 0);
-
-  const reactionType = createMemo(() => {
-    const index = myReactionIndex();
-    return index >= 0 ? REACTION_TYPES[index] : 'like';
-  });
-
-  const reactionLabel = createMemo(() => t(`reactions.${reactionType()}`));
-
-  const handleReaction = async () => {
-    if (isProcessing()) return;
-    setIsProcessing(true);
-    
-    const currentReaction = myReactionIndex();
-    // If ANY reaction is set (>= 0), unset it (-1). Otherwise, set "like" (0).
-    const newReaction = currentReaction >= 0 ? -1 : 0;
-
-    try {
-      await wsCall('react', {
-        domain: app.selectedDomainName(),
-        'obj-type': 0,
-        'obj-id': props.post?.savva_cid,
-        n: 0,
-        reaction: newReaction,
-      });
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to submit reaction" });
-      dbg.error("ReactionInput", "Failed to send reaction", e);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleReaction}
-      disabled={isProcessing()}
-      class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-      classList={{
-        "text-[hsl(var(--muted-foreground))]": !hasReacted(),
-        "text-blue-500": hasReacted()
-      }}
-    >
-      <Show
-        when={hasReacted()}
-        fallback={<span class="filter grayscale">👍</span>}
-      >
-        <ReactionIcon type={reactionType()} class="text-lg" />
-      </Show>
-      <span>{reactionLabel()}</span>
-    </button>
-  );
-}
-</file>
-
 <file path="src/vite-env.d.js">
 /// <reference types="vite/client" />
 </file>
@@ -16523,6 +16387,20 @@ export default function AlertManager() {
 ]
 </file>
 
+<file path="src/blockchain/chainLogos.js">
+// src/blockchain/chainLogos.js
+export const CHAIN_LOGOS = {
+  1: "/assets/chain_logos/ethereum.svg", // Ethereum Mainnet
+  943: "/assets/chain_logos/puilsechain-test-v4.svg", // PulseChain Testnet
+  369: "/assets/chain_logos/pulsechain.svg", // PulseChain Mainnet
+  // Add more as you need
+};
+
+export function getChainLogo(chainId) {
+  return CHAIN_LOGOS[chainId] || null;
+}
+</file>
+
 <file path="src/blockchain/config.js">
 // src/blockchain/config.js
 import { getSavvaContract } from "./contracts.js";
@@ -16581,6 +16459,129 @@ export function clearConfigCache() {
     paramCache.clear();
     dbg.log("ConfigHelper", "Configuration cache cleared.");
 }
+</file>
+
+<file path="src/blockchain/wallet.js">
+// src/blockchain/wallet.js
+import { createSignal } from "solid-js";
+
+const [walletAccount, setWalletAccount] = createSignal(null);
+const [walletChainId, setWalletChainId] = createSignal(null);
+
+export function isWalletAvailable() {
+  return typeof window !== "undefined" && !!window.ethereum;
+}
+
+function hexChainId(n) {
+  const id = Number(n);
+  if (!Number.isFinite(id)) throw new Error(`Invalid chain id: ${n}`);
+  return "0x" + id.toString(16);
+}
+
+let listenersReady = false;
+function setupListeners() {
+  const eth = window.ethereum;
+  if (!eth || listenersReady) return;
+  eth.on?.("accountsChanged", (accs) => {
+    setWalletAccount(accs?.[0] || null);
+  });
+  eth.on?.("chainChanged", (id) => {
+    const n = typeof id === "string" ? parseInt(id, 16) : +id;
+    setWalletChainId(Number.isFinite(n) ? n : null);
+  });
+  listenersReady = true;
+}
+
+export async function eagerConnect() {
+  const eth = window.ethereum;
+  if (!eth) return false;
+  setupListeners();
+  try {
+    const [accounts, chainIdHex] = await Promise.all([
+      eth.request({ method: "eth_accounts" }),
+      eth.request({ method: "eth_chainId" }).catch(() => null),
+    ]);
+    if (chainIdHex) {
+      const n = parseInt(chainIdHex, 16);
+      setWalletChainId(Number.isFinite(n) ? n : null);
+    }
+    if (accounts && accounts[0]) {
+      setWalletAccount(accounts[0]);
+      return true;
+    }
+    setWalletAccount(null);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function connectWallet() {
+  const eth = window.ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found");
+  setupListeners();
+  const accounts = await eth.request({ method: "eth_requestAccounts" });
+  const chainIdHex = await eth.request({ method: "eth_chainId" }).catch(() => null);
+  if (chainIdHex) {
+    const n = parseInt(chainIdHex, 16);
+    setWalletChainId(Number.isFinite(n) ? n : null);
+  }
+  setWalletAccount(accounts?.[0] || null);
+}
+
+/**
+ * Switch to a chain; if the wallet doesn't know it, try to add it.
+ * meta = {
+ *   chainId: number,
+ *   name: string,
+ *   nativeCurrency: { name, symbol, decimals },
+ *   rpcUrls: string[],
+ *   blockExplorers?: string[]
+ * }
+ */
+export async function switchOrAddChain(meta) {
+  const eth = window.ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found");
+  if (!meta || !meta.chainId) throw new Error("Missing chain metadata");
+
+  const chainIdHexVal = hexChainId(meta.chainId);
+  try {
+    await eth.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: chainIdHexVal }],
+    });
+  } catch (e) {
+    // 4902 = Unrecognized chain
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4902) {
+      await eth.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: chainIdHexVal,
+            chainName: meta.name || `Chain ${meta.chainId}`,
+            nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
+            rpcUrls: meta.rpcUrls || [],
+            blockExplorerUrls: meta.blockExplorers || [],
+          },
+        ],
+      });
+    } else {
+      throw e;
+    }
+  }
+
+  // update signal with the (new) chain id
+  try {
+    const cid = await eth.request({ method: "eth_chainId" });
+    if (cid) {
+      const n = parseInt(cid, 16);
+      setWalletChainId(Number.isFinite(n) ? n : null);
+    }
+  } catch { /* ignore */ }
+}
+
+export { walletAccount, walletChainId };
 </file>
 
 <file path="src/components/auth/SwitchAccountModal.jsx">
@@ -17352,72 +17353,6 @@ export default function TokenPrice() {
 }
 </file>
 
-<file path="src/components/net/WsConnector.jsx">
-// src/components/net/WsConnector.jsx
-import { onMount, onCleanup, createSignal } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "../../net/wsRuntime";
-import { wsUrl } from "../../net/endpoints";
-import { pushToast } from "../../ui/toast.js";
-import { useI18n } from "../../i18n/useI18n.js";
-
-let _mounted = false;
-
-export default function WsConnector() {
-  if (_mounted) return null;
-  _mounted = true;
-
-  const app = useApp();
-  const { t } = useI18n();
-
-  // Expose helpers from the singleton runtime
-  const ws = getWsClient();
-  const api = getWsApi();
-
-  app.ws = ws;
-  app.wsUrl = wsUrl;
-  app.wsStatus = () => ws.status();
-  app.wsConnected = () => ws.status() === "open";
-  app.wsReconnect = (r) => ws.reconnect(r || "manual");
-  app.wsCall = api.call;
-  app.wsMethod = api.method;
-  app.alertBus = { on: onAlert, off: offAlert };
-  app.onAlert = onAlert;
-  app.offAlert = offAlert;
-
-  onMount(() => {
-    ensureWsStarted("connector-mount");
-
-    const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
-
-    const onOpen = () => {
-      setHasConnectedOnce(true);
-    };
-
-    const onClose = () => {
-      if (!hasConnectedOnce()) {
-        pushToast({
-          type: "warning",
-          message: t("error.ws.title"),
-          details: t("error.ws.message"),
-          autohideMs: 15000,
-        });
-      }
-    };
-
-    ws.on("open", onOpen);
-    ws.on("close", onClose);
-
-    onCleanup(() => {
-      ws.off("open", onOpen);
-      ws.off("close", onClose);
-    });
-  });
-
-  return null;
-}
-</file>
-
 <file path="src/components/post/ChapterPager.jsx">
 // src/components/post/ChapterPager.jsx
 import { createMemo, Show } from "solid-js";
@@ -17582,6 +17517,69 @@ export default function ChapterSelector(props) {
 }
 </file>
 
+<file path="src/components/post/PostControls.jsx">
+// src/components/post/PostControls.jsx
+import { createSignal, Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { navigate } from "../../routing/hashRouter.js";
+import { preparePostForEditing } from "../../editor/postImporter.js";
+import { pushErrorToast } from "../../ui/toast.js";
+import ReactionInput from "./ReactionInput.jsx";
+
+export default function PostControls(props) {
+  const app = useApp();
+  const { t } = app;
+  const [isPreparing, setIsPreparing] = createSignal(false);
+
+  const isAuthor = createMemo(() => {
+    const userAddr = app.authorizedUser()?.address?.toLowerCase();
+    const authorAddr = props.post?.author?.address?.toLowerCase();
+    return !!userAddr && userAddr === authorAddr;
+  });
+
+  const handleEdit = async () => {
+    setIsPreparing(true);
+    try {
+      await preparePostForEditing(props.post, app);
+      navigate(`/editor/edit/${props.post.savva_cid}`);
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to prepare post for editing." });
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  return (
+    <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center justify-between">
+      {/* Left Side: Reaction Input for any logged-in user */}
+      <div>
+        <Show when={app.authorizedUser()}>
+          <ReactionInput post={props.post} />
+        </Show>
+      </div>
+
+      {/* Right Side: Author-only buttons */}
+      <div>
+        <Show when={isAuthor()}>
+          <div class="flex items-center gap-4">
+            <button
+              onClick={handleEdit}
+              disabled={isPreparing()}
+              class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+            >
+              {isPreparing() ? t("common.loading") : "Edit Post"}
+            </button>
+            <button class="px-4 py-2 text-sm rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]" disabled>
+              Promote
+            </button>
+          </div>
+        </Show>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/post/PostTags.jsx">
 // src/components/post/PostTags.jsx
 import { createMemo, For, Show } from "solid-js";
@@ -17635,6 +17633,79 @@ export default function PostTags(props) {
             </div>
         </Show>
     );
+}
+</file>
+
+<file path="src/components/post/ReactionInput.jsx">
+// src/components/post/ReactionInput.jsx
+import { createMemo, Show, createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import ReactionIcon, { REACTION_TYPES } from "../ui/icons/ReactionIcon.jsx";
+import { pushErrorToast } from "../../ui/toast.js";
+import { dbg } from "../../utils/debug.js";
+
+export default function ReactionInput(props) {
+  const app = useApp();
+  const { t, wsCall } = app;
+  const [isProcessing, setIsProcessing] = createSignal(false);
+
+  const myReactionIndex = createMemo(() => {
+    // Handle both wrapped objects (from feeds) and raw objects (from PostPage)
+    return props.post?._raw?.my_reaction ?? props.post?.my_reaction ?? -1;
+  });
+
+  const hasReacted = createMemo(() => myReactionIndex() >= 0);
+
+  const reactionType = createMemo(() => {
+    const index = myReactionIndex();
+    return index >= 0 ? REACTION_TYPES[index] : 'like';
+  });
+
+  const reactionLabel = createMemo(() => t(`reactions.${reactionType()}`));
+
+  const handleReaction = async () => {
+    if (isProcessing()) return;
+    setIsProcessing(true);
+    
+    const currentReaction = myReactionIndex();
+    // If ANY reaction is set (>= 0), unset it (-1). Otherwise, set "like" (0).
+    const newReaction = currentReaction >= 0 ? -1 : 0;
+
+    try {
+      await wsCall('react', {
+        domain: app.selectedDomainName(),
+        'obj-type': 0,
+        'obj-id': props.post?.savva_cid,
+        n: 0,
+        reaction: newReaction,
+      });
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to submit reaction" });
+      dbg.error("ReactionInput", "Failed to send reaction", e);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleReaction}
+      disabled={isProcessing()}
+      class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+      classList={{
+        "text-[hsl(var(--muted-foreground))]": !hasReacted(),
+        "text-blue-500": hasReacted()
+      }}
+    >
+      <Show
+        when={hasReacted()}
+        fallback={<span class="filter grayscale">👍</span>}
+      >
+        <ReactionIcon type={reactionType()} class="text-lg" />
+      </Show>
+      <span>{reactionLabel()}</span>
+    </button>
+  );
 }
 </file>
 
@@ -17905,41 +17976,6 @@ export default function NftBadge(props) {
       <path d="M15 30C23.2843 30 30 23.2843 30 15C30 6.71573 23.2843 0 15 0C6.71573 0 0 6.71573 0 15C0 23.2843 6.71573 30 15 30Z" fill="#337DB2"></path>
       <path fill-rule="evenodd" clip-rule="evenodd" d="M21.0014 6.1499C22.1844 6.1499 22.88 6.8262 22.88 7.72792C22.88 8.36247 22.3957 8.83003 21.7946 8.83003C21.2185 8.83003 20.7426 8.35412 20.7426 7.74462C20.7426 7.41065 20.8929 7.11842 21.1183 6.92639C19.8327 6.98589 19.2477 8.43568 18.8427 10.3811C18.689 11.1098 18.4541 12.2187 18.2026 13.4043L20.3273 13.1558L20.8155 10.8974L23.3325 10.6083L22.8434 12.8617L29.7119 12.059C29.7937 12.4704 29.8586 12.8878 29.906 13.3105L22.6366 13.8149L21.9478 16.9887C21.7349 18.008 22.0455 18.4588 22.7252 18.4736L22.7601 18.474C23.1908 18.474 23.5645 18.3314 23.8264 18.0941L23.8585 18.064L23.7502 18.5977C23.3248 19.263 22.3191 19.7116 21.3367 19.7116C19.8447 19.7116 19.1474 18.7656 19.4842 17.0607L19.4957 17.0042L20.1475 13.9877L18.0478 14.1334L18.019 14.2691L17.9646 14.5253L17.9221 14.7255C17.6107 16.1914 17.3097 17.6055 17.1364 18.416C16.3808 21.8002 15.0895 24.2249 12.0956 24.2249C10.9127 24.2249 10.217 23.5486 10.217 22.6469C10.217 22.0123 10.7013 21.5448 11.3024 21.5448C11.8785 21.5448 12.3545 22.0207 12.3545 22.6302C12.3545 22.9642 12.2042 23.2564 11.9787 23.4484C13.2643 23.3889 13.8494 21.9391 14.2544 19.9937C14.4203 19.2069 14.6809 17.9768 14.9549 16.6856L15.0007 16.4699C15.0084 16.4339 15.016 16.3978 15.0237 16.3618L15.078 16.1057L15.1202 15.907L15.1624 15.7085C15.2635 15.2324 15.3637 14.7609 15.459 14.313L14.3593 14.3895L14.4825 13.8389L15.5873 13.7098C15.7366 13.0083 15.8672 12.3958 15.9607 11.9588C16.7162 8.57461 18.0075 6.1499 21.0014 6.1499ZM11.4274 11.6513C12.9347 11.6513 13.6322 12.5822 13.2879 14.2867L13.2762 14.3432L12.5645 17.6617C12.4485 18.2032 12.6032 18.4585 12.9745 18.4585C13.2074 18.4585 13.5089 18.3694 13.7242 18.2106L13.7635 18.18L13.6475 18.7138C13.2143 19.2785 12.317 19.6962 11.3887 19.6962C10.328 19.6962 9.84693 19.1015 10.1015 17.8007L10.1123 17.7468L10.8704 14.1653C11.0561 13.2989 10.8008 12.8038 10.1588 12.8038C9.43613 12.8038 8.69854 13.5892 8.42408 14.7187L8.41053 14.7764L7.38944 19.5724H4.95276L6.17669 13.8481C6.26713 13.4185 6.10427 13.1725 5.68304 13.1842L5.64924 13.1857L0.0639648 13.6065C0.0800724 13.4316 0.0991812 13.2576 0.121239 13.0845L8.99069 11.7131L8.5343 13.8481C9.08352 12.4248 10.1433 11.6513 11.4274 11.6513Z" fill="white"></path>
     </svg>
-  );
-}
-</file>
-
-<file path="src/components/ui/icons/ReactionIcon.jsx">
-// src/components/ui/icons/ReactionIcon.jsx
-import { Show } from "solid-js";
-
-const REACTION_MAP = {
-  like: "👍",
-  super: "❤️",
-  ha_ha: "😂",
-  sad: "😢",
-  angry: "😡",
-  wow: "😮",
-  trophy: "🏆",
-  hot: "🔥",
-  clap: "👏",
-  dislike: "👎",
-};
-
-export const REACTION_TYPES = Object.keys(REACTION_MAP);
-
-export default function ReactionIcon(props) {
-  const emoji = () => REACTION_MAP[props.type];
-  return (
-    <Show when={emoji()}>
-      <span
-        class={props.class || "text-sm"}
-        aria-label={props.type}
-        title={props.type}
-      >
-        {emoji()}
-      </span>
-    </Show>
   );
 }
 </file>
@@ -20598,79 +20634,53 @@ function deploy() {
 });
 </file>
 
-<file path="src/blockchain/auth.js">
-// src/blockchain/auth.js
-import { hexToString } from "viem";
-import { getSavvaContract } from "./contracts.js";
-import { toHexBytes32, toChecksumAddress } from "./utils.js";
-import { walletAccount } from "./wallet.js";
-import { httpBase } from "../net/endpoints.js";
-
-export async function authorize(app) {
-  const account = walletAccount();
-  if (!account) throw new Error("Wallet is not connected.");
-  const checksummedAccount = toChecksumAddress(account);
-
-  const info = app.info();
-  if (!info) throw new Error("Backend /info not loaded yet.");
-
-  const userProfileContract = await getSavvaContract(app, 'UserProfile');
-  const domainHex = toHexBytes32("");
-  const keyHex = toHexBytes32("auth_modifier");
-  const modifierHex = await userProfileContract.read.getString([account, domainHex, keyHex]);
-  const modifierString = hexToString(modifierHex, { size: 32 });
-  
-  const textToSign = info.auth_text_to_sign;
-  if (!textToSign) throw new Error("auth_text_to_sign not found in /info response.");
-
-  const messageToSign = textToSign + modifierString;
-  
-  const walletClient = app.getGuardedWalletClient();
-  const signature = await walletClient.signMessage({ account, message: messageToSign });
-  
-  const currentDomain = app.config().domain;
-  
-  const authUrl = new URL(`${httpBase()}auth`);
-  authUrl.searchParams.set('user_addr', checksummedAccount);
-  authUrl.searchParams.set('domain', currentDomain);
-  authUrl.searchParams.set('signature', signature);
-  
-  const authRes = await fetch(authUrl.toString(), { credentials: 'include' });
-  if (!authRes.ok) throw new Error(`Authorization failed with status: ${authRes.status}`);
-
-  const isAdminUrl = new URL(`${httpBase()}is-admin`);
-  isAdminUrl.searchParams.set('address', checksummedAccount);
-  isAdminUrl.searchParams.set('domain', currentDomain);
-  
-  const adminRes = await fetch(isAdminUrl.toString(), { credentials: 'include' });
-  if (!adminRes.ok) throw new Error(`/is-admin check failed with status: ${adminRes.status}`);
-  const isAdminData = await adminRes.json();
-  
-  const isAdmin = !!isAdminData?.admin;
-
-  const coreUserData = {
-    address: account,
-    domain: currentDomain,
-    isAdmin: isAdmin,
-  };
-  
-  await app.login(coreUserData);
-  
-  return coreUserData;
-}
-</file>
-
-<file path="src/blockchain/chainLogos.js">
-// src/blockchain/chainLogos.js
-export const CHAIN_LOGOS = {
-  1: "/assets/chain_logos/ethereum.svg", // Ethereum Mainnet
-  943: "/assets/chain_logos/puilsechain-test-v4.svg", // PulseChain Testnet
-  369: "/assets/chain_logos/pulsechain.svg", // PulseChain Mainnet
-  // Add more as you need
+<file path="src/blockchain/chains.js">
+// src/blockchain/chains.js
+export const CHAINS = {
+  943: {
+    id: 943,
+    chainId: 943, // required by wallet.js
+    name: "PulseChain Testnet v4",
+    rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
+    nativeCurrency: { name: "Test Pulse", symbol: "tPLS", decimals: 18 },
+    blockExplorers: ["https://scan.v4.testnet.pulsechain.com"],
+  },
+  369: {
+    id: 369,
+    chainId: 369, // required by wallet.js
+    name: "PulseChain",
+    rpcUrls: ["https://rpc.pulsechain.com"],
+    nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
+    blockExplorers: ["https://scan.pulsechain.com"],
+  },
 };
 
-export function getChainLogo(chainId) {
-  return CHAIN_LOGOS[chainId] || null;
+export function getChainMeta(chainId) {
+  const raw = CHAINS[chainId];
+  if (!raw) return null;
+
+  const chainIdNum = raw.chainId ?? raw.id ?? Number(chainId);
+  const rpcUrls = Array.isArray(raw.rpcUrls)
+    ? raw.rpcUrls
+    : raw.rpcUrls ? [raw.rpcUrls] : [];
+
+  let explorers = [];
+  if (Array.isArray(raw.blockExplorers)) {
+    explorers = raw.blockExplorers
+      .map((x) => (typeof x === "string" ? x : x?.url))
+      .filter(Boolean);
+  } else if (Array.isArray(raw.blockExplorerUrls)) {
+    explorers = raw.blockExplorerUrls.filter(Boolean);
+  }
+
+  return {
+    id: chainIdNum, // This is the required property for viem
+    chainId: chainIdNum,
+    name: raw.name,
+    nativeCurrency: raw.nativeCurrency,
+    rpcUrls,
+    blockExplorers: explorers,
+  };
 }
 </file>
 
@@ -20791,240 +20801,6 @@ export function formatRewardAmount(weiValue) {
   } catch {
     return "0";
   }
-}
-</file>
-
-<file path="src/blockchain/wallet.js">
-// src/blockchain/wallet.js
-import { createSignal } from "solid-js";
-
-const [walletAccount, setWalletAccount] = createSignal(null);
-const [walletChainId, setWalletChainId] = createSignal(null);
-
-export function isWalletAvailable() {
-  return typeof window !== "undefined" && !!window.ethereum;
-}
-
-function hexChainId(n) {
-  const id = Number(n);
-  if (!Number.isFinite(id)) throw new Error(`Invalid chain id: ${n}`);
-  return "0x" + id.toString(16);
-}
-
-let listenersReady = false;
-function setupListeners() {
-  const eth = window.ethereum;
-  if (!eth || listenersReady) return;
-  eth.on?.("accountsChanged", (accs) => {
-    setWalletAccount(accs?.[0] || null);
-  });
-  eth.on?.("chainChanged", (id) => {
-    const n = typeof id === "string" ? parseInt(id, 16) : +id;
-    setWalletChainId(Number.isFinite(n) ? n : null);
-  });
-  listenersReady = true;
-}
-
-export async function eagerConnect() {
-  const eth = window.ethereum;
-  if (!eth) return false;
-  setupListeners();
-  try {
-    const [accounts, chainIdHex] = await Promise.all([
-      eth.request({ method: "eth_accounts" }),
-      eth.request({ method: "eth_chainId" }).catch(() => null),
-    ]);
-    if (chainIdHex) {
-      const n = parseInt(chainIdHex, 16);
-      setWalletChainId(Number.isFinite(n) ? n : null);
-    }
-    if (accounts && accounts[0]) {
-      setWalletAccount(accounts[0]);
-      return true;
-    }
-    setWalletAccount(null);
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-export async function connectWallet() {
-  const eth = window.ethereum;
-  if (!eth) throw new Error("No Ethereum wallet found");
-  setupListeners();
-  const accounts = await eth.request({ method: "eth_requestAccounts" });
-  const chainIdHex = await eth.request({ method: "eth_chainId" }).catch(() => null);
-  if (chainIdHex) {
-    const n = parseInt(chainIdHex, 16);
-    setWalletChainId(Number.isFinite(n) ? n : null);
-  }
-  setWalletAccount(accounts?.[0] || null);
-}
-
-/**
- * Switch to a chain; if the wallet doesn't know it, try to add it.
- * meta = {
- *   chainId: number,
- *   name: string,
- *   nativeCurrency: { name, symbol, decimals },
- *   rpcUrls: string[],
- *   blockExplorers?: string[]
- * }
- */
-export async function switchOrAddChain(meta) {
-  const eth = window.ethereum;
-  if (!eth) throw new Error("No Ethereum wallet found");
-  if (!meta || !meta.chainId) throw new Error("Missing chain metadata");
-
-  const chainIdHexVal = hexChainId(meta.chainId);
-  try {
-    await eth.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: chainIdHexVal }],
-    });
-  } catch (e) {
-    // 4902 = Unrecognized chain
-    const code = e?.code ?? e?.data?.originalError?.code;
-    if (code === 4902) {
-      await eth.request({
-        method: "wallet_addEthereumChain",
-        params: [
-          {
-            chainId: chainIdHexVal,
-            chainName: meta.name || `Chain ${meta.chainId}`,
-            nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
-            rpcUrls: meta.rpcUrls || [],
-            blockExplorerUrls: meta.blockExplorers || [],
-          },
-        ],
-      });
-    } else {
-      throw e;
-    }
-  }
-
-  // update signal with the (new) chain id
-  try {
-    const cid = await eth.request({ method: "eth_chainId" });
-    if (cid) {
-      const n = parseInt(cid, 16);
-      setWalletChainId(Number.isFinite(n) ? n : null);
-    }
-  } catch { /* ignore */ }
-}
-
-export { walletAccount, walletChainId };
-</file>
-
-<file path="src/components/auth/AuthorizedUser.jsx">
-// src/components/auth/AuthorizedUser.jsx
-import { createSignal, Show, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
-import { authorize } from "../../blockchain/auth.js";
-import { pushErrorToast } from "../../ui/toast.js";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-
-function ChevronDownIcon(props) {
-  return (
-    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
-      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
-    </svg>
-  );
-}
-
-export default function AuthorizedUser() {
-  const app = useApp();
-  const { t } = app;
-  const [menuOpen, setMenuOpen] = createSignal(false);
-  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
-  let menuRef;
-
-  const handleLoginClick = async () => {
-    setIsLoggingIn(true);
-    try {
-      await authorize(app);
-    } catch (e) {
-      console.error("Authorization failed:", e);
-      pushErrorToast(e, { context: "Login failed" });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleLogoutClick = () => {
-    app.logout();
-    setMenuOpen(false);
-  };
-  
-  const handleClickOutside = (event) => {
-    if (menuRef && !menuRef.contains(event.target)) {
-      setMenuOpen(false);
-    }
-  };
-
-  onMount(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-  });
-
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  });
-
-  return (
-    <div class="relative" ref={menuRef}>
-      <Show
-        when={app.authorizedUser()}
-        fallback={
-          <Show when={walletAccount()}>
-            <button
-              class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70"
-              onClick={handleLoginClick}
-              disabled={isLoggingIn()}
-            >
-              {isLoggingIn() ? t("common.checking") : "Login"}
-            </button>
-          </Show>
-        }
-      >
-        {(user) => (
-          <button
-            class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
-            onClick={() => setMenuOpen(!menuOpen())}
-            aria-haspopup="true"
-            aria-expanded={menuOpen()}
-          >
-            <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-              <IpfsImage
-                src={user().avatar}
-                alt="User Avatar"
-                class="w-full h-full object-cover"
-                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-              />
-            </div>
-            <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-          </button>
-        )}
-      </Show>
-
-      <Show when={menuOpen()}>
-        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
-          <div class="py-1" role="menu" aria-orientation="vertical">
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
-            >
-              Logout
-            </a>
-          </div>
-        </div>
-      </Show>
-    </div>
-  );
 }
 </file>
 
@@ -21406,6 +21182,77 @@ export default function RightRail(props) {
 }
 </file>
 
+<file path="src/components/net/WsConnector.jsx">
+// src/components/net/WsConnector.jsx
+import { onMount, onCleanup, createSignal } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "../../net/wsRuntime";
+import { wsUrl } from "../../net/endpoints";
+import { pushToast } from "../../ui/toast.js";
+import { useI18n } from "../../i18n/useI18n.js";
+
+let _mounted = false;
+
+export default function WsConnector() {
+  if (_mounted) return null;
+  _mounted = true;
+
+  const app = useApp();
+  const { t } = useI18n();
+
+  const ws = getWsClient();
+  const api = getWsApi();
+
+  app.ws = ws;
+  app.wsUrl = wsUrl;
+  app.wsStatus = () => ws.status();
+  app.wsConnected = () => ws.status() === "open";
+  app.wsReconnect = (r) => ws.reconnect(r || "manual");
+  app.wsCall = api.call;
+  app.wsMethod = api.method;
+  app.alertBus = { on: onAlert, off: offAlert };
+  app.onAlert = onAlert;
+  app.offAlert = offAlert;
+
+  onMount(() => {
+    ensureWsStarted("connector-mount");
+
+    const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
+
+    const onOpen = () => {
+      setHasConnectedOnce(true);
+    };
+
+    const onClose = () => {
+      if (!hasConnectedOnce()) {
+        pushToast({
+          type: "warning",
+          message: t("error.ws.title"),
+          details: t("error.ws.message"),
+          autohideMs: 15000,
+        });
+      }
+    };
+
+    const onAuthError = () => {
+      app.handleAuthError?.();
+    };
+
+    ws.on("open", onOpen);
+    ws.on("close", onClose);
+    ws.on("auth_error", onAuthError);
+
+    onCleanup(() => {
+      ws.off("open", onOpen);
+      ws.off("close", onClose);
+      ws.off("auth_error", onAuthError);
+    });
+  });
+
+  return null;
+}
+</file>
+
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -21558,6 +21405,41 @@ export default function Assets() {
         </div>
       </Show>
     </section>
+  );
+}
+</file>
+
+<file path="src/components/ui/icons/ReactionIcon.jsx">
+// src/components/ui/icons/ReactionIcon.jsx
+import { Show } from "solid-js";
+
+const REACTION_MAP = {
+  like: "👍",
+  super: "❤️",
+  ha_ha: "😂",
+  sad: "😢",
+  angry: "😡",
+  wow: "😮",
+  trophy: "🏆",
+  hot: "🔥",
+  clap: "👏",
+  dislike: "👎",
+};
+
+export const REACTION_TYPES = Object.keys(REACTION_MAP);
+
+export default function ReactionIcon(props) {
+  const emoji = () => REACTION_MAP[props.type];
+  return (
+    <Show when={emoji()}>
+      <span
+        class={props.class || "text-sm"}
+        aria-label={props.type}
+        title={props.type}
+      >
+        {emoji()}
+      </span>
+    </Show>
   );
 }
 </file>
@@ -23118,70 +23000,142 @@ sections:
         file: core-concepts/showing-posts.md
 </file>
 
-<file path="src/alerts/registry.js">
-// src/alerts/registry.js
-import * as h from "./handlers.js";
+<file path="src/blockchain/auth.js">
+// src/blockchain/auth.js
+import { hexToString } from "viem";
+import { getSavvaContract } from "./contracts.js";
+import { toHexBytes32, toChecksumAddress } from "./utils.js";
+import { walletAccount } from "./wallet.js";
+import { httpBase } from "../net/endpoints.js";
 
-/**
- * A map of WebSocket alert types to their handler functions.
- * The AlertManager uses this to delegate incoming messages.
- */
-export const alertRegistry = {
-  token_price_changed: h.handleTokenPriceChanged,
-  content_processed: h.handleContentProcessed,
-  ping: h.handlePing,
-  pong: h.handlePong,
-  react: h.handleReact,
-};
+export async function authorize(app) {
+  const account = walletAccount();
+  if (!account) throw new Error("Wallet is not connected.");
+  const checksummedAccount = toChecksumAddress(account);
+
+  const info = app.info();
+  if (!info) throw new Error("Backend /info not loaded yet.");
+
+  const userProfileContract = await getSavvaContract(app, 'UserProfile');
+  const domainHex = toHexBytes32("");
+  const keyHex = toHexBytes32("auth_modifier");
+  const modifierHex = await userProfileContract.read.getString([account, domainHex, keyHex]);
+  const modifierString = hexToString(modifierHex, { size: 32 });
+  
+  const textToSign = info.auth_text_to_sign;
+  if (!textToSign) throw new Error("auth_text_to_sign not found in /info response.");
+
+  const messageToSign = textToSign + modifierString;
+  
+  // Use the raw (unguarded) client for signing the login message
+  const walletClient = app.getRawWalletClient();
+  const signature = await walletClient.signMessage({ account, message: messageToSign });
+  
+  const currentDomain = app.config().domain;
+  
+  const authUrl = new URL(`${httpBase()}auth`);
+  authUrl.searchParams.set('user_addr', checksummedAccount);
+  authUrl.searchParams.set('domain', currentDomain);
+  authUrl.searchParams.set('signature', signature);
+  
+  const authRes = await fetch(authUrl.toString(), { credentials: 'include' });
+  if (!authRes.ok) throw new Error(`Authorization failed with status: ${authRes.status}`);
+
+  const isAdminUrl = new URL(`${httpBase()}is-admin`);
+  isAdminUrl.searchParams.set('address', checksummedAccount);
+  isAdminUrl.searchParams.set('domain', currentDomain);
+  
+  const adminRes = await fetch(isAdminUrl.toString(), { credentials: 'include' });
+  if (!adminRes.ok) throw new Error(`/is-admin check failed with status: ${adminRes.status}`);
+  const isAdminData = await adminRes.json();
+  
+  const isAdmin = !!isAdminData?.admin;
+
+  const coreUserData = {
+    address: account,
+    domain: currentDomain,
+    isAdmin: isAdmin,
+  };
+  
+  await app.login(coreUserData);
+  
+  return coreUserData;
+}
 </file>
 
-<file path="src/blockchain/chains.js">
-// src/blockchain/chains.js
-export const CHAINS = {
-  943: {
-    id: 943,
-    chainId: 943, // required by wallet.js
-    name: "PulseChain Testnet v4",
-    rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
-    nativeCurrency: { name: "Test Pulse", symbol: "tPLS", decimals: 18 },
-    blockExplorers: ["https://scan.v4.testnet.pulsechain.com"],
-  },
-  369: {
-    id: 369,
-    chainId: 369, // required by wallet.js
-    name: "PulseChain",
-    rpcUrls: ["https://rpc.pulsechain.com"],
-    nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
-    blockExplorers: ["https://scan.pulsechain.com"],
-  },
-};
+<file path="src/components/auth/AuthorizedUser.jsx">
+// src/components/auth/AuthorizedUser.jsx
+import { createSignal, Show, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 
-export function getChainMeta(chainId) {
-  const raw = CHAINS[chainId];
-  if (!raw) return null;
+function ChevronDownIcon(props) {
+  return (
+    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
+      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
+    </svg>
+  );
+}
 
-  const chainIdNum = raw.chainId ?? raw.id ?? Number(chainId);
-  const rpcUrls = Array.isArray(raw.rpcUrls)
-    ? raw.rpcUrls
-    : raw.rpcUrls ? [raw.rpcUrls] : [];
+export default function AuthorizedUser() {
+  const app = useApp();
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  let menuRef;
+  
+  const user = () => app.authorizedUser();
 
-  let explorers = [];
-  if (Array.isArray(raw.blockExplorers)) {
-    explorers = raw.blockExplorers
-      .map((x) => (typeof x === "string" ? x : x?.url))
-      .filter(Boolean);
-  } else if (Array.isArray(raw.blockExplorerUrls)) {
-    explorers = raw.blockExplorerUrls.filter(Boolean);
-  }
-
-  return {
-    id: chainIdNum, // This is the required property for viem
-    chainId: chainIdNum,
-    name: raw.name,
-    nativeCurrency: raw.nativeCurrency,
-    rpcUrls,
-    blockExplorers: explorers,
+  const handleLogoutClick = () => {
+    app.logout();
+    setMenuOpen(false);
   };
+  
+  const handleClickOutside = (event) => {
+    if (menuRef && !menuRef.contains(event.target)) {
+      setMenuOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  return (
+    <div class="relative" ref={menuRef}>
+      <Show when={user()}>
+        <button
+          class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
+          onClick={() => setMenuOpen(!menuOpen())}
+          aria-haspopup="true"
+          aria-expanded={menuOpen()}
+        >
+          <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+            <IpfsImage
+              src={user().avatar}
+              alt="User Avatar"
+              class="w-full h-full object-cover"
+              fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+            />
+          </div>
+          <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+        </button>
+      </Show>
+
+      <Show when={menuOpen()}>
+        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
+          <div class="py-1" role="menu" aria-orientation="vertical">
+            <a
+              href="#"
+              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+              role="menuitem"
+              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
+            >
+              Logout
+            </a>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
 }
 </file>
 
@@ -23251,79 +23205,6 @@ export default function FileGridItem(props) {
       
       <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black/50 text-white text-[10px] text-center">
         <span class="truncate">{props.file.name}</span>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/feed/PostInfo.jsx">
-// src/components/feed/PostInfo.jsx
-import { Show, createMemo } from "solid-js";
-import { formatUnits } from "viem";
-import { useApp } from "../../context/AppContext.jsx";
-import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
-import PostTime from "../ui/PostTime.jsx";
-import PostReactions from "../ui/PostReactions.jsx";
-import ReactionInput from "../post/ReactionInput.jsx";
-
-function PostComments(props) {
-  const count = () => props.item?._raw?.total_childs || props.item?.total_childs || 0;
-  return (
-    <Show when={count() > 0}>
-      <div class="flex items-center gap-1 text-xs">
-        <span>💬</span>
-        <span>{count()}</span>
-      </div>
-    </Show>
-  );
-}
-
-function PostRewards(props) {
-  const amount = createMemo(() => {
-    const rawAmount = props.item?._raw?.fund?.total_author_share || props.item?.fund?.total_author_share;
-    if (!rawAmount) return 0;
-    const formatted = formatUnits(BigInt(rawAmount), 18);
-    return parseFloat(formatted);
-  });
-
-  const localizedAmount = createMemo(() => {
-    const currentLang = props.lang();
-    return amount().toLocaleString(currentLang, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  });
-
-  return (
-    <Show when={amount() > 0}>
-      <div class="flex items-center gap-1 text-xs">
-        <span>{localizedAmount()}</span>
-        <SavvaTokenIcon class="w-3.5 h-3.5" />
-      </div>
-    </Show>
-  );
-}
-
-export default function PostInfo(props) {
-  const app = useApp();
-  const { lang } = app;
-  const isListMode = () => props.mode === 'list';
-  const postData = createMemo(() => props.item?._raw || props.item || {});
-
-  return (
-    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
-      <PostTime 
-        timestamp={postData().effective_time} 
-        format={props.timeFormat || "short"} 
-      />
-      <PostReactions item={props.item} />
-      {/* <Show when={app.authorizedUser() && !isListMode()}>
-        <ReactionInput post={props.item} />
-      </Show> */}
-      <PostComments item={props.item} />
-      <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
-        <PostRewards item={props.item} lang={lang} />
       </div>
     </div>
   );
@@ -24776,63 +24657,21 @@ async function translateTo(langCode, englishPairs) {
 });
 </file>
 
-<file path="src/alerts/handlers.js">
-// src/alerts/handlers.js
-import { dbg } from "../utils/debug";
-import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
-import { pushToast } from "../ui/toast";
+<file path="src/alerts/registry.js">
+// src/alerts/registry.js
+import * as h from "./handlers.js";
 
-export function handleTokenPriceChanged(app, payload) {
-  dbg.log("Alerts:token_price_changed", payload);
-  app.updateTokenPrices?.(payload);
-}
-
-export async function handleContentProcessed(app, payload) {
-  const { content } = payload.data || {}; // Correctly get content from the nested data object
-  if (!content || !content.guid) {
-    return; // Silently ignore if the payload is not what we expect
-  }
-
-  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
-
-  // Check against saved draft
-  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
-  if (draftParams && draftParams.guid === content.guid) {
-    await clearDraft(DRAFT_DIRS.NEW_POST);
-    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
-  }
-
-  // Check if new content should trigger the banner
-  const currentItems = app.newFeedItems();
-  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
-  
-  if (!isAlreadyVisible) {
-    app.setNewContentAvailable(content);
-  }
-}
-
-export function handlePing(app) {
-  dbg.log("Alerts:ping", "Received ping, sending pong.");
-  app.ws?.sendJson({ type: 'pong' });
-}
-
-export function handlePong() {
-  dbg.log("Alerts:pong", "Received pong.");
-  // Do nothing
-}
-
-export function handleReact(app, payload) {
-  dbg.log("Alerts:react", "Received react alert", payload);
-  
-  const currentDomain = app.selectedDomainName()?.toLowerCase();
-  const alertDomain = payload?.domain?.toLowerCase();
-
-  if (alertDomain === currentDomain) {
-    app.setPostUpdate(payload);
-  } else {
-    dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
-  }
-}
+/**
+ * A map of WebSocket alert types to their handler functions.
+ * The AlertManager uses this to delegate incoming messages.
+ */
+export const alertRegistry = {
+  token_price_changed: h.handleTokenPriceChanged,
+  content_processed: h.handleContentProcessed,
+  ping: h.handlePing,
+  pong: h.handlePong,
+  react: h.handleReact,
+};
 </file>
 
 <file path="src/components/docs/DocsContent.jsx">
@@ -25348,6 +25187,79 @@ export default function PostSubmissionWizard(props) {
 }
 </file>
 
+<file path="src/components/feed/PostInfo.jsx">
+// src/components/feed/PostInfo.jsx
+import { Show, createMemo } from "solid-js";
+import { formatUnits } from "viem";
+import { useApp } from "../../context/AppContext.jsx";
+import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
+import PostTime from "../ui/PostTime.jsx";
+import PostReactions from "../ui/PostReactions.jsx";
+import ReactionInput from "../post/ReactionInput.jsx";
+
+function PostComments(props) {
+  const count = () => props.item?._raw?.total_childs || props.item?.total_childs || 0;
+  return (
+    <Show when={count() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>💬</span>
+        <span>{count()}</span>
+      </div>
+    </Show>
+  );
+}
+
+function PostRewards(props) {
+  const amount = createMemo(() => {
+    const rawAmount = props.item?._raw?.fund?.total_author_share || props.item?.fund?.total_author_share;
+    if (!rawAmount) return 0;
+    const formatted = formatUnits(BigInt(rawAmount), 18);
+    return parseFloat(formatted);
+  });
+
+  const localizedAmount = createMemo(() => {
+    const currentLang = props.lang();
+    return amount().toLocaleString(currentLang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  });
+
+  return (
+    <Show when={amount() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>{localizedAmount()}</span>
+        <SavvaTokenIcon class="w-3.5 h-3.5" />
+      </div>
+    </Show>
+  );
+}
+
+export default function PostInfo(props) {
+  const app = useApp();
+  const { lang } = app;
+  const isListMode = () => props.mode === 'list';
+  const postData = createMemo(() => props.item?._raw || props.item || {});
+
+  return (
+    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+      <PostTime 
+        timestamp={postData().effective_time} 
+        format={props.timeFormat || "short"} 
+      />
+      <PostReactions item={props.item} />
+      {/* <Show when={app.authorizedUser() && !isListMode()}>
+        <ReactionInput post={props.item} />
+      </Show> */}
+      <PostComments item={props.item} />
+      <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
+        <PostRewards item={props.item} lang={lang} />
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/main/NewContentBanner.jsx">
 // src/components/main/NewContentBanner.jsx
 import { Show } from "solid-js";
@@ -25666,334 +25578,6 @@ export function useAppAuth() {
 }
 </file>
 
-<file path="src/net/WsClient.js">
-// src/net/WsClient.js
-import { dbg } from "../utils/debug";
-import { wsUrl as endpointsWsUrl } from "./endpoints";
-
-/**
- * Pure WebSocket transport.
- * Request:  { id: number, type: string, data: any }
- * Response: { id?: number, type?: string, error?: string, data?: any }
- * Alerts:   { type: string, data?: any }  (no id)
- */
-export default class WsClient {
-  constructor({ url = "", protocols } = {}) {
-    this._url = url || "";
-    this._protocols = protocols || undefined;
-    this._ws = null;
-    this._manualClose = false;
-
-    this._status = "idle"; // idle | connecting | open | closed
-    this._attempt = 0;
-    this._shouldReconnect = true;
-    this._reconnectTid = null;
-
-    this._heartbeatTid = null;
-    this._heartbeatMs = 25_000;
-
-    this._sendQueue = [];
-    this._pending = new Map(); // id (string) -> { resolve, reject, timer }
-    this._nextId = 1;
-
-    this._listeners = new Map();
-
-    this._onOnline = () => this.reconnect("online");
-    if (typeof window !== "undefined") {
-      window.addEventListener("online", this._onOnline);
-      window.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible" && this._status !== "open") {
-          this.reconnect("visible");
-        }
-      });
-    }
-  }
-
-  // ─── public API ───────────────────────────────────────────────────────────────
-  dispose() {
-    this._shouldReconnect = false;
-    this._clearReconnect();
-    this._stopHeartbeat();
-    if (this._ws) {
-      try {
-        this._ws.close();
-      } catch {}
-    }
-    this._ws = null;
-    if (typeof window !== "undefined") {
-      window.removeEventListener("online", this._onOnline);
-    }
-    this._failInflight(new Error("WS disposed"));
-    this._emit("status", "closed");
-  }
-
-  url() {
-    return this._url;
-  }
-  status() {
-    return this._status;
-  }
-  attempt() {
-    return this._attempt;
-  }
-
-  setUrl(nextUrl) {
-    const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
-    const u = String(source || "");
-    if (!u) {
-      dbg.warn("ws", "No WS URL configured");
-      return;
-    }
-    if (u === this._url) return;
-    this._url = u;
-    dbg.log("ws", "URL updated", { url: u });
-  }
-
-  setAutoReconnect(on) {
-    this._shouldReconnect = !!on;
-  }
-
-  connect() {
-    if (!this._url) return;
-    if (
-      this._ws &&
-      (this._ws.readyState === WebSocket.OPEN ||
-        this._ws.readyState === WebSocket.CONNECTING)
-    ) {
-      return;
-    }
-    this._clearReconnect();
-    this._setStatus("connecting");
-    dbg.log("ws", "Connecting…", { url: this._url });
-
-    try {
-      const ws = new WebSocket(this._url, this._protocols);
-      this._ws = ws;
-
-      ws.addEventListener("open", () => {
-        this._attempt = 0;
-        this._setStatus("open");
-        dbg.log("ws", "Connected", { url: this._url });
-        this._flushQueue();
-        this._startHeartbeat();
-        this._emit("open");
-      });
-
-      ws.addEventListener("message", (ev) => this._onMessage(ev));
-
-      ws.addEventListener("error", (ev) => {
-        dbg.warn("ws", "Error", { event: ev });
-        this._emit("error", ev);
-      });
-
-      ws.addEventListener("close", (ev) => {
-        dbg.warn("ws", "Closed", { code: ev.code, reason: ev.reason });
-        this._stopHeartbeat();
-        this._setStatus("closed");
-        this._emit("close", ev);
-        this._failInflight(new Error("WS closed"));
-        if (this._shouldReconnect && !this._manualClose) {
-          this._scheduleReconnect();
-        }
-        this._manualClose = false;
-      });
-    } catch (e) {
-      dbg.error("ws", "Connect exception", e);
-      this._setStatus("closed");
-      this._scheduleReconnect();
-    }
-  }
-
-  reconnect(reason = "manual") {
-    dbg.log("ws", "Reconnecting…", { reason });
-    this._clearReconnect();
-    if (this._ws) {
-      this._manualClose = true; 
-      try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
-    }
-    this._ws = null;
-    
-    this.connect();
-  }
-
-  close() {
-    this._manualClose = true;
-    this._clearReconnect();
-    this._stopHeartbeat();
-    this._shouldReconnect = false;
-    try {
-      this._ws && this._ws.close(1000, "client-close");
-    } catch {}
-    this._ws = null;
-    this._setStatus("closed");
-    this._failInflight(new Error("WS closed by client"));
-  }
-
-  send(data) {
-    const open = this._ws && this._ws.readyState === WebSocket.OPEN;
-    if (open) this._ws.send(data);
-    else this._sendQueue.push(data);
-  }
-  sendJson(obj) {
-    this.send(JSON.stringify(obj));
-  }
-
-  call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
-    const numericId = Number.isFinite(id) ? id : this._nextId++;
-    const callId = String(numericId);
-
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this._pending.delete(callId);
-        const err = new Error("WS request timeout");
-        err.code = "ETIMEDOUT";
-        reject(err);
-      }, timeoutMs);
-
-      this._pending.set(callId, { resolve, reject, timer });
-      this.sendJson({
-        id: numericId,
-        type: String(method),
-        data: params || {},
-      });
-    });
-  }
-
-  on(type, fn) {
-    const key = String(type || "");
-    const set = this._listeners.get(key) || new Set();
-    set.add(fn);
-    this._listeners.set(key, set);
-    return () => this.off(key, fn);
-  }
-  off(type, fn) {
-    const set = this._listeners.get(type);
-    if (!set) return;
-    set.delete(fn);
-    if (set.size === 0) this._listeners.delete(type);
-  }
-
-  _setStatus(s) {
-    if (this._status !== s) {
-      this._status = s;
-      this._emit("status", s);
-    }
-  }
-
-  _emit(type, payload) {
-    const set = this._listeners.get(type);
-    if (!set || set.size === 0) return;
-    for (const fn of Array.from(set)) {
-      try {
-        fn(payload);
-      } catch (e) {
-        dbg.error("ws", "listener error", e);
-      }
-    }
-  }
-
-  _onMessage(ev) {
-    try {
-      const obj = JSON.parse(ev.data);
-
-      if (obj && obj.id > 0) {
-        // This is a RESPONSE to a command.
-        const key = String(obj.id);
-        const entry = this._pending.get(key);
-        if (entry) {
-          clearTimeout(entry.timer);
-          this._pending.delete(key);
-
-          if (typeof obj.error === "string" && obj.error) {
-            const err = new Error(obj.error || "WS error");
-            err.code = "WS_ERROR";
-            entry.reject(err);
-          } else if ("data" in obj) {
-            entry.resolve(obj.data);
-          } else if ("result" in obj) {
-            entry.resolve(obj.result);
-          } else {
-            entry.resolve(obj);
-          }
-        } else {
-          dbg.warn("ws", "Received response for untracked call ID", { id: obj.id });
-        }
-      } else {
-        // This is a broadcast ALERT (id is 0, null, or undefined).
-        if (obj && obj.type) {
-          this._emit(obj.type, obj.data ?? obj);
-          this._emit("message", obj);
-        } else {
-          this._emit("message", obj);
-        }
-      }
-    } catch {
-      this._emit("raw", ev.data);
-    }
-  }
-
-  _flushQueue() {
-    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
-    while (this._sendQueue.length) {
-      const item = this._sendQueue.shift();
-      try {
-        this._ws.send(item);
-      } catch {}
-    }
-  }
-
-  _startHeartbeat() {
-    this._stopHeartbeat();
-    if (this._heartbeatMs > 0) {
-      this._heartbeatTid = setInterval(() => {
-        try {
-          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-            this._ws.send('{"type":"ping"}');
-          }
-        } catch {}
-      }, this._heartbeatMs);
-    }
-  }
-  _stopHeartbeat() {
-    if (this._heartbeatTid) {
-      clearInterval(this._heartbeatTid);
-      this._heartbeatTid = null;
-    }
-  }
-
-  _scheduleReconnect() {
-    if (!this._shouldReconnect) return;
-    this._attempt += 1;
-    const base = 300 * Math.pow(2, this._attempt - 1);
-    const jitter = Math.floor(Math.random() * 400);
-    const delay = Math.min(10_000, base + jitter);
-    dbg.log("ws", "Reconnect scheduled", {
-      inMs: delay,
-      attempt: this._attempt,
-    });
-    this._clearReconnect();
-    this._reconnectTid = setTimeout(() => this.connect(), delay);
-  }
-  _clearReconnect() {
-    if (this._reconnectTid) {
-      clearTimeout(this._reconnectTid);
-      this._reconnectTid = null;
-    }
-  }
-
-  _failInflight(err) {
-    if (!this._pending.size) return;
-    for (const [, entry] of this._pending) {
-      clearTimeout(entry.timer);
-      try {
-        entry.reject(err);
-      } catch {}
-    }
-    this._pending.clear();
-  }
-}
-</file>
-
 <file path="src/pages/Docs.jsx">
 // src/pages/Docs.jsx
 import { createMemo } from "solid-js";
@@ -26055,6 +25639,65 @@ render(() => (
     <App />
   </AppProvider>
 ), root);
+</file>
+
+<file path="src/alerts/handlers.js">
+// src/alerts/handlers.js
+import { dbg } from "../utils/debug";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
+import { pushToast } from "../ui/toast";
+
+export function handleTokenPriceChanged(app, payload) {
+  dbg.log("Alerts:token_price_changed", payload);
+  app.updateTokenPrices?.(payload);
+}
+
+export async function handleContentProcessed(app, payload) {
+  const { content } = payload.data || {};
+  if (!content || !content.guid) {
+    return;
+  }
+
+  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
+
+  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
+  if (draftParams && draftParams.guid === content.guid) {
+    await clearDraft(DRAFT_DIRS.NEW_POST);
+    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+  }
+
+  const currentItems = app.newFeedItems();
+  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
+  
+  if (!isAlreadyVisible) {
+    app.setNewContentAvailable(content);
+  }
+}
+
+export function handlePing(app) {
+  dbg.log("Alerts:ping", "Received ping, sending pong.");
+  app.ws?.sendJson({ type: 'pong' });
+}
+
+export function handlePong() {
+  dbg.log("Alerts:pong", "Received pong.");
+  // Do nothing
+}
+
+export function handleReact(app, payload) {
+  dbg.log("Alerts:react", "Received react alert", payload);
+  
+  const currentDomain = app.selectedDomainName()?.toLowerCase();
+  const alertDomain = payload?.domain?.toLowerCase();
+
+  if (alertDomain === currentDomain) {
+    // Pass the nested 'data' object, which contains the BCM_React struct
+    // that components are expecting.
+    app.setPostUpdate(payload.data);
+  } else {
+    dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
+  }
+}
 </file>
 
 <file path="src/components/editor/EditorFilesDrawer.jsx">
@@ -27229,6 +26872,335 @@ export const ipfs = {
   normalizeInput,
   buildUrl,
 };
+</file>
+
+<file path="src/net/WsClient.js">
+// src/net/WsClient.js
+import { dbg } from "../utils/debug";
+import { wsUrl as endpointsWsUrl } from "./endpoints";
+
+/**
+ * Pure WebSocket transport.
+ * Request:  { id: number, type: string, data: any }
+ * Response: { id?: number, type?: string, error?: string, data?: any }
+ * Alerts:   { type: string, data?: any }  (no id)
+ */
+export default class WsClient {
+  constructor({ url = "", protocols } = {}) {
+    this._url = url || "";
+    this._protocols = protocols || undefined;
+    this._ws = null;
+    this._manualClose = false;
+
+    this._status = "idle"; // idle | connecting | open | closed
+    this._attempt = 0;
+    this._shouldReconnect = true;
+    this._reconnectTid = null;
+
+    this._heartbeatTid = null;
+    this._heartbeatMs = 25_000;
+
+    this._sendQueue = [];
+    this._pending = new Map(); // id (string) -> { resolve, reject, timer }
+    this._nextId = 1;
+
+    this._listeners = new Map();
+
+    this._onOnline = () => this.reconnect("online");
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", this._onOnline);
+      window.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && this._status !== "open") {
+          this.reconnect("visible");
+        }
+      });
+    }
+  }
+
+  // ─── public API ───────────────────────────────────────────────────────────────
+  dispose() {
+    this._shouldReconnect = false;
+    this._clearReconnect();
+    this._stopHeartbeat();
+    if (this._ws) {
+      try {
+        this._ws.close();
+      } catch {}
+    }
+    this._ws = null;
+    if (typeof window !== "undefined") {
+      window.removeEventListener("online", this._onOnline);
+    }
+    this._failInflight(new Error("WS disposed"));
+    this._emit("status", "closed");
+  }
+
+  url() {
+    return this._url;
+  }
+  status() {
+    return this._status;
+  }
+  attempt() {
+    return this._attempt;
+  }
+
+  setUrl(nextUrl) {
+    const source = nextUrl == null ? endpointsWsUrl() : nextUrl;
+    const u = String(source || "");
+    if (!u) {
+      dbg.warn("ws", "No WS URL configured");
+      return;
+    }
+    if (u === this._url) return;
+    this._url = u;
+    dbg.log("ws", "URL updated", { url: u });
+  }
+
+  setAutoReconnect(on) {
+    this._shouldReconnect = !!on;
+  }
+
+  connect() {
+    if (!this._url) return;
+    if (
+      this._ws &&
+      (this._ws.readyState === WebSocket.OPEN ||
+        this._ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+    this._clearReconnect();
+    this._setStatus("connecting");
+    dbg.log("ws", "Connecting…", { url: this._url });
+
+    try {
+      const ws = new WebSocket(this._url, this._protocols);
+      this._ws = ws;
+
+      ws.addEventListener("open", () => {
+        this._attempt = 0;
+        this._setStatus("open");
+        dbg.log("ws", "Connected", { url: this._url });
+        this._flushQueue();
+        this._startHeartbeat();
+        this._emit("open");
+      });
+
+      ws.addEventListener("message", (ev) => this._onMessage(ev));
+
+      ws.addEventListener("error", (ev) => {
+        dbg.warn("ws", "Error", { event: ev });
+        this._emit("error", ev);
+      });
+
+      ws.addEventListener("close", (ev) => {
+        dbg.warn("ws", "Closed", { code: ev.code, reason: ev.reason });
+        this._stopHeartbeat();
+        this._setStatus("closed");
+        this._emit("close", ev);
+        this._failInflight(new Error("WS closed"));
+        if (this._shouldReconnect && !this._manualClose) {
+          this._scheduleReconnect();
+        }
+        this._manualClose = false;
+      });
+    } catch (e) {
+      dbg.error("ws", "Connect exception", e);
+      this._setStatus("closed");
+      this._scheduleReconnect();
+    }
+  }
+
+  reconnect(reason = "manual") {
+    dbg.log("ws", "Reconnecting…", { reason });
+    this._clearReconnect();
+    if (this._ws) {
+      this._manualClose = true; 
+      try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
+    }
+    this._ws = null;
+    
+    this.connect();
+  }
+
+  close() {
+    this._manualClose = true;
+    this._clearReconnect();
+    this._stopHeartbeat();
+    this._shouldReconnect = false;
+    try {
+      this._ws && this._ws.close(1000, "client-close");
+    } catch {}
+    this._ws = null;
+    this._setStatus("closed");
+    this._failInflight(new Error("WS closed by client"));
+  }
+
+  send(data) {
+    const open = this._ws && this._ws.readyState === WebSocket.OPEN;
+    if (open) this._ws.send(data);
+    else this._sendQueue.push(data);
+  }
+  sendJson(obj) {
+    this.send(JSON.stringify(obj));
+  }
+
+  call(method, params = {}, { timeoutMs = 15_000, id } = {}) {
+    const numericId = Number.isFinite(id) ? id : this._nextId++;
+    const callId = String(numericId);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pending.delete(callId);
+        const err = new Error("WS request timeout");
+        err.code = "ETIMEDOUT";
+        reject(err);
+      }, timeoutMs);
+
+      this._pending.set(callId, { resolve, reject, timer });
+      this.sendJson({
+        id: numericId,
+        type: String(method),
+        data: params || {},
+      });
+    });
+  }
+
+  on(type, fn) {
+    const key = String(type || "");
+    const set = this._listeners.get(key) || new Set();
+    set.add(fn);
+    this._listeners.set(key, set);
+    return () => this.off(key, fn);
+  }
+  off(type, fn) {
+    const set = this._listeners.get(type);
+    if (!set) return;
+    set.delete(fn);
+    if (set.size === 0) this._listeners.delete(type);
+  }
+
+  _setStatus(s) {
+    if (this._status !== s) {
+      this._status = s;
+      this._emit("status", s);
+    }
+  }
+
+  _emit(type, payload) {
+    const set = this._listeners.get(type);
+    if (!set || set.size === 0) return;
+    for (const fn of Array.from(set)) {
+      try {
+        fn(payload);
+      } catch (e) {
+        dbg.error("ws", "listener error", e);
+      }
+    }
+  }
+
+  _onMessage(ev) {
+    try {
+      const obj = JSON.parse(ev.data);
+
+      if (obj && obj.id > 0) {
+        const key = String(obj.id);
+        const entry = this._pending.get(key);
+        if (entry) {
+          clearTimeout(entry.timer);
+          this._pending.delete(key);
+
+          if (typeof obj.error === "string" && obj.error) {
+            if (obj.error.toLowerCase() === "not authenticated") {
+              this._emit("auth_error", obj);
+            }
+            const err = new Error(obj.error || "WS error");
+            err.code = "WS_ERROR";
+            entry.reject(err);
+          } else if ("data" in obj) {
+            entry.resolve(obj.data);
+          } else if ("result" in obj) {
+            entry.resolve(obj.result);
+          } else {
+            entry.resolve(obj);
+          }
+        } else {
+          dbg.warn("ws", "Received response for untracked call ID", { id: obj.id });
+        }
+      } else {
+        if (obj && obj.type) {
+          this._emit(obj.type, obj.data ?? obj);
+          this._emit("message", obj);
+        } else {
+          this._emit("message", obj);
+        }
+      }
+    } catch {
+      this._emit("raw", ev.data);
+    }
+  }
+
+  _flushQueue() {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+    while (this._sendQueue.length) {
+      const item = this._sendQueue.shift();
+      try {
+        this._ws.send(item);
+      } catch {}
+    }
+  }
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    if (this._heartbeatMs > 0) {
+      this._heartbeatTid = setInterval(() => {
+        try {
+          if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+            this._ws.send('{"type":"ping"}');
+          }
+        } catch {}
+      }, this._heartbeatMs);
+    }
+  }
+  _stopHeartbeat() {
+    if (this._heartbeatTid) {
+      clearInterval(this._heartbeatTid);
+      this._heartbeatTid = null;
+    }
+  }
+
+  _scheduleReconnect() {
+    if (!this._shouldReconnect) return;
+    this._attempt += 1;
+    const base = 300 * Math.pow(2, this._attempt - 1);
+    const jitter = Math.floor(Math.random() * 400);
+    const delay = Math.min(10_000, base + jitter);
+    dbg.log("ws", "Reconnect scheduled", {
+      inMs: delay,
+      attempt: this._attempt,
+    });
+    this._clearReconnect();
+    this._reconnectTid = setTimeout(() => this.connect(), delay);
+  }
+  _clearReconnect() {
+    if (this._reconnectTid) {
+      clearTimeout(this._reconnectTid);
+      this._reconnectTid = null;
+    }
+  }
+
+  _failInflight(err) {
+    if (!this._pending.size) return;
+    for (const [, entry] of this._pending) {
+      clearTimeout(entry.timer);
+      try {
+        entry.reject(err);
+      } catch {}
+    }
+    this._pending.clear();
+  }
+}
 </file>
 
 <file path="src/components/editor/EditorFullPreview.jsx">
@@ -28833,15 +28805,11 @@ export default function Settings() {
 
 <file path="src/components/Header.jsx">
 // src/components/Header.jsx
-import { Show, createSignal, onMount, createMemo } from "solid-js";
+import { Show, createSignal, onMount, createMemo, Switch, Match } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
-import {
-  connectWallet,
-  walletAccount,
-  walletChainId,
-  isWalletAvailable,
-  eagerConnect,
-} from "../blockchain/wallet";
+import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
+import { authorize } from "../blockchain/auth.js";
+import { pushErrorToast } from "../ui/toast.js";
 import { getChainLogo } from "../blockchain/chainLogos";
 import BrandLogo from "./ui/BrandLogo.jsx";
 import Container from "./layout/Container";
@@ -28856,10 +28824,12 @@ function shortAddr(addr) {
 
 export default function Header({ onTogglePane }) {
   const app = useApp();
+  const { t } = app;
   const [eagerDone, setEagerDone] = createSignal(false);
+  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
 
   const desiredId = () => app.desiredChainId();
-  const mismatched = () =>
+  const mismatchedChain = () =>
     walletChainId() != null &&
     desiredId() != null &&
     walletChainId() !== desiredId();
@@ -28872,21 +28842,28 @@ export default function Header({ onTogglePane }) {
   });
 
   onMount(async () => {
-    if (isWalletAvailable()) {
-      await eagerConnect();
-    }
+    if (isWalletAvailable()) await eagerConnect();
     setEagerDone(true);
   });
+
+  const handleLoginClick = async () => {
+    setIsLoggingIn(true);
+    try {
+      await authorize(app);
+    } catch (e) {
+      console.error("Authorization failed:", e);
+      pushErrorToast(e, { context: "Login failed" });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   async function onConnect() {
     try {
       await connectWallet();
-      if (desiredId()) {
-        try { await app.ensureWalletOnDesiredChain(); } catch {}
-      }
+      if (desiredId()) await app.ensureWalletOnDesiredChain();
     } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
+      pushErrorToast(e, { context: "Failed to connect wallet" });
     }
   }
 
@@ -28902,113 +28879,72 @@ export default function Header({ onTogglePane }) {
     try {
       await app.ensureWalletOnDesiredChain();
     } catch (e) {
-      console.error(e);
-      alert(e?.message || String(e));
+      pushErrorToast(e, { context: "Failed to switch chain" });
     }
   }
 
-  const chainLogoSrc = () => {
-    const id = desiredId();
-    return id ? getChainLogo(id) : null;
-  };
+  const chainLogoSrc = () => getChainLogo(desiredId());
 
   return (
-    <header
-      class="
-        sticky top-0 z-10
-        bg-[hsl(var(--background))] text-[hsl(var(--foreground))]
-        shadow-sm
-      "
-    >
+    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
       <Container>
         <div class="h-12 px-2 flex items-center justify-between">
-          {/* Left: brand */}
           <div class="flex items-center gap-4">
             <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
             <TokenPrice />
           </div>
 
-          {/* Right: wallet + auth + menu */}
           <div class="flex items-center gap-3">
             <Show when={app.authorizedUser()}>
               <NewPostButton />
             </Show>
-            <AuthorizedUser />
-            
-            <Show
-              when={walletAccount()}
-              fallback={
-                <Show when={eagerDone() && isWalletAvailable()}>
-                  <button
-                    class="
-                      px-3 py-1.5 text-sm rounded
-                      bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]
-                      hover:opacity-90
-                    "
-                    onClick={onConnect}
-                    title={app.t("wallet.connect")}
-                    aria-label={app.t("wallet.connect")}
-                  >
-                    {app.t("wallet.connect")}
+
+            <Switch>
+              <Match when={!walletAccount() && eagerDone()}>
+                <Show when={isWalletAvailable()}>
+                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
+                    {t("wallet.connect")}
                   </button>
                 </Show>
-              }
-            >
-              <div class="flex items-center gap-2">
-                <button
-                  classList={{
-                    "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
-                    "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
-                  }}
-                  onClick={copyAddress}
-                  title={app.t("wallet.copyAddress")}
-                  aria-label={app.t("wallet.copyAddress")}
-                >
-                  {shortAddr(walletAccount())}
-                </button>
+              </Match>
 
-                <Show
-                  when={!mismatched()}
-                  fallback={
+              <Match when={walletAccount() && !app.authorizedUser()}>
+                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
+                  {isLoggingIn() ? t("common.checking") : "Login"}
+                </button>
+              </Match>
+              
+              <Match when={app.authorizedUser()}>
+                <AuthorizedUser />
+              </Match>
+            </Switch>
+
+            <Show when={walletAccount()}>
+                <div class="flex items-center gap-2">
                     <button
-                      class="
-                        px-2 py-1 rounded
-                        bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]
-                        hover:opacity-90
-                      "
-                      onClick={onSwitchChain}
-                      title={app.t("wallet.changeChain")}
-                      aria-label={app.t("wallet.changeChain")}
+                        classList={{
+                            "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                            "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                        }}
+                        onClick={copyAddress}
+                        title={t("wallet.copyAddress")}
                     >
-                      {app.t("wallet.changeChain")}
+                        {shortAddr(walletAccount())}
                     </button>
-                  }
-                >
-                  <Show when={chainLogoSrc()}>
-                    <img
-                      src={chainLogoSrc()}
-                      alt="chain"
-                      class="w-5 h-5"
-                      title={app.t("wallet.onRequiredNetwork")}
-                    />
-                  </Show>
-                </Show>
-              </div>
+                    <Show when={!mismatchedChain()} fallback={
+                        <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
+                            {t("wallet.changeChain")}
+                        </button>
+                    }>
+                        <Show when={chainLogoSrc()}>
+                            <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
+                        </Show>
+                    </Show>
+                </div>
             </Show>
 
-            <button
-              class="
-                p-1 rounded transition
-                text-[hsl(var(--muted-foreground))]
-                hover:bg-[hsl(var(--muted))]
-              "
-              onClick={onTogglePane}
-              aria-label={app.t("menu.open")}
-              title={app.t("menu.open")}
-            >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
           </div>
         </div>
@@ -29599,6 +29535,273 @@ export default function PostCard(props) {
 }
 </file>
 
+<file path="src/components/tabs/NewTab.jsx">
+// src/components/tabs/NewTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { dbg } from "../../utils/debug.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../../editor/storage.js";
+import { pushToast } from "../../ui/toast.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+export default function NewTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${app.newTabRefreshKey()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
+      await whenWsOpen();
+      dbg.log("NewTab", "after whenWsOpen");
+
+      if (!contentList) {
+        dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
+        return [];
+      }
+      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      dbg.log('NewTab', 'Fetching with params:', params);
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+
+      const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
+      if (draftParams?.guid) {
+        const newPostsHaveDraftGuid = arr.some(post => post.guid === draftParams.guid);
+        if (newPostsHaveDraftGuid) {
+          await clearDraft(DRAFT_DIRS.NEW_POST);
+          pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+        }
+      }
+
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      dbg.error('NewTab', "fetchPage error:", err);
+      return [];
+    }
+  }
+
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={category()}
+            onInput={(e) => setCategory(e.currentTarget.value)}
+            aria-label={app.t("newTab.category")}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+            </For>
+          </select>
+          <Show when={categoriesRes.loading}>
+            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+          </Show>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+        onItemsChange={app.setNewFeedItems}
+        isActivated={props.isActivated}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createSignal, Show, createMemo, createEffect } from "solid-js";
+import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import ThemeToggle from "./ui/ThemeToggle.jsx";
+import LangSelector from "./ui/LangSelector.jsx";
+import RightPaneFooter from "./RightPaneFooter.jsx";
+
+export default function RightPane({ isOpen, onClose }) {
+  const app = useApp();
+  const { t } = app;
+  const [showSwitch, setShowSwitch] = createSignal(false);
+
+  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  const domainLangCodes = createMemo(() => {
+    const fromDomain = (app.domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
+    return fromDomain.length > 0 ? fromDomain : ["en"];
+  });
+
+  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
+
+  createEffect(() => {
+    const availableCodes = domainLangCodes();
+    const currentLang = app.lang?.();
+
+    if (!availableCodes.includes(currentLang)) {
+      app.setLang?.(availableCodes[0]);
+    }
+  });
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col p-4 space-y-3">
+          <nav class="pt-2">
+            <ul class="space-y-3">
+              <li><ThemeToggle /></li>
+
+              <Show when={showLangSelector()}>
+                <li><LangSelector codes={domainLangCodes()} /></li>
+              </Show>
+
+              {/* Gear settings link */}
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
+
+              {/* Documentation link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    // --- MODIFICATION: Save scroll position ---
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/docs"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+              {/* Settings link */}
+              <li>
+                <div
+                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    // --- MODIFICATION: Save scroll position ---
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/settings"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+            </ul>
+          </nav>
+          <RightPaneFooter />
+        </div>
+      </div>
+
+      {isOpen() && (
+        <div
+          class="fixed inset-0 z-20"
+          style={{ "background-color": "rgba(0,0,0,0.2)" }}
+          data-testid="overlay"
+          onClick={onClose}
+        />
+      )}
+
+      <Show when={showSwitch()} keyed>
+        <SwitchConnectDialog
+          open={true}
+          domain={app.config()?.domain}
+          backendLink={app.config()?.backendLink}
+          loading={app.loading()}
+          error={app.error()}
+          onApply={() => { }}
+          onReset={app.clearConnectOverride}
+          onClose={() => setShowSwitch(false)}
+        />
+      </Show>
+    </>
+  );
+}
+</file>
+
 <file path="src/pages/PostPage.jsx">
 // src/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
@@ -29936,273 +30139,6 @@ export default function PostPage() {
         </Match>
       </Switch>
     </main>
-  );
-}
-</file>
-
-<file path="src/components/tabs/NewTab.jsx">
-// src/components/tabs/NewTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-import { dbg } from "../../utils/debug.js";
-import { whenWsOpen } from "../../net/wsRuntime.js";
-import { getDraftParams, clearDraft, DRAFT_DIRS } from "../../editor/storage.js";
-import { pushToast } from "../../ui/toast.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-export default function NewTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${app.newTabRefreshKey()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      dbg.log('NewTab', `fetchPage called for page ${page}. WS Status: ${app.wsStatus()}`);
-      await whenWsOpen();
-      dbg.log("NewTab", "after whenWsOpen");
-
-      if (!contentList) {
-        dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
-        return [];
-      }
-      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-
-      const user = app.authorizedUser();
-      if (user?.address) {
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      dbg.log('NewTab', 'Fetching with params:', params);
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-
-      const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
-      if (draftParams?.guid) {
-        const newPostsHaveDraftGuid = arr.some(post => post.guid === draftParams.guid);
-        if (newPostsHaveDraftGuid) {
-          await clearDraft(DRAFT_DIRS.NEW_POST);
-          pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
-        }
-      }
-
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      dbg.error('NewTab', "fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
-          </Show>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-        onItemsChange={app.setNewFeedItems}
-        isActivated={props.isActivated}
-      />
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createSignal, Show, createMemo, createEffect } from "solid-js";
-import { navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
-import ThemeToggle from "./ui/ThemeToggle.jsx";
-import LangSelector from "./ui/LangSelector.jsx";
-import RightPaneFooter from "./RightPaneFooter.jsx";
-
-export default function RightPane({ isOpen, onClose }) {
-  const app = useApp();
-  const { t } = app;
-  const [showSwitch, setShowSwitch] = createSignal(false);
-
-  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
-
-  const domainLangCodes = createMemo(() => {
-    const fromDomain = (app.domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
-    return fromDomain.length > 0 ? fromDomain : ["en"];
-  });
-
-  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
-
-  createEffect(() => {
-    const availableCodes = domainLangCodes();
-    const currentLang = app.lang?.();
-
-    if (!availableCodes.includes(currentLang)) {
-      app.setLang?.(availableCodes[0]);
-    }
-  });
-
-  return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col p-4 space-y-3">
-          <nav class="pt-2">
-            <ul class="space-y-3">
-              <li><ThemeToggle /></li>
-
-              <Show when={showLangSelector()}>
-                <li><LangSelector codes={domainLangCodes()} /></li>
-              </Show>
-
-              {/* Gear settings link */}
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
-              </Show>
-
-              {/* Documentation link */}
-              <li>
-                <div
-                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    // --- MODIFICATION: Save scroll position ---
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/docs"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
-                  aria-label={t("docs.nav")}
-                  title={t("docs.nav")}
-                >
-                  {t("docs.nav")}
-                </div>
-              </li>
-
-              {/* Settings link */}
-              <li>
-                <div
-                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    // --- MODIFICATION: Save scroll position ---
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/settings"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
-                >
-                  {t("rightPane.settings")}
-                </div>
-              </li>
-            </ul>
-          </nav>
-          <RightPaneFooter />
-        </div>
-      </div>
-
-      {isOpen() && (
-        <div
-          class="fixed inset-0 z-20"
-          style={{ "background-color": "rgba(0,0,0,0.2)" }}
-          data-testid="overlay"
-          onClick={onClose}
-        />
-      )}
-
-      <Show when={showSwitch()} keyed>
-        <SwitchConnectDialog
-          open={true}
-          domain={app.config()?.domain}
-          backendLink={app.config()?.backendLink}
-          loading={app.loading()}
-          error={app.error()}
-          onApply={() => { }}
-          onReset={app.clearConnectOverride}
-          onClose={() => setShowSwitch(false)}
-        />
-      </Show>
-    </>
   );
 }
 </file>
@@ -31265,31 +31201,40 @@ export function AppProvider(props) {
     setIsSwitchAccountModalOpen(false);
     if (switchAccountRejecter) switchAccountRejecter(new Error("User canceled the action."));
   };
-  
-  async function getGuardedWalletClient() {
+
+  function getRawWalletClient() {
     const walletAcc = walletAccount();
-    const authorizedAcc = auth.authorizedUser()?.address;
-
     if (!isWalletAvailable()) throw new Error("Wallet is not available.");
-    if (!authorizedAcc) throw new Error("User is not authorized.");
     if (!walletAcc) throw new Error("Wallet is not connected.");
-
-    if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
-      try {
-        await promptSwitchAccount(authorizedAcc);
-      } catch (e) {
-        throw new Error(i18n.t("wallet.error.userCanceled"));
-      }
-    }
     
     const chain = desiredChain();
     if (!chain) throw new Error("Target chain is not configured.");
 
     return createWalletClient({
       chain: chain,
-      account: walletAccount(),
+      account: walletAcc,
       transport: custom(window.ethereum)
     });
+  }
+  
+  async function getGuardedWalletClient() {
+    const authorizedAcc = auth.authorizedUser()?.address;
+    if (!authorizedAcc) throw new Error("User is not authorized.");
+    
+    const walletClient = getRawWalletClient(); // Uses the raw client internally
+    const walletAcc = walletClient.account.address;
+
+    if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
+      try {
+        await promptSwitchAccount(authorizedAcc);
+        // After success, the walletAccount() signal is updated, so we need a fresh client.
+        return getRawWalletClient();
+      } catch (e) {
+        throw new Error(i18n.t("wallet.error.userCanceled"));
+      }
+    }
+    
+    return walletClient;
   }
 
   const value = {
@@ -31305,10 +31250,11 @@ export function AppProvider(props) {
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
+    postUpdate, setPostUpdate,
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
     getGuardedWalletClient,
-    postUpdate, setPostUpdate,
+    getRawWalletClient,
     isSwitchAccountModalOpen,
     requiredAccount,
     resolveSwitchAccountPrompt,

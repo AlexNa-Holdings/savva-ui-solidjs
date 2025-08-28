@@ -19,3 +19,7 @@ sections:
         file: core-concepts/auth.md
       - label: Showing Posts
         file: core-concepts/showing-posts.md
+      - label: Publishing Posts
+        file: core-concepts/publishing-posts.md
+      - label: Config Contract
+        file: core-concepts/config-contract.md
