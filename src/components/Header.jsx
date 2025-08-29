@@ -89,11 +89,19 @@ export default function Header({ onTogglePane }) {
           </div>
 
           <div class="flex items-center gap-3">
-            <Show when={app.authorizedUser()}>
+            {/* Show New Post button ONLY when authorized AND wallet is connected */}
+            <Show when={app.authorizedUser() && walletAccount()}>
               <NewPostButton />
             </Show>
 
+            {/* Show user avatar menu if a session exists, regardless of wallet connection */}
+            <Show when={app.authorizedUser()}>
+              <AuthorizedUser />
+            </Show>
+
+            {/* Logic for Connect/Login buttons */}
             <Switch>
+              {/* Wallet not connected -> Show "Connect" button */}
               <Match when={!walletAccount() && eagerDone()}>
                 <Show when={isWalletAvailable()}>
                   <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
@@ -102,17 +110,15 @@ export default function Header({ onTogglePane }) {
                 </Show>
               </Match>
 
+              {/* Wallet connected BUT no session -> Show "Login" button */}
               <Match when={walletAccount() && !app.authorizedUser()}>
                 <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
                   {isLoggingIn() ? t("common.checking") : "Login"}
                 </button>
               </Match>
-              
-              <Match when={app.authorizedUser()}>
-                <AuthorizedUser />
-              </Match>
             </Switch>
 
+            {/* Wallet address and chain info */}
             <Show when={walletAccount()}>
                 <div class="flex items-center gap-2">
                     <button
@@ -137,6 +143,7 @@ export default function Header({ onTogglePane }) {
                 </div>
             </Show>
 
+            {/* Hamburger menu */}
             <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>

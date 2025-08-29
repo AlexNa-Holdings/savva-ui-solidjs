@@ -41,6 +41,7 @@ export default function EditorPage() {
   const [showChapters, setShowChapters] = createSignal(false);
   const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
   const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
+  const [showConfirmClear, setShowConfirmClear] = createSignal(false);
   const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
   const [showFullPreview, setShowFullPreview] = createSignal(false);
   const [showPublishWizard, setShowPublishWizard] = createSignal(false);
@@ -170,6 +171,28 @@ export default function EditorPage() {
 
   const updateParam = (field, value) => {
     setPostParams(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleConfirmClear = () => {
+    const newPostData = {};
+    const newPostParams = {
+      guid: editorMode() === 'new_post' ? crypto.randomUUID() : postParams().guid,
+      publishAsNewPost: editorMode() === 'edit_post' ? false : undefined,
+      locales: {}
+    };
+
+    for (const langCode of domainLangCodes()) {
+        newPostData[langCode] = { title: "", body: "", chapters: [] };
+        newPostParams.locales[langCode] = { chapters: [] };
+    }
+
+    batch(() => {
+        setPostData(newPostData);
+        setPostParams(newPostParams);
+        setEditingChapterIndex(-1);
+        setShowChapters(false);
+        setThumbnailUrl(null);
+    });
   };
 
   const updateChapterTitle = (index, newTitle) => {
@@ -344,7 +367,7 @@ export default function EditorPage() {
           <Show when={!isFullScreen()}>
             <ClosePageButton />
             <header class="flex justify-between items-start gap-4">
-              <div class="flex-1 min-w-0">
+              <div class="flex-1 min-w-0 flex items-center gap-4">
                 <h2 class="text-2xl font-semibold">{title()}</h2>
               </div>
               <div class="w-48 flex-shrink-0 space-y-2">
@@ -482,7 +505,14 @@ export default function EditorPage() {
                     </div>
                   </div>
 
-                  <div class="mt-6 flex justify-end">
+                  <div class="mt-6 flex justify-end items-center gap-4">
+                    <button 
+                      onClick={() => setShowConfirmClear(true)}
+                      title={t("editor.clearDraft")}
+                      class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
+                    >
+                      <TrashIcon />
+                    </button>
                     <button 
                       onClick={() => setShowFullPreview(true)}
                       class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
@@ -507,10 +537,17 @@ export default function EditorPage() {
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}
-        onClose={() => setFileToDelete(null)}
+        onClose={() => setShowConfirmDelete(false)}
         onConfirm={confirmRemoveChapter}
         title={t("editor.chapters.confirmDeleteTitle")}
         message={t("editor.chapters.confirmDeleteMessage")}
+      />
+       <ConfirmModal
+        isOpen={showConfirmClear()}
+        onClose={() => setShowConfirmClear(false)}
+        onConfirm={handleConfirmClear}
+        title={t("editor.clearDraftTitle")}
+        message={t("editor.clearDraftMessage")}
       />
       <PostSubmissionWizard 
         isOpen={showPublishWizard()}
@@ -518,6 +555,7 @@ export default function EditorPage() {
         onSuccess={handlePublishSuccess}
         postData={postData}
         postParams={postParams}
+        editorMode={editorMode()}
       />
     </main>
   );

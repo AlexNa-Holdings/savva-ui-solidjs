@@ -224,6 +224,8 @@ src/
     post/
       ChapterPager.jsx
       ChapterSelector.jsx
+      CommentCard.jsx
+      PostComments.jsx
       PostControls.jsx
       PostTags.jsx
       ReactionInput.jsx
@@ -363,6 +365,325 @@ This section contains the contents of the repository's files.
   <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
   <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h14"/>
 </svg>
+</file>
+
+<file path="public/domain_default/favicon/browserconfig.xml">
+<?xml version="1.0" encoding="utf-8"?>
+<browserconfig>
+    <msapplication>
+        <tile>
+            <square150x150logo src="/mstile-150x150.png"/>
+            <TileColor>#da532c</TileColor>
+        </tile>
+    </msapplication>
+</browserconfig>
+</file>
+
+<file path="public/domain_default/favicon/safari-pinned-tab.svg">
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="700.000000pt" height="700.000000pt" viewBox="0 0 700.000000 700.000000"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created by potrace 1.14, written by Peter Selinger 2001-2017
+</metadata>
+<g transform="translate(0.000000,700.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M3249 6996 c-2 -2 -37 -7 -78 -10 -113 -10 -269 -33 -351 -52 -14 -3
+-38 -7 -55 -10 -111 -19 -539 -150 -570 -174 -5 -4 -21 -11 -35 -15 -14 -4
+-51 -20 -82 -36 -32 -15 -58 -25 -58 -22 0 3 -6 1 -12 -5 -7 -5 -66 -37 -131
+-71 -65 -33 -131 -70 -147 -81 -15 -11 -31 -20 -34 -20 -10 0 -242 -156 -311
+-209 -194 -148 -421 -364 -561 -532 -93 -112 -220 -286 -281 -385 -202 -327
+-327 -612 -424 -969 -24 -89 -24 -88 9 -80 15 4 34 8 42 10 29 6 135 36 155
+45 11 4 43 16 70 25 204 71 507 216 947 456 70 38 130 69 133 69 3 0 23 11 44
+24 21 14 133 72 247 129 181 90 246 121 409 192 215 94 558 186 785 213 85 9
+407 9 490 -1 53 -6 221 -39 317 -62 101 -24 343 -127 463 -197 169 -98 385
+-302 493 -464 153 -230 225 -449 233 -709 l4 -130 -23 38 c-109 188 -158 265
+-217 342 -63 84 -195 222 -265 277 -193 155 -441 266 -679 304 -21 3 -48 8
+-60 11 -11 3 -104 7 -206 9 -214 3 -283 -4 -462 -51 -262 -68 -566 -230 -905
+-483 -91 -68 -401 -307 -698 -540 -25 -19 -64 -48 -81 -60 -11 -7 -57 -40
+-104 -73 -399 -285 -780 -458 -1218 -555 -22 -4 -23 -8 -18 -52 12 -91 17
+-127 22 -157 3 -16 7 -39 8 -50 2 -11 6 -33 10 -50 3 -16 8 -39 10 -51 16 -83
+63 -259 97 -364 298 -907 926 -1634 1774 -2057 99 -49 188 -90 215 -98 3 -1
+19 -7 35 -14 95 -40 325 -117 405 -136 8 -2 56 -13 105 -25 282 -67 450 -85
+790 -85 245 0 414 10 520 29 11 2 38 7 60 11 874 149 1654 616 2196 1315 182
+235 359 543 471 820 68 168 167 485 155 497 -15 14 -328 -90 -512 -170 -156
+-68 -496 -238 -665 -334 -55 -30 -133 -73 -285 -153 -182 -97 -438 -222 -565
+-275 -123 -52 -389 -146 -450 -159 -14 -3 -52 -12 -85 -21 -74 -18 -220 -44
+-300 -53 -126 -14 -537 -4 -565 13 -3 2 -26 6 -50 10 -25 3 -53 8 -62 11 -9 3
+-25 6 -35 8 -126 25 -348 107 -476 177 -38 22 -71 39 -73 39 -6 0 -134 90
+-184 129 -79 62 -234 225 -292 307 -161 229 -241 460 -255 727 -4 86 -3 127 5
+127 5 0 15 -12 21 -27 21 -56 119 -215 192 -314 151 -203 324 -354 529 -461
+47 -24 87 -44 90 -45 3 0 23 -8 45 -17 69 -29 208 -67 300 -81 117 -19 178
+-23 310 -23 209 0 360 26 565 100 195 70 363 163 664 368 45 31 296 222 451
+344 258 204 453 348 606 451 256 170 323 207 621 343 111 51 314 113 517 158
+22 5 23 8 16 57 -4 29 -9 68 -11 87 -5 39 -5 41 -28 165 -92 493 -320 1013
+-626 1423 -481 645 -1161 1103 -1935 1302 -82 21 -170 41 -195 45 -24 4 -47 8
+-50 10 -3 1 -27 6 -54 9 -27 4 -52 9 -55 11 -3 1 -37 6 -76 10 -38 3 -83 8
+-100 11 -34 6 -590 15 -596 10z m412 -2701 c239 -50 445 -207 562 -427 31 -59
+62 -153 78 -236 15 -78 6 -255 -16 -337 -42 -157 -130 -299 -250 -404 -271
+-237 -668 -267 -968 -74 -465 298 -508 951 -86 1306 102 86 237 150 366 173
+15 3 29 7 31 8 9 10 227 3 283 -9z"/>
+</g>
+</svg>
+</file>
+
+<file path="public/domain_default/favicon/site.webmanifest">
+{
+    "name": "",
+    "short_name": "",
+    "icons": [
+        {
+            "src": "./android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "./android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#ffffff",
+    "background_color": "#ffffff",
+    "display": "standalone"
+}
+</file>
+
+<file path="public/domain_default/html/info_block_en.html">
+<div style="text-align: center;">
+    <h1>Welcome to SAVVA, your affinity network</h1>
+    <p>No registration is needed—having a PulseChain address is enough.</p>
+    <p>Feel free to explore, read, and support the authors you like. If you'd like to post content, just stake 5000 SAVVA tokens.</p>
+    <p>Remember, SAVVA is an open platform, which means you can create your own site like this one. It's completely free.</p>
+    <p>Let us know if you're interested in running your own site!</p>
+  </div>
+</file>
+
+<file path="public/domain_default/html/info_block_fr.html">
+<div style="text-align: center;">
+    <h1>Bienvenue sur la plateforme SAVVA, votre réseau par centres d'intérêt</h1>
+    <p>Aucune inscription n'est requise — il suffit d'avoir une adresse PulseChain.</p>
+    <p>Sentez-vous libre : explorez, lisez et soutenez les auteurs qui vous plaisent. Si vous souhaitez publier du contenu, il suffit de staker 5000 tokens SAVVA.</p>
+    <p>N'oubliez pas que la plateforme SAVVA est ouverte, et que vous pouvez créer votre propre site, comme celui-ci. C'est complètement gratuit.</p>
+    <p>Faites-nous savoir si vous êtes intéressé par le lancement de votre propre site !</p>
+</div>
+</file>
+
+<file path="public/domain_default/html/info_block_ru.html">
+<div style="text-align: center;">
+    <h1>Добро пожаловать на платформу SAVVA, вашу сеть по интересам</h1>
+    <p>Регистрация не требуется — достаточно иметь адрес PulseChain.</p>
+    <p>Чувствуйте себя свободно: изучайте, читайте и поддерживайте авторов, которые вам нравятся. Если хотите публиковать контент, достаточно застейкать 5000 токенов SAVVA.</p>
+    <p>Помните, что платформа SAVVA открыта, и вы можете создать свой собственный сайт, как этот. Это абсолютно бесплатно.</p>
+    <p>Дайте нам знать, если вы заинтересованы в запуске своего сайта!</p>
+  </div>
+</file>
+
+<file path="public/domain_default/html/info_block_ua.html">
+<div style="text-align: center;">
+    <h1>Ласкаво просимо на платформу SAVVA, вашу мережу за інтересами</h1>
+    <p>Реєстрація не потрібна — достатньо мати адресу PulseChain.</p>
+    <p>Почувайтесь вільно: досліджуйте, читайте та підтримуйте авторів, які вам подобаються. Якщо бажаєте публікувати контент, достатньо застейкати 5000 токенів SAVVA.</p>
+    <p>Пам’ятайте, що платформа SAVVA відкрита, і ви можете створити власний сайт, як цей. Це абсолютно безкоштовно.</p>
+    <p>Дайте нам знати, якщо ви зацікавлені у запуску власного сайту!</p>
+</div>
+</file>
+
+<file path="public/domain_default/html/info_block.html">
+<div>
+    Some text about the project.
+</div>
+
+<div class="icons-container">
+    <a href="https://t.me/savvaapp">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+                d="M22 43C33.598 43 43 33.598 43 22C43 10.402 33.598 1 22 1C10.402 1 1 10.402 1 22C1 33.598 10.402 43 22 43Z"
+                stroke="black" stroke-width="2"></path>
+            <path fill-rule="evenodd" clip-rule="evenodd"
+                d="M14.9581 19.2048C12.8968 20.1103 10.779 21.0408 8.84231 22.1141C7.83107 22.8591 9.17507 23.3861 10.436 23.8804C10.6365 23.959 10.8348 24.0368 11.0212 24.1144C11.1764 24.1625 11.3342 24.213 11.4941 24.2643C12.8965 24.7138 14.4601 25.2151 15.8216 24.461C18.0581 23.1683 20.1687 21.6738 22.2777 20.1804C22.9686 19.6911 23.6594 19.202 24.3544 18.7201C24.387 18.6991 24.4237 18.6752 24.4639 18.649C25.0559 18.2628 26.3874 17.3944 25.8949 18.5911C24.7303 19.8726 23.4827 21.0071 22.2285 22.1478C21.3831 22.9165 20.5347 23.6881 19.7065 24.5093C18.9852 25.0991 18.2361 26.285 19.0438 27.1108C20.9042 28.4212 22.7936 29.6999 24.682 30.9778C25.2965 31.3936 25.9109 31.8095 26.5241 32.2263C27.5634 33.0612 29.1877 32.3858 29.4162 31.0812C29.5177 30.481 29.6198 29.8809 29.7218 29.2808C30.2856 25.9641 30.8496 22.6461 31.3478 19.3186C31.4155 18.7966 31.4922 18.2747 31.5691 17.7525C31.7552 16.4869 31.9416 15.2197 31.9998 13.9473C31.8498 12.6774 30.3195 12.9567 29.468 13.2422C25.091 14.9181 20.7578 16.7181 16.4416 18.5499C15.9527 18.7678 15.4571 18.9856 14.9581 19.2048Z"
+                fill="black"></path>
+        </svg>
+    </a>
+</div>
+</file>
+
+<file path="public/domain_default/modules/categories.yaml">
+required: false
+locales:
+  ru:
+    - SAVVA Платформа
+    - SAVVA Документация
+    - Вопросы и ответы
+  en:
+    - SAVVA Talk
+    - SAVVA Documentation
+    - Q&A
+  fr:
+    - Plateforme SAVVA
+    - Documentation SAVVA
+    - Questions et Réponses
+  ua:
+    - Платформа SAVVA
+    - Документація SAVVA
+    - Запитання та Відповіді
+</file>
+
+<file path="public/domain_default/modules/content_lists.yaml">
+market_contract: ''
+list:
+  main:
+    title:
+      ru: 'Анонсы'
+      en: 'Announcements'
+      ua: 'Анонси'
+      fr: 'Annonces'
+    on_market: true
+  new:
+    title:
+      ru: 'Новые анонсы'
+      en: 'New announces'
+      ua: 'Новi анонсы'
+      fr: 'new annonces'
+    on_market: true
+</file>
+
+<file path="public/domain_default/modules/staker_levels.yaml">
+staker_levels:
+  levels:
+  - min: 0
+    icon:
+    name: 
+      - locale: en
+        text: "Guest"
+      - locale: ru
+        text: "Гость"
+      - locale: fr
+        text: "Invité"
+      - locale: ua
+        text: "Гість"
+      - locale: de
+        text: "Gast"
+  - min: 5000
+    icon: /images/icons8-clam-50.svg
+    name: 
+      - locale: en
+        text: "Clam"
+      - locale: ru
+        text: "Моллюск"
+      - locale: fr
+        text: "Palourde"
+      - locale: ua
+        text: "Молюск"
+      - locale: de
+        text: "Muschel"
+  - min: 10000
+    icon: /images/icons8-shrimp-50.svg
+    name: 
+      - locale: en
+        text: "Shrimp"
+      - locale: ru
+        text: "Креветка"
+      - locale: fr
+        text: "Crevette"
+      - locale: ua
+        text: "Креветка"
+      - locale: de
+        text: "Garnele"
+  - min: 20000
+    icon: /images/icons8-seahorse-50.svg
+    name: 
+      - locale: en
+        text: "Seahorse"
+      - locale: ru
+        text: "Морской конек"
+      - locale: fr
+        text: "Hippocampe"
+      - locale: ua
+        text: "Морський коник"
+      - locale: de
+        text: "Seepferdchen"
+  - min: 50000
+    icon: /images/icons8-top-view-fish-50.svg
+    name: 
+      - locale: en
+        text: "Fish"
+      - locale: ru
+        text: "Рыба"
+      - locale: fr
+        text: "Poisson"
+      - locale: ua
+        text: "Риба"
+      - locale: de
+        text: "Fisch"
+  - min: 100000
+    icon: /images/icons8-dolphin-50.svg
+    name: 
+      - locale: en
+        text: "Dolphin"
+      - locale: ru
+        text: "Дельфин"
+      - locale: fr
+        text: "Dauphin"
+      - locale: ua
+        text: "Дельфін"
+      - locale: de
+        text: "Delfin"
+  - min: 200000 
+    icon: /images/icons8-shark-50.svg
+    name: 
+      - locale: en
+        text: "Shark"
+      - locale: ru
+        text: "Акула"
+      - locale: fr
+        text: "Requin"
+      - locale: ua
+        text: "Акула"
+      - locale: de
+        text: "Hai"
+  - min: 500000
+    icon: /images/icons8-stingray.svg
+    name: 
+      - locale: en
+        text: "Stingray"
+      - locale: ru
+        text: "Скат"
+      - locale: fr
+        text: "Raie"
+      - locale: ua
+        text: "Скат"
+      - locale: de
+        text: "Stachelrochen"
+  - min: 1000000
+    icon: /images/icons8-orca-50.svg
+    name: 
+      - locale: en
+        text: "Orca"
+      - locale: ru
+        text: "Косатка"
+      - locale: fr
+        text: "Orque"
+      - locale: ua
+        text: "Косатка"
+      - locale: de
+        text: "Orca"
+  - min: 10000000
+    icon: /images/icons8-whale-50.svg
+    name: 
+      - locale: en
+        text: "Whale"
+      - locale: ru
+        text: "Кит"
+      - locale: fr
+        text: "Baleine"
+      - locale: ua
+        text: "Кит"
+      - locale: de
+        text: "Wal"
 </file>
 
 <file path="src/assets/solid.svg">
@@ -3777,323 +4098,49 @@ SAVVA є проектом з відкритим кодом, і ми активн
 Якщо ви розробник, який досліджує SAVVA, це місце, з якого варто почати. 🚀
 </file>
 
-<file path="public/domain_default/favicon/browserconfig.xml">
-<?xml version="1.0" encoding="utf-8"?>
-<browserconfig>
-    <msapplication>
-        <tile>
-            <square150x150logo src="/mstile-150x150.png"/>
-            <TileColor>#da532c</TileColor>
-        </tile>
-    </msapplication>
-</browserconfig>
-</file>
-
-<file path="public/domain_default/favicon/safari-pinned-tab.svg">
-<?xml version="1.0" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
- "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
- width="700.000000pt" height="700.000000pt" viewBox="0 0 700.000000 700.000000"
- preserveAspectRatio="xMidYMid meet">
-<metadata>
-Created by potrace 1.14, written by Peter Selinger 2001-2017
-</metadata>
-<g transform="translate(0.000000,700.000000) scale(0.100000,-0.100000)"
-fill="#000000" stroke="none">
-<path d="M3249 6996 c-2 -2 -37 -7 -78 -10 -113 -10 -269 -33 -351 -52 -14 -3
--38 -7 -55 -10 -111 -19 -539 -150 -570 -174 -5 -4 -21 -11 -35 -15 -14 -4
--51 -20 -82 -36 -32 -15 -58 -25 -58 -22 0 3 -6 1 -12 -5 -7 -5 -66 -37 -131
--71 -65 -33 -131 -70 -147 -81 -15 -11 -31 -20 -34 -20 -10 0 -242 -156 -311
--209 -194 -148 -421 -364 -561 -532 -93 -112 -220 -286 -281 -385 -202 -327
--327 -612 -424 -969 -24 -89 -24 -88 9 -80 15 4 34 8 42 10 29 6 135 36 155
-45 11 4 43 16 70 25 204 71 507 216 947 456 70 38 130 69 133 69 3 0 23 11 44
-24 21 14 133 72 247 129 181 90 246 121 409 192 215 94 558 186 785 213 85 9
-407 9 490 -1 53 -6 221 -39 317 -62 101 -24 343 -127 463 -197 169 -98 385
--302 493 -464 153 -230 225 -449 233 -709 l4 -130 -23 38 c-109 188 -158 265
--217 342 -63 84 -195 222 -265 277 -193 155 -441 266 -679 304 -21 3 -48 8
--60 11 -11 3 -104 7 -206 9 -214 3 -283 -4 -462 -51 -262 -68 -566 -230 -905
--483 -91 -68 -401 -307 -698 -540 -25 -19 -64 -48 -81 -60 -11 -7 -57 -40
--104 -73 -399 -285 -780 -458 -1218 -555 -22 -4 -23 -8 -18 -52 12 -91 17
--127 22 -157 3 -16 7 -39 8 -50 2 -11 6 -33 10 -50 3 -16 8 -39 10 -51 16 -83
-63 -259 97 -364 298 -907 926 -1634 1774 -2057 99 -49 188 -90 215 -98 3 -1
-19 -7 35 -14 95 -40 325 -117 405 -136 8 -2 56 -13 105 -25 282 -67 450 -85
-790 -85 245 0 414 10 520 29 11 2 38 7 60 11 874 149 1654 616 2196 1315 182
-235 359 543 471 820 68 168 167 485 155 497 -15 14 -328 -90 -512 -170 -156
--68 -496 -238 -665 -334 -55 -30 -133 -73 -285 -153 -182 -97 -438 -222 -565
--275 -123 -52 -389 -146 -450 -159 -14 -3 -52 -12 -85 -21 -74 -18 -220 -44
--300 -53 -126 -14 -537 -4 -565 13 -3 2 -26 6 -50 10 -25 3 -53 8 -62 11 -9 3
--25 6 -35 8 -126 25 -348 107 -476 177 -38 22 -71 39 -73 39 -6 0 -134 90
--184 129 -79 62 -234 225 -292 307 -161 229 -241 460 -255 727 -4 86 -3 127 5
-127 5 0 15 -12 21 -27 21 -56 119 -215 192 -314 151 -203 324 -354 529 -461
-47 -24 87 -44 90 -45 3 0 23 -8 45 -17 69 -29 208 -67 300 -81 117 -19 178
--23 310 -23 209 0 360 26 565 100 195 70 363 163 664 368 45 31 296 222 451
-344 258 204 453 348 606 451 256 170 323 207 621 343 111 51 314 113 517 158
-22 5 23 8 16 57 -4 29 -9 68 -11 87 -5 39 -5 41 -28 165 -92 493 -320 1013
--626 1423 -481 645 -1161 1103 -1935 1302 -82 21 -170 41 -195 45 -24 4 -47 8
--50 10 -3 1 -27 6 -54 9 -27 4 -52 9 -55 11 -3 1 -37 6 -76 10 -38 3 -83 8
--100 11 -34 6 -590 15 -596 10z m412 -2701 c239 -50 445 -207 562 -427 31 -59
-62 -153 78 -236 15 -78 6 -255 -16 -337 -42 -157 -130 -299 -250 -404 -271
--237 -668 -267 -968 -74 -465 298 -508 951 -86 1306 102 86 237 150 366 173
-15 3 29 7 31 8 9 10 227 3 283 -9z"/>
-</g>
-</svg>
-</file>
-
-<file path="public/domain_default/favicon/site.webmanifest">
-{
-    "name": "",
-    "short_name": "",
-    "icons": [
-        {
-            "src": "./android-chrome-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "./android-chrome-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ],
-    "theme_color": "#ffffff",
-    "background_color": "#ffffff",
-    "display": "standalone"
-}
-</file>
-
-<file path="public/domain_default/html/info_block_en.html">
-<div style="text-align: center;">
-    <h1>Welcome to SAVVA, your affinity network</h1>
-    <p>No registration is needed—having a PulseChain address is enough.</p>
-    <p>Feel free to explore, read, and support the authors you like. If you'd like to post content, just stake 5000 SAVVA tokens.</p>
-    <p>Remember, SAVVA is an open platform, which means you can create your own site like this one. It's completely free.</p>
-    <p>Let us know if you're interested in running your own site!</p>
-  </div>
-</file>
-
-<file path="public/domain_default/html/info_block_fr.html">
-<div style="text-align: center;">
-    <h1>Bienvenue sur la plateforme SAVVA, votre réseau par centres d'intérêt</h1>
-    <p>Aucune inscription n'est requise — il suffit d'avoir une adresse PulseChain.</p>
-    <p>Sentez-vous libre : explorez, lisez et soutenez les auteurs qui vous plaisent. Si vous souhaitez publier du contenu, il suffit de staker 5000 tokens SAVVA.</p>
-    <p>N'oubliez pas que la plateforme SAVVA est ouverte, et que vous pouvez créer votre propre site, comme celui-ci. C'est complètement gratuit.</p>
-    <p>Faites-nous savoir si vous êtes intéressé par le lancement de votre propre site !</p>
-</div>
-</file>
-
-<file path="public/domain_default/html/info_block_ru.html">
-<div style="text-align: center;">
-    <h1>Добро пожаловать на платформу SAVVA, вашу сеть по интересам</h1>
-    <p>Регистрация не требуется — достаточно иметь адрес PulseChain.</p>
-    <p>Чувствуйте себя свободно: изучайте, читайте и поддерживайте авторов, которые вам нравятся. Если хотите публиковать контент, достаточно застейкать 5000 токенов SAVVA.</p>
-    <p>Помните, что платформа SAVVA открыта, и вы можете создать свой собственный сайт, как этот. Это абсолютно бесплатно.</p>
-    <p>Дайте нам знать, если вы заинтересованы в запуске своего сайта!</p>
-  </div>
-</file>
-
-<file path="public/domain_default/html/info_block_ua.html">
-<div style="text-align: center;">
-    <h1>Ласкаво просимо на платформу SAVVA, вашу мережу за інтересами</h1>
-    <p>Реєстрація не потрібна — достатньо мати адресу PulseChain.</p>
-    <p>Почувайтесь вільно: досліджуйте, читайте та підтримуйте авторів, які вам подобаються. Якщо бажаєте публікувати контент, достатньо застейкати 5000 токенів SAVVA.</p>
-    <p>Пам’ятайте, що платформа SAVVA відкрита, і ви можете створити власний сайт, як цей. Це абсолютно безкоштовно.</p>
-    <p>Дайте нам знати, якщо ви зацікавлені у запуску власного сайту!</p>
-</div>
-</file>
-
-<file path="public/domain_default/html/info_block.html">
-<div>
-    Some text about the project.
-</div>
-
-<div class="icons-container">
-    <a href="https://t.me/savvaapp">
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-                d="M22 43C33.598 43 43 33.598 43 22C43 10.402 33.598 1 22 1C10.402 1 1 10.402 1 22C1 33.598 10.402 43 22 43Z"
-                stroke="black" stroke-width="2"></path>
-            <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M14.9581 19.2048C12.8968 20.1103 10.779 21.0408 8.84231 22.1141C7.83107 22.8591 9.17507 23.3861 10.436 23.8804C10.6365 23.959 10.8348 24.0368 11.0212 24.1144C11.1764 24.1625 11.3342 24.213 11.4941 24.2643C12.8965 24.7138 14.4601 25.2151 15.8216 24.461C18.0581 23.1683 20.1687 21.6738 22.2777 20.1804C22.9686 19.6911 23.6594 19.202 24.3544 18.7201C24.387 18.6991 24.4237 18.6752 24.4639 18.649C25.0559 18.2628 26.3874 17.3944 25.8949 18.5911C24.7303 19.8726 23.4827 21.0071 22.2285 22.1478C21.3831 22.9165 20.5347 23.6881 19.7065 24.5093C18.9852 25.0991 18.2361 26.285 19.0438 27.1108C20.9042 28.4212 22.7936 29.6999 24.682 30.9778C25.2965 31.3936 25.9109 31.8095 26.5241 32.2263C27.5634 33.0612 29.1877 32.3858 29.4162 31.0812C29.5177 30.481 29.6198 29.8809 29.7218 29.2808C30.2856 25.9641 30.8496 22.6461 31.3478 19.3186C31.4155 18.7966 31.4922 18.2747 31.5691 17.7525C31.7552 16.4869 31.9416 15.2197 31.9998 13.9473C31.8498 12.6774 30.3195 12.9567 29.468 13.2422C25.091 14.9181 20.7578 16.7181 16.4416 18.5499C15.9527 18.7678 15.4571 18.9856 14.9581 19.2048Z"
-                fill="black"></path>
-        </svg>
-    </a>
-</div>
-</file>
-
-<file path="public/domain_default/modules/categories.yaml">
-required: false
+<file path="public/domain_default/config.yaml">
+logo:
+  light: images/logo_light.png
+  dark: images/logo_dark.png
+  light_mobile: images/logo_light.png
+  dark_mobile: images/logo_dark.png
+favicon:
+  apple-touch-icon: favicon/apple-touch-icon.png
+  16: favicon/favicon-16x16.png
+  32: favicon/favicon-32x32.png
+  manifest: favicon/site.webmanifest
+  mask-icon:
+    href: favicon/safari-pinned-tab.svg
+    color: '#5bbad5'
+  base: favicon/favicon.ico
+  meta:
+    - name: msapplication-TileColor
+      content: '#da532c'
+    - name: theme-color
+      content: '#ffffff'
+GA_tag: G-XDSTY1ND4P
+modules:
+  content_lists: modules/content_lists.yaml
+  categories: modules/categories.yaml
+  tabs: modules/tabs.yaml
+default_locale: en
 locales:
-  ru:
-    - SAVVA Платформа
-    - SAVVA Документация
-    - Вопросы и ответы
-  en:
-    - SAVVA Talk
-    - SAVVA Documentation
-    - Q&A
-  fr:
-    - Plateforme SAVVA
-    - Documentation SAVVA
-    - Questions et Réponses
-  ua:
-    - Платформа SAVVA
-    - Документація SAVVA
-    - Запитання та Відповіді
-</file>
-
-<file path="public/domain_default/modules/content_lists.yaml">
-market_contract: ''
-list:
-  main:
-    title:
-      ru: 'Анонсы'
-      en: 'Announcements'
-      ua: 'Анонси'
-      fr: 'Annonces'
-    on_market: true
-  new:
-    title:
-      ru: 'Новые анонсы'
-      en: 'New announces'
-      ua: 'Новi анонсы'
-      fr: 'new annonces'
-    on_market: true
-</file>
-
-<file path="public/domain_default/modules/staker_levels.yaml">
-staker_levels:
-  levels:
-  - min: 0
-    icon:
-    name: 
-      - locale: en
-        text: "Guest"
-      - locale: ru
-        text: "Гость"
-      - locale: fr
-        text: "Invité"
-      - locale: ua
-        text: "Гість"
-      - locale: de
-        text: "Gast"
-  - min: 5000
-    icon: /images/icons8-clam-50.svg
-    name: 
-      - locale: en
-        text: "Clam"
-      - locale: ru
-        text: "Моллюск"
-      - locale: fr
-        text: "Palourde"
-      - locale: ua
-        text: "Молюск"
-      - locale: de
-        text: "Muschel"
-  - min: 10000
-    icon: /images/icons8-shrimp-50.svg
-    name: 
-      - locale: en
-        text: "Shrimp"
-      - locale: ru
-        text: "Креветка"
-      - locale: fr
-        text: "Crevette"
-      - locale: ua
-        text: "Креветка"
-      - locale: de
-        text: "Garnele"
-  - min: 20000
-    icon: /images/icons8-seahorse-50.svg
-    name: 
-      - locale: en
-        text: "Seahorse"
-      - locale: ru
-        text: "Морской конек"
-      - locale: fr
-        text: "Hippocampe"
-      - locale: ua
-        text: "Морський коник"
-      - locale: de
-        text: "Seepferdchen"
-  - min: 50000
-    icon: /images/icons8-top-view-fish-50.svg
-    name: 
-      - locale: en
-        text: "Fish"
-      - locale: ru
-        text: "Рыба"
-      - locale: fr
-        text: "Poisson"
-      - locale: ua
-        text: "Риба"
-      - locale: de
-        text: "Fisch"
-  - min: 100000
-    icon: /images/icons8-dolphin-50.svg
-    name: 
-      - locale: en
-        text: "Dolphin"
-      - locale: ru
-        text: "Дельфин"
-      - locale: fr
-        text: "Dauphin"
-      - locale: ua
-        text: "Дельфін"
-      - locale: de
-        text: "Delfin"
-  - min: 200000 
-    icon: /images/icons8-shark-50.svg
-    name: 
-      - locale: en
-        text: "Shark"
-      - locale: ru
-        text: "Акула"
-      - locale: fr
-        text: "Requin"
-      - locale: ua
-        text: "Акула"
-      - locale: de
-        text: "Hai"
-  - min: 500000
-    icon: /images/icons8-stingray.svg
-    name: 
-      - locale: en
-        text: "Stingray"
-      - locale: ru
-        text: "Скат"
-      - locale: fr
-        text: "Raie"
-      - locale: ua
-        text: "Скат"
-      - locale: de
-        text: "Stachelrochen"
-  - min: 1000000
-    icon: /images/icons8-orca-50.svg
-    name: 
-      - locale: en
-        text: "Orca"
-      - locale: ru
-        text: "Косатка"
-      - locale: fr
-        text: "Orque"
-      - locale: ua
-        text: "Косатка"
-      - locale: de
-        text: "Orca"
-  - min: 10000000
-    icon: /images/icons8-whale-50.svg
-    name: 
-      - locale: en
-        text: "Whale"
-      - locale: ru
-        text: "Кит"
-      - locale: fr
-        text: "Baleine"
-      - locale: ua
-        text: "Кит"
-      - locale: de
-        text: "Wal"
+  - code: en
+    name: English
+    title: 'SAVVA.APP - Beyond Likes Social'
+    dictionary: i18n/en.yaml
+  - code: ru
+    name: Русский
+    title: 'SAVVA.APP - За пределами лайков'
+    dictionary: i18n/ru.yaml
+  - code: fr
+    name: Français
+    title: 'SAVVA.APP - Au-delà des likes'
+    dictionary: i18n/fr.yaml
+  - code: ua
+    name: Українська
+    title: 'SAVVA.APP - Поза межами вподобань'
+    dictionary: i18n/ua.yaml
 </file>
 
 <file path="scripts/i18n-docs.mjs">
@@ -17621,6 +17668,179 @@ export default function ChapterSelector(props) {
 }
 </file>
 
+<file path="src/components/post/CommentCard.jsx">
+// src/components/post/CommentCard.jsx
+import { For, Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import PostInfo from "../feed/PostInfo";
+import UserCard from "../ui/UserCard";
+
+/**
+ * Recursively renders a comment and its children.
+ */
+export default function CommentCard(props) {
+  const app = useApp(); // Correctly assign the app context to a variable
+  const { t } = app;
+  const comment = () => props.comment;
+  const level = () => props.level || 0;
+
+  const localizedPreview = createMemo(() => {
+    const locales = comment().savva_content?.locales;
+    if (!locales) return "";
+    const lang = app.lang(); // Now this will work
+    if (locales[lang]?.text_preview) return locales[lang].text_preview;
+    if (locales.en?.text_preview) return locales.en.text_preview;
+    const firstKey = Object.keys(locales)[0];
+    return firstKey ? locales[firstKey].text_preview : "";
+  });
+
+  return (
+    <div
+      class="flex flex-col"
+      style={{ "padding-left": level() > 0 ? "1.5rem" : "0" }}
+    >
+      <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+        <div class="mb-2">
+          <UserCard author={comment().author} compact={true} />
+        </div>
+        <p class="text-sm">{localizedPreview()}</p>
+        <div class="mt-2 flex items-center justify-between">
+          <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
+          <button class="text-xs font-semibold hover:underline">Reply</button>
+        </div>
+      </div>
+      
+      <Show when={comment().children?.length > 0}>
+        <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
+          <For each={comment().children}>
+            {(reply) => <CommentCard comment={reply} level={level() + 1} />}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/post/PostComments.jsx">
+// src/components/post/PostComments.jsx
+import { createMemo, createResource, For, Show, createSignal, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { toChecksumAddress } from "../../blockchain/utils";
+import Spinner from "../ui/Spinner";
+import CommentCard from "./CommentCard";
+
+function buildCommentTree(comments, rootPostId) {
+  if (!comments || comments.length === 0) return [];
+  
+  const map = new Map();
+  const roots = [];
+
+  // First pass: create a map and initialize children array
+  for (const comment of comments) {
+    comment.children = [];
+    map.set(comment.savva_cid, comment);
+  }
+
+  // Second pass: build the tree
+  for (const comment of comments) {
+    const parentId = comment.savva_content?.parent_post;
+    if (parentId === rootPostId) {
+      roots.push(comment);
+    } else if (map.has(parentId)) {
+      map.get(parentId).children.push(comment);
+    }
+  }
+  
+  return roots;
+}
+
+async function fetchComments(params) {
+  const { app, postId, offset = 0 } = params;
+  if (!app.wsMethod || !postId) return { list: [], nextOffset: null };
+
+  const getChildren = app.wsMethod("content-children");
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    savva_cid: postId,
+    max_deep: 4,
+    limit: 20,
+    offset: offset,
+  };
+
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  try {
+    const res = await getChildren(requestParams);
+    const list = Array.isArray(res?.list) ? res.list : [];
+    const nextOffset = res?.next_offset > 0 ? res.next_offset : null;
+    return { list, nextOffset };
+  } catch (err) {
+    console.error(`Failed to fetch comments for post '${postId}':`, err);
+    return { list: [], nextOffset: null, error: err.message };
+  }
+}
+
+// --- TEMPORARY DEBUGGING DATA ---
+const dummyComment = {
+  author: {
+    name: "testuser",
+    staked: "5000000000000000000000",
+  },
+  savva_content: {
+    locales: {
+      en: { text_preview: "This is a test comment to verify rendering." }
+    }
+  },
+  effective_time: new Date().toISOString(),
+  reactions: [5, 2],
+  children: [
+    {
+      author: { name: "reply_user" },
+      savva_content: { locales: { en: { text_preview: "This is a nested reply." } } },
+      effective_time: new Date().toISOString(),
+      reactions: [1],
+      children: []
+    }
+  ]
+};
+// --- END TEMPORARY DEBUGGING DATA ---
+
+export default function PostComments(props) {
+  const app = useApp();
+  // ... all data fetching logic remains but is unused by the temporary JSX ...
+  const postId = () => props.post?.savva_cid;
+  const [comments, setComments] = createSignal([]);
+  const [nextOffset, setNextOffset] = createSignal(0);
+  const [isLoading, setIsLoading] = createSignal(false);
+  const [initialData] = createResource(() => ({ app, postId: postId() }), fetchComments);
+  createEffect(() => {
+    const data = initialData();
+    if (data && !initialData.loading) {
+      setComments(data.list || []);
+      setNextOffset(data.nextOffset);
+    }
+  });
+
+
+  return (
+    <div class="mt-8 pt-6 border-t border-[hsl(var(--border))]">
+      <h3 class="text-xl font-semibold mb-4">Comments</h3>
+      
+      {/* --- TEMPORARY DEBUGGING JSX --- */}
+      <div class="space-y-4">
+        <CommentCard comment={dummyComment} />
+      </div>
+      {/* --- END TEMPORARY JSX --- */}
+
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/post/PostControls.jsx">
 // src/components/post/PostControls.jsx
 import { createSignal, Show, createMemo } from "solid-js";
@@ -20524,51 +20744,6 @@ locales:
 ```
 </file>
 
-<file path="public/domain_default/config.yaml">
-logo:
-  light: images/logo_light.png
-  dark: images/logo_dark.png
-  light_mobile: images/logo_light.png
-  dark_mobile: images/logo_dark.png
-favicon:
-  apple-touch-icon: favicon/apple-touch-icon.png
-  16: favicon/favicon-16x16.png
-  32: favicon/favicon-32x32.png
-  manifest: favicon/site.webmanifest
-  mask-icon:
-    href: favicon/safari-pinned-tab.svg
-    color: '#5bbad5'
-  base: favicon/favicon.ico
-  meta:
-    - name: msapplication-TileColor
-      content: '#da532c'
-    - name: theme-color
-      content: '#ffffff'
-GA_tag: G-XDSTY1ND4P
-modules:
-  content_lists: modules/content_lists.yaml
-  categories: modules/categories.yaml
-  tabs: modules/tabs.yaml
-default_locale: en
-locales:
-  - code: en
-    name: English
-    title: 'SAVVA.APP - Beyond Likes Social'
-    dictionary: i18n/en.yaml
-  - code: ru
-    name: Русский
-    title: 'SAVVA.APP - За пределами лайков'
-    dictionary: i18n/ru.yaml
-  - code: fr
-    name: Français
-    title: 'SAVVA.APP - Au-delà des likes'
-    dictionary: i18n/fr.yaml
-  - code: ua
-    name: Українська
-    title: 'SAVVA.APP - Поза межами вподобань'
-    dictionary: i18n/ua.yaml
-</file>
-
 <file path="public/default_connect.yaml">
 domain: savva.app
 backendLink: https://ui.savva.app/api/
@@ -23146,6 +23321,123 @@ sections:
         file: core-concepts/showing-posts.md
 </file>
 
+<file path="public/domain_default/modules/tabs.yaml">
+tabs:
+  - type: leaders
+    right_panel:
+      available: true
+      blocks:
+        - type: html
+          en: /html/info_block_en.html
+          ru: /html/info_block_ru.html
+          ua: /html/info_block_ua.html
+          fr: /html/info_block_fr.html
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: actual
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: comments
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: new
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+  - type: for-you
+    private: true
+    right_panel:
+      available: false
+      blocks:
+        - type: content_List
+          list_name: main
+          count: 7
+</file>
+
+<file path="public/domain_default/domain.css">
+:root {
+  --gradient: linear-gradient(to top left, #000c40, #607d8b);
+  --background: 243 100% 98.26%;
+  --foreground: 243 10% 0.52%;
+
+  --muted: 243 10% 91.3%;
+  --muted-foreground: 243 5% 41.3%;
+
+  --popover: 243 10% 91.3%;
+  --popover-foreground: 243 10% 0.65%;
+
+  --card: 243 10% 91.3%;
+  --card-foreground: 243 10% 0.65%;
+
+  --border: 243 15% 89.52%;
+  --input: 243 15% 89.52%;
+
+  --primary: 243 100% 13%;
+  --primary-foreground: 243 2% 91.3%;
+
+  --secondary: 243 5% 81.73%;
+  --secondary-foreground: 243 7% 11.3%;
+
+  --accent: 243 5% 95.65%;
+  --accent-foreground: 243 7% 11.3%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+
+  --ring: 243 100% 13%;
+
+  --radius: 0.5rem;
+
+  --tabs-justify: center;
+}
+
+.dark {
+  /* CSS: .bg-gradient { background: var(--gradient) } */
+  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
+
+  --background: 244 33.800000000000004% 6.32%;
+  --foreground: 244 5.2% 98.95%;
+
+  --muted: 244 26% 23.700000000000003%;
+  --muted-foreground: 244 5.2% 57.9%;
+
+  --popover: 244 54.6% 10.27%;
+  --popover-foreground: 244 5.2% 98.95%;
+
+  --card: 244 54.6% 10.27%;
+  --card-foreground: 244 5.2% 98.95%;
+
+  --border: 244 26% 23.700000000000003%;
+  --input: 244 26% 23.700000000000003%;
+
+  --primary: 244 52% 79%;
+  --primary-foreground: 244 5.2% 7.9%;
+
+  --secondary: 244 26% 23.700000000000003%;
+  --secondary-foreground: 244 5.2% 98.95%;
+
+  --accent: 244 26% 23.700000000000003%;
+  --accent-foreground: 244 5.2% 98.95%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 244 5.2% 98.95%;
+
+  --ring: 244 52% 79%;
+}
+</file>
+
 <file path="src/blockchain/auth.js">
 // src/blockchain/auth.js
 import { hexToString } from "viem";
@@ -24710,123 +25002,6 @@ export default dbg;
 }
 </file>
 
-<file path="public/domain_default/modules/tabs.yaml">
-tabs:
-  - type: leaders
-    right_panel:
-      available: true
-      blocks:
-        - type: html
-          en: /html/info_block_en.html
-          ru: /html/info_block_ru.html
-          ua: /html/info_block_ua.html
-          fr: /html/info_block_fr.html
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: actual
-    right_panel:
-      available: false
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: comments
-    right_panel:
-      available: false
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: new
-    right_panel:
-      available: false
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-  - type: for-you
-    private: true
-    right_panel:
-      available: false
-      blocks:
-        - type: content_List
-          list_name: main
-          count: 7
-</file>
-
-<file path="public/domain_default/domain.css">
-:root {
-  --gradient: linear-gradient(to top left, #000c40, #607d8b);
-  --background: 243 100% 98.26%;
-  --foreground: 243 10% 0.52%;
-
-  --muted: 243 10% 91.3%;
-  --muted-foreground: 243 5% 41.3%;
-
-  --popover: 243 10% 91.3%;
-  --popover-foreground: 243 10% 0.65%;
-
-  --card: 243 10% 91.3%;
-  --card-foreground: 243 10% 0.65%;
-
-  --border: 243 15% 89.52%;
-  --input: 243 15% 89.52%;
-
-  --primary: 243 100% 13%;
-  --primary-foreground: 243 2% 91.3%;
-
-  --secondary: 243 5% 81.73%;
-  --secondary-foreground: 243 7% 11.3%;
-
-  --accent: 243 5% 95.65%;
-  --accent-foreground: 243 7% 11.3%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  --ring: 243 100% 13%;
-
-  --radius: 0.5rem;
-
-  --tabs-justify: center;
-}
-
-.dark {
-  /* CSS: .bg-gradient { background: var(--gradient) } */
-  --gradient: linear-gradient(to top left, #acb6e5, #86fde8);
-
-  --background: 244 33.800000000000004% 6.32%;
-  --foreground: 244 5.2% 98.95%;
-
-  --muted: 244 26% 23.700000000000003%;
-  --muted-foreground: 244 5.2% 57.9%;
-
-  --popover: 244 54.6% 10.27%;
-  --popover-foreground: 244 5.2% 98.95%;
-
-  --card: 244 54.6% 10.27%;
-  --card-foreground: 244 5.2% 98.95%;
-
-  --border: 244 26% 23.700000000000003%;
-  --input: 244 26% 23.700000000000003%;
-
-  --primary: 244 52% 79%;
-  --primary-foreground: 244 5.2% 7.9%;
-
-  --secondary: 244 26% 23.700000000000003%;
-  --secondary-foreground: 244 5.2% 98.95%;
-
-  --accent: 244 26% 23.700000000000003%;
-  --accent-foreground: 244 5.2% 98.95%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 244 5.2% 98.95%;
-
-  --ring: 244 52% 79%;
-}
-</file>
-
 <file path="scripts/i18n.mjs">
 // scripts/i18n.mjs
 import fs from "node:fs";
@@ -25758,6 +25933,43 @@ export default function NewContentBanner() {
 }
 </file>
 
+<file path="src/components/settings/DeveloperSection.jsx">
+// src/components/settings/DeveloperSection.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug";
+
+export default function DeveloperSection() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
+
+      {/* Show translation keys */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.showKeys()}
+          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.showKeys")}</span>
+      </label>
+
+      {/* Enable debug logging */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={dbg.enabled()}
+          onInput={(e) => dbg.enable(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.debug.enable")}</span>
+      </label>
+    </section>
+  );
+}
+</file>
+
 <file path="src/components/tabs/RightRailLayout.jsx">
 // src/components/tabs/RightRailLayout.jsx
 import { Show } from "solid-js";
@@ -26150,43 +26362,6 @@ export default function EditorFilesDrawer(props) {
         message={t("editor.files.confirmDeleteMessage", { name: fileToDelete() })}
       />
     </>
-  );
-}
-</file>
-
-<file path="src/components/settings/DeveloperSection.jsx">
-// src/components/settings/DeveloperSection.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug";
-
-export default function DeveloperSection() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
-
-      {/* Show translation keys */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={app.showKeys()}
-          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.showKeys")}</span>
-      </label>
-
-      {/* Enable debug logging */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={dbg.enabled()}
-          onInput={(e) => dbg.enable(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.debug.enable")}</span>
-      </label>
-    </section>
   );
 }
 </file>
@@ -27167,7 +27342,7 @@ import { pushToast } from "../ui/toast";
 
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
-  app.updateTokenPrices?.(payload);
+  app.updateTokenPrices?.(payload.data);
 }
 
 export async function handleContentProcessed(app, payload) {
@@ -30416,6 +30591,7 @@ import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
 import ContextMenu from "../components/ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 import PostControls from "../components/post/PostControls.jsx";
+import PostComments from "../components/post/PostComments.jsx";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -30724,6 +30900,7 @@ export default function PostPage() {
                       </Match>
                     </Switch>
                     <PostControls post={post} />
+                    <PostComments post={post} />
                   </div>
                   <RightPanel />
                 </div>

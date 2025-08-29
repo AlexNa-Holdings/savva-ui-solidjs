@@ -5,7 +5,7 @@ import { pushToast } from "../ui/toast";
 
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
-  app.updateTokenPrices?.(payload);
+  app.updateTokenPrices?.(payload.data);
 }
 
 export async function handleContentProcessed(app, payload) {

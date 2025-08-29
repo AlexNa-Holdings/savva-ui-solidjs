@@ -122,6 +122,7 @@ export default function PostSubmissionWizard(props) {
                     publishedData={publishedData}
                     onComplete={handleNextStep}
                     onCancel={handleValidationBack}
+                    editorMode={props.editorMode}
                   />
                 </Match>
               </Switch>

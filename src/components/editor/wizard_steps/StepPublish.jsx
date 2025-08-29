@@ -33,7 +33,7 @@ export default function StepPublish(props) {
     setStatus("waiting_signature");
 
     try {
-      const { postParams, publishedData } = props;
+      const { postParams, publishedData, editorMode } = props;
       const user = app.authorizedUser();
       const domain = app.selectedDomainName();
       const descriptorCid = publishedData().descriptorCid;
@@ -43,12 +43,15 @@ export default function StepPublish(props) {
         throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
       }
 
-      const publishAsNew = postParams().publishAsNewPost || false;
-      const contentType = publishAsNew ? "post" : "post-edit";
-
+      let contentType;
+      if (editorMode === 'new_post') {
+        contentType = 'post';
+      } else { // edit_post mode
+        contentType = postParams().publishAsNewPost ? 'post' : 'post-edit';
+      }
+      
       dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid, contentType });
 
-      // Request a write-enabled contract instance
       const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
       
       const hash = await contract.write.reg([
