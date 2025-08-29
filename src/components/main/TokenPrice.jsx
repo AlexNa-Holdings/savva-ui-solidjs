@@ -22,18 +22,34 @@ function DownArrow() {
 export default function TokenPrice() {
   const app = useApp();
   const [isAnimating, setIsAnimating] = createSignal(false);
+  const sourceData = () => app.savvaTokenPrice();
+  
+  // This signal holds the price data that is currently visible on screen.
+  const [displayData, setDisplayData] = createSignal(sourceData());
 
-  const priceData = () => app.savvaTokenPrice();
+  // Effect to handle the animation logic.
+  createEffect(on(sourceData, (newValue, prevValue) => {
+    // Don't animate on initial render
+    if (prevValue === undefined || prevValue === null) {
+      setDisplayData(newValue);
+      return;
+    }
 
-  const triggerAnimation = () => {
-    setIsAnimating(false);
-    requestAnimationFrame(() => {
-      setIsAnimating(true);
-      setTimeout(() => setIsAnimating(false), 300);
-    });
-  };
+    // 1. Start the animation, showing the OLD value first.
+    setDisplayData(prevValue);
+    setIsAnimating(true);
 
-  createEffect(on(priceData, triggerAnimation, { defer: true }));
+    // 2. Halfway through the 400ms animation, swap to the NEW value.
+    setTimeout(() => {
+      setDisplayData(newValue);
+    }, 200);
+
+    // 3. After the animation is complete, remove the animation class.
+    setTimeout(() => {
+      setIsAnimating(false);
+    }, 400);
+
+  }, { defer: true }));
 
   const formatPrice = (price) => {
     if (typeof price !== 'number') return '$0.0000';
@@ -46,14 +62,11 @@ export default function TokenPrice() {
   };
 
   return (
-    <Show when={priceData()}>
+    <Show when={displayData()}>
       {(data) => (
-        <div 
-          class="flex items-center gap-2 cursor-pointer"
-          onClick={triggerAnimation}
-        >
+        <div class="flex items-center gap-2">
           <SavvaTokenIcon class="w-5 h-5" />
-          <div classList={{ "price-animation": isAnimating() }} class="flex items-center gap-2 text-sm">
+          <div classList={{ "default-animation": isAnimating() }} class="flex items-center gap-2 text-sm">
             <span class="font-semibold">{formatPrice(data().price)}</span>
             <div classList={{ "text-emerald-500": data().gain >= 0, "text-red-500": data().gain < 0 }} class="flex items-center gap-1 text-xs">
               <Show when={data().gain >= 0} fallback={<DownArrow />}>
