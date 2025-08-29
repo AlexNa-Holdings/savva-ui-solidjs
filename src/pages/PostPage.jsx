@@ -23,6 +23,7 @@ import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
 import ContextMenu from "../components/ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 import PostControls from "../components/post/PostControls.jsx";
+import PostComments from "../components/post/PostComments.jsx";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -331,6 +332,7 @@ export default function PostPage() {
                       </Match>
                     </Switch>
                     <PostControls post={post} />
+                    <PostComments post={post} />
                   </div>
                   <RightPanel />
                 </div>
