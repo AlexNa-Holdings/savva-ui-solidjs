@@ -5,17 +5,16 @@ import { stakerLevelIconFor } from "./icons/FishIcons.jsx";
 import { formatUnits } from "viem";
 
 const STAKER_LEVELS = [
-    // do not remove comments !!!
-    { min: 0, key: "guest" }, //t("stakerLevels.guest")
-    { min: 5000, key: "clam" }, //t("stakerLevels.clam")
-    { min: 10000, key: "shrimp" }, //t("stakerLevels.shrimp")
-    { min: 20000, key: "seahorse" }, //t("stakerLevels.seahorse")
-    { min: 50000, key: "fish" }, //t("stakerLevels.fish")
-    { min: 100000, key: "dolphin" }, //t("stakerLevels.dolphin")
-    { min: 200000, key: "shark" }, //t("stakerLevels.shark")
-    { min: 500000, key: "stingray" }, //t("stakerLevels.stingray")
-    { min: 1000000, key: "orca" }, //t("stakerLevels.orca")
-    { min: 10000000, key: "whale" }, //t("stakerLevels.whale")
+    { min: 0, key: "guest" }, 
+    { min: 5000, key: "clam" }, 
+    { min: 10000, key: "shrimp" }, 
+    { min: 20000, key: "seahorse" }, 
+    { min: 50000, key: "fish" }, 
+    { min: 100000, key: "dolphin" }, 
+    { min: 200000, key: "shark" }, 
+    { min: 500000, key: "stingray" }, 
+    { min: 1000000, key: "orca" }, 
+    { min: 10000000, key: "whale" }, 
 ];
 
 function getStakerLevel(levels, stakedAmount) {

@@ -31,12 +31,10 @@ export async function handleContentProcessed(app, payload) {
 }
 
 export function handlePing(app) {
-  dbg.log("Alerts:ping", "Received ping, sending pong.");
   app.ws?.sendJson({ type: 'pong' });
 }
 
 export function handlePong() {
-  dbg.log("Alerts:pong", "Received pong.");
   // Do nothing
 }
 

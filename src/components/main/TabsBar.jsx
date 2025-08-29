@@ -74,6 +74,7 @@ export default function TabsBar() {
 
   const [selectedId, setSelectedId] = createSignal("");
   const [activatedTabs, setActivatedTabs] = createSignal(new Set());
+  const [isInitialized, setIsInitialized] = createSignal(false);
 
   const items = createMemo(() =>
     (tabsRaw() || []).map((tab) => {
@@ -86,6 +87,7 @@ export default function TabsBar() {
 
   createEffect(() => {
     const list = tabsRaw();
+    if (tabsRaw.loading) return;
     if (!list || list.length === 0) return setSelectedId("");
 
     const key = firstSeg(route());
@@ -105,7 +107,7 @@ export default function TabsBar() {
       
       if (isPageRoute) {
         setSelectedId("");
-      } else if (r === "/") {
+      } else if (r === "/" && !isInitialized()) {
         const first = list[0];
         const defaultPath = pathFor(first.type || first.id);
         batch(() => {
@@ -113,6 +115,7 @@ export default function TabsBar() {
           navigate(defaultPath, { replace: true });
           setLastTabRoute(defaultPath);
           setActivatedTabs(prev => new Set(prev).add(first.id));
+          setIsInitialized(true);
         });
       }
     }

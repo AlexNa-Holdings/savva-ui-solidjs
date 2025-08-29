@@ -1,13 +1,22 @@
 // src/components/ui/LangSelector.jsx
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createMemo, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { LANG_INFO } from "../../i18n/useI18n";
+import { dbg } from "../../utils/debug";
 
 export default function LangSelector(props) {
   const app = useApp();
   const codes = createMemo(() => props.codes || []);
   const value = () => (props.value || app.lang?.() || "").toLowerCase();
-  const onChange = (code) => (props.onChange ? props.onChange(code) : app.setLang?.(code));
+  
+  const onChange = (code) => {
+    dbg.log("LangSelector", `User clicked '${code}'. Calling onChange.`);
+    return (props.onChange ? props.onChange(code) : app.setLang?.(code));
+  };
+  
+  createEffect(() => {
+    dbg.log("LangSelector", `Active value updated to '${value()}'`);
+  });
   
   const isStretch = () => props.variant === 'stretch';
 
@@ -16,11 +25,10 @@ export default function LangSelector(props) {
       <div 
         classList={{
           'themed-segment': !isStretch(),
-          // --- MODIFICATION: Use CSS Grid for the stretch variant ---
           'grid w-full grid-cols-4 gap-1 p-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]': isStretch(),
         }}
         class={props.class || ""} 
-        role="group" // Changed from radiogroup for better semantics with multiple rows
+        role="group"
         aria-label={app.t("rightPane.language")}
       >
         <For each={codes()}>
@@ -31,7 +39,6 @@ export default function LangSelector(props) {
             return (
               <button
                 type="button"
-                // No flex-1 needed for grid layout
                 class={`themed-pill ${active() ? "is-active" : ""}`}
                 aria-pressed={active()}
                 onClick={() => onChange(c)}

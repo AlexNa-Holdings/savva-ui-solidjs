@@ -15,7 +15,7 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const BATCH_SIZE = 60; // how many keys to ask the model about per request
 const targetLang = process.argv[2] || null;
-const onlyEnglish = targetLang === 'en';
+const onlyEnglish = targetLang === "en";
 
 // ---------- Collect used keys (scan t("key") calls) ----------
 const exts = [".js", ".jsx", ".ts", ".tsx"];
@@ -220,11 +220,29 @@ async function translateTo(langCode, englishPairs) {
     console.log("[i18n] No missing English strings to fill.");
   }
 
+  // ---------- 2.5) Detect 'force retranslate' flags on English ('!…') ----------
+  // Only applicable when NOT in en-only mode.
+  const flaggedKeys = new Set();
+  const cleanFlagText = {};
+  if (!onlyEnglish) {
+    for (const k of Object.keys(enNew)) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        flaggedKeys.add(k);
+        cleanFlagText[k] = v.slice(1).trim(); // the source text to re-translate from English
+      }
+    }
+  }
+
   // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
   if (onlyEnglish) {
     console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
     return;
   }
+
+  // We'll track which flagged keys succeeded in ALL languages,
+  // so we can safely strip '!' from English afterwards.
+  const maybeStripBang = new Set(flaggedKeys); // remove any key that fails in a language
 
   for (const f of langFiles) {
     if (f === "en.js") continue;
@@ -236,14 +254,27 @@ async function translateTo(langCode, englishPairs) {
     // Prune/prepare
     const out = {};
     const toTranslate = {};
+
     for (const k of desiredKeys) {
       const v = langDict[k];
-      const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-      if (isMissing) {
+      const enVal = enNew[k];
+
+      // Should we force re-translate this key (English starts with '!')?
+      const forceRetranslate = flaggedKeys.has(k);
+
+      // Missing?
+      const isMissing =
+        v == null ||
+        (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+
+      if (forceRetranslate) {
+        // Mark as missing to ensure we overwrite; queue clean English for translation
         out[k] = "???";
-        // Only translate if we have an English source string that isn't a placeholder
-        if (typeof enNew[k] === "string" && enNew[k].trim() && enNew[k] !== "???") {
-          toTranslate[k] = enNew[k];
+        if (cleanFlagText[k]) toTranslate[k] = cleanFlagText[k];
+      } else if (isMissing) {
+        out[k] = "???";
+        if (typeof enVal === "string" && enVal.trim() && enVal !== "???") {
+          toTranslate[k] = enVal;
         }
       } else {
         out[k] = v;
@@ -255,29 +286,64 @@ async function translateTo(langCode, englishPairs) {
 
     if (toTranslateCount === 0) {
       console.log(`[i18n] ${langCode}: nothing to translate.`);
+      // If there are flagged keys but nothing to translate for this lang,
+      // we consider it a failure for those keys because they remained as-is.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
       continue;
     }
 
     if (!openai) {
       console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
+      // Mark all flagged keys as failed for this language.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
       continue;
     }
 
     console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
     const translated = await translateTo(langCode, toTranslate);
     let translatedCount = 0;
+
     for (const key of Object.keys(toTranslate)) {
       const t = translated[key];
-      if (typeof t === "string" && t.trim() && out[key] === "???") {
+      if (typeof t === "string" && t.trim()) {
         out[key] = t.trim();
         translatedCount++;
+      } else {
+        // translation for this key failed → don't strip '!' later
+        if (flaggedKeys.has(key)) maybeStripBang.delete(key);
       }
     }
-    
+
+    // Any flagged key that still left as "???" is a failure for this language
+    for (const k of flaggedKeys) {
+      if (out[k] === "???") maybeStripBang.delete(k);
+    }
+
     if (translatedCount > 0) {
-        writeLang(langPath, out);
+      writeLang(langPath, out);
     }
     console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
+  }
+
+  // ---------- 4) If all non-English languages were updated for a flagged key, strip '!' in English ----------
+  if (maybeStripBang.size > 0) {
+    let changed = 0;
+    for (const k of maybeStripBang) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        const cleaned = v.slice(1).trim();
+        enNew[k] = cleaned || v; // don't produce empty
+        changed++;
+      }
+    }
+    if (changed > 0) {
+      writeLang(enPath, enNew);
+      console.log(`[i18n] Removed leading '!' from ${changed} English key(s) after successful re-translation.`);
+    }
   }
 })().catch((err) => {
   console.error(err);

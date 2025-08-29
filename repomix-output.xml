@@ -304,6 +304,7 @@ src/
     fr.js
     ru.js
     sr.js
+    static_keys.jsx
     ua.js
     useI18n.js
   ipfs/
@@ -811,6 +812,53 @@ export async function switchOrAddChain(meta) {
 }
 
 export { walletAccount, walletChainId };
+</file>
+
+<file path="src/i18n/static_keys.jsx">
+//--------------------------------------------------------
+// i18n techical comments.'
+// DO NOT REMOVE
+//--------------------------------------------------------
+
+/*
+t("timeFrame.week")
+t("timeFrame.month")
+t("timeFrame.year")
+t("timeFrame.all")
+
+t("stakerLevels.guest")
+t("stakerLevels.clam")
+t("stakerLevels.shrimp")
+t("stakerLevels.seahorse")
+t("stakerLevels.fish")
+t("stakerLevels.dolphin")
+t("stakerLevels.shark")
+t("stakerLevels.stingray")
+t("stakerLevels.orca")
+t("stakerLevels.whale")
+
+t("editor.publish.steps.validate")
+t("editor.publish.steps.validate.help")
+t("editor.publish.steps.check_rights")
+t("editor.publish.steps.check_rights.help")
+t("editor.publish.steps.ipfs")
+t("editor.publish.steps.ipfs.help")
+t("editor.publish.steps.ipfs_publish")
+t("editor.publish.steps.ipfs_publish.help")
+t("editor.publish.steps.publish")
+t("editor.publish.steps.publish.help")
+
+t("reactions.like")
+t("reactions.love")
+t("reactions.laugh")
+t("reactions.wow")
+t("reactions.sad")
+t("reactions.angry")
+t("reactions.fire")
+t("reactions.rocket")
+t("reactions.star")
+t("reactions.hot")
+*/
 </file>
 
 <file path="src/vite-env.d.js">
@@ -17670,28 +17718,81 @@ export default function ChapterSelector(props) {
 
 <file path="src/components/post/CommentCard.jsx">
 // src/components/post/CommentCard.jsx
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createMemo, createSignal, createResource, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import PostInfo from "../feed/PostInfo";
 import UserCard from "../ui/UserCard";
+import MarkdownView from "../docs/MarkdownView";
+import { ipfs } from "../../ipfs";
+import { getPostContentBaseCid } from "../../ipfs/utils";
+import Spinner from "../ui/Spinner";
 
 /**
- * Recursively renders a comment and its children.
+ * Fetches the full content of a comment's prologue for a specific language.
  */
+async function fetchFullContent(params) {
+  const { app, comment, lang } = params;
+  if (!comment || !lang) return "";
+
+  const locales = comment.savva_content?.locales;
+  const currentLocale = locales?.[lang] || locales?.en || locales?.[Object.keys(locales)[0]];
+  
+  const dataPath = currentLocale?.data_path;
+  if (!dataPath) return currentLocale?.text_preview || ""; // Fallback to preview if no path
+
+  const baseCid = getPostContentBaseCid(comment);
+  if (!baseCid) return "";
+
+  const fullIpfsPath = `${baseCid}/${dataPath}`;
+  
+  try {
+    const { res } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways: comment.gateways });
+    return await res.text();
+  } catch (e) {
+    console.error("Failed to fetch full comment content:", e);
+    return `Error: Could not load content.`;
+  }
+}
+
 export default function CommentCard(props) {
-  const app = useApp(); // Correctly assign the app context to a variable
+  const app = useApp();
   const { t } = app;
   const comment = () => props.comment;
   const level = () => props.level || 0;
+  
+  const [isExpanded, setIsExpanded] = createSignal(false);
 
+  // Memo for the truncated preview content
   const localizedPreview = createMemo(() => {
     const locales = comment().savva_content?.locales;
     if (!locales) return "";
-    const lang = app.lang(); // Now this will work
+    const lang = app.lang();
     if (locales[lang]?.text_preview) return locales[lang].text_preview;
     if (locales.en?.text_preview) return locales.en.text_preview;
     const firstKey = Object.keys(locales)[0];
     return firstKey ? locales[firstKey].text_preview : "";
+  });
+
+  // Resource to fetch full content only when expanded
+  const [fullContent] = createResource(
+    () => ({
+      // This resource will only fetch when isExpanded is true
+      shouldFetch: isExpanded(),
+      app: app,
+      comment: comment(),
+      lang: app.lang()
+    }),
+    async (params) => {
+      if (!params.shouldFetch) return null;
+      return fetchFullContent(params);
+    }
+  );
+
+  // Determine if the "Show More" button should be visible
+  const needsTruncation = createMemo(() => {
+    const preview = localizedPreview();
+    // A simple heuristic: if the preview is long or explicitly truncated
+    return preview.length > 280 || preview.endsWith("...");
   });
 
   return (
@@ -17701,12 +17802,43 @@ export default function CommentCard(props) {
     >
       <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
         <div class="mb-2">
-          <UserCard author={comment().author} compact={true} />
+          <UserCard author={comment().author} compact={false} />
         </div>
-        <p class="text-sm">{localizedPreview()}</p>
+        
+        {/* Content Area */}
+        <div 
+          class="text-sm prose prose-sm max-w-none transition-all duration-300 overflow-hidden"
+          classList={{ 
+            "max-h-24": !isExpanded(), 
+            "max-h-[1000px]": isExpanded() 
+          }}
+        >
+          <Switch>
+            <Match when={isExpanded() && fullContent.loading}>
+              <div class="flex items-center justify-center h-24">
+                <Spinner />
+              </div>
+            </Match>
+            <Match when={isExpanded() && fullContent()}>
+              <MarkdownView markdown={fullContent()} />
+            </Match>
+            <Match when={!isExpanded()}>
+              <MarkdownView markdown={localizedPreview()} />
+            </Match>
+          </Switch>
+        </div>
+
+        {/* Footer */}
         <div class="mt-2 flex items-center justify-between">
           <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
-          <button class="text-xs font-semibold hover:underline">Reply</button>
+          <div class="flex items-center gap-4 text-xs font-semibold">
+            <Show when={needsTruncation() || isExpanded()}>
+              <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
+                {isExpanded() ? "Show Less" : "Show More"}
+              </button>
+            </Show>
+            <button class="hover:underline">Reply</button>
+          </div>
         </div>
       </div>
       
@@ -17724,36 +17856,11 @@ export default function CommentCard(props) {
 
 <file path="src/components/post/PostComments.jsx">
 // src/components/post/PostComments.jsx
-import { createMemo, createResource, For, Show, createSignal, createEffect } from "solid-js";
+import { createResource, For, Show, createSignal, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { toChecksumAddress } from "../../blockchain/utils";
 import Spinner from "../ui/Spinner";
 import CommentCard from "./CommentCard";
-
-function buildCommentTree(comments, rootPostId) {
-  if (!comments || comments.length === 0) return [];
-  
-  const map = new Map();
-  const roots = [];
-
-  // First pass: create a map and initialize children array
-  for (const comment of comments) {
-    comment.children = [];
-    map.set(comment.savva_cid, comment);
-  }
-
-  // Second pass: build the tree
-  for (const comment of comments) {
-    const parentId = comment.savva_content?.parent_post;
-    if (parentId === rootPostId) {
-      roots.push(comment);
-    } else if (map.has(parentId)) {
-      map.get(parentId).children.push(comment);
-    }
-  }
-  
-  return roots;
-}
 
 async function fetchComments(params) {
   const { app, postId, offset = 0 } = params;
@@ -17765,7 +17872,7 @@ async function fetchComments(params) {
     savva_cid: postId,
     max_deep: 4,
     limit: 20,
-    offset: offset,
+    offset,
   };
 
   const user = app.authorizedUser();
@@ -17784,39 +17891,17 @@ async function fetchComments(params) {
   }
 }
 
-// --- TEMPORARY DEBUGGING DATA ---
-const dummyComment = {
-  author: {
-    name: "testuser",
-    staked: "5000000000000000000000",
-  },
-  savva_content: {
-    locales: {
-      en: { text_preview: "This is a test comment to verify rendering." }
-    }
-  },
-  effective_time: new Date().toISOString(),
-  reactions: [5, 2],
-  children: [
-    {
-      author: { name: "reply_user" },
-      savva_content: { locales: { en: { text_preview: "This is a nested reply." } } },
-      effective_time: new Date().toISOString(),
-      reactions: [1],
-      children: []
-    }
-  ]
-};
-// --- END TEMPORARY DEBUGGING DATA ---
-
 export default function PostComments(props) {
   const app = useApp();
-  // ... all data fetching logic remains but is unused by the temporary JSX ...
+  const { t } = app;
   const postId = () => props.post?.savva_cid;
+
   const [comments, setComments] = createSignal([]);
   const [nextOffset, setNextOffset] = createSignal(0);
-  const [isLoading, setIsLoading] = createSignal(false);
+  const [isLoadingMore, setIsLoadingMore] = createSignal(false);
+
   const [initialData] = createResource(() => ({ app, postId: postId() }), fetchComments);
+
   createEffect(() => {
     const data = initialData();
     if (data && !initialData.loading) {
@@ -17825,17 +17910,63 @@ export default function PostComments(props) {
     }
   });
 
+  const loadMore = async () => {
+    if (isLoadingMore() || nextOffset() === null) return;
+    setIsLoadingMore(true);
+    const data = await fetchComments({ app, postId: postId(), offset: nextOffset() });
+    if (data.list) {
+      setComments((prev) => [...prev, ...data.list]);
+      setNextOffset(data.nextOffset);
+    }
+    setIsLoadingMore(false);
+  };
 
   return (
     <div class="mt-8 pt-6 border-t border-[hsl(var(--border))]">
-      <h3 class="text-xl font-semibold mb-4">Comments</h3>
-      
-      {/* --- TEMPORARY DEBUGGING JSX --- */}
-      <div class="space-y-4">
-        <CommentCard comment={dummyComment} />
+      {/* Header with link only, no counter */}
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-xl font-semibold">{t("post.comments")}</h3>
+        <a
+          href="#comment-new"
+          class="text-sm underline text-[hsl(var(--foreground))] hover:opacity-80"
+        >
+          {t("post.addComment")}
+        </a>
       </div>
-      {/* --- END TEMPORARY JSX --- */}
 
+      <Show when={initialData.loading}>
+        <div class="flex justify-center p-8"><Spinner /></div>
+      </Show>
+
+      <Show when={initialData.error}>
+        <p class="text-sm text-[hsl(var(--destructive))]">
+          {t("common.error")}: {initialData.error}
+        </p>
+      </Show>
+
+      <Show when={!initialData.loading && !initialData.error && comments().length > 0}>
+        <div class="space-y-4">
+          <For each={comments()}>
+            {(comment) => <CommentCard comment={comment} />}
+          </For>
+        </div>
+      </Show>
+
+      <Show when={!initialData.loading && !initialData.error && comments().length === 0}>
+        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("post.noComments")}</p>
+      </Show>
+
+      <Show when={nextOffset() !== null && !initialData.loading}>
+        <div class="mt-6 text-center">
+          <button
+            onClick={loadMore}
+            disabled={isLoadingMore()}
+            class="px-4 py-2 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+          >
+            {isLoadingMore() ? t("common.loading") : t("post.loadMoreComments")}
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }
@@ -17848,7 +17979,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/hashRouter.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
-import ReactionInput from "./ReactionInput.jsx";
+import PostInfo from "../feed/PostInfo.jsx";
 
 export default function PostControls(props) {
   const app = useApp();
@@ -17875,17 +18006,19 @@ export default function PostControls(props) {
 
   return (
     <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center justify-between">
-      {/* Left Side: Reaction Input for any logged-in user */}
-      <div>
-        <Show when={app.authorizedUser()}>
-          <ReactionInput post={props.post} />
-        </Show>
+      {/* Left Side: Full PostInfo component */}
+      <div class="flex-1 min-w-0">
+        <PostInfo 
+          item={props.post} 
+          hideTopBorder={true} 
+          timeFormat="long" 
+        />
       </div>
 
       {/* Right Side: Author-only buttons */}
-      <div>
+      <div class="pl-4">
         <Show when={isAuthor()}>
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-4 flex-shrink-0">
             <button
               onClick={handleEdit}
               disabled={isPreparing()}
@@ -18479,17 +18612,16 @@ import { stakerLevelIconFor } from "./icons/FishIcons.jsx";
 import { formatUnits } from "viem";
 
 const STAKER_LEVELS = [
-    // do not remove comments !!!
-    { min: 0, key: "guest" }, //t("stakerLevels.guest")
-    { min: 5000, key: "clam" }, //t("stakerLevels.clam")
-    { min: 10000, key: "shrimp" }, //t("stakerLevels.shrimp")
-    { min: 20000, key: "seahorse" }, //t("stakerLevels.seahorse")
-    { min: 50000, key: "fish" }, //t("stakerLevels.fish")
-    { min: 100000, key: "dolphin" }, //t("stakerLevels.dolphin")
-    { min: 200000, key: "shark" }, //t("stakerLevels.shark")
-    { min: 500000, key: "stingray" }, //t("stakerLevels.stingray")
-    { min: 1000000, key: "orca" }, //t("stakerLevels.orca")
-    { min: 10000000, key: "whale" }, //t("stakerLevels.whale")
+    { min: 0, key: "guest" }, 
+    { min: 5000, key: "clam" }, 
+    { min: 10000, key: "shrimp" }, 
+    { min: 20000, key: "seahorse" }, 
+    { min: 50000, key: "fish" }, 
+    { min: 100000, key: "dolphin" }, 
+    { min: 200000, key: "shark" }, 
+    { min: 500000, key: "stingray" }, 
+    { min: 1000000, key: "orca" }, 
+    { min: 10000000, key: "whale" }, 
 ];
 
 function getStakerLevel(levels, stakedAmount) {
@@ -21559,6 +21691,8 @@ export default function ReactionInput(props) {
   const [showPalette, setShowPalette] = createSignal(false);
   const [isMouseOver, setIsMouseOver] = createSignal(false);
   const [isGracePeriod, setIsGracePeriod] = createSignal(false);
+  const [paletteStyle, setPaletteStyle] = createSignal({});
+  let containerRef;
   let showTimerId, graceTimerId;
 
   const [myReactionIndex, setMyReactionIndex] = createSignal(
@@ -21568,7 +21702,7 @@ export default function ReactionInput(props) {
   createEffect(() => {
     const update = app.postUpdate();
     const authorizedUserAddress = app.authorizedUser()?.address;
-    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid;
+    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
 
     if (
       update &&
@@ -21580,6 +21714,38 @@ export default function ReactionInput(props) {
       setMyReactionIndex(update.data.reaction);
     }
   });
+  
+  // This effect calculates the palette's horizontal position dynamically
+  createEffect(() => {
+    if (showPalette() && containerRef) {
+      const buttonRect = containerRef.getBoundingClientRect();
+      const paletteWidth = 300; // Estimated width of the palette
+      const screenPadding = 10;
+
+      // 1. Calculate the ideal centered position's LEFT EDGE relative to the VIEWPORT
+      const idealViewportLeft = buttonRect.left + (buttonRect.width / 2) - (paletteWidth / 2);
+
+      let finalRelativeLeft;
+
+      // 2. Check for right viewport overflow
+      if (idealViewportLeft + paletteWidth > window.innerWidth - screenPadding) {
+        // Align palette's right edge with button's right edge
+        finalRelativeLeft = buttonRect.width - paletteWidth;
+      } 
+      // 3. Check for left viewport overflow
+      else if (idealViewportLeft < screenPadding) {
+        // Align palette's left edge with button's left edge
+        finalRelativeLeft = 0;
+      } 
+      // 4. Default: Center the palette relative to the button
+      else {
+        finalRelativeLeft = (buttonRect.width / 2) - (paletteWidth / 2);
+      }
+      
+      // We only need to set the left property for our absolutely positioned element.
+      setPaletteStyle({ left: `${finalRelativeLeft}px` });
+    }
+  });
 
   onCleanup(() => {
     if (showTimerId) clearTimeout(showTimerId);
@@ -21589,7 +21755,7 @@ export default function ReactionInput(props) {
   const handleContainerEnter = () => {
     setIsMouseOver(true);
     if (showTimerId) clearTimeout(showTimerId);
-    if (showPalette()) return; // Don't restart timers if already visible
+    if (showPalette()) return; 
 
     showTimerId = setTimeout(() => {
       setShowPalette(true);
@@ -21597,18 +21763,16 @@ export default function ReactionInput(props) {
       if (graceTimerId) clearTimeout(graceTimerId);
       graceTimerId = setTimeout(() => {
         setIsGracePeriod(false);
-        // If mouse left during grace period, hide now.
         if (!isMouseOver()) {
           setShowPalette(false);
         }
-      }, 3000); // 3-second grace period
+      }, 3000);
     }, 1000);
   };
 
   const handleContainerLeave = () => {
     setIsMouseOver(false);
     if (showTimerId) clearTimeout(showTimerId);
-    // Only hide if not in the grace period
     if (!isGracePeriod()) {
       setShowPalette(false);
     }
@@ -21618,7 +21782,7 @@ export default function ReactionInput(props) {
     if (isProcessing()) return;
     setIsProcessing(true);
     
-    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid;
+    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
 
     try {
       await wsCall('react', {
@@ -21640,7 +21804,7 @@ export default function ReactionInput(props) {
   };
 
   const handleMainButtonClick = () => {
-    const newReaction = myReactionIndex() >= 0 ? -1 : 0; // Toggle 'like'
+    const newReaction = myReactionIndex() >= 0 ? -1 : 0; 
     sendReaction(newReaction);
   };
 
@@ -21653,12 +21817,16 @@ export default function ReactionInput(props) {
 
   return (
     <div 
-      class="relative inline-block" 
+      class="relative inline-block reaction-input-container" 
       onMouseEnter={handleContainerEnter}
       onMouseLeave={handleContainerLeave}
+      ref={containerRef}
     >
       <Show when={showPalette()}>
-        <div class="absolute bottom-full left-0 p-1.5 flex items-center gap-1 rounded-full bg-[hsl(var(--popover))] shadow-lg border border-[hsl(var(--border))]">
+        <div 
+          class="absolute bottom-full z-50 mb-1 p-1.5 flex items-center gap-1 rounded-full bg-[hsl(var(--popover))] shadow-lg border border-[hsl(var(--border))]"
+          style={paletteStyle()}
+        >
           <For each={REACTION_TYPES}>
             {(type, index) => (
               <button 
@@ -21676,7 +21844,7 @@ export default function ReactionInput(props) {
       <button
         onClick={handleMainButtonClick}
         disabled={isProcessing()}
-        class="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+        class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50 w-[80px]"
         classList={{
           "text-[hsl(var(--muted-foreground))]": !hasReacted(),
           "text-blue-500": hasReacted()
@@ -21684,7 +21852,7 @@ export default function ReactionInput(props) {
       >
         <Show
           when={hasReacted()}
-          fallback={<span class="filter grayscale">👍</span>}
+          fallback={<span class="filter grayscale text-lg">👍</span>}
         >
           <ReactionIcon type={reactionType()} class="text-lg" />
         </Show>
@@ -21847,6 +22015,115 @@ export default function Assets() {
         </div>
       </Show>
     </section>
+  );
+}
+</file>
+
+<file path="src/components/ui/BrandLogo.jsx">
+// src/components/ui/BrandLogo.jsx
+/* src/components/ui/BrandLogo.jsx */
+import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { dbg } from "../../utils/debug";
+
+export default function BrandLogo(props) {
+  const app = useApp();
+  const { t, domainAssetsConfig, assetUrl } = app;
+
+  // Single source of truth for the domain name (falls back to i18n brand name)
+  const domainTitle = createMemo(() => {
+    const fromCfg = app.config?.()?.domain?.trim();
+    const fallback = t("brand.name");
+    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
+  });
+
+  // Theme + mobile detection
+  const [isDark, setIsDark] = createSignal(false);
+  const [isMobile, setIsMobile] = createSignal(false);
+  onMount(() => {
+    const el = document.documentElement;
+    const updateDark = () => setIsDark(el.classList.contains("dark"));
+    updateDark();
+    const mo = new MutationObserver(updateDark);
+    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onMQ = (e) => setIsMobile(!!e.matches);
+    onMQ(mql);
+    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
+
+    onCleanup(() => {
+      mo.disconnect();
+      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
+    });
+  });
+
+  // logos from active domain assets config
+  const logos = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const raw = cfg?.logos ?? cfg?.logo ?? null;
+    if (!raw) return null;
+    if (typeof raw === "string") return { default: raw };
+    return {
+      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+      mobile:       raw.mobile       ?? null,
+      dark:         raw.dark         ?? null,
+      light:        raw.light        ?? null,
+      default:      raw.default      ?? raw.fallback     ?? null,
+    };
+  });
+
+  const relPath = createMemo(() => {
+    const l = logos();
+    if (!l) return "";
+    const dark = isDark();
+    const mobile = isMobile();
+    const order = dark
+      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
+      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
+    return order.find(Boolean) || "";
+  });
+
+  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
+
+  // 🔎 Debug: log whenever the chosen logo src changes
+  createEffect(() => {
+    const s = src();
+    if (!s) return;
+    dbg.log("logo", "BrandLogo src picked", {
+      src: s,
+      relPath: relPath(),
+      dark: isDark(),
+      mobile: isMobile(),
+      domain: app.config?.()?.domain,
+      activePrefix: app.domainAssetsPrefix?.(),
+      source: app.domainAssetsSource?.(),
+    });
+  });
+
+  const [imgBroken, setImgBroken] = createSignal(false);
+  // reset broken flag whenever src changes
+  createMemo(() => { src(); setImgBroken(false); });
+
+  return (
+    <div class="flex items-center">
+      <Show when={src() && !imgBroken()} fallback={
+        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
+      }>
+        <img
+          src={src()}
+          alt={t("brand.logoAlt", { domain: domainTitle() })}
+          class={props.class || "h-8 w-auto"}
+          decoding="async"
+          loading="eager"
+          onError={() => {
+            dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
+            setImgBroken(true);
+          }}
+        />
+      </Show>
+    </div>
   );
 }
 </file>
@@ -24077,115 +24354,6 @@ export default function VerifiedBadge(props) {
 }
 </file>
 
-<file path="src/components/ui/BrandLogo.jsx">
-// src/components/ui/BrandLogo.jsx
-/* src/components/ui/BrandLogo.jsx */
-import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { dbg } from "../../utils/debug";
-
-export default function BrandLogo(props) {
-  const app = useApp();
-  const { t, domainAssetsConfig, assetUrl } = app;
-
-  // Single source of truth for the domain name (falls back to i18n brand name)
-  const domainTitle = createMemo(() => {
-    const fromCfg = app.config?.()?.domain?.trim();
-    const fallback = t("brand.name");
-    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
-  });
-
-  // Theme + mobile detection
-  const [isDark, setIsDark] = createSignal(false);
-  const [isMobile, setIsMobile] = createSignal(false);
-  onMount(() => {
-    const el = document.documentElement;
-    const updateDark = () => setIsDark(el.classList.contains("dark"));
-    updateDark();
-    const mo = new MutationObserver(updateDark);
-    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
-
-    const mql = window.matchMedia("(max-width: 640px)");
-    const onMQ = (e) => setIsMobile(!!e.matches);
-    onMQ(mql);
-    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
-
-    onCleanup(() => {
-      mo.disconnect();
-      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
-    });
-  });
-
-  // logos from active domain assets config
-  const logos = createMemo(() => {
-    const cfg = domainAssetsConfig?.();
-    const raw = cfg?.logos ?? cfg?.logo ?? null;
-    if (!raw) return null;
-    if (typeof raw === "string") return { default: raw };
-    return {
-      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
-      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-      mobile:       raw.mobile       ?? null,
-      dark:         raw.dark         ?? null,
-      light:        raw.light        ?? null,
-      default:      raw.default      ?? raw.fallback     ?? null,
-    };
-  });
-
-  const relPath = createMemo(() => {
-    const l = logos();
-    if (!l) return "";
-    const dark = isDark();
-    const mobile = isMobile();
-    const order = dark
-      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
-      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
-    return order.find(Boolean) || "";
-  });
-
-  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
-
-  // 🔎 Debug: log whenever the chosen logo src changes
-  createEffect(() => {
-    const s = src();
-    if (!s) return;
-    dbg.log("logo", "BrandLogo src picked", {
-      src: s,
-      relPath: relPath(),
-      dark: isDark(),
-      mobile: isMobile(),
-      domain: app.config?.()?.domain,
-      activePrefix: app.domainAssetsPrefix?.(),
-      source: app.domainAssetsSource?.(),
-    });
-  });
-
-  const [imgBroken, setImgBroken] = createSignal(false);
-  // reset broken flag whenever src changes
-  createMemo(() => { src(); setImgBroken(false); });
-
-  return (
-    <div class="flex items-center">
-      <Show when={src() && !imgBroken()} fallback={
-        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
-      }>
-        <img
-          src={src()}
-          alt={t("brand.logoAlt", { domain: domainTitle() })}
-          class={props.class || "h-8 w-auto"}
-          decoding="async"
-          loading="eager"
-          onError={() => {
-            dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
-            setImgBroken(true);
-          }}
-        />
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/ui/LangSelector.jsx">
 // src/components/ui/LangSelector.jsx
 import { For, Show, createMemo } from "solid-js";
@@ -25020,7 +25188,7 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const BATCH_SIZE = 60; // how many keys to ask the model about per request
 const targetLang = process.argv[2] || null;
-const onlyEnglish = targetLang === 'en';
+const onlyEnglish = targetLang === "en";
 
 // ---------- Collect used keys (scan t("key") calls) ----------
 const exts = [".js", ".jsx", ".ts", ".tsx"];
@@ -25225,11 +25393,29 @@ async function translateTo(langCode, englishPairs) {
     console.log("[i18n] No missing English strings to fill.");
   }
 
+  // ---------- 2.5) Detect 'force retranslate' flags on English ('!…') ----------
+  // Only applicable when NOT in en-only mode.
+  const flaggedKeys = new Set();
+  const cleanFlagText = {};
+  if (!onlyEnglish) {
+    for (const k of Object.keys(enNew)) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        flaggedKeys.add(k);
+        cleanFlagText[k] = v.slice(1).trim(); // the source text to re-translate from English
+      }
+    }
+  }
+
   // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
   if (onlyEnglish) {
     console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
     return;
   }
+
+  // We'll track which flagged keys succeeded in ALL languages,
+  // so we can safely strip '!' from English afterwards.
+  const maybeStripBang = new Set(flaggedKeys); // remove any key that fails in a language
 
   for (const f of langFiles) {
     if (f === "en.js") continue;
@@ -25241,14 +25427,27 @@ async function translateTo(langCode, englishPairs) {
     // Prune/prepare
     const out = {};
     const toTranslate = {};
+
     for (const k of desiredKeys) {
       const v = langDict[k];
-      const isMissing = v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-      if (isMissing) {
+      const enVal = enNew[k];
+
+      // Should we force re-translate this key (English starts with '!')?
+      const forceRetranslate = flaggedKeys.has(k);
+
+      // Missing?
+      const isMissing =
+        v == null ||
+        (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+
+      if (forceRetranslate) {
+        // Mark as missing to ensure we overwrite; queue clean English for translation
         out[k] = "???";
-        // Only translate if we have an English source string that isn't a placeholder
-        if (typeof enNew[k] === "string" && enNew[k].trim() && enNew[k] !== "???") {
-          toTranslate[k] = enNew[k];
+        if (cleanFlagText[k]) toTranslate[k] = cleanFlagText[k];
+      } else if (isMissing) {
+        out[k] = "???";
+        if (typeof enVal === "string" && enVal.trim() && enVal !== "???") {
+          toTranslate[k] = enVal;
         }
       } else {
         out[k] = v;
@@ -25260,29 +25459,64 @@ async function translateTo(langCode, englishPairs) {
 
     if (toTranslateCount === 0) {
       console.log(`[i18n] ${langCode}: nothing to translate.`);
+      // If there are flagged keys but nothing to translate for this lang,
+      // we consider it a failure for those keys because they remained as-is.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
       continue;
     }
 
     if (!openai) {
       console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
+      // Mark all flagged keys as failed for this language.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
       continue;
     }
 
     console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
     const translated = await translateTo(langCode, toTranslate);
     let translatedCount = 0;
+
     for (const key of Object.keys(toTranslate)) {
       const t = translated[key];
-      if (typeof t === "string" && t.trim() && out[key] === "???") {
+      if (typeof t === "string" && t.trim()) {
         out[key] = t.trim();
         translatedCount++;
+      } else {
+        // translation for this key failed → don't strip '!' later
+        if (flaggedKeys.has(key)) maybeStripBang.delete(key);
       }
     }
-    
+
+    // Any flagged key that still left as "???" is a failure for this language
+    for (const k of flaggedKeys) {
+      if (out[k] === "???") maybeStripBang.delete(k);
+    }
+
     if (translatedCount > 0) {
-        writeLang(langPath, out);
+      writeLang(langPath, out);
     }
     console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
+  }
+
+  // ---------- 4) If all non-English languages were updated for a flagged key, strip '!' in English ----------
+  if (maybeStripBang.size > 0) {
+    let changed = 0;
+    for (const k of maybeStripBang) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        const cleaned = v.slice(1).trim();
+        enNew[k] = cleaned || v; // don't produce empty
+        changed++;
+      }
+    }
+    if (changed > 0) {
+      writeLang(enPath, enNew);
+      console.log(`[i18n] Removed leading '!' from ${changed} English key(s) after successful re-translation.`);
+    }
   }
 })().catch((err) => {
   console.error(err);
@@ -25334,138 +25568,6 @@ export default function DocsContent(props) {
       }>
         <MarkdownView markdown={doc()?.text || ""} />
         <DocsPager activeRelPath={props.relPath} onPick={props.onPick} />
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/wizard_steps/StepPublish.jsx">
-// src/components/editor/wizard_steps/StepPublish.jsx
-import { createSignal, onMount, Show } from "solid-js";
-import { useApp } from "../../../context/AppContext.jsx";
-import Spinner from "../../ui/Spinner.jsx";
-import { getSavvaContract } from "../../../blockchain/contracts.js";
-import { toHexBytes32 } from "../../../blockchain/utils.js";
-import { dbg } from "../../../utils/debug.js";
-import { createPublicClient, http } from "viem";
-
-function parseViemError(e) {
-  if (e?.shortMessage) {
-    return e.shortMessage;
-  }
-  if (e?.message?.includes('User rejected the request')) {
-    return 'User rejected the request.';
-  }
-  if (e?.name === 'TransactionExecutionError' && e.cause?.shortMessage) {
-    return e.cause.shortMessage;
-  }
-  return e.message;
-}
-
-export default function StepPublish(props) {
-  const app = useApp();
-  const { t } = app;
-  const [error, setError] = createSignal(null);
-  const [status, setStatus] = createSignal("waiting_signature");
-  const [txHash, setTxHash] = createSignal(null);
-
-  const attemptPublish = async () => {
-    setError(null);
-    setTxHash(null);
-    setStatus("waiting_signature");
-
-    try {
-      const { postParams, publishedData } = props;
-      const user = app.authorizedUser();
-      const domain = app.selectedDomainName();
-      const descriptorCid = publishedData().descriptorCid;
-      const guid = postParams().guid;
-
-      if (!user?.address || !domain || !descriptorCid || !guid) {
-        throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
-      }
-
-      const publishAsNew = postParams().publishAsNewPost || false;
-      const contentType = publishAsNew ? "post" : "post-edit";
-
-      dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid, contentType });
-
-      // Request a write-enabled contract instance
-      const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
-      
-      const hash = await contract.write.reg([
-        domain,
-        user.address,
-        guid,
-        descriptorCid,
-        toHexBytes32(contentType)
-      ]);
-
-      setStatus("publishing");
-      setTxHash(hash);
-      dbg.log("StepPublish", "Transaction sent, hash:", hash);
-
-      const desiredChain = app.desiredChain();
-      if (!desiredChain?.rpcUrls?.[0]) {
-        throw new Error("RPC URL for the desired chain is not configured.");
-      }
-      const transport = http(desiredChain.rpcUrls[0]);
-      const publicClient = createPublicClient({ chain: desiredChain, transport: transport });
-
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') {
-        throw new Error(`Transaction failed with status: ${receipt.status}`);
-      }
-
-      dbg.log("StepPublish", "Transaction confirmed:", receipt);
-      props.onComplete?.();
-    } catch (e) {
-      dbg.error("StepPublish", "Publishing failed:", e);
-      setError(parseViemError(e));
-    }
-  };
-
-  onMount(() => {
-    setTimeout(attemptPublish, 500);
-  });
-
-  return (
-    <div class="flex flex-col items-center justify-center h-full text-center p-4">
-      <Show when={!error()}
-        fallback={
-          <>
-            <h4 class="font-bold text-red-600">{t("editor.publish.publishing.errorTitle")}</h4>
-            <p class="mt-2 text-sm break-all">{error()}</p>
-            <div class="mt-4 flex gap-2 justify-center">
-              <button onClick={props.onCancel} class="px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-                {t("editor.publish.validation.backToEditor")}
-              </button>
-              <button onClick={attemptPublish} class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">
-                {t("common.retry")}
-              </button>
-            </div>
-          </>
-        }
-      >
-        <Spinner />
-        <Show when={status() === 'waiting_signature'}>
-            <p class="mt-2 text-sm font-semibold">{t("editor.publish.publishing.waitSignature")}</p>
-            <p class="mt-1 text-xs text-[hsl(var(--muted-foreground))] max-w-sm">
-              {t("editor.publish.publishing.waitSignatureHelp")}
-            </p>
-        </Show>
-         <Show when={status() === 'publishing'}>
-            <p class="mt-2 text-sm">{t("editor.publish.publishing.waitFinalize")}</p>
-        </Show>
-        <Show when={txHash()}>
-          <div class="mt-4 text-xs text-[hsl(var(--muted-foreground))]">
-            <p>{t("editor.publish.publishing.txHash")}:</p>
-            <a href={`${app.desiredChain().blockExplorers[0]}/tx/${txHash()}`} target="_blank" class="font-mono break-all underline">
-              {txHash()}
-            </a>
-          </div>
-        </Show>
       </Show>
     </div>
   );
@@ -25683,143 +25785,6 @@ export default function MarkdownInput(props) {
 }
 </file>
 
-<file path="src/components/editor/PostSubmissionWizard.jsx">
-// src/components/editor/PostSubmissionWizard.jsx
-/*
-  i18n technical comment. Do not remove.
-  This is used by the i18n script to detect dynamically used keys.
-  t("editor.publish.steps.validate")
-  t("editor.publish.steps.validate.help")
-  t("editor.publish.steps.check_rights")
-  t("editor.publish.steps.check_rights.help")
-  t("editor.publish.steps.ipfs")
-  t("editor.publish.steps.ipfs.help")
-  t("editor.publish.steps.ipfs_publish")
-  t("editor.publish.steps.ipfs_publish.help")
-  t("editor.publish.steps.publish")
-  t("editor.publish.steps.publish.help")
-*/
-import { createSignal, createMemo, Show, For, Switch, Match } from "solid-js";
-import { Dynamic } from "solid-js/web";
-import { useApp } from "../../context/AppContext.jsx";
-import StepValidate from "./wizard_steps/StepValidate.jsx";
-import StepCheckRights from "./wizard_steps/StepCheckRights.jsx";
-import StepUploadIPFS from "./wizard_steps/StepUploadIPFS.jsx";
-import StepUploadDescriptor from "./wizard_steps/StepUploadDescriptor.jsx";
-import StepPublish from "./wizard_steps/StepPublish.jsx";
-
-const STEPS = [
-  { id: "validate",      title: "editor.publish.steps.validate",      help: "editor.publish.steps.validate.help",      component: StepValidate },
-  { id: "check_rights",  title: "editor.publish.steps.check_rights",  help: "editor.publish.steps.check_rights.help",  component: StepCheckRights },
-  { id: "ipfs",          title: "editor.publish.steps.ipfs",          help: "editor.publish.steps.ipfs.help",          component: StepUploadIPFS },
-  { id: "ipfs_publish",  title: "editor.publish.steps.ipfs_publish",  help: "editor.publish.steps.ipfs_publish.help",  component: StepUploadDescriptor },
-  { id: "publish",       title: "editor.publish.steps.publish",       help: "editor.publish.steps.publish.help",       component: StepPublish },
-];
-
-function CheckmarkIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-  );
-}
-
-function StepIcon(props) {
-  return (
-    <div class={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${props.class}`}>
-      <Show when={props.status === "completed"}><CheckmarkIcon class="text-white" /></Show>
-      <Show when={props.status === "active"}><div class="w-4 h-4 rounded-full bg-blue-500" /></Show>
-      <Show when={props.status === "pending"}><div class="w-2 h-2 rounded-full bg-gray-400" /></Show>
-    </div>
-  );
-}
-
-export default function PostSubmissionWizard(props) {
-  const { t } = useApp();
-  const [currentStepIndex, setCurrentStepIndex] = createSignal(0);
-  const [publishedData, setPublishedData] = createSignal({});
-
-  const activeComponent = createMemo(() => STEPS[currentStepIndex()]?.component);
-
-  const handleNextStep = (stepResult) => {
-    const currentStep = STEPS[currentStepIndex()];
-    if (currentStep.id === 'ipfs') {
-      setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
-    } else if (currentStep.id === 'ipfs_publish') {
-      setPublishedData(prev => ({ ...prev, descriptorCid: stepResult }));
-    }
-
-    if (currentStepIndex() < STEPS.length - 1) {
-      setCurrentStepIndex(currentStepIndex() + 1);
-    } else {
-      props.onSuccess?.();
-    }
-  };
-
-  const getStepStatus = (index) => {
-    if (index < currentStepIndex()) return "completed";
-    if (index === currentStepIndex()) return "active";
-    return "pending";
-  };
-
-  const handleValidationBack = () => {
-    props.onClose?.();
-  };
-
-  return (
-    <Show when={props.isOpen}>
-      <div class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" />
-        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-3xl p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <header class="flex items-center justify-between pb-3 border-b border-[hsl(var(--border))]">
-            <h3 class="text-lg font-semibold">{t("editor.publish.title")}</h3>
-            <button class="px-3 py-1 rounded hover:bg-[hsl(var(--accent))]" onClick={props.onClose}>
-              {t("common.cancel")}
-            </button>
-          </header>
-
-          <div class="flex gap-6 py-4">
-            <div class="w-48 flex-shrink-0">
-              <For each={STEPS}>
-                {(step, index) => (
-                  <div class="flex items-start">
-                    <div class="flex flex-col items-center mr-4">
-                      <StepIcon status={getStepStatus(index())} class={getStepStatus(index()) === "completed" ? "bg-green-500 border-green-500" : "border-gray-400"} />
-                      <Show when={index() < STEPS.length - 1}>
-                        <div class="w-px h-8 bg-gray-300" />
-                      </Show>
-                    </div>
-                    <div>
-                      <h4 class="font-semibold text-sm">{t(step.title)}</h4>
-                      <p class="text-xs text-[hsl(var(--muted-foreground))]">{t(step.help)}</p>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
-
-            <div class="flex-1 min-w-0 min-h-[20rem]">
-              <Switch>
-                <Match when={activeComponent()}>
-                  <Dynamic
-                    component={activeComponent()}
-                    postData={props.postData}
-                    postParams={props.postParams}
-                    publishedData={publishedData}
-                    onComplete={handleNextStep}
-                    onCancel={handleValidationBack}
-                  />
-                </Match>
-              </Switch>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Show>
-  );
-}
-</file>
-
 <file path="src/components/feed/PostInfo.jsx">
 // src/components/feed/PostInfo.jsx
 import { Show, createMemo } from "solid-js";
@@ -25876,17 +25841,20 @@ export default function PostInfo(props) {
 
   return (
     <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+      {/* Left-aligned items */}
       <PostTime 
         timestamp={postData().effective_time} 
         format={props.timeFormat || "short"} 
       />
       <PostReactions item={props.item} />
-      {/* <Show when={app.authorizedUser() && !isListMode()}>
-        <ReactionInput post={props.item} />
-      </Show> */}
+      <PostRewards item={props.item} lang={lang} />
       <PostComments item={props.item} />
-      <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
-        <PostRewards item={props.item} lang={lang} />
+      
+      {/* Right-aligned items */}
+      <div class="ml-auto">
+        <Show when={app.authorizedUser()}>
+          <ReactionInput post={props.item} />
+        </Show>
       </div>
     </div>
   );
@@ -26182,6 +26150,141 @@ sections:
         file: core-concepts/config-contract.md
 </file>
 
+<file path="src/components/editor/wizard_steps/StepPublish.jsx">
+// src/components/editor/wizard_steps/StepPublish.jsx
+import { createSignal, onMount, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { getSavvaContract } from "../../../blockchain/contracts.js";
+import { toHexBytes32 } from "../../../blockchain/utils.js";
+import { dbg } from "../../../utils/debug.js";
+import { createPublicClient, http } from "viem";
+
+function parseViemError(e) {
+  if (e?.shortMessage) {
+    return e.shortMessage;
+  }
+  if (e?.message?.includes('User rejected the request')) {
+    return 'User rejected the request.';
+  }
+  if (e?.name === 'TransactionExecutionError' && e.cause?.shortMessage) {
+    return e.cause.shortMessage;
+  }
+  return e.message;
+}
+
+export default function StepPublish(props) {
+  const app = useApp();
+  const { t } = app;
+  const [error, setError] = createSignal(null);
+  const [status, setStatus] = createSignal("waiting_signature");
+  const [txHash, setTxHash] = createSignal(null);
+
+  const attemptPublish = async () => {
+    setError(null);
+    setTxHash(null);
+    setStatus("waiting_signature");
+
+    try {
+      const { postParams, publishedData, editorMode } = props;
+      const user = app.authorizedUser();
+      const domain = app.selectedDomainName();
+      const descriptorCid = publishedData().descriptorCid;
+      const guid = postParams().guid;
+
+      if (!user?.address || !domain || !descriptorCid || !guid) {
+        throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
+      }
+
+      let contentType;
+      if (editorMode === 'new_post') {
+        contentType = 'post';
+      } else { // edit_post mode
+        contentType = postParams().publishAsNewPost ? 'post' : 'post-edit';
+      }
+      
+      dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid, contentType });
+
+      const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
+      
+      const hash = await contract.write.reg([
+        domain,
+        user.address,
+        guid,
+        descriptorCid,
+        toHexBytes32(contentType)
+      ]);
+
+      setStatus("publishing");
+      setTxHash(hash);
+      dbg.log("StepPublish", "Transaction sent, hash:", hash);
+
+      const desiredChain = app.desiredChain();
+      if (!desiredChain?.rpcUrls?.[0]) {
+        throw new Error("RPC URL for the desired chain is not configured.");
+      }
+      const transport = http(desiredChain.rpcUrls[0]);
+      const publicClient = createPublicClient({ chain: desiredChain, transport: transport });
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') {
+        throw new Error(`Transaction failed with status: ${receipt.status}`);
+      }
+
+      dbg.log("StepPublish", "Transaction confirmed:", receipt);
+      props.onComplete?.();
+    } catch (e) {
+      dbg.error("StepPublish", "Publishing failed:", e);
+      setError(parseViemError(e));
+    }
+  };
+
+  onMount(() => {
+    setTimeout(attemptPublish, 500);
+  });
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full text-center p-4">
+      <Show when={!error()}
+        fallback={
+          <>
+            <h4 class="font-bold text-red-600">{t("editor.publish.publishing.errorTitle")}</h4>
+            <p class="mt-2 text-sm break-all">{error()}</p>
+            <div class="mt-4 flex gap-2 justify-center">
+              <button onClick={props.onCancel} class="px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+                {t("editor.publish.validation.backToEditor")}
+              </button>
+              <button onClick={attemptPublish} class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">
+                {t("common.retry")}
+              </button>
+            </div>
+          </>
+        }
+      >
+        <Spinner />
+        <Show when={status() === 'waiting_signature'}>
+            <p class="mt-2 text-sm font-semibold">{t("editor.publish.publishing.waitSignature")}</p>
+            <p class="mt-1 text-xs text-[hsl(var(--muted-foreground))] max-w-sm">
+              {t("editor.publish.publishing.waitSignatureHelp")}
+            </p>
+        </Show>
+         <Show when={status() === 'publishing'}>
+            <p class="mt-2 text-sm">{t("editor.publish.publishing.waitFinalize")}</p>
+        </Show>
+        <Show when={txHash()}>
+          <div class="mt-4 text-xs text-[hsl(var(--muted-foreground))]">
+            <p>{t("editor.publish.publishing.txHash")}:</p>
+            <a href={`${app.desiredChain().blockExplorers[0]}/tx/${txHash()}`} target="_blank" class="font-mono break-all underline">
+              {txHash()}
+            </a>
+          </div>
+        </Show>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/editor/EditorFilesDrawer.jsx">
 // src/components/editor/EditorFilesDrawer.jsx
 import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
@@ -26366,6 +26469,131 @@ export default function EditorFilesDrawer(props) {
 }
 </file>
 
+<file path="src/components/editor/PostSubmissionWizard.jsx">
+// src/components/editor/PostSubmissionWizard.jsx
+
+import { createSignal, createMemo, Show, For, Switch, Match } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import { useApp } from "../../context/AppContext.jsx";
+import StepValidate from "./wizard_steps/StepValidate.jsx";
+import StepCheckRights from "./wizard_steps/StepCheckRights.jsx";
+import StepUploadIPFS from "./wizard_steps/StepUploadIPFS.jsx";
+import StepUploadDescriptor from "./wizard_steps/StepUploadDescriptor.jsx";
+import StepPublish from "./wizard_steps/StepPublish.jsx";
+
+const STEPS = [
+  { id: "validate",      title: "editor.publish.steps.validate",      help: "editor.publish.steps.validate.help",      component: StepValidate },
+  { id: "check_rights",  title: "editor.publish.steps.check_rights",  help: "editor.publish.steps.check_rights.help",  component: StepCheckRights },
+  { id: "ipfs",          title: "editor.publish.steps.ipfs",          help: "editor.publish.steps.ipfs.help",          component: StepUploadIPFS },
+  { id: "ipfs_publish",  title: "editor.publish.steps.ipfs_publish",  help: "editor.publish.steps.ipfs_publish.help",  component: StepUploadDescriptor },
+  { id: "publish",       title: "editor.publish.steps.publish",       help: "editor.publish.steps.publish.help",       component: StepPublish },
+];
+
+function CheckmarkIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  );
+}
+
+function StepIcon(props) {
+  return (
+    <div class={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${props.class}`}>
+      <Show when={props.status === "completed"}><CheckmarkIcon class="text-white" /></Show>
+      <Show when={props.status === "active"}><div class="w-4 h-4 rounded-full bg-blue-500" /></Show>
+      <Show when={props.status === "pending"}><div class="w-2 h-2 rounded-full bg-gray-400" /></Show>
+    </div>
+  );
+}
+
+export default function PostSubmissionWizard(props) {
+  const { t } = useApp();
+  const [currentStepIndex, setCurrentStepIndex] = createSignal(0);
+  const [publishedData, setPublishedData] = createSignal({});
+
+  const activeComponent = createMemo(() => STEPS[currentStepIndex()]?.component);
+
+  const handleNextStep = (stepResult) => {
+    const currentStep = STEPS[currentStepIndex()];
+    if (currentStep.id === 'ipfs') {
+      setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
+    } else if (currentStep.id === 'ipfs_publish') {
+      setPublishedData(prev => ({ ...prev, descriptorCid: stepResult }));
+    }
+
+    if (currentStepIndex() < STEPS.length - 1) {
+      setCurrentStepIndex(currentStepIndex() + 1);
+    } else {
+      props.onSuccess?.();
+    }
+  };
+
+  const getStepStatus = (index) => {
+    if (index < currentStepIndex()) return "completed";
+    if (index === currentStepIndex()) return "active";
+    return "pending";
+  };
+
+  const handleValidationBack = () => {
+    props.onClose?.();
+  };
+
+  return (
+    <Show when={props.isOpen}>
+      <div class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" />
+        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-3xl p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <header class="flex items-center justify-between pb-3 border-b border-[hsl(var(--border))]">
+            <h3 class="text-lg font-semibold">{t("editor.publish.title")}</h3>
+            <button class="px-3 py-1 rounded hover:bg-[hsl(var(--accent))]" onClick={props.onClose}>
+              {t("common.cancel")}
+            </button>
+          </header>
+
+          <div class="flex gap-6 py-4">
+            <div class="w-48 flex-shrink-0">
+              <For each={STEPS}>
+                {(step, index) => (
+                  <div class="flex items-start">
+                    <div class="flex flex-col items-center mr-4">
+                      <StepIcon status={getStepStatus(index())} class={getStepStatus(index()) === "completed" ? "bg-green-500 border-green-500" : "border-gray-400"} />
+                      <Show when={index() < STEPS.length - 1}>
+                        <div class="w-px h-8 bg-gray-300" />
+                      </Show>
+                    </div>
+                    <div>
+                      <h4 class="font-semibold text-sm">{t(step.title)}</h4>
+                      <p class="text-xs text-[hsl(var(--muted-foreground))]">{t(step.help)}</p>
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+
+            <div class="flex-1 min-w-0 min-h-[20rem]">
+              <Switch>
+                <Match when={activeComponent()}>
+                  <Dynamic
+                    component={activeComponent()}
+                    postData={props.postData}
+                    postParams={props.postParams}
+                    publishedData={publishedData}
+                    onComplete={handleNextStep}
+                    onCancel={handleValidationBack}
+                    editorMode={props.editorMode}
+                  />
+                </Match>
+              </Switch>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/components/tabs/LeadersTab.jsx">
 // src/components/tabs/LeadersTab.jsx
 import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
@@ -26453,12 +26681,6 @@ export default function LeadersTab(props) {
         if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
         if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
         if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
-
-          // i18n techical comments. Do not remove
-          // t("timeFrame.week")
-          // t("timeFrame.month")
-          // t("timeFrame.year")
-          // t("timeFrame.all")
 
 
         // MODIFICATION: Changed to standard ISO string format.
@@ -26631,6 +26853,9 @@ export default {
   "editor.chapters.remove": "Supprimer le Chapitre",
   "editor.chapters.title": "Chapitres",
   "editor.chapters.titlePlaceholder": "Entrez le titre du chapitre",
+  "editor.clearDraft": "Effacer le brouillon",
+  "editor.clearDraftMessage": "Êtes-vous sûr de vouloir effacer ce brouillon ?",
+  "editor.clearDraftTitle": "Confirmer l'effacement du brouillon",
   "editor.files.confirmDeleteTitle": "Supprimer le Fichier",
   "editor.files.empty": "Aucun fichier téléchargé pour l'instant. Utilisez les boutons ci-dessus pour ajouter des fichiers à votre publication.",
   "editor.files.menu.delete": "Supprimer",
@@ -26651,6 +26876,8 @@ export default {
   "editor.params.fundraiser.label": "ID de campagne de collecte de fonds promue",
   "editor.params.nsfw.help": "Le contenu contient un langage ou des images explicites.",
   "editor.params.nsfw.label": "NSFW",
+  "editor.params.publishAsNew.help": "Si coché, cela sera publié en tant que nouveau post avec un horodatage mis à jour, apparaissant en haut des fils.",
+  "editor.params.publishAsNew.label": "Publier en tant que nouveau post",
   "editor.params.title": "Paramètres supplémentaires",
   "editor.previewPost": "Aperçu du Post",
   "editor.publish.descriptor.errorTitle": "Échec du téléchargement du descripteur",
@@ -26689,7 +26916,6 @@ export default {
   "editor.sidebar.thumbnailPlaceholder": "Aperçu de la miniature",
   "editor.thumbnail.delete": "Supprimer la miniature",
   "editor.title": "Éditeur de Post",
-  "editor.titleComment": "Modifier le Commentaire",
   "editor.titleEditPost": "Modifier le Post",
   "editor.titleNewPost": "Nouveau Post",
   "editor.titlePlaceholder": "Titre du Post",
@@ -26731,13 +26957,16 @@ export default {
   "main.tabs.empty": "Cet onglet est vide pour l'instant.",
   "main.tabs.loading": "Chargement des onglets…",
   "main.tabs.untitled": "Sans titre",
-  "menu.open": "Ouvrir le menu",
   "newTab.category": "Catégorie",
   "newTab.view.grid": "Vue en grille",
   "newTab.view.group": "Groupe de vue",
   "newTab.view.list": "Vue en liste",
+  "post.addComment": "Ajouter un commentaire...",
   "post.chapters.prologue": "Prologue",
   "post.chapters.title": "Table des matières",
+  "post.comments": "Commentaires",
+  "post.loadMoreComments": "Charger plus de commentaires",
+  "post.noComments": "Pas encore de commentaires.",
   "post.notFound.message": "La publication que vous recherchez n'existe pas ou a été supprimée.",
   "post.notFound.title": "Publication non trouvée",
   "postcard.copyDataCid": "Copier le Data CID",
@@ -26745,6 +26974,18 @@ export default {
   "postcard.copySavvaCid": "Copier le SAVVA CID",
   "postcard.pin": "Épingler le Post",
   "postcard.unpin": "Détacher le Post",
+  "reactions.${reactionType()}": "Réagir avec {reactionType}",
+  "reactions.${type}": "Réaction {type}",
+  "reactions.angry": "Fâché",
+  "reactions.fire": "🔥",
+  "reactions.hot": "Chaud",
+  "reactions.laugh": "Haha",
+  "reactions.like": "J'aime",
+  "reactions.love": "Amour",
+  "reactions.rocket": "🚀",
+  "reactions.sad": "Triste",
+  "reactions.star": "⭐",
+  "reactions.wow": "Wow",
   "rightPane.language": "Langue",
   "rightPane.settings": "Paramètres",
   "rightPane.switch.backend.help": "L'application récupérera /info depuis cette URL pour lister les domaines pris en charge.",
@@ -26835,7 +27076,7 @@ export default {
   "wallet.changeChain": "Changer de réseau",
   "wallet.connect": "Connecter le portefeuille",
   "wallet.copyAddress": "Copier l'adresse",
-  "wallet.error.addressMismatch": "Adresse de portefeuille non correspondante. Veuillez passer au compte autorisé pour continuer.",
+  "wallet.error.userCanceled": "Transaction annulée.",
   "wallet.onRequiredNetwork": "Sur le réseau requis"
 };
 </file>
@@ -26878,6 +27119,9 @@ export default {
   "editor.chapters.remove": "Obriši Poglavlje",
   "editor.chapters.title": "Poglavlja",
   "editor.chapters.titlePlaceholder": "Unesite naslov poglavlja",
+  "editor.clearDraft": "Obriši nacrt",
+  "editor.clearDraftMessage": "Da li ste sigurni da želite da obrišete ovaj nacrt?",
+  "editor.clearDraftTitle": "Potvrdi brisanje nacrta",
   "editor.files.confirmDeleteTitle": "Obriši Datoteku",
   "editor.files.empty": "Još nema učitanih datoteka. Iskoristite dugmadi iznad da dodate datoteke u vaš post.",
   "editor.files.menu.delete": "Obriši",
@@ -26898,6 +27142,8 @@ export default {
   "editor.params.fundraiser.label": "ID Promovisanog Kampanje Prikupljanja Sredstava",
   "editor.params.nsfw.help": "Sadržaj sadrži eksplicitni jezik ili slike.",
   "editor.params.nsfw.label": "NSFW",
+  "editor.params.publishAsNew.help": "Ako je označeno, ovo će biti objavljeno kao nova objava sa ažuriranim vremenom, pojavljujući na vrhu feedova.",
+  "editor.params.publishAsNew.label": "Objavi kao novu objavu",
   "editor.params.title": "Dodatni Parametri",
   "editor.previewPost": "Pregled Posta",
   "editor.publish.descriptor.errorTitle": "Neuspešno otpremanje opisa",
@@ -26936,7 +27182,6 @@ export default {
   "editor.sidebar.thumbnailPlaceholder": "Pregled sličice",
   "editor.thumbnail.delete": "Obriši sličicu",
   "editor.title": "Uređivač Posta",
-  "editor.titleComment": "Izmeni Komentar",
   "editor.titleEditPost": "Izmeni Post",
   "editor.titleNewPost": "Novi Post",
   "editor.titlePlaceholder": "Naslov Posta",
@@ -26978,13 +27223,16 @@ export default {
   "main.tabs.empty": "Ovaj tab je trenutno prazan.",
   "main.tabs.loading": "Učitavanje tabova…",
   "main.tabs.untitled": "Bez naslova",
-  "menu.open": "Otvorite meni",
   "newTab.category": "Kategorija",
   "newTab.view.grid": "Mrežni prikaz",
   "newTab.view.group": "Grupni prikaz",
   "newTab.view.list": "Lista",
+  "post.addComment": "Dodaj komentar...",
   "post.chapters.prologue": "Prolog",
   "post.chapters.title": "Sadržaj",
+  "post.comments": "Komentari",
+  "post.loadMoreComments": "Učitaj više komentara",
+  "post.noComments": "Još nema komentara.",
   "post.notFound.message": "Objava koju tražite ne postoji ili je uklonjena.",
   "post.notFound.title": "Objava nije pronađena",
   "postcard.copyDataCid": "Kopiraj Data CID",
@@ -26992,6 +27240,18 @@ export default {
   "postcard.copySavvaCid": "Kopiraj SAVVA CID",
   "postcard.pin": "Prikazivanje Posta",
   "postcard.unpin": "Ukloni Prikazivanje Posta",
+  "reactions.${reactionType()}": "Reaguj sa {reactionType}",
+  "reactions.${type}": "{type} reakcija",
+  "reactions.angry": "Ljut",
+  "reactions.fire": "🔥",
+  "reactions.hot": "Vruće",
+  "reactions.laugh": "Haha",
+  "reactions.like": "Sviđa mi se",
+  "reactions.love": "Volim",
+  "reactions.rocket": "🚀",
+  "reactions.sad": "Tužno",
+  "reactions.star": "⭐",
+  "reactions.wow": "Vau",
   "rightPane.language": "Jezik",
   "rightPane.settings": "Podešavanja",
   "rightPane.switch.backend.help": "Aplikacija će preuzeti /info sa ove URL adrese da bi prikazala podržane domene.",
@@ -27082,7 +27342,7 @@ export default {
   "wallet.changeChain": "Promeni mrežu",
   "wallet.connect": "Poveži novčanik",
   "wallet.copyAddress": "Kopiraj adresu",
-  "wallet.error.addressMismatch": "Neusklađenost adrese novčanika. Molimo prebacite se na ovlašćen račun da biste nastavili.",
+  "wallet.error.userCanceled": "Transakcija otkazana.",
   "wallet.onRequiredNetwork": "Na potrebnoj mreži"
 };
 </file>
@@ -27125,6 +27385,9 @@ export default {
   "editor.chapters.remove": "Видалити Розділ",
   "editor.chapters.title": "Розділи",
   "editor.chapters.titlePlaceholder": "Введіть назву розділу",
+  "editor.clearDraft": "Очистити чернетку",
+  "editor.clearDraftMessage": "Ви впевнені, що хочете очистити цю чернетку?",
+  "editor.clearDraftTitle": "Підтвердити очищення чернетки",
   "editor.files.confirmDeleteTitle": "Видалити Файл",
   "editor.files.empty": "Ще не завантажено жодного файлу. Використовуйте кнопки вище, щоб додати файли до вашого посту.",
   "editor.files.menu.delete": "Видалити",
@@ -27145,6 +27408,8 @@ export default {
   "editor.params.fundraiser.label": "ID просуваної кампанії збору коштів",
   "editor.params.nsfw.help": "Контент містить відверту мову або зображення.",
   "editor.params.nsfw.label": "NSFW",
+  "editor.params.publishAsNew.help": "Якщо вибрано, це буде опубліковано як новий пост з оновленим часом, з'являючись на початку стрічок.",
+  "editor.params.publishAsNew.label": "Опублікувати як новий пост",
   "editor.params.title": "Додаткові параметри",
   "editor.previewPost": "Попередній перегляд поста",
   "editor.publish.descriptor.errorTitle": "Не вдалося завантажити опис",
@@ -27183,7 +27448,6 @@ export default {
   "editor.sidebar.thumbnailPlaceholder": "Попередній перегляд мініатюри",
   "editor.thumbnail.delete": "Видалити ескіз",
   "editor.title": "Редактор постів",
-  "editor.titleComment": "Редагувати коментар",
   "editor.titleEditPost": "Редагувати пост",
   "editor.titleNewPost": "Новий пост",
   "editor.titlePlaceholder": "Заголовок поста",
@@ -27225,13 +27489,16 @@ export default {
   "main.tabs.empty": "Ця вкладка поки що порожня.",
   "main.tabs.loading": "Завантаження вкладок…",
   "main.tabs.untitled": "Без назви",
-  "menu.open": "Відкрити меню",
   "newTab.category": "Категорія",
   "newTab.view.grid": "Сітка перегляду",
   "newTab.view.group": "Група перегляду",
   "newTab.view.list": "Список перегляду",
+  "post.addComment": "Додати коментар...",
   "post.chapters.prologue": "Пролог",
   "post.chapters.title": "Зміст",
+  "post.comments": "Коментарі",
+  "post.loadMoreComments": "Завантажити більше коментарів",
+  "post.noComments": "Коментарів ще немає.",
   "post.notFound.message": "Пост, який ви шукаєте, не існує або був видалений.",
   "post.notFound.title": "Пост не знайдено",
   "postcard.copyDataCid": "Копіювати Data CID",
@@ -27239,6 +27506,18 @@ export default {
   "postcard.copySavvaCid": "Копіювати SAVVA CID",
   "postcard.pin": "Закріпити пост",
   "postcard.unpin": "Відкріпити пост",
+  "reactions.${reactionType()}": "Реагувати з {reactionType}",
+  "reactions.${type}": "Реакція {type}",
+  "reactions.angry": "Злий",
+  "reactions.fire": "🔥",
+  "reactions.hot": "Гарячий",
+  "reactions.laugh": "Ха-ха",
+  "reactions.like": "Подобається",
+  "reactions.love": "Люблю",
+  "reactions.rocket": "🚀",
+  "reactions.sad": "Сумно",
+  "reactions.star": "⭐",
+  "reactions.wow": "Вау",
   "rightPane.language": "Мова",
   "rightPane.settings": "Налаштування",
   "rightPane.switch.backend.help": "Додаток отримає /info з цього URL, щоб перерахувати підтримувані домени.",
@@ -27329,76 +27608,9 @@ export default {
   "wallet.changeChain": "Змінити мережу",
   "wallet.connect": "Підключити гаманець",
   "wallet.copyAddress": "Копіювати адресу",
-  "wallet.error.addressMismatch": "Несумісність адреси гаманця. Будь ласка, перемкніться на авторизований акаунт, щоб продовжити.",
+  "wallet.error.userCanceled": "Транзакцію скасовано.",
   "wallet.onRequiredNetwork": "На потрібній мережі"
 };
-</file>
-
-<file path="src/alerts/handlers.js">
-// src/alerts/handlers.js
-import { dbg } from "../utils/debug";
-import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
-import { pushToast } from "../ui/toast";
-
-export function handleTokenPriceChanged(app, payload) {
-  dbg.log("Alerts:token_price_changed", payload);
-  app.updateTokenPrices?.(payload.data);
-}
-
-export async function handleContentProcessed(app, payload) {
-  const { content } = payload.data || {};
-  if (!content || !content.guid) {
-    return;
-  }
-
-  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
-
-  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
-  if (draftParams && draftParams.guid === content.guid) {
-    await clearDraft(DRAFT_DIRS.NEW_POST);
-    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
-  }
-
-  const currentItems = app.newFeedItems();
-  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
-  
-  if (!isAlreadyVisible) {
-    app.setNewContentAvailable(content);
-  }
-}
-
-export function handlePing(app) {
-  dbg.log("Alerts:ping", "Received ping, sending pong.");
-  app.ws?.sendJson({ type: 'pong' });
-}
-
-export function handlePong() {
-  dbg.log("Alerts:pong", "Received pong.");
-  // Do nothing
-}
-
-export function handleReact(app, payload) {
-  dbg.log("Alerts:react", "Received react alert", payload);
-  
-  const currentDomain = app.selectedDomainName()?.toLowerCase();
-  const alertDomain = payload?.domain?.toLowerCase();
-
-  if (alertDomain === currentDomain) {
-    const d = payload.data;
-    // Emit a specific event with only the changed data
-    app.setPostUpdate({
-      cid: d?.object_id,
-      type: 'reactionsChanged',
-      data: {
-        reactions: d?.reactions,
-        reaction: d?.reaction,
-        user: d?.user?.address,
-      }
-    });
-  } else {
-    dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
-  }
-}
 </file>
 
 <file path="src/components/editor/EditorFullPreview.jsx">
@@ -28524,6 +28736,73 @@ html.dark .sv-docs code[data-theme*=" "] span {
 }
 </file>
 
+<file path="src/alerts/handlers.js">
+// src/alerts/handlers.js
+import { dbg } from "../utils/debug";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
+import { pushToast } from "../ui/toast";
+
+export function handleTokenPriceChanged(app, payload) {
+  dbg.log("Alerts:token_price_changed", payload);
+  app.updateTokenPrices?.(payload.data);
+}
+
+export async function handleContentProcessed(app, payload) {
+  const { content } = payload.data || {};
+  if (!content || !content.guid) {
+    return;
+  }
+
+  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
+
+  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
+  if (draftParams && draftParams.guid === content.guid) {
+    await clearDraft(DRAFT_DIRS.NEW_POST);
+    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+  }
+
+  const currentItems = app.newFeedItems();
+  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
+  
+  if (!isAlreadyVisible) {
+    app.setNewContentAvailable(content);
+  }
+}
+
+export function handlePing(app) {
+  dbg.log("Alerts:ping", "Received ping, sending pong.");
+  app.ws?.sendJson({ type: 'pong' });
+}
+
+export function handlePong() {
+  dbg.log("Alerts:pong", "Received pong.");
+  // Do nothing
+}
+
+export function handleReact(app, payload) {
+  dbg.log("Alerts:react", "Received react alert", payload);
+  
+  const currentDomain = app.selectedDomainName()?.toLowerCase();
+  const alertDomain = payload?.domain?.toLowerCase();
+
+  if (alertDomain === currentDomain) {
+    const d = payload.data;
+    // Emit a specific event with only the changed data
+    app.setPostUpdate({
+      cid: d?.object_id,
+      type: 'reactionsChanged',
+      data: {
+        reactions: d?.reactions,
+        reaction: d?.reaction,
+        user: d?.user?.address,
+      }
+    });
+  } else {
+    dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
+  }
+}
+</file>
+
 <file path="src/components/feed/ContentFeed.jsx">
 // src/components/feed/ContentFeed.jsx
 import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
@@ -29390,11 +29669,19 @@ export default function Header({ onTogglePane }) {
           </div>
 
           <div class="flex items-center gap-3">
-            <Show when={app.authorizedUser()}>
+            {/* Show New Post button ONLY when authorized AND wallet is connected */}
+            <Show when={app.authorizedUser() && walletAccount()}>
               <NewPostButton />
             </Show>
 
+            {/* Show user avatar menu if a session exists, regardless of wallet connection */}
+            <Show when={app.authorizedUser()}>
+              <AuthorizedUser />
+            </Show>
+
+            {/* Logic for Connect/Login buttons */}
             <Switch>
+              {/* Wallet not connected -> Show "Connect" button */}
               <Match when={!walletAccount() && eagerDone()}>
                 <Show when={isWalletAvailable()}>
                   <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
@@ -29403,17 +29690,15 @@ export default function Header({ onTogglePane }) {
                 </Show>
               </Match>
 
+              {/* Wallet connected BUT no session -> Show "Login" button */}
               <Match when={walletAccount() && !app.authorizedUser()}>
                 <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
                   {isLoggingIn() ? t("common.checking") : "Login"}
                 </button>
               </Match>
-              
-              <Match when={app.authorizedUser()}>
-                <AuthorizedUser />
-              </Match>
             </Switch>
 
+            {/* Wallet address and chain info */}
             <Show when={walletAccount()}>
                 <div class="flex items-center gap-2">
                     <button
@@ -29438,6 +29723,7 @@ export default function Header({ onTogglePane }) {
                 </div>
             </Show>
 
+            {/* Hamburger menu */}
             <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
@@ -30128,17 +30414,13 @@ export default function PostCard(props) {
   const { t } = app;
   const [isHovered, setIsHovered] = createSignal(false);
   
-  // Create a single reactive memo that holds the most up-to-date post data.
   const item = createMemo(() => {
     const baseItem = props.item;
     const update = app.postUpdate();
 
-    // Check if the current update alert is for this specific card
     if (update && update.type === 'reactionsChanged' && update.cid === baseItem.id) {
-      // Create a new object with the updated reaction data
       const updatedRaw = { ...baseItem._raw, reactions: update.data.reactions };
       
-      // Only update `my_reaction` if the alert is for the current logged-in user
       if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
         updatedRaw.my_reaction = update.data.reaction;
       }
@@ -30146,7 +30428,6 @@ export default function PostCard(props) {
       return { ...baseItem, _raw: updatedRaw };
     }
     
-    // If there's no relevant update, return the original item from props
     return baseItem;
   });
 
@@ -30172,11 +30453,11 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container') || e.target.closest('.context-menu-container')) {
+    if (e.target.closest('.user-card-container, .context-menu-container, .reaction-input-container')) {
       return;
     }
     e.preventDefault();
-    const postId = props.item.id; // Always read the stable ID directly from props for navigation
+    const postId = props.item.id;
     if (postId) {
       app.setSavedScrollY(window.scrollY);
       navigate(`/post/${postId}`);
@@ -30356,6 +30637,9 @@ export default {
   "editor.chapters.remove": "Удалить главу",
   "editor.chapters.title": "Главы",
   "editor.chapters.titlePlaceholder": "Введите название главы",
+  "editor.clearDraft": "Очистить черновик",
+  "editor.clearDraftMessage": "Вы уверены, что хотите очистить этот черновик?",
+  "editor.clearDraftTitle": "Подтвердите очистку черновика",
   "editor.files.confirmDeleteTitle": "Удалить файл",
   "editor.files.empty": "Пока нет загруженных файлов. Используйте кнопки выше, чтобы добавить файлы в ваш пост.",
   "editor.files.menu.delete": "Удалить",
@@ -30376,6 +30660,8 @@ export default {
   "editor.params.fundraiser.label": "ID продвигаемой кампании по сбору средств",
   "editor.params.nsfw.help": "Контент содержит откровенный язык или изображения.",
   "editor.params.nsfw.label": "NSFW",
+  "editor.params.publishAsNew.help": "Если отмечено, это будет опубликовано как новый пост с обновленной датой, появляясь вверху ленты.",
+  "editor.params.publishAsNew.label": "Опубликовать как новый пост",
   "editor.params.title": "Дополнительные параметры",
   "editor.previewPost": "Предпросмотр поста",
   "editor.publish.descriptor.errorTitle": "Ошибка загрузки описания",
@@ -30414,7 +30700,6 @@ export default {
   "editor.sidebar.thumbnailPlaceholder": "Предварительный просмотр миниатюры",
   "editor.thumbnail.delete": "Удалить миниатюру",
   "editor.title": "Редактор постов",
-  "editor.titleComment": "Редактировать комментарий",
   "editor.titleEditPost": "Редактировать пост",
   "editor.titleNewPost": "Новый пост",
   "editor.titlePlaceholder": "Название поста",
@@ -30456,13 +30741,16 @@ export default {
   "main.tabs.empty": "Эта вкладка пока пуста.",
   "main.tabs.loading": "Загрузка вкладок…",
   "main.tabs.untitled": "Без названия",
-  "menu.open": "Открыть меню",
   "newTab.category": "Категория",
   "newTab.view.grid": "Сетка",
   "newTab.view.group": "Просмотреть группу",
   "newTab.view.list": "Список",
+  "post.addComment": "Добавить комментарий...",
   "post.chapters.prologue": "Пролог",
   "post.chapters.title": "Содержание",
+  "post.comments": "Комментарии",
+  "post.loadMoreComments": "Загрузить больше комментариев",
+  "post.noComments": "Пока нет комментариев.",
   "post.notFound.message": "Пост, который вы ищете, не существует или был удален.",
   "post.notFound.title": "Пост не найден",
   "postcard.copyDataCid": "Скопировать Data CID",
@@ -30470,6 +30758,18 @@ export default {
   "postcard.copySavvaCid": "Скопировать SAVVA CID",
   "postcard.pin": "Закрепить пост",
   "postcard.unpin": "Открепить пост",
+  "reactions.${reactionType()}": "Реакция с {reactionType}",
+  "reactions.${type}": "Реакция {type}",
+  "reactions.angry": "Злюсь",
+  "reactions.fire": "🔥",
+  "reactions.hot": "Горячо",
+  "reactions.laugh": "Ха-ха",
+  "reactions.like": "Нравится",
+  "reactions.love": "Люблю",
+  "reactions.rocket": "🚀",
+  "reactions.sad": "Грустно",
+  "reactions.star": "⭐",
+  "reactions.wow": "Ух ты",
   "rightPane.language": "Язык",
   "rightPane.settings": "Настройки",
   "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
@@ -30560,7 +30860,7 @@ export default {
   "wallet.changeChain": "Сменить сеть",
   "wallet.connect": "Подключить кошелек",
   "wallet.copyAddress": "Скопировать адрес",
-  "wallet.error.addressMismatch": "Несоответствие адреса кошелька. Пожалуйста, переключитесь на авторизованный аккаунт, чтобы продолжить.",
+  "wallet.error.userCanceled": "Транзакция отменена.",
   "wallet.onRequiredNetwork": "В требуемой сети"
 };
 </file>
@@ -30723,8 +31023,10 @@ export default function PostPage() {
   createEffect(() => {
     const update = app.postUpdate();
     if (post && update && update.type === 'reactionsChanged' && update.cid === post.savva_cid) {
-      // Only update the aggregate reactions array
       setPost('reactions', update.data.reactions);
+      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+        setPost('my_reaction', update.data.reaction);
+      }
     }
   });
 
@@ -30836,15 +31138,7 @@ export default function PostPage() {
                       positionClass="absolute top-0 right-0 z-20"
                     />
                   </Show>
-
                   <UserCard author={post.author} />
-                  <PostInfo 
-                    item={post} 
-                    hideTopBorder={true} 
-                    timeFormat="long"
-                    rewardsAlign="left" 
-                  />
-                  <PostTags postData={post} />
                 </div>
                 <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
                   <Show when={thumbnail()}>
@@ -30907,6 +31201,7 @@ export default function PostPage() {
               </div>
             </article>
           </div>
+          
         </Match>
       </Switch>
     </main>
@@ -31131,6 +31426,7 @@ export default function EditorPage() {
   const [showChapters, setShowChapters] = createSignal(false);
   const [editingChapterIndex, setEditingChapterIndex] = createSignal(-1);
   const [showConfirmDelete, setShowConfirmDelete] = createSignal(false);
+  const [showConfirmClear, setShowConfirmClear] = createSignal(false);
   const [thumbnailUrl, setThumbnailUrl] = createSignal(null);
   const [showFullPreview, setShowFullPreview] = createSignal(false);
   const [showPublishWizard, setShowPublishWizard] = createSignal(false);
@@ -31260,6 +31556,28 @@ export default function EditorPage() {
 
   const updateParam = (field, value) => {
     setPostParams(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleConfirmClear = () => {
+    const newPostData = {};
+    const newPostParams = {
+      guid: editorMode() === 'new_post' ? crypto.randomUUID() : postParams().guid,
+      publishAsNewPost: editorMode() === 'edit_post' ? false : undefined,
+      locales: {}
+    };
+
+    for (const langCode of domainLangCodes()) {
+        newPostData[langCode] = { title: "", body: "", chapters: [] };
+        newPostParams.locales[langCode] = { chapters: [] };
+    }
+
+    batch(() => {
+        setPostData(newPostData);
+        setPostParams(newPostParams);
+        setEditingChapterIndex(-1);
+        setShowChapters(false);
+        setThumbnailUrl(null);
+    });
   };
 
   const updateChapterTitle = (index, newTitle) => {
@@ -31434,7 +31752,7 @@ export default function EditorPage() {
           <Show when={!isFullScreen()}>
             <ClosePageButton />
             <header class="flex justify-between items-start gap-4">
-              <div class="flex-1 min-w-0">
+              <div class="flex-1 min-w-0 flex items-center gap-4">
                 <h2 class="text-2xl font-semibold">{title()}</h2>
               </div>
               <div class="w-48 flex-shrink-0 space-y-2">
@@ -31572,7 +31890,14 @@ export default function EditorPage() {
                     </div>
                   </div>
 
-                  <div class="mt-6 flex justify-end">
+                  <div class="mt-6 flex justify-end items-center gap-4">
+                    <button 
+                      onClick={() => setShowConfirmClear(true)}
+                      title={t("editor.clearDraft")}
+                      class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
+                    >
+                      <TrashIcon />
+                    </button>
                     <button 
                       onClick={() => setShowFullPreview(true)}
                       class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
@@ -31597,10 +31922,17 @@ export default function EditorPage() {
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}
-        onClose={() => setFileToDelete(null)}
+        onClose={() => setShowConfirmDelete(false)}
         onConfirm={confirmRemoveChapter}
         title={t("editor.chapters.confirmDeleteTitle")}
         message={t("editor.chapters.confirmDeleteMessage")}
+      />
+       <ConfirmModal
+        isOpen={showConfirmClear()}
+        onClose={() => setShowConfirmClear(false)}
+        onConfirm={handleConfirmClear}
+        title={t("editor.clearDraftTitle")}
+        message={t("editor.clearDraftMessage")}
       />
       <PostSubmissionWizard 
         isOpen={showPublishWizard()}
@@ -31608,6 +31940,7 @@ export default function EditorPage() {
         onSuccess={handlePublishSuccess}
         postData={postData}
         postParams={postParams}
+        editorMode={editorMode()}
       />
     </main>
   );
@@ -31834,6 +32167,9 @@ export default {
   "editor.chapters.remove": "Delete Chapter",
   "editor.chapters.title": "Chapters",
   "editor.chapters.titlePlaceholder": "Enter chapter title",
+  "editor.clearDraft": "Clear Draft",
+  "editor.clearDraftMessage": "Are you sure you want to clear this draft?",
+  "editor.clearDraftTitle": "Confirm Clear Draft",
   "editor.files.confirmDeleteTitle": "Delete File",
   "editor.files.empty": "No files uploaded yet. Use the buttons above to add files to your post.",
   "editor.files.menu.delete": "Delete",
@@ -31854,6 +32190,8 @@ export default {
   "editor.params.fundraiser.label": "Promoted Fundrising Campaign ID",
   "editor.params.nsfw.help": "Content contains explicit language or images.",
   "editor.params.nsfw.label": "NSFW",
+  "editor.params.publishAsNew.help": "If checked, this will be published as a new post with an updated timestamp, appearing at the top of feeds.",
+  "editor.params.publishAsNew.label": "Publish as new post",
   "editor.params.title": "Additional Parameters",
   "editor.previewPost": "Preview Post",
   "editor.publish.descriptor.errorTitle": "Descriptor Upload Failed",
@@ -31892,7 +32230,6 @@ export default {
   "editor.sidebar.thumbnailPlaceholder": "Thumbnail preview",
   "editor.thumbnail.delete": "Delete thumbnail",
   "editor.title": "Post Editor",
-  "editor.titleComment": "Edit Comment",
   "editor.titleEditPost": "Edit Post",
   "editor.titleNewPost": "New Post",
   "editor.titlePlaceholder": "Post Title",
@@ -31934,13 +32271,16 @@ export default {
   "main.tabs.empty": "This tab is empty for now.",
   "main.tabs.loading": "Loading tabs…",
   "main.tabs.untitled": "Untitled",
-  "menu.open": "Open menu",
   "newTab.category": "Category",
   "newTab.view.grid": "Grid View",
   "newTab.view.group": "View Group",
   "newTab.view.list": "List View",
+  "post.addComment": "Add a comment...",
   "post.chapters.prologue": "Prologue",
   "post.chapters.title": "Table of Contents",
+  "post.comments": "Comments",
+  "post.loadMoreComments": "Load more comments",
+  "post.noComments": "No comments yet.",
   "post.notFound.message": "The post you're looking for doesn't exist or has been removed.",
   "post.notFound.title": "Post Not Found",
   "postcard.copyDataCid": "Copy Data CID",
@@ -31948,6 +32288,18 @@ export default {
   "postcard.copySavvaCid": "Copy SAVVA CID",
   "postcard.pin": "Pin Post",
   "postcard.unpin": "Unpin Post",
+  "reactions.${reactionType()}": "React with {reactionType}",
+  "reactions.${type}": "{type} Reaction",
+  "reactions.angry": "Angry",
+  "reactions.fire": "🔥",
+  "reactions.hot": "Hot",
+  "reactions.laugh": "Haha",
+  "reactions.like": "Like",
+  "reactions.love": "Love",
+  "reactions.rocket": "🚀",
+  "reactions.sad": "Sad",
+  "reactions.star": "⭐",
+  "reactions.wow": "Wow",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
   "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",
@@ -32038,20 +32390,8 @@ export default {
   "wallet.changeChain": "Change network",
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
-  "wallet.error.addressMismatch": "Wallet address mismatch. Please switch to the authorized account to proceed.",
-  "wallet.onRequiredNetwork": "On required network",
-  "editor.params.publishAsNew.label": "Publish as new post",
-"editor.params.publishAsNew.help": "If checked, this will be published as a new post with an updated timestamp, appearing at the top of feeds.",
-"reactions.like": "Like",
-"reactions.super": "Super",
-"reactions.ha_ha": "Haha",
-"reactions.sad": "Sad",
-"reactions.angry": "Angry",
-"reactions.wow": "Wow",
-"reactions.trophy": "Trophy",
-"reactions.hot": "Hot",
-"reactions.clap": "Clap",
-"reactions.dislike": "Dislike"
+  "wallet.error.userCanceled": "Transaction canceled.",
+  "wallet.onRequiredNetwork": "On required network"
 };
 </file>
 

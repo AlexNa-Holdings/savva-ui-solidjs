@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/hashRouter.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
-import ReactionInput from "./ReactionInput.jsx";
+import PostInfo from "../feed/PostInfo.jsx";
 
 export default function PostControls(props) {
   const app = useApp();
@@ -31,17 +31,19 @@ export default function PostControls(props) {
 
   return (
     <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center justify-between">
-      {/* Left Side: Reaction Input for any logged-in user */}
-      <div>
-        <Show when={app.authorizedUser()}>
-          <ReactionInput post={props.post} />
-        </Show>
+      {/* Left Side: Full PostInfo component */}
+      <div class="flex-1 min-w-0">
+        <PostInfo 
+          item={props.post} 
+          hideTopBorder={true} 
+          timeFormat="long" 
+        />
       </div>
 
       {/* Right Side: Author-only buttons */}
-      <div>
+      <div class="pl-4">
         <Show when={isAuthor()}>
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-4 flex-shrink-0">
             <button
               onClick={handleEdit}
               disabled={isPreparing()}

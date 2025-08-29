@@ -85,12 +85,6 @@ export default function LeadersTab(props) {
         if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
         if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
 
-          // i18n techical comments. Do not remove
-          // t("timeFrame.week")
-          // t("timeFrame.month")
-          // t("timeFrame.year")
-          // t("timeFrame.all")
-
 
         // MODIFICATION: Changed to standard ISO string format.
         params.min_time = pastDate.toISOString();

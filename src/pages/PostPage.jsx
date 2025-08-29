@@ -155,8 +155,10 @@ export default function PostPage() {
   createEffect(() => {
     const update = app.postUpdate();
     if (post && update && update.type === 'reactionsChanged' && update.cid === post.savva_cid) {
-      // Only update the aggregate reactions array
       setPost('reactions', update.data.reactions);
+      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+        setPost('my_reaction', update.data.reaction);
+      }
     }
   });
 
@@ -268,15 +270,7 @@ export default function PostPage() {
                       positionClass="absolute top-0 right-0 z-20"
                     />
                   </Show>
-
                   <UserCard author={post.author} />
-                  <PostInfo 
-                    item={post} 
-                    hideTopBorder={true} 
-                    timeFormat="long"
-                    rewardsAlign="left" 
-                  />
-                  <PostTags postData={post} />
                 </div>
                 <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
                   <Show when={thumbnail()}>
@@ -339,6 +333,7 @@ export default function PostPage() {
               </div>
             </article>
           </div>
+          
         </Match>
       </Switch>
     </main>

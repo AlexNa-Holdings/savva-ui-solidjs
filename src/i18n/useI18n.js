@@ -5,6 +5,7 @@ import ru from "./ru";
 import sr from "./sr";
 import ua from "./ua";
 import fr from "./fr";
+import { dbg } from "../utils/debug";
 
 // Used by the Lang selector for labels
 export const LANG_INFO = {
@@ -73,6 +74,14 @@ export function useI18n() {
 
     function setLang(next) {
       const v = normalizeLang(next);
+      const current = lang();
+
+      dbg.log("useI18n", `setLang called. Request: '${next}', Normalized: '${v}', Current: '${current}'.`);
+      if (current === v) {
+        dbg.log("useI18n", "-> SKIPPING: Language is already set to this value.");
+        return;
+      }
+
       setLangSignal(v);
       try { localStorage.setItem(LANG_KEY, v); } catch {}
       if (typeof document !== "undefined") {

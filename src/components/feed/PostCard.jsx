@@ -40,17 +40,13 @@ export default function PostCard(props) {
   const { t } = app;
   const [isHovered, setIsHovered] = createSignal(false);
   
-  // Create a single reactive memo that holds the most up-to-date post data.
   const item = createMemo(() => {
     const baseItem = props.item;
     const update = app.postUpdate();
 
-    // Check if the current update alert is for this specific card
     if (update && update.type === 'reactionsChanged' && update.cid === baseItem.id) {
-      // Create a new object with the updated reaction data
       const updatedRaw = { ...baseItem._raw, reactions: update.data.reactions };
       
-      // Only update `my_reaction` if the alert is for the current logged-in user
       if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
         updatedRaw.my_reaction = update.data.reaction;
       }
@@ -58,7 +54,6 @@ export default function PostCard(props) {
       return { ...baseItem, _raw: updatedRaw };
     }
     
-    // If there's no relevant update, return the original item from props
     return baseItem;
   });
 
@@ -84,11 +79,11 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container') || e.target.closest('.context-menu-container')) {
+    if (e.target.closest('.user-card-container, .context-menu-container, .reaction-input-container')) {
       return;
     }
     e.preventDefault();
-    const postId = props.item.id; // Always read the stable ID directly from props for navigation
+    const postId = props.item.id;
     if (postId) {
       app.setSavedScrollY(window.scrollY);
       navigate(`/post/${postId}`);

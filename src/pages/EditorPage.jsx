@@ -9,7 +9,7 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS } from "../editor/storage.js";
+import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
@@ -18,6 +18,7 @@ import { insertTextAtCursor } from "../editor/text-utils.js";
 import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
 import { pushToast } from "../ui/toast.js";
+import CommentEditor from "../components/editor/CommentEditor.jsx";
 
 function TrashIcon(props) {
   return (
@@ -50,15 +51,21 @@ export default function EditorPage() {
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
 
-  const editorMode = createMemo(() => {
+  const routeParams = createMemo(() => {
     const path = route();
-    if (path.startsWith("/editor/new")) return "new_post";
-    if (path.startsWith("/editor/edit/")) return "edit_post";
-    return "unknown";
+    if (path.startsWith("/editor/new")) return { mode: "new_post" };
+    if (path.startsWith("/editor/edit/")) return { mode: "edit_post", id: path.split('/')[3] };
+    if (path.startsWith("/editor/comment/")) return { mode: "new_comment", parent_savva_cid: path.split('/')[3] };
+    return { mode: "unknown" };
   });
+
+  const editorMode = () => routeParams().mode;
   
   const baseDir = createMemo(() => {
-    return editorMode() === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
+    const mode = editorMode();
+    if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
+    if (mode === "edit_post" || mode === "new_comment") return DRAFT_DIRS.EDIT;
+    return "unknown";
   });
 
   const domainLangCodes = createMemo(() => {
@@ -68,30 +75,48 @@ export default function EditorPage() {
 
   const loadEditorContent = async () => {
     try {
-      const draft = await loadDraft(baseDir());
-      if (draft && draft.content) {
-          batch(() => {
-            setPostData(draft.content);
-            const params = draft.params || {};
-            if (editorMode() === "new_post" && !params.guid) {
-                params.guid = crypto.randomUUID();
-            }
-            setPostParams(params);
-          });
-      } else if (editorMode() === "new_post") {
-          const newPostData = {};
-          const newPostParams = { locales: {}, guid: crypto.randomUUID() };
-          for (const langCode of domainLangCodes()) {
-              newPostData[langCode] = { title: "", body: "", chapters: [] };
-              newPostParams.locales[langCode] = { chapters: [] };
-          }
-          batch(() => {
-            setPostData(newPostData);
-            setPostParams(newPostParams);
-          });
+      if (editorMode() === "new_comment") {
+        await clearDraft(baseDir());
+        const newPostData = {};
+        const newPostParams = { 
+          locales: {}, 
+          guid: crypto.randomUUID(),
+          parent_savva_cid: routeParams().parent_savva_cid 
+        };
+        for (const langCode of domainLangCodes()) {
+            newPostData[langCode] = { title: "", body: "", chapters: [] };
+            newPostParams.locales[langCode] = { chapters: [] };
+        }
+        batch(() => {
+          setPostData(newPostData);
+          setPostParams(newPostParams);
+        });
       } else {
-        dbg.error("EditorPage", `Draft not found for edit mode in '${baseDir()}', navigating back.`);
-        navigate(lastTabRoute() || "/");
+        const draft = await loadDraft(baseDir());
+        if (draft && draft.content) {
+            batch(() => {
+              setPostData(draft.content);
+              const params = draft.params || {};
+              if (editorMode() === "new_post" && !params.guid) {
+                  params.guid = crypto.randomUUID();
+              }
+              setPostParams(params);
+            });
+        } else if (editorMode() === "new_post") {
+            const newPostData = {};
+            const newPostParams = { locales: {}, guid: crypto.randomUUID() };
+            for (const langCode of domainLangCodes()) {
+                newPostData[langCode] = { title: "", body: "", chapters: [] };
+                newPostParams.locales[langCode] = { chapters: [] };
+            }
+            batch(() => {
+              setPostData(newPostData);
+              setPostParams(newPostParams);
+            });
+        } else {
+          dbg.error("EditorPage", `Draft not found for edit mode in '${baseDir()}', navigating back.`);
+          navigate(lastTabRoute() || "/");
+        }
       }
     } catch (error) {
       dbg.error("EditorPage", "Failed to load draft, navigating away.", error);
@@ -180,6 +205,10 @@ export default function EditorPage() {
       publishAsNewPost: editorMode() === 'edit_post' ? false : undefined,
       locales: {}
     };
+
+    if (editorMode() === 'new_comment') {
+        newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
+    }
 
     for (const langCode of domainLangCodes()) {
         newPostData[langCode] = { title: "", body: "", chapters: [] };
@@ -316,6 +345,7 @@ export default function EditorPage() {
     switch (editorMode()) {
       case "new_post": return t("editor.titleNewPost");
       case "edit_post": return t("editor.titleEditPost");
+      case "new_comment": return t("editor.titleNewComment");
       default: return t("editor.title");
     }
   });
@@ -370,31 +400,33 @@ export default function EditorPage() {
               <div class="flex-1 min-w-0 flex items-center gap-4">
                 <h2 class="text-2xl font-semibold">{title()}</h2>
               </div>
-              <div class="w-48 flex-shrink-0 space-y-2">
-                <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-                  <Show when={thumbnailUrl()}
-                    fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
-                  >
-                    <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
-                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button 
-                        onClick={handleDeleteThumbnail}
-                        title={t("editor.thumbnail.delete")}
-                        class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
-                      >
-                        <TrashIcon class="w-5 h-5" />
-                      </button>
-                    </div>
-                  </Show>
+              <Show when={editorMode() !== 'new_comment'}>
+                <div class="w-48 flex-shrink-0 space-y-2">
+                  <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
+                    <Show when={thumbnailUrl()}
+                      fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
+                    >
+                      <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
+                      <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          onClick={handleDeleteThumbnail}
+                          title={t("editor.thumbnail.delete")}
+                          class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
+                        >
+                          <TrashIcon class="w-5 h-5" />
+                        </button>
+                      </div>
+                    </Show>
+                  </div>
+                  <div class="flex justify-center">
+                    <LangSelector
+                        codes={domainLangCodes()}
+                        value={activeLang()}
+                        onChange={setActiveLang}
+                    />
+                  </div>
                 </div>
-                <div class="flex justify-center">
-                  <LangSelector
-                      codes={domainLangCodes()}
-                      value={activeLang()}
-                      onChange={setActiveLang}
-                  />
-                </div>
-              </div>
+              </Show>
             </header>
           </Show>
 
@@ -402,6 +434,9 @@ export default function EditorPage() {
             <div classList={{ "h-full flex flex-col": isFullScreen() }}>
               <Show when={!isFullScreen()}>
                 <>
+                  <Show when={editorMode() === 'new_comment'}>
+                    <CommentEditor savva_cid={routeParams().parent_savva_cid} />
+                  </Show>
                   <div class="flex items-center gap-4 mb-4">
                     <input
                       type="text"
@@ -411,7 +446,7 @@ export default function EditorPage() {
                       class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
                     />
                     <div class="flex-shrink-0 flex items-center gap-2">
-                      <Show when={!showChapters()}>
+                      <Show when={!showChapters() && editorMode() !== 'new_comment'}>
                         <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
                       </Show>
                       <Show when={!showFiles()}>
@@ -420,7 +455,7 @@ export default function EditorPage() {
                     </div>
                   </div>
                   
-                  <Show when={showChapters()}>
+                  <Show when={showChapters() && editorMode() !== 'new_comment'}>
                     <div class="mb-4">
                         <EditorChapterSelector
                             chapters={combinedChapters()}
@@ -473,18 +508,19 @@ export default function EditorPage() {
                           onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
                         />
                       </div>
-
-                      <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
-                      <div class="justify-self-start">
-                        <input
-                          id="fundraiser-id"
-                          type="number"
-                          value={postParams().fundraiser || 0}
-                          onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
-                          class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                          min="0"
-                        />
-                      </div>
+                      <Show when={editorMode() !== 'new_comment'}>
+                        <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+                        <div class="justify-self-start">
+                          <input
+                            id="fundraiser-id"
+                            type="number"
+                            value={postParams().fundraiser || 0}
+                            onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                            class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                            min="0"
+                          />
+                        </div>
+                      </Show>
                       <Show when={editorMode() === 'edit_post'}>
                         <div class="justify-self-start self-start">
                           <label for="publish-as-new-checkbox" class="font-medium">{t("editor.params.publishAsNew.label")}</label>

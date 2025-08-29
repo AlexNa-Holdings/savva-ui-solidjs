@@ -53,17 +53,20 @@ export default function PostInfo(props) {
 
   return (
     <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+      {/* Left-aligned items */}
       <PostTime 
         timestamp={postData().effective_time} 
         format={props.timeFormat || "short"} 
       />
       <PostReactions item={props.item} />
-      {/* <Show when={app.authorizedUser() && !isListMode()}>
-        <ReactionInput post={props.item} />
-      </Show> */}
+      <PostRewards item={props.item} lang={lang} />
       <PostComments item={props.item} />
-      <div class={props.rewardsAlign === 'left' ? '' : 'ml-auto'}>
-        <PostRewards item={props.item} lang={lang} />
+      
+      {/* Right-aligned items */}
+      <div class="ml-auto">
+        <Show when={app.authorizedUser()}>
+          <ReactionInput post={props.item} />
+        </Show>
       </div>
     </div>
   );
