@@ -66,7 +66,7 @@ export default function PostComments(props) {
   };
 
   const handleAddComment = () => {
-    navigate(`/editor/comment/${postId()}`);
+    navigate(`/editor/new-comment/${postId()}`);
   };
 
   return (

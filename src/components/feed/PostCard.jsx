@@ -79,10 +79,7 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    if (e.target.closest('.user-card-container, .context-menu-container, .reaction-input-container')) {
-      return;
-    }
-    e.preventDefault();
+    // This event will now only fire if the user clicks outside the user card's content area
     const postId = props.item.id;
     if (postId) {
       app.setSavedScrollY(window.scrollY);
@@ -90,10 +87,6 @@ export default function PostCard(props) {
     } else {
       console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
     }
-  };
-
-  const handleUserClick = (e) => {
-    e.stopPropagation();
   };
 
   const finalContextMenuItems = createMemo(() => {
@@ -163,7 +156,7 @@ export default function PostCard(props) {
         </Show>
       </div>
       
-      <div class="mt-1 user-card-container" onClick={handleUserClick}>
+      <div class="mt-1">
         <UserCard author={author()} compact={props.compact} />
       </div>
 

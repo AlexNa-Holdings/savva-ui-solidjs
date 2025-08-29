@@ -53,9 +53,10 @@ export default function EditorPage() {
 
   const routeParams = createMemo(() => {
     const path = route();
+    if (path.startsWith("/editor/new-comment/")) return { mode: "new_comment", parent_savva_cid: path.split('/')[3] };
+    if (path.startsWith("/editor/comment/")) return { mode: "edit_comment", id: path.split('/')[3] };
     if (path.startsWith("/editor/new")) return { mode: "new_post" };
     if (path.startsWith("/editor/edit/")) return { mode: "edit_post", id: path.split('/')[3] };
-    if (path.startsWith("/editor/comment/")) return { mode: "new_comment", parent_savva_cid: path.split('/')[3] };
     return { mode: "unknown" };
   });
 
@@ -64,7 +65,7 @@ export default function EditorPage() {
   const baseDir = createMemo(() => {
     const mode = editorMode();
     if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
-    if (mode === "edit_post" || mode === "new_comment") return DRAFT_DIRS.EDIT;
+    if (["edit_post", "new_comment", "edit_comment"].includes(mode)) return DRAFT_DIRS.EDIT;
     return "unknown";
   });
 
@@ -345,7 +346,8 @@ export default function EditorPage() {
     switch (editorMode()) {
       case "new_post": return t("editor.titleNewPost");
       case "edit_post": return t("editor.titleEditPost");
-      case "new_comment": return t("editor.titleNewComment");
+      case "new_comment": return t("editor.titleNewCommentFor");
+      case "edit_comment": return t("editor.titleEditComment");
       default: return t("editor.title");
     }
   });
@@ -397,10 +399,8 @@ export default function EditorPage() {
           <Show when={!isFullScreen()}>
             <ClosePageButton />
             <header class="flex justify-between items-start gap-4">
-              <div class="flex-1 min-w-0 flex items-center gap-4">
-                <h2 class="text-2xl font-semibold">{title()}</h2>
-              </div>
-              <Show when={editorMode() !== 'new_comment'}>
+              <h2 class="text-2xl font-semibold flex-1 min-w-0">{title()}</h2>
+              <Show when={editorMode() === 'new_post' || editorMode() === 'edit_post'}>
                 <div class="w-48 flex-shrink-0 space-y-2">
                   <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
                     <Show when={thumbnailUrl()}
@@ -434,28 +434,41 @@ export default function EditorPage() {
             <div classList={{ "h-full flex flex-col": isFullScreen() }}>
               <Show when={!isFullScreen()}>
                 <>
-                  <Show when={editorMode() === 'new_comment'}>
-                    <CommentEditor savva_cid={routeParams().parent_savva_cid} />
-                  </Show>
-                  <div class="flex items-center gap-4 mb-4">
-                    <input
-                      type="text"
-                      value={currentLangData().title}
-                      onInput={(e) => updateField('title', e.currentTarget.value)}
-                      placeholder={t("editor.titlePlaceholder")}
-                      class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
-                    />
-                    <div class="flex-shrink-0 flex items-center gap-2">
-                      <Show when={!showChapters() && editorMode() !== 'new_comment'}>
-                        <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
-                      </Show>
-                      <Show when={!showFiles()}>
+                  <Show when={editorMode() === 'new_comment' || editorMode() === 'edit_comment'}>
+                    <div class="mt-4">
+                      <CommentEditor savva_cid={routeParams().parent_savva_cid || routeParams().id} />
+                      <div class="flex justify-end items-center gap-2 my-4">
+                        <LangSelector
+                          codes={domainLangCodes()}
+                          value={activeLang()}
+                          onChange={setActiveLang}
+                        />
                         <EditorFilesButton onClick={() => setShowFiles(true)} />
-                      </Show>
+                      </div>
                     </div>
-                  </div>
+                  </Show>
                   
-                  <Show when={showChapters() && editorMode() !== 'new_comment'}>
+                  <Show when={editorMode() === 'new_post' || editorMode() === 'edit_post'}>
+                    <div class="flex items-center gap-4 mb-4">
+                      <input
+                        type="text"
+                        value={currentLangData().title}
+                        onInput={(e) => updateField('title', e.currentTarget.value)}
+                        placeholder={t("editor.titlePlaceholder")}
+                        class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+                      />
+                      <div class="flex-shrink-0 flex items-center gap-2">
+                        <Show when={!showChapters()}>
+                          <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                        </Show>
+                        <Show when={!showFiles()}>
+                          <EditorFilesButton onClick={() => setShowFiles(true)} />
+                        </Show>
+                      </div>
+                    </div>
+                  </Show>
+                  
+                  <Show when={showChapters() && editorMode() !== 'new_comment' && editorMode() !== 'edit_comment'}>
                     <div class="mb-4">
                         <EditorChapterSelector
                             chapters={combinedChapters()}
@@ -508,7 +521,7 @@ export default function EditorPage() {
                           onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
                         />
                       </div>
-                      <Show when={editorMode() !== 'new_comment'}>
+                      <Show when={editorMode() !== 'new_comment' && editorMode() !== 'edit_comment'}>
                         <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
                         <div class="justify-self-start">
                           <input
