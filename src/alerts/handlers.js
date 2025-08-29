@@ -47,9 +47,17 @@ export function handleReact(app, payload) {
   const alertDomain = payload?.domain?.toLowerCase();
 
   if (alertDomain === currentDomain) {
-    // Pass the nested 'data' object, which contains the BCM_React struct
-    // that components are expecting.
-    app.setPostUpdate(payload.data);
+    const d = payload.data;
+    // Emit a specific event with only the changed data
+    app.setPostUpdate({
+      cid: d?.object_id,
+      type: 'reactionsChanged',
+      data: {
+        reactions: d?.reactions,
+        reaction: d?.reaction,
+        user: d?.user?.address,
+      }
+    });
   } else {
     dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
   }

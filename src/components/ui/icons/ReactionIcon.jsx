@@ -23,7 +23,6 @@ export default function ReactionIcon(props) {
       <span
         class={props.class || "text-sm"}
         aria-label={props.type}
-        title={props.type}
       >
         {emoji()}
       </span>

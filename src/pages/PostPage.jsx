@@ -1,5 +1,6 @@
 // src/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { useHashRouter, navigate } from "../routing/hashRouter";
 import { useApp } from "../context/AppContext.jsx";
 import { ipfs } from "../ipfs/index.js";
@@ -113,7 +114,7 @@ export default function PostPage() {
   const identifier = createMemo(() => getIdentifier(route));
   const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
 
-  const [post, { mutate }] = createResource(
+  const [postResource] = createResource(
     () => ({
       identifier: identifier(),
       domain: app.selectedDomainName(),
@@ -123,7 +124,16 @@ export default function PostPage() {
     fetchPostByIdentifier
   );
   
-  const [details] = createResource(post, (p) => fetchPostDetails(p, app));
+  const [post, setPost] = createStore(null);
+
+  createEffect(() => {
+    const resourceData = postResource();
+    if (resourceData) {
+      setPost(reconcile(resourceData));
+    }
+  });
+
+  const [details] = createResource(postResource, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
   const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
 
@@ -133,7 +143,7 @@ export default function PostPage() {
   );
 
   createEffect(() => {
-    const p = post();
+    const p = post;
     const id = identifier();
     if (p && id.startsWith("0x") && p.short_cid) {
       const newPath = `/post/${p.short_cid}`;
@@ -143,17 +153,15 @@ export default function PostPage() {
 
   createEffect(() => {
     const update = app.postUpdate();
-    if (update?.data?.savva_cid && update.object_type === 0 && update.object_id === post()?.savva_cid) {
-      // Added log for debugging
-      dbg.log("PostPage:react", "Applying reaction update from alert", { update });
-      mutate(update.data);
+    if (post && update && update.type === 'reactionsChanged' && update.cid === post.savva_cid) {
+      // Only update the aggregate reactions array
+      setPost('reactions', update.data.reactions);
     }
   });
 
   createEffect(() => {
-    const p = post();
-    if (p && !postLang()) {
-      const availableLangs = Object.keys(details()?.descriptor?.locales || p.savva_content?.locales || {});
+    if (post && !postLang()) {
+      const availableLangs = Object.keys(details()?.descriptor?.locales || post.savva_content?.locales || {});
       if (availableLangs.length === 0) return;
       const currentUiLang = uiLang();
       let initialLang = availableLangs[0]; 
@@ -167,20 +175,18 @@ export default function PostPage() {
   });
 
   const contextMenuItems = createMemo(() => {
-    const p = post();
-    if (!p) return [];
-    return getPostAdminItems(p, t);
+    if (!post) return [];
+    return getPostAdminItems(post, t);
   });
 
-  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post()?.savva_content?.locales?.[postLang()]?.title || "");
+  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post?.savva_content?.locales?.[postLang()]?.title || "");
   const thumbnail = createMemo(() => {
-    const p = post();
-    if (!p) return null;
+    if (!post) return null;
     const d = details();
-    const thumbnailPath = d?.descriptor?.thumbnail || p.savva_content?.thumbnail;
-    return resolvePostCidPath(p, thumbnailPath);
+    const thumbnailPath = d?.descriptor?.thumbnail || post.savva_content?.thumbnail;
+    return resolvePostCidPath(post, thumbnailPath);
   });
-  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post()?.savva_content?.locales || {}));
+  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post?.savva_content?.locales || {}));
   
   const chapterList = createMemo(() => {
     const prologue = { title: t("post.chapters.prologue"), data_path: null };
@@ -233,22 +239,22 @@ export default function PostPage() {
     <main class="sv-container p-4">
       <ClosePageButton />
       <Switch>
-        <Match when={post.loading}>
+        <Match when={postResource.loading}>
           <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
         </Match>
-        <Match when={post.error || details()?.descriptor?.error}>
+        <Match when={postResource.error || details()?.descriptor?.error}>
           <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
             <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
-            <p class="text-sm mt-1">{post.error?.message || details()?.descriptor?.error}</p>
+            <p class="text-sm mt-1">{postResource.error?.message || details()?.descriptor?.error}</p>
           </div>
         </Match>
-        <Match when={!post.loading && post() === null}>
+        <Match when={!postResource.loading && !post}>
           <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
             <h3 class="font-semibold">{t("post.notFound.title")}</h3>
             <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
           </div>
         </Match>
-        <Match when={post()}>
+        <Match when={post}>
           <div class="max-w-5xl mx-auto">
             <article class="space-y-4">
               <header class="flex justify-between items-start gap-4">
@@ -262,14 +268,14 @@ export default function PostPage() {
                     />
                   </Show>
 
-                  <UserCard author={post().author} />
+                  <UserCard author={post.author} />
                   <PostInfo 
-                    item={post()} 
+                    item={post} 
                     hideTopBorder={true} 
                     timeFormat="long"
                     rewardsAlign="left" 
                   />
-                  <PostTags postData={post()} />
+                  <PostTags postData={post} />
                 </div>
                 <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
                   <Show when={thumbnail()}>
@@ -324,7 +330,7 @@ export default function PostPage() {
                         </Show>
                       </Match>
                     </Switch>
-                    <PostControls post={post()} />
+                    <PostControls post={post} />
                   </div>
                   <RightPanel />
                 </div>
