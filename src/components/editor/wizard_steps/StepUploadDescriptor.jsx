@@ -25,7 +25,7 @@ export default function StepUploadDescriptor(props) {
 
     if (postParams().parent_savva_cid) {
         descriptor.parent_savva_cid = postParams().parent_savva_cid;
-        descriptor.root_savva_cid = postParams().parent_savva_cid;
+        descriptor.root_savva_cid = postParams().root_savva_cid || postParams().parent_savva_cid;
     }
 
     const gateways = app.info()?.ipfs_gateways;

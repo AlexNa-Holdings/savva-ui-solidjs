@@ -9,6 +9,7 @@ import { getPostContentBaseCid } from "../../ipfs/utils";
 import Spinner from "../ui/Spinner";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { navigate } from "../../routing/hashRouter.js";
 
 /**
  * Fetches the full content of a comment's prologue for a specific language.
@@ -82,6 +83,14 @@ export default function CommentCard(props) {
     return preview.length > 280 || preview.endsWith("...");
   });
 
+  const handleReply = (e) => {
+    e.stopPropagation();
+    const commentCid = comment()?.savva_cid;
+    if (commentCid) {
+      navigate(`/editor/new-comment/${commentCid}`);
+    }
+  };
+
   return (
     <div
       class="relative flex flex-col"
@@ -124,7 +133,7 @@ export default function CommentCard(props) {
                 {isExpanded() ? "Show Less" : "Show More"}
               </button>
             </Show>
-            <button class="hover:underline">Reply</button>
+            <button class="hover:underline" onClick={handleReply}>Reply</button>
           </div>
         </div>
       </div>

@@ -1017,6 +1017,34 @@ export async function loadAssetResource(app, relPath, opts = {}) {
 /// <reference types="vite/client" />
 </file>
 
+<file path=".gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
 <file path="postcss.config.js">
 // postcss.config.js
 export default {
@@ -19754,6 +19782,44 @@ export function pushErrorToast(err, context = {}) {
 }
 </file>
 
+<file path="src/utils/debug.js">
+// src/utils/debug.js
+const STORE_KEY = "savva_debug_enabled";
+
+const state = {
+  enabled: (() => { try { return localStorage.getItem(STORE_KEY) === "1"; } catch { return false; } })(),
+};
+
+function logWithScope(method, scope, args) {
+  if (!state.enabled) return;
+  const c = console[method] || console.log;
+  c.call(console, `${scope}:`, ...args);
+}
+
+export const dbg = {
+  enable(on = true) {
+    state.enabled = !!on;
+    try { localStorage.setItem(STORE_KEY, state.enabled ? "1" : "0"); } catch {}
+    return state.enabled;
+  },
+  enabled: () => !!state.enabled,
+
+  log(scope, ...args)  { logWithScope("log", scope, args); },
+  info(scope, ...args) { logWithScope("info", scope, args); },
+  warn(scope, ...args) { logWithScope("warn", scope, args); },
+  error(scope, ...args){ logWithScope("error", scope, args); },
+
+  group(label) {
+    if (state.enabled && console.groupCollapsed) console.groupCollapsed(label);
+  },
+  groupEnd() {
+    if (state.enabled && console.groupEnd) console.groupEnd();
+  },
+};
+
+export default dbg;
+</file>
+
 <file path="src/utils/format.js">
 // src/utils/format.js
 export function formatBytes(bytes, decimals = 2) {
@@ -19793,34 +19859,6 @@ export async function fetchWithTimeout(
     clearTimeout(timer);
   }
 }
-</file>
-
-<file path=".gitignore">
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-.env
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
 </file>
 
 <file path="public/dev_docs/en/core-concepts/showing-posts.md">
@@ -21595,6 +21633,43 @@ export default function PostControls(props) {
 }
 </file>
 
+<file path="src/components/settings/DeveloperSection.jsx">
+// src/components/settings/DeveloperSection.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug";
+
+export default function DeveloperSection() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
+
+      {/* Show translation keys */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.showKeys()}
+          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.showKeys")}</span>
+      </label>
+
+      {/* Enable debug logging */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={dbg.enabled()}
+          onInput={(e) => dbg.enable(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.debug.enable")}</span>
+      </label>
+    </section>
+  );
+}
+</file>
+
 <file path="src/components/ui/ContextMenu.jsx">
 // src/components/ui/ContextMenu.jsx
 import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
@@ -22964,44 +23039,6 @@ export async function assessAssets(p) {
 }
 </file>
 
-<file path="src/utils/debug.js">
-// src/utils/debug.js
-const STORE_KEY = "savva_debug_enabled";
-
-const state = {
-  enabled: (() => { try { return localStorage.getItem(STORE_KEY) === "1"; } catch { return false; } })(),
-};
-
-function logWithScope(method, scope, args) {
-  if (!state.enabled) return;
-  const c = console[method] || console.log;
-  c.call(console, `${scope}:`, ...args);
-}
-
-export const dbg = {
-  enable(on = true) {
-    state.enabled = !!on;
-    try { localStorage.setItem(STORE_KEY, state.enabled ? "1" : "0"); } catch {}
-    return state.enabled;
-  },
-  enabled: () => !!state.enabled,
-
-  log(scope, ...args)  { logWithScope("log", scope, args); },
-  info(scope, ...args) { logWithScope("info", scope, args); },
-  warn(scope, ...args) { logWithScope("warn", scope, args); },
-  error(scope, ...args){ logWithScope("error", scope, args); },
-
-  group(label) {
-    if (state.enabled && console.groupCollapsed) console.groupCollapsed(label);
-  },
-  groupEnd() {
-    if (state.enabled && console.groupEnd) console.groupEnd();
-  },
-};
-
-export default dbg;
-</file>
-
 <file path="index.html">
 <!doctype html>
 <html lang="en">
@@ -23872,6 +23909,7 @@ import { getPostContentBaseCid } from "../../ipfs/utils";
 import Spinner from "../ui/Spinner";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { navigate } from "../../routing/hashRouter.js";
 
 /**
  * Fetches the full content of a comment's prologue for a specific language.
@@ -23945,6 +23983,14 @@ export default function CommentCard(props) {
     return preview.length > 280 || preview.endsWith("...");
   });
 
+  const handleReply = (e) => {
+    e.stopPropagation();
+    const commentCid = comment()?.savva_cid;
+    if (commentCid) {
+      navigate(`/editor/new-comment/${commentCid}`);
+    }
+  };
+
   return (
     <div
       class="relative flex flex-col"
@@ -23987,7 +24033,7 @@ export default function CommentCard(props) {
                 {isExpanded() ? "Show Less" : "Show More"}
               </button>
             </Show>
-            <button class="hover:underline">Reply</button>
+            <button class="hover:underline" onClick={handleReply}>Reply</button>
           </div>
         </div>
       </div>
@@ -24128,217 +24174,6 @@ export default function PostComments(props) {
         </div>
       </Show>
     </div>
-  );
-}
-</file>
-
-<file path="src/components/post/ReactionInput.jsx">
-// src/components/post/ReactionInput.jsx
-import { createMemo, Show, createSignal, createEffect, For, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import ReactionIcon, { REACTION_TYPES } from "../ui/icons/ReactionIcon.jsx";
-import { pushErrorToast } from "../../ui/toast.js";
-import { dbg } from "../../utils/debug.js";
-
-export default function ReactionInput(props) {
-  const app = useApp();
-  const { t, wsCall } = app;
-  const [isProcessing, setIsProcessing] = createSignal(false);
-  const [showPalette, setShowPalette] = createSignal(false);
-  const [isMouseOver, setIsMouseOver] = createSignal(false);
-  const [isGracePeriod, setIsGracePeriod] = createSignal(false);
-  const [paletteStyle, setPaletteStyle] = createSignal({});
-  let containerRef;
-  let showTimerId, graceTimerId;
-
-  const [myReactionIndex, setMyReactionIndex] = createSignal(
-    props.post?._raw?.my_reaction ?? props.post?.my_reaction ?? -1
-  );
-
-  createEffect(() => {
-    const update = app.postUpdate();
-    const authorizedUserAddress = app.authorizedUser()?.address;
-    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
-
-    if (
-      update &&
-      update.type === 'reactionsChanged' &&
-      update.cid === postId &&
-      authorizedUserAddress &&
-      update.data?.user?.toLowerCase() === authorizedUserAddress.toLowerCase()
-    ) {
-      setMyReactionIndex(update.data.reaction);
-    }
-  });
-  
-  createEffect(() => {
-    if (showPalette() && containerRef) {
-      const buttonRect = containerRef.getBoundingClientRect();
-      const paletteWidth = 300; // Estimated width of the palette
-      const screenPadding = 10;
-
-      const idealViewportLeft = buttonRect.left + (buttonRect.width / 2) - (paletteWidth / 2);
-
-      let finalRelativeLeft;
-
-      if (idealViewportLeft + paletteWidth > window.innerWidth - screenPadding) {
-        finalRelativeLeft = buttonRect.width - paletteWidth;
-      } 
-      else if (idealViewportLeft < screenPadding) {
-        finalRelativeLeft = 0;
-      } 
-      else {
-        finalRelativeLeft = (buttonRect.width / 2) - (paletteWidth / 2);
-      }
-      
-      setPaletteStyle({ left: `${finalRelativeLeft}px` });
-    }
-  });
-
-  onCleanup(() => {
-    if (showTimerId) clearTimeout(showTimerId);
-    if (graceTimerId) clearTimeout(graceTimerId);
-  });
-
-  const handleContainerEnter = () => {
-    setIsMouseOver(true);
-    if (showTimerId) clearTimeout(showTimerId);
-    if (showPalette()) return; 
-
-    showTimerId = setTimeout(() => {
-      setShowPalette(true);
-      setIsGracePeriod(true);
-      if (graceTimerId) clearTimeout(graceTimerId);
-      graceTimerId = setTimeout(() => {
-        setIsGracePeriod(false);
-        if (!isMouseOver()) {
-          setShowPalette(false);
-        }
-      }, 3000);
-    }, 1000);
-  };
-
-  const handleContainerLeave = () => {
-    setIsMouseOver(false);
-    if (showTimerId) clearTimeout(showTimerId);
-    if (!isGracePeriod()) {
-      setShowPalette(false);
-    }
-  };
-
-  const sendReaction = async (reactionIndex) => {
-    if (isProcessing()) return;
-    setIsProcessing(true);
-    
-    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
-
-    try {
-      await wsCall('react', {
-        domain: app.selectedDomainName(),
-        'obj-type': 0,
-        'obj-id': postId,
-        n: 0,
-        reaction: reactionIndex,
-      });
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to submit reaction" });
-      dbg.error("ReactionInput", "Failed to send reaction", e);
-    } finally {
-      setIsProcessing(false);
-      setShowPalette(false);
-      setIsGracePeriod(false);
-      if (graceTimerId) clearTimeout(graceTimerId);
-    }
-  };
-
-  const handleMainButtonClick = () => {
-    const newReaction = myReactionIndex() >= 0 ? -1 : 0; 
-    sendReaction(newReaction);
-  };
-
-  const hasReacted = createMemo(() => myReactionIndex() >= 0);
-  const reactionType = createMemo(() => {
-    const index = myReactionIndex();
-    return index >= 0 ? REACTION_TYPES[index] : 'like';
-  });
-  const reactionLabel = createMemo(() => t(`reactions.${reactionType()}`));
-
-  return (
-    <div 
-      class="relative inline-block reaction-input-container" 
-      onMouseEnter={handleContainerEnter}
-      onMouseLeave={handleContainerLeave}
-      ref={containerRef}
-    >
-      <Show when={showPalette()}>
-        <div 
-          class="absolute bottom-full z-50 mb-1 p-1.5 flex items-center gap-1 rounded-full bg-[hsl(var(--popover))] shadow-lg border border-[hsl(var(--border))]"
-          style={paletteStyle()}
-        >
-          <For each={REACTION_TYPES}>
-            {(type, index) => (
-              <button 
-                onClick={() => sendReaction(index())}
-                class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
-                title={t(`reactions.${type}`)}
-              >
-                <ReactionIcon type={type} class="text-xl" />
-              </button>
-            )}
-          </For>
-        </div>
-      </Show>
-
-      <button
-        onClick={handleMainButtonClick}
-        disabled={isProcessing()}
-        class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50 w-[80px]"
-        classList={{
-          "text-[hsl(var(--muted-foreground))]": !hasReacted(),
-          "text-blue-500": hasReacted()
-        }}
-      >
-        <ReactionIcon type={reactionType()} class="text-lg" />
-        <span>{reactionLabel()}</span>
-      </button>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/settings/DeveloperSection.jsx">
-// src/components/settings/DeveloperSection.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug";
-
-export default function DeveloperSection() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
-
-      {/* Show translation keys */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={app.showKeys()}
-          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.showKeys")}</span>
-      </label>
-
-      {/* Enable debug logging */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={dbg.enabled()}
-          onInput={(e) => dbg.enable(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.debug.enable")}</span>
-      </label>
-    </section>
   );
 }
 </file>
@@ -25164,527 +24999,6 @@ export const ipfs = {
 }
 </file>
 
-<file path="src/alerts/registry.js">
-// src/alerts/registry.js
-import * as h from "./handlers.js";
-
-/**
- * A map of WebSocket alert types to their handler functions.
- * The AlertManager uses this to delegate incoming messages.
- */
-export const alertRegistry = {
-  token_price_changed: h.handleTokenPriceChanged,
-  content_processed: h.handleContentProcessed,
-  ping: h.handlePing,
-  pong: h.handlePong,
-  react: h.handleReact,
-  comment_counter: h.handleCommentCounterUpdate,
-};
-</file>
-
-<file path="src/components/docs/DocsContent.jsx">
-// src/components/docs/DocsContent.jsx
-import { createMemo, createResource, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import MarkdownView from "./MarkdownView.jsx";
-import DocsPager from "./DocsPager.jsx";
-
-async function fetchMd({ lang, relPath }) {
-  const clean = String(relPath || "index.md").replace(/^\/*/, "");
-  const res = await fetch(`/dev_docs/${lang}/${clean}`, { cache: "no-store" });
-  if (!res.ok) return { ok: false, text: `# 404\n\n/dev_docs/${lang}/${clean}` };
-  return { ok: true, text: await res.text() };
-}
-
-export default function DocsContent(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const params = createMemo(() => ({ lang: lang(), relPath: props.relPath }));
-  const [doc] = createResource(params, fetchMd);
-
-  return (
-    <div class="p-4">
-      <Show when={!doc.loading} fallback={
-        <div class="text-sm text-[hsl(var(--muted-foreground))]">{app.t("common.loading")}</div>
-      }>
-        <MarkdownView markdown={doc()?.text || ""} />
-        <DocsPager activeRelPath={props.relPath} onPick={props.onPick} />
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/EditorToolbar.jsx">
-// src/components/editor/EditorToolbar.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { applyMarkdownFormat } from "../../editor/text-utils.js";
-import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon, MaximizeIcon, MinimizeIcon } from "./ToolbarIcons.jsx";
-import { Show } from "solid-js";
-
-export default function EditorToolbar(props) {
-  const { t } = useApp();
-
-  const handleFormat = (format) => {
-    const textarea = props.getTextareaRef?.();
-    applyMarkdownFormat(textarea, format, props.onValueChange);
-  };
-
-  return (
-    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-      <div class="flex items-center">
-        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
-          <BoldIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
-          <ItalicIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
-          <LinkIcon />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
-          <ImageIcon />
-        </ToolbarButton>
-      </div>
-      <div class="flex items-center gap-2">
-        <button
-          onClick={props.onTogglePreview}
-          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
-        >
-          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
-        </button>
-        <ToolbarButton
-          onClick={props.onToggleFullScreen}
-          title={props.isFullScreen ? t("editor.toolbar.minimize") : t("editor.toolbar.maximize")}
-        >
-          <Show when={props.isFullScreen} fallback={<MaximizeIcon />}>
-            <MinimizeIcon />
-          </Show>
-        </ToolbarButton>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/MarkdownInput.jsx">
-// src/components/editor/MarkdownInput.jsx
-import { Show } from "solid-js";
-import MarkdownView from "../docs/MarkdownView.jsx";
-
-export default function MarkdownInput(props) {
-  return (
-    <div class={`grid ${props.isFullScreen ? 'flex-grow' : 'h-[400px]'} ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-      <textarea
-        ref={props.editorRef}
-        value={props.value}
-        onInput={(e) => props.onInput(e.currentTarget.value)}
-        class="relative w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:z-10"
-        placeholder={props.placeholder}
-      />
-      <Show when={props.showPreview}>
-        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
-          <MarkdownView markdown={props.value} rehypePlugins={props.rehypePlugins} />
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/main/NewContentBanner.jsx">
-// src/components/main/NewContentBanner.jsx
-import { Show } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { navigate } from "../../routing/hashRouter";
-
-export default function NewContentBanner() {
-  const app = useApp();
-  const { t } = app;
-
-  const handleClick = () => {
-    app.setNewContentAvailable(null);
-    const newPath = "/new"; // Use the simple, non-prefixed path
-    if (window.location.hash.slice(1) !== newPath) {
-      navigate(newPath);
-    }
-    app.setNewTabRefreshKey(Date.now());
-  };
-
-  return (
-    <div class="fixed top-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-none">
-      <Show when={app.newContentAvailable()}>
-        <div class="pointer-events-auto">
-          <button
-            onClick={handleClick}
-            class="w-full px-4 py-2 rounded-lg shadow-lg text-sm font-semibold transition-transform duration-300 ease-out"
-            style={{ 
-              background: "var(--gradient)", 
-              color: "hsl(var(--card))"
-            }}
-          >
-            {t("main.newContentAvailable")}
-          </button>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/tabs/RightRailLayout.jsx">
-// src/components/tabs/RightRailLayout.jsx
-import { Show } from "solid-js";
-import RightRail from "../layout/RightRail.jsx";
-
-const HEADER_H = 48;
-
-export default function RightRailLayout(props) {
-  return (
-    <section
-      class="w-full"
-      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
-    >
-      <Show
-        when={props.rightPanelConfig?.available}
-        fallback={
-          // When the right panel is unavailable, render content in a single column.
-          <div>{props.children}</div>
-        }
-      >
-        {/* When the right panel is available, render the two-column grid. */}
-        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
-          <div>{props.children}</div>
-          <aside class="hidden md:block sticky top-16">
-            <div class="space-y-4">
-              <RightRail config={props.rightPanelConfig} />
-            </div>
-          </aside>
-        </div>
-      </Show>
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/ui/LangSelector.jsx">
-// src/components/ui/LangSelector.jsx
-import { For, Show, createMemo, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { LANG_INFO } from "../../i18n/useI18n";
-import { dbg } from "../../utils/debug";
-
-export default function LangSelector(props) {
-  const app = useApp();
-  const codes = createMemo(() => props.codes || []);
-  const value = () => (props.value || app.lang?.() || "").toLowerCase();
-  
-  const onChange = (code) => {
-    dbg.log("LangSelector", `User clicked '${code}'. Calling onChange.`);
-    return (props.onChange ? props.onChange(code) : app.setLang?.(code));
-  };
-  
-  createEffect(() => {
-    dbg.log("LangSelector", `Active value updated to '${value()}'`);
-  });
-  
-  const isStretch = () => props.variant === 'stretch';
-
-  return (
-    <Show when={codes().length > 1}>
-      <div 
-        classList={{
-          'themed-segment': !isStretch(),
-          'grid w-full grid-cols-4 gap-1 p-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]': isStretch(),
-        }}
-        class={props.class || ""} 
-        role="group"
-        aria-label={app.t("rightPane.language")}
-      >
-        <For each={codes()}>
-          {(code) => {
-            const c = String(code).toLowerCase();
-            const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
-            const active = () => value() === c;
-            return (
-              <button
-                type="button"
-                class={`themed-pill ${active() ? "is-active" : ""}`}
-                aria-pressed={active()}
-                onClick={() => onChange(c)}
-                title={info.name}
-              >
-                {info.code}
-              </button>
-            );
-          }}
-        </For>
-      </div>
-    </Show>
-  );
-}
-</file>
-
-<file path="src/components/ui/Tabs.jsx">
-// src/components/ui/Tabs.jsx
-import { For, createSignal, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-export default function Tabs(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const items = () => props.items || [];
-  const value = () => props.value;
-  const [compact, setCompact] = createSignal(false);
-
-  onMount(() => {
-    // Parse the prop more robustly.
-    const compactWidth = parseInt(props.compactWidth, 10);
-
-    // Check if we received a valid number and enable the feature.
-    if (!isNaN(compactWidth) && compactWidth > 0) {
-      console.log(`[Tabs] Responsive mode enabled with width: ${compactWidth}`);
-
-      const checkWidth = () => {
-        setCompact(window.innerWidth <= compactWidth);
-      };
-
-      checkWidth(); // Run on initial mount
-      window.addEventListener("resize", checkWidth, { passive: true });
-      onCleanup(() => window.removeEventListener("resize", checkWidth));
-    } else {
-      console.log("[Tabs] Responsive mode disabled (compactWidth prop not provided or invalid).");
-    }
-  });
-
-  return (
-    <ul
-      class={`tabs ${props.class || ""}`}
-      role="tablist"
-      aria-label={t("tabs.aria")}
-      data-compact={compact() ? "true" : "false"}
-    >
-      <For each={items()}>
-        {(it) => {
-          const active = () => it.id === value();
-          const disabled = !!it.disabled;
-          const tabId = `tab-${it.id}`;
-
-          const onClick = (e) => {
-            e.preventDefault();
-            if (disabled || active()) return;
-            props.onChange?.(it.id);
-          };
-
-          const onKeyDown = (e) => {
-            if (disabled) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              if (!active()) props.onChange?.(it.id);
-            }
-          };
-
-          return (
-            <li classList={{ active: active() }} role="presentation" aria-selected={active()}>
-              <a
-                id={tabId}
-                href="#"
-                role="tab"
-                aria-selected={active() ? "true" : "false"}
-                aria-disabled={disabled ? "true" : "false"}
-                aria-label={it.label}
-                title={it.label}
-                tabIndex={disabled ? -1 : 0}
-                onClick={onClick}
-                onKeyDown={onKeyDown}
-              >
-                {it.icon ? <span class="tab__icon" aria-hidden="true">{it.icon}</span> : null}
-                <span class="tab__label">{it.label}</span>
-              </a>
-            </li>
-          );
-        }}
-      </For>
-    </ul>
-  );
-}
-</file>
-
-<file path="src/components/ui/UserCard.jsx">
-// src/components/ui/UserCard.jsx
-import { Show, createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "./IpfsImage.jsx";
-import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
-import VerifiedBadge from "./icons/VerifiedBadge.jsx";
-import StakerLevelIcon from "./StakerLevelIcon.jsx";
-
-function isVerified(a) {
-    return Boolean(a && a.name);
-}
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function UserCard(props) {
-    const { t } = useApp();
-    const author = () => props.author || {};
-
-    const hasName = createMemo(() => author().name || author().display_name);
-
-    const handleUserClick = (e) => {
-        e.stopPropagation();
-        // Placeholder for future navigation to user profile
-        console.log("UserCard clicked, navigate to profile for:", author().address);
-    };
-
-    return (
-        <Show when={author()}>
-            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-8'}`}>
-                <div class="inline-flex items-center gap-2 cursor-pointer" onClick={handleUserClick}>
-                    <Show when={!props.compact}>
-                        <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-                            <Show
-                                when={author().avatar}
-                                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-                            >
-                                <IpfsImage
-                                    src={author().avatar}
-                                    alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
-                                    class="w-full h-full object-cover"
-                                />
-                            </Show>
-                        </div>
-                    </Show>
-
-                    <div class="min-w-0">
-                        <Show when={author().display_name && !props.compact}>
-                            <div class="text-xs truncate text-[hsl(var(--foreground))]">
-                                {author().display_name}
-                            </div>
-                        </Show>
-
-                        <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
-                            <Show when={author().name}>
-                                <div class="min-w-0 flex items-center">
-                                    <span class="truncate uppercase font-semibold">{author().name}</span>
-                                    <Show when={isVerified(author())}>
-                                        <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
-                                    </Show>
-                                </div>
-                            </Show>
-                            
-                            <Show when={!hasName() && author().address}>
-                                <span class="font-mono">{shortAddr(author().address)}</span>
-                            </Show>
-
-                            <StakerLevelIcon
-                                staked={author().staked}
-                                class={`${props.compact ? 'w-4 h-4' : 'w-6 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Show>
-    );
-}
-</file>
-
-<file path="src/pages/Docs.jsx">
-// src/pages/Docs.jsx
-import { createMemo } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { useHashRouter } from "../routing/hashRouter";
-import DocsIndex from "../components/docs/DocsIndex.jsx";
-import DocsContent from "../components/docs/DocsContent.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-
-const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
-const fileFromRoute = (route) => {
-  if (!String(route || "").startsWith("/docs")) return "index.md";
-  const rest = String(route).slice("/docs".length);
-  return trim(rest) || "index.md";
-};
-
-export default function Docs() {
-  const app = useApp();
-  const { route, navigate } = useHashRouter();
-  const file = createMemo(() => fileFromRoute(route()));
-  const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
-  const title = createMemo(() => app.t("docs.title"));
-
-  return (
-    <div class="sv-container sv-container--no-gutter">
-      <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
-      <ClosePageButton />
-        {/* Left sidebar */}
-        <aside class="min-w-0">
-          <div>
-            <div class="flex items-center justify-between">
-              <h2 class="text-sm font-semibold mb-2">{title()}</h2>
-            </div>
-            <DocsIndex active={file()} onPick={onPick} />
-          </div>
-        </aside>
-
-        {/* Right content */}
-        <main class="min-w-0">
-          <DocsContent relPath={file()} onPick={onPick} />
-        </main>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/index.jsx">
-// src/index.jsx
-import { render } from "solid-js/web";
-import "./index.css";
-import App from "./components/App.jsx";
-import { AppProvider } from "./context/AppContext.jsx";
-
-const root = document.getElementById("root");
-
-render(() => (
-  <AppProvider>
-    <App />
-  </AppProvider>
-), root);
-</file>
-
-<file path="public/dev_docs/en/sidebar.yaml">
-# public/dev_docs/en/sidebar.yaml
-sections:
-  - title: Getting Started
-    items:
-      - label: Overview
-        file: index.md
-      - label: Setup
-        file: getting-started.md
-
-  - title: Core Concepts
-    items:
-      - label: Overview
-        file: core-concepts/index.md
-      - label: App initialization & backend connect
-        file: core-concepts/app-init.md
-      - label: Working with domains
-        file: core-concepts/domain.md
-      - label: Authentication
-        file: core-concepts/auth.md
-      - label: Showing Posts
-        file: core-concepts/showing-posts.md
-      - label: Publishing Posts
-        file: core-concepts/publishing-posts.md
-      - label: Config Contract
-        file: core-concepts/config-contract.md
-</file>
-
 <file path="scripts/i18n.mjs">
 // scripts/i18n.mjs
 import fs from "node:fs";
@@ -26039,6 +25353,734 @@ async function translateTo(langCode, englishPairs) {
 });
 </file>
 
+<file path="src/components/docs/DocsContent.jsx">
+// src/components/docs/DocsContent.jsx
+import { createMemo, createResource, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import MarkdownView from "./MarkdownView.jsx";
+import DocsPager from "./DocsPager.jsx";
+
+async function fetchMd({ lang, relPath }) {
+  const clean = String(relPath || "index.md").replace(/^\/*/, "");
+  const res = await fetch(`/dev_docs/${lang}/${clean}`, { cache: "no-store" });
+  if (!res.ok) return { ok: false, text: `# 404\n\n/dev_docs/${lang}/${clean}` };
+  return { ok: true, text: await res.text() };
+}
+
+export default function DocsContent(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const params = createMemo(() => ({ lang: lang(), relPath: props.relPath }));
+  const [doc] = createResource(params, fetchMd);
+
+  return (
+    <div class="p-4">
+      <Show when={!doc.loading} fallback={
+        <div class="text-sm text-[hsl(var(--muted-foreground))]">{app.t("common.loading")}</div>
+      }>
+        <MarkdownView markdown={doc()?.text || ""} />
+        <DocsPager activeRelPath={props.relPath} onPick={props.onPick} />
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/EditorToolbar.jsx">
+// src/components/editor/EditorToolbar.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { applyMarkdownFormat } from "../../editor/text-utils.js";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon, MaximizeIcon, MinimizeIcon } from "./ToolbarIcons.jsx";
+import { Show } from "solid-js";
+
+export default function EditorToolbar(props) {
+  const { t } = useApp();
+
+  const handleFormat = (format) => {
+    const textarea = props.getTextareaRef?.();
+    applyMarkdownFormat(textarea, format, props.onValueChange);
+  };
+
+  return (
+    <div class="flex items-center justify-between h-10 px-2 rounded-t-lg border-t border-x border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+      <div class="flex items-center">
+        <ToolbarButton onClick={() => handleFormat('bold')} title={t("editor.toolbar.bold")}>
+          <BoldIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('italic')} title={t("editor.toolbar.italic")}>
+          <ItalicIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('link')} title={t("editor.toolbar.link")}>
+          <LinkIcon />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => handleFormat('image')} title={t("editor.toolbar.image")}>
+          <ImageIcon />
+        </ToolbarButton>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          onClick={props.onTogglePreview}
+          class="px-3 py-1 text-sm rounded-md hover:bg-[hsl(var(--accent))]"
+        >
+          {props.isPreview ? t("editor.toolbar.hidePreview") : t("editor.toolbar.showPreview")}
+        </button>
+        <ToolbarButton
+          onClick={props.onToggleFullScreen}
+          title={props.isFullScreen ? t("editor.toolbar.minimize") : t("editor.toolbar.maximize")}
+        >
+          <Show when={props.isFullScreen} fallback={<MaximizeIcon />}>
+            <MinimizeIcon />
+          </Show>
+        </ToolbarButton>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/editor/MarkdownInput.jsx">
+// src/components/editor/MarkdownInput.jsx
+import { Show } from "solid-js";
+import MarkdownView from "../docs/MarkdownView.jsx";
+
+export default function MarkdownInput(props) {
+  return (
+    <div class={`grid ${props.isFullScreen ? 'flex-grow' : 'h-[400px]'} ${props.showPreview ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+      <textarea
+        ref={props.editorRef}
+        value={props.value}
+        onInput={(e) => props.onInput(e.currentTarget.value)}
+        class="relative w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:z-10"
+        placeholder={props.placeholder}
+      />
+      <Show when={props.showPreview}>
+        <div class="h-full overflow-y-auto p-3 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+          <MarkdownView markdown={props.value} rehypePlugins={props.rehypePlugins} />
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/main/NewContentBanner.jsx">
+// src/components/main/NewContentBanner.jsx
+import { Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { navigate } from "../../routing/hashRouter";
+
+export default function NewContentBanner() {
+  const app = useApp();
+  const { t } = app;
+
+  const handleClick = () => {
+    app.setNewContentAvailable(null);
+    const newPath = "/new"; // Use the simple, non-prefixed path
+    if (window.location.hash.slice(1) !== newPath) {
+      navigate(newPath);
+    }
+    app.setNewTabRefreshKey(Date.now());
+  };
+
+  return (
+    <div class="fixed top-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-4 pointer-events-none">
+      <Show when={app.newContentAvailable()}>
+        <div class="pointer-events-auto">
+          <button
+            onClick={handleClick}
+            class="w-full px-4 py-2 rounded-lg shadow-lg text-sm font-semibold transition-transform duration-300 ease-out"
+            style={{ 
+              background: "var(--gradient)", 
+              color: "hsl(var(--card))"
+            }}
+          >
+            {t("main.newContentAvailable")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/post/ReactionInput.jsx">
+// src/components/post/ReactionInput.jsx
+import { createMemo, Show, createSignal, createEffect, For, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import ReactionIcon, { REACTION_TYPES } from "../ui/icons/ReactionIcon.jsx";
+import { pushErrorToast } from "../../ui/toast.js";
+import { dbg } from "../../utils/debug.js";
+
+export default function ReactionInput(props) {
+  const app = useApp();
+  const { t, wsCall } = app;
+  const [isProcessing, setIsProcessing] = createSignal(false);
+  const [showPalette, setShowPalette] = createSignal(false);
+  const [isMouseOver, setIsMouseOver] = createSignal(false);
+  const [isGracePeriod, setIsGracePeriod] = createSignal(false);
+  const [paletteStyle, setPaletteStyle] = createSignal({});
+  let containerRef;
+  let showTimerId, graceTimerId;
+
+  const [myReactionIndex, setMyReactionIndex] = createSignal(
+    props.post?._raw?.my_reaction ?? props.post?.my_reaction ?? -1
+  );
+
+  createEffect(() => {
+    const update = app.postUpdate();
+    const authorizedUserAddress = app.authorizedUser()?.address;
+    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
+
+    if (
+      update &&
+      update.type === 'reactionsChanged' &&
+      update.cid === postId &&
+      authorizedUserAddress &&
+      update.data?.user?.toLowerCase() === authorizedUserAddress.toLowerCase()
+    ) {
+      setMyReactionIndex(update.data.reaction);
+    }
+  });
+  
+  createEffect(() => {
+    if (showPalette() && containerRef) {
+      const buttonRect = containerRef.getBoundingClientRect();
+      const paletteWidth = 300; // Estimated width of the palette
+      const screenPadding = 10;
+
+      const idealViewportLeft = buttonRect.left + (buttonRect.width / 2) - (paletteWidth / 2);
+
+      let finalRelativeLeft;
+
+      if (idealViewportLeft + paletteWidth > window.innerWidth - screenPadding) {
+        finalRelativeLeft = buttonRect.width - paletteWidth;
+      } 
+      else if (idealViewportLeft < screenPadding) {
+        finalRelativeLeft = 0;
+      } 
+      else {
+        finalRelativeLeft = (buttonRect.width / 2) - (paletteWidth / 2);
+      }
+      
+      setPaletteStyle({ left: `${finalRelativeLeft}px` });
+    }
+  });
+
+  onCleanup(() => {
+    if (showTimerId) clearTimeout(showTimerId);
+    if (graceTimerId) clearTimeout(graceTimerId);
+  });
+
+  const handleContainerEnter = () => {
+    setIsMouseOver(true);
+    if (showTimerId) clearTimeout(showTimerId);
+    if (showPalette()) return; 
+
+    showTimerId = setTimeout(() => {
+      setShowPalette(true);
+      setIsGracePeriod(true);
+      if (graceTimerId) clearTimeout(graceTimerId);
+      graceTimerId = setTimeout(() => {
+        setIsGracePeriod(false);
+        if (!isMouseOver()) {
+          setShowPalette(false);
+        }
+      }, 3000);
+    }, 1000);
+  };
+
+  const handleContainerLeave = () => {
+    setIsMouseOver(false);
+    if (showTimerId) clearTimeout(showTimerId);
+    if (!isGracePeriod()) {
+      setShowPalette(false);
+    }
+  };
+
+  const sendReaction = async (reactionIndex) => {
+    if (isProcessing()) return;
+    setIsProcessing(true);
+    
+    const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
+
+    try {
+      await wsCall('react', {
+        domain: app.selectedDomainName(),
+        'obj-type': 0,
+        'obj-id': postId,
+        n: 0,
+        reaction: reactionIndex,
+      });
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to submit reaction" });
+      dbg.error("ReactionInput", "Failed to send reaction", e);
+    } finally {
+      setIsProcessing(false);
+      setShowPalette(false);
+      setIsGracePeriod(false);
+      if (graceTimerId) clearTimeout(graceTimerId);
+    }
+  };
+
+  const handleMainButtonClick = (e) => {
+    e.stopPropagation();
+    const newReaction = myReactionIndex() >= 0 ? -1 : 0; 
+    sendReaction(newReaction);
+  };
+
+  const hasReacted = createMemo(() => myReactionIndex() >= 0);
+  const reactionType = createMemo(() => {
+    const index = myReactionIndex();
+    return index >= 0 ? REACTION_TYPES[index] : 'like';
+  });
+  const reactionLabel = createMemo(() => t(`reactions.${reactionType()}`));
+
+  return (
+    <div 
+      class="relative inline-block reaction-input-container" 
+      onMouseEnter={handleContainerEnter}
+      onMouseLeave={handleContainerLeave}
+      ref={containerRef}
+    >
+      <Show when={showPalette()}>
+        <div 
+          class="absolute bottom-full z-50 mb-1 p-1.5 flex items-center gap-1 rounded-full bg-[hsl(var(--popover))] shadow-lg border border-[hsl(var(--border))]"
+          style={paletteStyle()}
+        >
+          <For each={REACTION_TYPES}>
+            {(type, index) => (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sendReaction(index());
+                }}
+                class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
+                title={t(`reactions.${type}`)}
+              >
+                <ReactionIcon type={type} class="text-xl" />
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+
+      <button
+        onClick={handleMainButtonClick}
+        disabled={isProcessing()}
+        class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50 w-[80px]"
+        classList={{
+          "text-[hsl(var(--muted-foreground))]": !hasReacted(),
+          "text-blue-500": hasReacted()
+        }}
+      >
+        <ReactionIcon type={reactionType()} class="text-lg" />
+        <span>{reactionLabel()}</span>
+      </button>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/tabs/RightRailLayout.jsx">
+// src/components/tabs/RightRailLayout.jsx
+import { Show } from "solid-js";
+import RightRail from "../layout/RightRail.jsx";
+
+const HEADER_H = 48;
+
+export default function RightRailLayout(props) {
+  return (
+    <section
+      class="w-full"
+      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
+    >
+      <Show
+        when={props.rightPanelConfig?.available}
+        fallback={
+          // When the right panel is unavailable, render content in a single column.
+          <div>{props.children}</div>
+        }
+      >
+        {/* When the right panel is available, render the two-column grid. */}
+        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
+          <div>{props.children}</div>
+          <aside class="hidden md:block sticky top-16">
+            <div class="space-y-4">
+              <RightRail config={props.rightPanelConfig} />
+            </div>
+          </aside>
+        </div>
+      </Show>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/ui/LangSelector.jsx">
+// src/components/ui/LangSelector.jsx
+import { For, Show, createMemo, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { LANG_INFO } from "../../i18n/useI18n";
+import { dbg } from "../../utils/debug";
+
+export default function LangSelector(props) {
+  const app = useApp();
+  const codes = createMemo(() => props.codes || []);
+  const value = () => (props.value || app.lang?.() || "").toLowerCase();
+  
+  const onChange = (code) => {
+    dbg.log("LangSelector", `User clicked '${code}'. Calling onChange.`);
+    return (props.onChange ? props.onChange(code) : app.setLang?.(code));
+  };
+  
+  createEffect(() => {
+    dbg.log("LangSelector", `Active value updated to '${value()}'`);
+  });
+  
+  const isStretch = () => props.variant === 'stretch';
+
+  return (
+    <Show when={codes().length > 1}>
+      <div 
+        classList={{
+          'themed-segment': !isStretch(),
+          'grid w-full grid-cols-4 gap-1 p-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))]': isStretch(),
+        }}
+        class={props.class || ""} 
+        role="group"
+        aria-label={app.t("rightPane.language")}
+      >
+        <For each={codes()}>
+          {(code) => {
+            const c = String(code).toLowerCase();
+            const info = LANG_INFO[c] || { code: c.toUpperCase(), name: c.toUpperCase() };
+            const active = () => value() === c;
+            return (
+              <button
+                type="button"
+                class={`themed-pill ${active() ? "is-active" : ""}`}
+                aria-pressed={active()}
+                onClick={() => onChange(c)}
+                title={info.name}
+              >
+                {info.code}
+              </button>
+            );
+          }}
+        </For>
+      </div>
+    </Show>
+  );
+}
+</file>
+
+<file path="src/components/ui/Tabs.jsx">
+// src/components/ui/Tabs.jsx
+import { For, createSignal, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function Tabs(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const items = () => props.items || [];
+  const value = () => props.value;
+  const [compact, setCompact] = createSignal(false);
+
+  onMount(() => {
+    // Parse the prop more robustly.
+    const compactWidth = parseInt(props.compactWidth, 10);
+
+    // Check if we received a valid number and enable the feature.
+    if (!isNaN(compactWidth) && compactWidth > 0) {
+      console.log(`[Tabs] Responsive mode enabled with width: ${compactWidth}`);
+
+      const checkWidth = () => {
+        setCompact(window.innerWidth <= compactWidth);
+      };
+
+      checkWidth(); // Run on initial mount
+      window.addEventListener("resize", checkWidth, { passive: true });
+      onCleanup(() => window.removeEventListener("resize", checkWidth));
+    } else {
+      console.log("[Tabs] Responsive mode disabled (compactWidth prop not provided or invalid).");
+    }
+  });
+
+  return (
+    <ul
+      class={`tabs ${props.class || ""}`}
+      role="tablist"
+      aria-label={t("tabs.aria")}
+      data-compact={compact() ? "true" : "false"}
+    >
+      <For each={items()}>
+        {(it) => {
+          const active = () => it.id === value();
+          const disabled = !!it.disabled;
+          const tabId = `tab-${it.id}`;
+
+          const onClick = (e) => {
+            e.preventDefault();
+            if (disabled || active()) return;
+            props.onChange?.(it.id);
+          };
+
+          const onKeyDown = (e) => {
+            if (disabled) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (!active()) props.onChange?.(it.id);
+            }
+          };
+
+          return (
+            <li classList={{ active: active() }} role="presentation" aria-selected={active()}>
+              <a
+                id={tabId}
+                href="#"
+                role="tab"
+                aria-selected={active() ? "true" : "false"}
+                aria-disabled={disabled ? "true" : "false"}
+                aria-label={it.label}
+                title={it.label}
+                tabIndex={disabled ? -1 : 0}
+                onClick={onClick}
+                onKeyDown={onKeyDown}
+              >
+                {it.icon ? <span class="tab__icon" aria-hidden="true">{it.icon}</span> : null}
+                <span class="tab__label">{it.label}</span>
+              </a>
+            </li>
+          );
+        }}
+      </For>
+    </ul>
+  );
+}
+</file>
+
+<file path="src/components/ui/UserCard.jsx">
+// src/components/ui/UserCard.jsx
+import { Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "./IpfsImage.jsx";
+import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
+import VerifiedBadge from "./icons/VerifiedBadge.jsx";
+import StakerLevelIcon from "./StakerLevelIcon.jsx";
+
+function isVerified(a) {
+    return Boolean(a && a.name);
+}
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function UserCard(props) {
+    const { t } = useApp();
+    const author = () => props.author || {};
+
+    const hasName = createMemo(() => author().name || author().display_name);
+
+    const handleUserClick = (e) => {
+        e.stopPropagation();
+        // Placeholder for future navigation to user profile
+        console.log("UserCard clicked, navigate to profile for:", author().address);
+    };
+
+    return (
+        <Show when={author()}>
+            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-8'}`}>
+                <div class="inline-flex items-center gap-2 cursor-pointer" onClick={handleUserClick}>
+                    <Show when={!props.compact}>
+                        <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+                            <Show
+                                when={author().avatar}
+                                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+                            >
+                                <IpfsImage
+                                    src={author().avatar}
+                                    alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
+                                    class="w-full h-full object-cover"
+                                />
+                            </Show>
+                        </div>
+                    </Show>
+
+                    <div class="min-w-0">
+                        <Show when={author().display_name && !props.compact}>
+                            <div class="text-xs truncate text-[hsl(var(--foreground))]">
+                                {author().display_name}
+                            </div>
+                        </Show>
+
+                        <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
+                            <Show when={author().name}>
+                                <div class="min-w-0 flex items-center">
+                                    <span class="truncate uppercase font-semibold">{author().name}</span>
+                                    <Show when={isVerified(author())}>
+                                        <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
+                                    </Show>
+                                </div>
+                            </Show>
+                            
+                            <Show when={!hasName() && author().address}>
+                                <span class="font-mono">{shortAddr(author().address)}</span>
+                            </Show>
+
+                            <StakerLevelIcon
+                                staked={author().staked}
+                                class={`${props.compact ? 'w-4 h-4' : 'w-6 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Show>
+    );
+}
+</file>
+
+<file path="src/pages/Docs.jsx">
+// src/pages/Docs.jsx
+import { createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { useHashRouter } from "../routing/hashRouter";
+import DocsIndex from "../components/docs/DocsIndex.jsx";
+import DocsContent from "../components/docs/DocsContent.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+
+const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
+const fileFromRoute = (route) => {
+  if (!String(route || "").startsWith("/docs")) return "index.md";
+  const rest = String(route).slice("/docs".length);
+  return trim(rest) || "index.md";
+};
+
+export default function Docs() {
+  const app = useApp();
+  const { route, navigate } = useHashRouter();
+  const file = createMemo(() => fileFromRoute(route()));
+  const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
+  const title = createMemo(() => app.t("docs.title"));
+
+  return (
+    <div class="sv-container sv-container--no-gutter">
+      <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
+      <ClosePageButton />
+        {/* Left sidebar */}
+        <aside class="min-w-0">
+          <div>
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm font-semibold mb-2">{title()}</h2>
+            </div>
+            <DocsIndex active={file()} onPick={onPick} />
+          </div>
+        </aside>
+
+        {/* Right content */}
+        <main class="min-w-0">
+          <DocsContent relPath={file()} onPick={onPick} />
+        </main>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/Settings.jsx">
+// src/pages/Settings.jsx
+import { useApp } from "../context/AppContext.jsx";
+import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
+import Assets from "../components/settings/Assets.jsx";
+import DeveloperSection from "../components/settings/DeveloperSection.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+
+export default function Settings() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto space-y-6">
+
+      <ClosePageButton />
+
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
+      </div>
+
+      <LocalIpfsSection />
+      <Assets />
+      <DeveloperSection />
+    </main>
+  );
+}
+</file>
+
+<file path="src/index.jsx">
+// src/index.jsx
+import { render } from "solid-js/web";
+import "./index.css";
+import App from "./components/App.jsx";
+import { AppProvider } from "./context/AppContext.jsx";
+
+const root = document.getElementById("root");
+
+render(() => (
+  <AppProvider>
+    <App />
+  </AppProvider>
+), root);
+</file>
+
+<file path="public/dev_docs/en/sidebar.yaml">
+# public/dev_docs/en/sidebar.yaml
+sections:
+  - title: Getting Started
+    items:
+      - label: Overview
+        file: index.md
+      - label: Setup
+        file: getting-started.md
+
+  - title: Core Concepts
+    items:
+      - label: Overview
+        file: core-concepts/index.md
+      - label: App initialization & backend connect
+        file: core-concepts/app-init.md
+      - label: Working with domains
+        file: core-concepts/domain.md
+      - label: Authentication
+        file: core-concepts/auth.md
+      - label: Showing Posts
+        file: core-concepts/showing-posts.md
+      - label: Publishing Posts
+        file: core-concepts/publishing-posts.md
+      - label: Config Contract
+        file: core-concepts/config-contract.md
+</file>
+
+<file path="src/alerts/registry.js">
+// src/alerts/registry.js
+import * as h from "./handlers.js";
+
+/**
+ * A map of WebSocket alert types to their handler functions.
+ * The AlertManager uses this to delegate incoming messages.
+ */
+export const alertRegistry = {
+  token_price_changed: h.handleTokenPriceChanged,
+  content_processed: h.handleContentProcessed,
+  ping: h.handlePing,
+  pong: h.handlePong,
+  react: h.handleReact,
+  comment_counter: h.handleCommentCounterUpdate,
+};
+</file>
+
 <file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
 // src/components/editor/wizard_steps/StepUploadDescriptor.jsx
 import { createSignal, createEffect, on, Show } from "solid-js";
@@ -26067,7 +26109,7 @@ export default function StepUploadDescriptor(props) {
 
     if (postParams().parent_savva_cid) {
         descriptor.parent_savva_cid = postParams().parent_savva_cid;
-        descriptor.root_savva_cid = postParams().parent_savva_cid;
+        descriptor.root_savva_cid = postParams().root_savva_cid || postParams().parent_savva_cid;
     }
 
     const gateways = app.info()?.ipfs_gateways;
@@ -26366,99 +26408,6 @@ export default function EditorFilesDrawer(props) {
 }
 </file>
 
-<file path="src/components/feed/PostInfo.jsx">
-// src/components/feed/PostInfo.jsx
-import { Show, createMemo, createSignal, createEffect, on } from "solid-js";
-import { formatUnits } from "viem";
-import { useApp } from "../../context/AppContext.jsx";
-import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
-import PostTime from "../ui/PostTime.jsx";
-import PostReactions from "../ui/PostReactions.jsx";
-import ReactionInput from "../post/ReactionInput.jsx";
-
-function PostComments(props) {
-  const [isAnimating, setIsAnimating] = createSignal(false);
-  const sourceCount = createMemo(() => props.item?._raw?.total_childs || props.item?.total_childs || 0);
-  const [displayCount, setDisplayCount] = createSignal(sourceCount());
-
-  createEffect(on(sourceCount, (newCount, prevCount) => {
-    if (prevCount === undefined) {
-      setDisplayCount(newCount);
-      return;
-    }
-    setDisplayCount(prevCount);
-    setIsAnimating(true);
-    setTimeout(() => setDisplayCount(newCount), 200);
-    setTimeout(() => setIsAnimating(false), 400);
-  }, { defer: true }));
-
-  return (
-    <Show when={displayCount() > 0 || isAnimating()}>
-      <div 
-        class="flex items-center gap-1 text-xs"
-        classList={{ "default-animation": isAnimating() }}
-      >
-        <span>💬</span>
-        <span>{displayCount()}</span>
-      </div>
-    </Show>
-  );
-}
-
-function PostRewards(props) {
-  const amount = createMemo(() => {
-    const rawAmount = props.item?._raw?.fund?.total_author_share || props.item?.fund?.total_author_share;
-    if (!rawAmount) return 0;
-    const formatted = formatUnits(BigInt(rawAmount), 18);
-    return parseFloat(formatted);
-  });
-
-  const localizedAmount = createMemo(() => {
-    const currentLang = props.lang();
-    return amount().toLocaleString(currentLang, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  });
-
-  return (
-    <Show when={amount() > 0}>
-      <div class="flex items-center gap-1 text-xs">
-        <span>{localizedAmount()}</span>
-        <SavvaTokenIcon class="w-3.5 h-3.5" />
-      </div>
-    </Show>
-  );
-}
-
-export default function PostInfo(props) {
-  const app = useApp();
-  const { lang } = app;
-  const isListMode = () => props.mode === 'list';
-  const postData = createMemo(() => props.item?._raw || props.item || {});
-
-  return (
-    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
-      {/* Left-aligned items */}
-      <PostTime 
-        timestamp={postData().effective_time} 
-        format={props.timeFormat || "short"} 
-      />
-      <PostReactions item={props.item} />
-      <PostRewards item={props.item} lang={lang} />
-      <PostComments item={props.item} />
-      
-      {/* Right-aligned items */}
-      <div class="ml-auto">
-        <Show when={app.authorizedUser()}>
-          <ReactionInput post={props.item} />
-        </Show>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/main/MainView.jsx">
 // src/components/main/MainView.jsx
 import { useApp } from "../../context/AppContext";
@@ -26688,32 +26637,50 @@ export function useAppAuth() {
 }
 </file>
 
-<file path="src/pages/Settings.jsx">
-// src/pages/Settings.jsx
-import { useApp } from "../context/AppContext.jsx";
-import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
-import Assets from "../components/settings/Assets.jsx";
-import DeveloperSection from "../components/settings/DeveloperSection.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-
-export default function Settings() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <main class="p-4 max-w-3xl mx-auto space-y-6">
-
-      <ClosePageButton />
-
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
-      </div>
-
-      <LocalIpfsSection />
-      <Assets />
-      <DeveloperSection />
-    </main>
-  );
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "release": "node scripts/release.mjs",
+    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
+  },
+  "dependencies": {
+    "@shikijs/themes": "^3.11.0",
+    "@solidjs/router": "^0.15.3",
+    "dompurify": "^3.2.6",
+    "dotenv": "^17.2.1",
+    "js-yaml": "^4.1.0",
+    "marked": "^16.2.0",
+    "openai": "^5.12.2",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-pretty-code": "^0.14.1",
+    "rehype-slug": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "shiki": "^3.11.0",
+    "solid-js": "^1.9.8",
+    "unified": "^11.0.5",
+    "viem": "^2.33.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
 }
 </file>
 
@@ -27002,6 +26969,99 @@ export default function EditorFullPreview(props) {
 }
 </file>
 
+<file path="src/components/feed/PostInfo.jsx">
+// src/components/feed/PostInfo.jsx
+import { Show, createMemo, createSignal, createEffect, on } from "solid-js";
+import { formatUnits } from "viem";
+import { useApp } from "../../context/AppContext.jsx";
+import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
+import PostTime from "../ui/PostTime.jsx";
+import PostReactions from "../ui/PostReactions.jsx";
+import ReactionInput from "../post/ReactionInput.jsx";
+
+function PostComments(props) {
+  const [isAnimating, setIsAnimating] = createSignal(false);
+  const sourceCount = createMemo(() => props.item?._raw?.total_childs || props.item?.total_childs || 0);
+  const [displayCount, setDisplayCount] = createSignal(sourceCount());
+
+  createEffect(on(sourceCount, (newCount, prevCount) => {
+    if (prevCount === undefined) {
+      setDisplayCount(newCount);
+      return;
+    }
+    setDisplayCount(prevCount);
+    setIsAnimating(true);
+    setTimeout(() => setDisplayCount(newCount), 200);
+    setTimeout(() => setIsAnimating(false), 400);
+  }, { defer: true }));
+
+  return (
+    <Show when={displayCount() > 0 || isAnimating()}>
+      <div 
+        class="flex items-center gap-1 text-xs"
+        classList={{ "default-animation": isAnimating() }}
+      >
+        <span>💬</span>
+        <span>{displayCount()}</span>
+      </div>
+    </Show>
+  );
+}
+
+function PostRewards(props) {
+  const amount = createMemo(() => {
+    const rawAmount = props.item?._raw?.fund?.total_author_share || props.item?.fund?.total_author_share;
+    if (!rawAmount) return 0;
+    const formatted = formatUnits(BigInt(rawAmount), 18);
+    return parseFloat(formatted);
+  });
+
+  const localizedAmount = createMemo(() => {
+    const currentLang = props.lang();
+    return amount().toLocaleString(currentLang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  });
+
+  return (
+    <Show when={amount() > 0}>
+      <div class="flex items-center gap-1 text-xs">
+        <span>{localizedAmount()}</span>
+        <SavvaTokenIcon class="w-3.5 h-3.5" />
+      </div>
+    </Show>
+  );
+}
+
+export default function PostInfo(props) {
+  const app = useApp();
+  const { lang } = app;
+  const isListMode = () => props.mode === 'list';
+  const postData = createMemo(() => props.item?._raw || props.item || {});
+
+  return (
+    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+      {/* Left-aligned items */}
+      <PostTime 
+        timestamp={postData().effective_time} 
+        format={props.timeFormat || "short"} 
+      />
+      <PostReactions item={props.item} />
+      <PostRewards item={props.item} lang={lang} />
+      <PostComments item={props.item} />
+      
+      {/* Right-aligned items */}
+      <div class="ml-auto">
+        <Show when={app.authorizedUser()}>
+          <ReactionInput post={props.item} />
+        </Show>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/tabs/LeadersTab.jsx">
 // src/components/tabs/LeadersTab.jsx
 import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
@@ -27206,6 +27266,292 @@ export default function IpfsImage(props) {
         </Match>
       </Switch>
     </div>
+  );
+}
+</file>
+
+<file path="src/components/SwitchConnectDialog.jsx">
+// File: src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
+import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
+
+function isAbortError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  if (e?.name === "AbortError") return true;
+  if (e?.code === 20) return true;
+  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
+  return false;
+}
+
+async function fetchInfoJSON(backendLink, { signal } = {}) {
+  const base = httpBase(backendLink);
+  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+  return await res.json();
+}
+
+export default function SwitchConnectDialog(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains] = createSignal([]); // [{ name }]
+  const [fetching, setFetching] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
+  const [localError, setLocalError] = createSignal("");
+
+  let aborter;
+
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
+  });
+
+  createEffect(async () => {
+    if (!props.open) return;
+
+    setLocalError("");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
+    setDomains([]);
+
+    aborter?.abort();
+    aborter = new AbortController();
+    setFetching(true);
+
+    try {
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
+        const resolved =
+          normalized.find((d) => eq(d.name, wanted)) ||
+          normalized.find((d) => eq(d.name, domain())) ||
+          normalized[0];
+
+        const name = resolved.name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  });
+
+  onCleanup(() => aborter?.abort());
+
+  async function handleReload() {
+    setLocalError("");
+
+    // Normalize the user-entered backend URL (candidate) without touching global config.
+    let candidate = (backendUrl() || "").trim();
+    try {
+      const u = new URL(candidate);
+      if (!/^https?:$/.test(u.protocol)) {
+        throw new Error(t("rightPane.switch.validation.protocol"));
+      }
+      // Ensure trailing slash for consistent "base + 'info'" concatenation.
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
+      candidate = u.toString();
+    } catch (e) {
+      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    setFetching(true);
+    aborter?.abort();
+    aborter = new AbortController();
+
+    try {
+      // Probe the candidate backend’s /info to list available domains.
+      const res = await fetch(candidate + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        // Try to keep current/wanted domain if present; otherwise pick the first.
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
+        const keep =
+          normalized.find((d) => eq(d.name, prefer)) ||
+          normalized.find((d) => eq(d.name, domain()));
+        const name = keep?.name || normalized[0].name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function onApply() {
+    setLocalError("");
+    setApplying(true);
+    try {
+      const newUrl = (backendUrl() || "").trim();
+      const chosenDomain = (domain() || "").trim();
+      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
+
+      const oldBackendBase = httpBase();
+      const newBackendBase = new URL(newUrl);
+      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
+      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
+
+      // --- MODIFICATION START: Logout from the OLD backend first ---
+      if (isSwitchingBackends) {
+        await app.logout?.();
+      }
+      // --- MODIFICATION END ---
+
+      // Now, proceed with switching to the new backend
+      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
+
+      await app.updateConnect?.({ backendLink: httpBase() });
+      await app.setDomain?.(chosenDomain);
+      await app.refreshDomainAssets?.();
+
+      if (app.ws) {
+        app.ws.setUrl(wsUrl());
+        app.ws.reconnect("switch-backend");
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+      setApplying(false);
+      return;
+    }
+
+    setApplying(false);
+    try { aborter?.abort(); } catch { }
+    props.onClose?.();
+  }
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
+            {t("rightPane.switch.title")}
+          </h3>
+
+          <label class="block mb-3">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
+            <div class="mt-1 flex gap-2">
+              <input
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                value={backendUrl()}
+                onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                placeholder={t("rightPane.switch.backend.placeholder")}
+                spellcheck={false}
+              />
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                onClick={handleReload}
+                disabled={fetching()}
+                title={t("rightPane.switch.reload.title")}
+              >
+                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+              </button>
+            </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
+          </label>
+
+          <label class="block mb-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
+          </label>
+          <select
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
+            value={domain()}
+            onChange={(e) => setDomain(e.currentTarget.value)}
+            disabled={fetching() || domains().length === 0}
+          >
+            {domains().map((d) => (
+              <option value={d.name} selected={eq(d.name, domain())}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <Show when={selectedDomainObj()}>
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+              <Show when={selectedDomainObj().website}>
+                <div>
+                  {t("rightPane.switch.domain.website")}:{" "}
+                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                    {selectedDomainObj().website}
+                  </a>
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={localError() || props.error}>
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
+              {t("common.error")}: {localError() || props.error?.message}
+            </p>
+          </Show>
+
+          <div class="mt-4 flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              onClick={props.onReset}
+              title={t("rightPane.switch.reset.title")}
+            >
+              {t("rightPane.switch.reset")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onApply}
+              disabled={props.loading || fetching() || applying()}
+            >
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
   );
 }
 </file>
@@ -28751,53 +29097,6 @@ html.dark .sv-docs code[data-theme*=" "] span {
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "release": "node scripts/release.mjs",
-    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
-  },
-  "dependencies": {
-    "@shikijs/themes": "^3.11.0",
-    "@solidjs/router": "^0.15.3",
-    "dompurify": "^3.2.6",
-    "dotenv": "^17.2.1",
-    "js-yaml": "^4.1.0",
-    "marked": "^16.2.0",
-    "openai": "^5.12.2",
-    "rehype-autolink-headings": "^7.1.0",
-    "rehype-pretty-code": "^0.14.1",
-    "rehype-slug": "^6.0.0",
-    "rehype-stringify": "^10.0.1",
-    "remark-breaks": "^4.0.0",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2",
-    "shiki": "^3.11.0",
-    "solid-js": "^1.9.8",
-    "unified": "^11.0.5",
-    "viem": "^2.33.3",
-    "yaml": "^2.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
-  }
-}
-</file>
-
 <file path="src/components/editor/PostSubmissionWizard.jsx">
 // src/components/editor/wizard_steps/PostSubmissionWizard.jsx
 import { createSignal, createMemo, Show, For, Switch, Match, createEffect, on } from "solid-js";
@@ -29038,292 +29337,6 @@ export default function ContentFeed(props) {
 }
 </file>
 
-<file path="src/components/SwitchConnectDialog.jsx">
-// File: src/components/SwitchConnectDialog.jsx
-import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext";
-import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
-
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
-
-function isAbortError(e) {
-  const msg = String(e?.message || e || "").toLowerCase();
-  if (e?.name === "AbortError") return true;
-  if (e?.code === 20) return true;
-  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
-  return false;
-}
-
-async function fetchInfoJSON(backendLink, { signal } = {}) {
-  const base = httpBase(backendLink);
-  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
-  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-  return await res.json();
-}
-
-export default function SwitchConnectDialog(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
-  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
-  const [domains, setDomains] = createSignal([]); // [{ name }]
-  const [fetching, setFetching] = createSignal(false);
-  const [applying, setApplying] = createSignal(false);
-  const [localError, setLocalError] = createSignal("");
-
-  let aborter;
-
-  const selectedDomainObj = createMemo(() => {
-    const cur = (domain() || "").trim().toLowerCase();
-    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
-  });
-
-  createEffect(async () => {
-    if (!props.open) return;
-
-    setLocalError("");
-    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
-    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
-    setDomains([]);
-
-    aborter?.abort();
-    aborter = new AbortController();
-    setFetching(true);
-
-    try {
-      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
-      const u = new URL(initialUrl);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-
-      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
-        const resolved =
-          normalized.find((d) => eq(d.name, wanted)) ||
-          normalized.find((d) => eq(d.name, domain())) ||
-          normalized[0];
-
-        const name = resolved.name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  });
-
-  onCleanup(() => aborter?.abort());
-
-  async function handleReload() {
-    setLocalError("");
-
-    // Normalize the user-entered backend URL (candidate) without touching global config.
-    let candidate = (backendUrl() || "").trim();
-    try {
-      const u = new URL(candidate);
-      if (!/^https?:$/.test(u.protocol)) {
-        throw new Error(t("rightPane.switch.validation.protocol"));
-      }
-      // Ensure trailing slash for consistent "base + 'info'" concatenation.
-      if (!u.pathname.endsWith("/")) u.pathname += "/";
-      candidate = u.toString();
-    } catch (e) {
-      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
-      return;
-    }
-
-    setFetching(true);
-    aborter?.abort();
-    aborter = new AbortController();
-
-    try {
-      // Probe the candidate backend’s /info to list available domains.
-      const res = await fetch(candidate + "info", {
-        headers: { Accept: "application/json" },
-        signal: aborter.signal,
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-      const info = await res.json();
-
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        // Try to keep current/wanted domain if present; otherwise pick the first.
-        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
-        const keep =
-          normalized.find((d) => eq(d.name, prefer)) ||
-          normalized.find((d) => eq(d.name, domain()));
-        const name = keep?.name || normalized[0].name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function onApply() {
-    setLocalError("");
-    setApplying(true);
-    try {
-      const newUrl = (backendUrl() || "").trim();
-      const chosenDomain = (domain() || "").trim();
-      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
-
-      const oldBackendBase = httpBase();
-      const newBackendBase = new URL(newUrl);
-      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
-      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
-
-      // --- MODIFICATION START: Logout from the OLD backend first ---
-      if (isSwitchingBackends) {
-        await app.logout?.();
-      }
-      // --- MODIFICATION END ---
-
-      // Now, proceed with switching to the new backend
-      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
-
-      await app.updateConnect?.({ backendLink: httpBase() });
-      await app.setDomain?.(chosenDomain);
-      await app.refreshDomainAssets?.();
-
-      if (app.ws) {
-        app.ws.setUrl(wsUrl());
-        app.ws.reconnect("switch-backend");
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-      setApplying(false);
-      return;
-    }
-
-    setApplying(false);
-    try { aborter?.abort(); } catch { }
-    props.onClose?.();
-  }
-
-  return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 z-40 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-
-        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-3">
-            {t("rightPane.switch.title")}
-          </h3>
-
-          <label class="block mb-3">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
-            <div class="mt-1 flex gap-2">
-              <input
-                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                value={backendUrl()}
-                onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder={t("rightPane.switch.backend.placeholder")}
-                spellcheck={false}
-              />
-              <button
-                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
-                onClick={handleReload}
-                disabled={fetching()}
-                title={t("rightPane.switch.reload.title")}
-              >
-                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
-              </button>
-            </div>
-            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
-          </label>
-
-          <label class="block mb-1">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
-          </label>
-          <select
-            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name} selected={eq(d.name, domain())}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-
-          <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-              <Show when={selectedDomainObj().website}>
-                <div>
-                  {t("rightPane.switch.domain.website")}:{" "}
-                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
-                    {selectedDomainObj().website}
-                  </a>
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
-              {t("common.error")}: {localError() || props.error?.message}
-            </p>
-          </Show>
-
-          <div class="mt-4 flex gap-2 justify-end">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              onClick={props.onReset}
-              title={t("rightPane.switch.reset.title")}
-            >
-              {t("rightPane.switch.reset")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onApply}
-              disabled={props.loading || fetching() || applying()}
-            >
-              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
-  );
-}
-</file>
-
 <file path="src/i18n/useI18n.js">
 // src/i18n/useI18n.js
 import { createSignal } from "solid-js";
@@ -29460,87 +29473,6 @@ export function useI18n() {
     };
   }
   return i18nSingleton;
-}
-</file>
-
-<file path="src/alerts/handlers.js">
-// src/alerts/handlers.js
-import { dbg } from "../utils/debug";
-import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
-import { pushToast } from "../ui/toast";
-
-export function handleTokenPriceChanged(app, payload) {
-  dbg.log("Alerts:token_price_changed", payload);
-  app.updateTokenPrices?.(payload.data);
-}
-
-export async function handleContentProcessed(app, payload) {
-  const { content } = payload.data || {};
-  if (!content || !content.guid) {
-    return;
-  }
-
-  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
-
-  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
-  if (draftParams && draftParams.guid === content.guid) {
-    await clearDraft(DRAFT_DIRS.NEW_POST);
-    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
-  }
-
-  const currentItems = app.newFeedItems();
-  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
-  
-  if (!isAlreadyVisible && content.content_type === 'post') {
-    app.setNewContentAvailable(content);
-  }
-}
-
-export function handleCommentCounterUpdate(app, payload) {
-    dbg.log("Alerts:comment_counter", "Received comment counter alert", payload);
-    const { savva_cid, n } = payload.data || {};
-    if (!savva_cid) return;
-
-    app.setPostUpdate({
-        cid: savva_cid,
-        type: 'commentCountChanged',
-        data: {
-            newTotal: n,
-        }
-    });
-}
-
-export function handlePing(app) {
-  dbg.log("Alerts:ping", "Received ping, sending pong.");
-  app.ws?.sendJson({ type: 'pong' });
-}
-
-export function handlePong() {
-  dbg.log("Alerts:pong", "Received pong.");
-  // Do nothing
-}
-
-export function handleReact(app, payload) {
-  dbg.log("Alerts:react", "Received react alert", payload);
-  
-  const currentDomain = app.selectedDomainName()?.toLowerCase();
-  const alertDomain = payload?.domain?.toLowerCase();
-
-  if (alertDomain === currentDomain) {
-    const d = payload.data;
-    // Emit a specific event with only the changed data
-    app.setPostUpdate({
-      cid: d?.object_id,
-      type: 'reactionsChanged',
-      data: {
-        reactions: d?.reactions,
-        reaction: d?.reaction,
-        user: d?.user?.address,
-      }
-    });
-  } else {
-    dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
-  }
 }
 </file>
 
@@ -29742,6 +29674,87 @@ ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOr
         </Show>
     </section>
   );
+}
+</file>
+
+<file path="src/alerts/handlers.js">
+// src/alerts/handlers.js
+import { dbg } from "../utils/debug";
+import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
+import { pushToast } from "../ui/toast";
+
+export function handleTokenPriceChanged(app, payload) {
+  dbg.log("Alerts:token_price_changed", payload);
+  app.updateTokenPrices?.(payload.data);
+}
+
+export async function handleContentProcessed(app, payload) {
+  const { content } = payload.data || {};
+  if (!content || !content.guid) {
+    return;
+  }
+
+  dbg.log("Alerts:content_processed", "Handler triggered with content:", content);
+
+  const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
+  if (draftParams && draftParams.guid === content.guid) {
+    await clearDraft(DRAFT_DIRS.NEW_POST);
+    pushToast({ type: "success", message: app.t("editor.publish.draftCleared") });
+  }
+
+  const currentItems = app.newFeedItems();
+  const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
+  
+  if (!isAlreadyVisible && content.content_type === 'post') {
+    app.setNewContentAvailable(content);
+  }
+}
+
+export function handleCommentCounterUpdate(app, payload) {
+    dbg.log("Alerts:comment_counter", "Received comment counter alert", payload);
+    const { savva_cid, n } = payload.data || {};
+    if (!savva_cid) return;
+
+    app.setPostUpdate({
+        cid: savva_cid,
+        type: 'commentCountChanged',
+        data: {
+            newTotal: n,
+        }
+    });
+}
+
+export function handlePing(app) {
+  dbg.log("Alerts:ping", "Received ping, sending pong.");
+  app.ws?.sendJson({ type: 'pong' });
+}
+
+export function handlePong() {
+  dbg.log("Alerts:pong", "Received pong.");
+  // Do nothing
+}
+
+export function handleReact(app, payload) {
+  dbg.log("Alerts:react", "Received react alert", payload);
+  
+  const currentDomain = app.selectedDomainName()?.toLowerCase();
+  const alertDomain = payload?.domain?.toLowerCase();
+
+  if (alertDomain === currentDomain) {
+    const d = payload.data;
+    // Emit a specific event with only the changed data
+    app.setPostUpdate({
+      cid: d?.object_id,
+      type: 'reactionsChanged',
+      data: {
+        reactions: d?.reactions,
+        reaction: d?.reaction,
+        user: d?.user?.address,
+      }
+    });
+  } else {
+    dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
+  }
 }
 </file>
 
@@ -30069,6 +30082,7 @@ import { createTextPreview } from "./preview-utils.js";
 
 export const DRAFT_DIRS = {
   NEW_POST: "new_post",
+  NEW_COMMENT: "new_comment",
   EDIT: "post",
   UPLOADS: "uploads",
 };
@@ -30982,231 +30996,6 @@ export default {
 export const APP_VERSION = "0.104";
 </file>
 
-<file path="src/components/feed/PostCard.jsx">
-// src/components/feed/PostCard.jsx
-import { Show, createMemo, createSignal, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UserCard from "../ui/UserCard.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import PostInfo from "./PostInfo.jsx";
-import NftBadge from "../ui/icons/NftBadge.jsx";
-import PostFundBadge from "../ui/PostFundBadge.jsx";
-import { navigate } from "../../routing/hashRouter";
-import ContextMenu from "../ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
-import { resolvePostCidPath } from "../../ipfs/utils.js";
-
-function PinIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
-      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-      <g id="SVGRepo_iconCarrier">
-        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
-      </g>
-    </svg>
-  );
-}
-
-function getLocalizedField(locales, fieldName, currentLang) {
-  if (!locales || typeof locales !== 'object') return "";
-  if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
-  if (locales.en?.[fieldName]) return locales.en[fieldName];
-  const firstLocaleKey = Object.keys(locales)[0];
-  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
-    return locales[firstLocaleKey][fieldName];
-  }
-  return "";
-}
-
-export default function PostCard(props) {
-  const app = useApp();
-  const { t } = app;
-  const [isHovered, setIsHovered] = createSignal(false);
-  
-  const item = createMemo(() => {
-    const baseItem = props.item;
-    const update = app.postUpdate();
-
-    if (update && update.cid === baseItem.id) {
-        let updatedRaw = { ...baseItem._raw };
-        
-        if (update.type === 'reactionsChanged') {
-            updatedRaw.reactions = update.data.reactions;
-            if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
-                updatedRaw.my_reaction = update.data.reaction;
-            }
-        } else if (update.type === 'commentCountChanged') {
-            updatedRaw.total_childs = update.data.newTotal;
-        }
-
-        return { ...baseItem, _raw: updatedRaw };
-    }
-    
-    return baseItem;
-  });
-
-  const author = () => item()._raw?.author;
-  const content = () => item()._raw?.savva_content;
-  const fund = () => item()._raw?.fund;
-  const isListMode = () => props.mode === 'list';
-
-  const displayImageSrc = createMemo(() => {
-    const thumbnailPath = content()?.thumbnail;
-    if (thumbnailPath) {
-      return resolvePostCidPath(item()._raw, thumbnailPath);
-    }
-    return author()?.avatar;
-  });
-
-  const title = createMemo(() => {
-    return getLocalizedField(content()?.locales, "title", app.lang());
-  });
-
-  const textPreview = createMemo(() => {
-    return getLocalizedField(content()?.locales, "text_preview", app.lang());
-  });
-
-  const handleCardClick = (e) => {
-    const postId = props.item.id;
-    if (postId) {
-      app.setSavedScrollY(window.scrollY);
-      navigate(`/post/${postId}`);
-    } else {
-      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
-    }
-  };
-
-  const finalContextMenuItems = createMemo(() => {
-    const propItems = props.contextMenuItems || [];
-    const adminItems = getPostAdminItems(item()._raw, t);
-    return [...propItems, ...adminItems];
-  });
-
-  const articleClasses = createMemo(() => {
-    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
-    if (isListMode()) {
-      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
-    }
-    return `${base} flex-col`;
-  });
-
-  const imageContainerClasses = createMemo(() => {
-    const listModeRounding = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
-    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-r" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
-  });
-  
-  const ImageBlock = () => {
-    const roundingClass = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
-    return (
-      <div class={imageContainerClasses()}>
-        <IpfsImage
-          src={displayImageSrc()}
-          class={roundingClass}
-          postGateways={item()?._raw?.gateways || []}
-          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
-        />
-        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
-          <div class="absolute bottom-2 right-0 z-10">
-            <PostFundBadge amount={fund()?.amount} />
-          </div>
-        </Show>
-      </div>
-    );
-  };
-
-  const contentContainerClasses = createMemo(() => {
-    return isListMode()
-      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
-      : "px-3 pb-3 flex-1 flex flex-col";
-  });
-
-  const textPreviewClasses = createMemo(() => {
-    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
-    if (isListMode()) {
-      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
-    }
-    return `${base} line-clamp-3`;
-  });
-
-  const ContentBlock = () => (
-    <div class={contentContainerClasses()}>
-      <div class="flex-1 space-y-1 min-h-0">
-        <Show when={title()}>
-          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
-            {title()}
-          </h4>
-        </Show>
-        <Show when={textPreview() && !props.compact}>
-          <p class={textPreviewClasses()}>
-            {textPreview()}
-          </p>
-        </Show>
-      </div>
-      
-      <div class="mt-1">
-        <UserCard author={author()} compact={props.compact} />
-      </div>
-
-      <Show when={!props.compact}>
-        <PostInfo item={item()} mode={props.mode} timeFormat="long" />
-      </Show>
-    </div>
-  );
-
-  return (
-    <article 
-      class={articleClasses()} 
-      onClick={handleCardClick} 
-      style={{ cursor: 'pointer' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <Show when={item()?._raw?.pinned}>
-        <div class="absolute -top-2 -left-2 z-10">
-          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
-        </div>
-      </Show>
-
-      <Show when={item()?._raw?.nft?.owner}>
-        <div class="absolute -top-2 -right-2 z-10">
-          <NftBadge />
-        </div>
-      </Show>
-
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
-        <div class="context-menu-container">
-          <ContextMenu items={finalContextMenuItems()} />
-        </div>
-      </Show>
-
-      <Show
-        when={isListMode()}
-        fallback={
-          <>
-            <ImageBlock />
-            <ContentBlock />
-          </>
-        }
-      >
-        {isListMode() ? (
-          <>
-            <ContentBlock />
-            <ImageBlock />
-          </>
-        ) : (
-          <>
-            <ImageBlock />
-            <ContentBlock />
-          </>
-        )}
-      </Show>
-    </article>
-  );
-}
-</file>
-
 <file path="src/pages/PostPage.jsx">
 // src/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
@@ -31547,6 +31336,231 @@ export default function PostPage() {
         </Match>
       </Switch>
     </main>
+  );
+}
+</file>
+
+<file path="src/components/feed/PostCard.jsx">
+// src/components/feed/PostCard.jsx
+import { Show, createMemo, createSignal, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UserCard from "../ui/UserCard.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import PostInfo from "./PostInfo.jsx";
+import NftBadge from "../ui/icons/NftBadge.jsx";
+import PostFundBadge from "../ui/PostFundBadge.jsx";
+import { navigate } from "../../routing/hashRouter";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { resolvePostCidPath } from "../../ipfs/utils.js";
+
+function PinIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
+      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+      <g id="SVGRepo_iconCarrier">
+        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
+      </g>
+    </svg>
+  );
+}
+
+function getLocalizedField(locales, fieldName, currentLang) {
+  if (!locales || typeof locales !== 'object') return "";
+  if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
+  if (locales.en?.[fieldName]) return locales.en[fieldName];
+  const firstLocaleKey = Object.keys(locales)[0];
+  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
+    return locales[firstLocaleKey][fieldName];
+  }
+  return "";
+}
+
+export default function PostCard(props) {
+  const app = useApp();
+  const { t } = app;
+  const [isHovered, setIsHovered] = createSignal(false);
+  
+  const item = createMemo(() => {
+    const baseItem = props.item;
+    const update = app.postUpdate();
+
+    if (update && update.cid === baseItem.id) {
+        let updatedRaw = { ...baseItem._raw };
+        
+        if (update.type === 'reactionsChanged') {
+            updatedRaw.reactions = update.data.reactions;
+            if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+                updatedRaw.my_reaction = update.data.reaction;
+            }
+        } else if (update.type === 'commentCountChanged') {
+            updatedRaw.total_childs = update.data.newTotal;
+        }
+
+        return { ...baseItem, _raw: updatedRaw };
+    }
+    
+    return baseItem;
+  });
+
+  const author = () => item()._raw?.author;
+  const content = () => item()._raw?.savva_content;
+  const fund = () => item()._raw?.fund;
+  const isListMode = () => props.mode === 'list';
+
+  const displayImageSrc = createMemo(() => {
+    const thumbnailPath = content()?.thumbnail;
+    if (thumbnailPath) {
+      return resolvePostCidPath(item()._raw, thumbnailPath);
+    }
+    return author()?.avatar;
+  });
+
+  const title = createMemo(() => {
+    return getLocalizedField(content()?.locales, "title", app.lang());
+  });
+
+  const textPreview = createMemo(() => {
+    return getLocalizedField(content()?.locales, "text_preview", app.lang());
+  });
+
+  const handleCardClick = (e) => {
+    const postId = props.item.id;
+    if (postId) {
+      app.setSavedScrollY(window.scrollY);
+      navigate(`/post/${postId}`);
+    } else {
+      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
+    }
+  };
+
+  const finalContextMenuItems = createMemo(() => {
+    const propItems = props.contextMenuItems || [];
+    const adminItems = getPostAdminItems(item()._raw, t);
+    return [...propItems, ...adminItems];
+  });
+
+  const articleClasses = createMemo(() => {
+    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
+    if (isListMode()) {
+      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
+    }
+    return `${base} flex-col`;
+  });
+
+  const imageContainerClasses = createMemo(() => {
+    const listModeRounding = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
+    return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-r" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
+  });
+  
+  const ImageBlock = () => {
+    const roundingClass = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
+    return (
+      <div class={imageContainerClasses()}>
+        <IpfsImage
+          src={displayImageSrc()}
+          class={roundingClass}
+          postGateways={item()?._raw?.gateways || []}
+          fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
+        />
+        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
+          <div class="absolute bottom-2 right-0 z-10">
+            <PostFundBadge amount={fund()?.amount} />
+          </div>
+        </Show>
+      </div>
+    );
+  };
+
+  const contentContainerClasses = createMemo(() => {
+    return isListMode()
+      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
+      : "px-3 pb-3 flex-1 flex flex-col";
+  });
+
+  const textPreviewClasses = createMemo(() => {
+    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
+    if (isListMode()) {
+      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
+    }
+    return `${base} line-clamp-3`;
+  });
+
+  const ContentBlock = () => (
+    <div class={contentContainerClasses()}>
+      <div class="flex-1 space-y-1 min-h-0">
+        <Show when={title()}>
+          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
+            {title()}
+          </h4>
+        </Show>
+        <Show when={textPreview() && !props.compact}>
+          <p class={textPreviewClasses()}>
+            {textPreview()}
+          </p>
+        </Show>
+      </div>
+      
+      <div class="mt-1">
+        <UserCard author={author()} compact={props.compact} />
+      </div>
+
+      <Show when={!props.compact}>
+        <PostInfo item={item()} mode={props.mode} timeFormat="long" />
+      </Show>
+    </div>
+  );
+
+  return (
+    <article 
+      class={articleClasses()} 
+      onClick={handleCardClick} 
+      style={{ cursor: 'pointer' }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Show when={item()?._raw?.pinned}>
+        <div class="absolute -top-2 -left-2 z-10">
+          <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
+        </div>
+      </Show>
+
+      <Show when={item()?._raw?.nft?.owner}>
+        <div class="absolute -top-2 -right-2 z-10">
+          <NftBadge />
+        </div>
+      </Show>
+
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
+        <div class="context-menu-container">
+          <ContextMenu items={finalContextMenuItems()} />
+        </div>
+      </Show>
+
+      <Show
+        when={isListMode()}
+        fallback={
+          <>
+            <ImageBlock />
+            <ContentBlock />
+          </>
+        }
+      >
+        {isListMode() ? (
+          <>
+            <ContentBlock />
+            <ImageBlock />
+          </>
+        ) : (
+          <>
+            <ImageBlock />
+            <ContentBlock />
+          </>
+        )}
+      </Show>
+    </article>
   );
 }
 </file>
@@ -31926,6 +31940,34 @@ import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
 import { pushToast } from "../ui/toast.js";
 import CommentEditor from "../components/editor/CommentEditor.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import { whenWsOpen } from "../net/wsRuntime.js";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, domain, app, lang } = params;
+  if (!identifier || !domain || !app.wsMethod) return null;
+  
+  await whenWsOpen();
+  
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: domain,
+    lang: lang,
+    limit: 1,
+  };
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  return arr[0] || null;
+}
 
 function TrashIcon(props) {
   return (
@@ -31972,7 +32014,8 @@ export default function EditorPage() {
   const baseDir = createMemo(() => {
     const mode = editorMode();
     if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
-    if (["edit_post", "new_comment", "edit_comment"].includes(mode)) return DRAFT_DIRS.EDIT;
+    if (mode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
+    if (["edit_post", "edit_comment"].includes(mode)) return DRAFT_DIRS.EDIT;
     return "unknown";
   });
 
@@ -31983,14 +32026,27 @@ export default function EditorPage() {
 
   const loadEditorContent = async () => {
     try {
-      if (editorMode() === "new_comment") {
+      const mode = editorMode();
+      if (mode === "new_comment") {
         await clearDraft(baseDir());
-        const newPostData = {};
+        const parentCid = routeParams().parent_savva_cid;
+        const parentObject = await fetchPostByIdentifier({
+            identifier: parentCid,
+            domain: app.selectedDomainName(),
+            app,
+            lang: app.lang()
+        });
+        if (!parentObject) throw new Error("Parent content not found.");
+        
+        const isReplyToComment = !!parentObject.parent_savva_cid;
         const newPostParams = { 
           locales: {}, 
           guid: crypto.randomUUID(),
-          parent_savva_cid: routeParams().parent_savva_cid 
+          parent_savva_cid: parentObject.savva_cid,
+          root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid
         };
+
+        const newPostData = {};
         for (const langCode of domainLangCodes()) {
             newPostData[langCode] = { title: "", body: "", chapters: [] };
             newPostParams.locales[langCode] = { chapters: [] };
@@ -32681,18 +32737,16 @@ export default {
   "postcard.unpin": "Unpin Post",
   "reactions.${reactionType()}": "React with {reactionType}",
   "reactions.${type}": "{type} Reaction",
-  "reactions.angry": "Angry",
-  "reactions.fire": "🔥",
-  "reactions.ha_ha": "😂 Ha Ha",
-  "reactions.hot": "Hot",
-  "reactions.laugh": "Haha",
-  "reactions.like": "Like",
-  "reactions.love": "Love",
-  "reactions.rocket": "🚀",
-  "reactions.sad": "Sad",
-  "reactions.star": "⭐",
-  "reactions.trophy": "🏆 Trophy",
-  "reactions.wow": "Wow",
+  "reactions.angry": "!Angry",
+  "reactions.clap": "!Clap",
+  "reactions.dislike": "!Dislike",
+  "reactions.ha_ha": "!Ha Ha",
+  "reactions.hot": "!Hot",
+  "reactions.like": "!Like",
+  "reactions.sad": "!Sad",
+  "reactions.super": "!Super",
+  "reactions.wow": "!Wow",
+  "reactions.trophy": "!Trophy",
   "rightPane.language": "Language",
   "rightPane.settings": "Settings",
   "rightPane.switch.backend.help": "The app will fetch /info from this URL to list supported domains.",

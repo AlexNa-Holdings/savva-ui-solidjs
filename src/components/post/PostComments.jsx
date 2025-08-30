@@ -1,4 +1,4 @@
-// src/components/post/PostComments.jsx
+// src/components/editor/PostComments.jsx
 import { createResource, For, Show, createSignal, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { toChecksumAddress } from "../../blockchain/utils";
@@ -71,6 +71,7 @@ export default function PostComments(props) {
 
   return (
     <div class="mt-8 pt-6 border-t border-[hsl(var(--border))]">
+      {/* Header with link only, no counter */}
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-xl font-semibold">{t("post.comments")}</h3>
         <button

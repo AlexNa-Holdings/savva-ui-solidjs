@@ -5,6 +5,7 @@ import { createTextPreview } from "./preview-utils.js";
 
 export const DRAFT_DIRS = {
   NEW_POST: "new_post",
+  NEW_COMMENT: "new_comment",
   EDIT: "post",
   UPLOADS: "uploads",
 };

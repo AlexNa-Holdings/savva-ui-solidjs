@@ -19,6 +19,34 @@ import EditorFullPreview from "../components/editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../components/editor/PostSubmissionWizard.jsx";
 import { pushToast } from "../ui/toast.js";
 import CommentEditor from "../components/editor/CommentEditor.jsx";
+import { toChecksumAddress } from "../blockchain/utils.js";
+import { whenWsOpen } from "../net/wsRuntime.js";
+
+async function fetchPostByIdentifier(params) {
+  const { identifier, domain, app, lang } = params;
+  if (!identifier || !domain || !app.wsMethod) return null;
+  
+  await whenWsOpen();
+  
+  const contentList = app.wsMethod("content-list");
+  const requestParams = {
+    domain: domain,
+    lang: lang,
+    limit: 1,
+  };
+  if (identifier.startsWith("0x")) {
+    requestParams.savva_cid = identifier;
+  } else {
+    requestParams.short_cid = identifier;
+  }
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+  const res = await contentList(requestParams);
+  const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+  return arr[0] || null;
+}
 
 function TrashIcon(props) {
   return (
@@ -30,7 +58,8 @@ function TrashIcon(props) {
 }
 
 export default function EditorPage() {
-  const { t, domainAssetsConfig, lastTabRoute } = useApp();
+  const app = useApp();
+  const { t, domainAssetsConfig, lastTabRoute } = app;
   const { route } = useHashRouter();
   let textareaRef;
 
@@ -65,7 +94,8 @@ export default function EditorPage() {
   const baseDir = createMemo(() => {
     const mode = editorMode();
     if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
-    if (["edit_post", "new_comment", "edit_comment"].includes(mode)) return DRAFT_DIRS.EDIT;
+    if (mode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
+    if (["edit_post", "edit_comment"].includes(mode)) return DRAFT_DIRS.EDIT;
     return "unknown";
   });
 
@@ -76,14 +106,27 @@ export default function EditorPage() {
 
   const loadEditorContent = async () => {
     try {
-      if (editorMode() === "new_comment") {
+      const mode = editorMode();
+      if (mode === "new_comment") {
         await clearDraft(baseDir());
-        const newPostData = {};
+        const parentCid = routeParams().parent_savva_cid;
+        const parentObject = await fetchPostByIdentifier({
+            identifier: parentCid,
+            domain: app.selectedDomainName(),
+            app,
+            lang: app.lang()
+        });
+        if (!parentObject) throw new Error("Parent content not found.");
+        
+        const isReplyToComment = !!parentObject.parent_savva_cid;
         const newPostParams = { 
           locales: {}, 
           guid: crypto.randomUUID(),
-          parent_savva_cid: routeParams().parent_savva_cid 
+          parent_savva_cid: parentObject.savva_cid,
+          root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid
         };
+
+        const newPostData = {};
         for (const langCode of domainLangCodes()) {
             newPostData[langCode] = { title: "", body: "", chapters: [] };
             newPostParams.locales[langCode] = { chapters: [] };

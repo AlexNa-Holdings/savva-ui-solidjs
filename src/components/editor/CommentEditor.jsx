@@ -4,11 +4,13 @@ import { useApp } from "../../context/AppContext";
 import { toChecksumAddress } from "../../blockchain/utils";
 import PostCard from "../feed/PostCard";
 import Spinner from "../ui/Spinner";
+import { whenWsOpen } from "../../net/wsRuntime.js";
 
 async function fetchPost(params) {
   const { app, savva_cid } = params;
   if (!app.wsMethod || !savva_cid) return null;
 
+  await whenWsOpen();
   const getList = app.wsMethod("content-list");
   
   const requestParams = {
