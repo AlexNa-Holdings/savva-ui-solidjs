@@ -17,3 +17,7 @@ sections:
         file: core-concepts/auth.md
       - label: Prikazivanje postova
         file: core-concepts/showing-posts.md
+      - label: Objavljivanje postova
+        file: core-concepts/publishing-posts.md
+      - label: Ugovor o konfiguraciji
+        file: core-concepts/config-contract.md

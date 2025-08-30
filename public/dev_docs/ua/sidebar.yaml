@@ -17,3 +17,7 @@ sections:
         file: core-concepts/auth.md
       - label: Показ постів
         file: core-concepts/showing-posts.md
+      - label: Публікація постів
+        file: core-concepts/publishing-posts.md
+      - label: Контракт конфігурації
+        file: core-concepts/config-contract.md

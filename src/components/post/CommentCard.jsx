@@ -13,16 +13,9 @@ import { navigate } from "../../routing/hashRouter.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
-import { dbg } from "../../utils/debug.js"; 
-
-function EditIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class={props.class || "w-5 h-5"} fill="currentColor">
-      <path d="M20.71,3.29a2.91,2.91,0,0,0-2.2-.84,3.25,3.25,0,0,0-2.17,1L9.46,10.29s0,0,0,0a.62.62,0,0,0-.11.17,1,1,0,0,0-.1.18l0,0,L8,14.72A1,1,0,0,0,9,16a.9.9,0,0,0,.28,0l4-1.17,0,0,.18-.1a.62.62,0,0,0,.17-.11l0,0,6.87-6.88a3.25,3.25,0,0,0,1-2.17A2.91,2.91,0,0,0,20.71,3.29Z"></path>
-      <path d="M20,22H4a2,2,0,0,1-2-2V4A2,2,0,0,1,4,2h8a1,1,0,0,1,0,2H4V20H20V12a1,1,0,0,1,2,0v8A2,2,0,0,1,20,22Z"></path>
-    </svg>
-  );
-}
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
+import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
@@ -32,7 +25,7 @@ async function fetchFullContent(params) {
   const currentLocale = locales?.[lang] || locales?.en || locales?.[Object.keys(locales)[0]];
   
   const dataPath = currentLocale?.data_path;
-  if (!dataPath) return currentLocale?.text_preview || ""; // Fallback to preview if no path
+  if (!dataPath) return currentLocale?.text_preview || "";
 
   const baseCid = getPostContentBaseCid(comment);
   if (!baseCid) return "";
@@ -57,6 +50,8 @@ export default function CommentCard(props) {
   const [isExpanded, setIsExpanded] = createSignal(false);
   const [isHovered, setIsHovered] = createSignal(false);
   const [isPreparing, setIsPreparing] = createSignal(false);
+  
+  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(comment);
 
   const isAuthor = createMemo(() => {
     const userAddr = app.authorizedUser()?.address?.toLowerCase();
@@ -132,7 +127,6 @@ export default function CommentCard(props) {
     e.stopPropagation();
     setIsPreparing(true);
     try {
-      dbg.log("CommentCard:handleEdit", "Original comment object:", comment()); // <<< ADD THIS LINE
       await preparePostForEditing(comment(), app);
       navigate(`/editor/comment/${comment().savva_cid}`);
     } catch (err) {
@@ -172,12 +166,20 @@ export default function CommentCard(props) {
 
         <div class="mt-2 flex items-center justify-between">
           <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
-          <div class="flex items-center gap-4 text-xs font-semibold">
+          <div class="flex items-center gap-2 text-xs font-semibold">
             <Show when={isAuthor()}>
               <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title="Edit Comment">
                 <Show when={isPreparing()} fallback={<EditIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]" />}>
                   <Spinner class="w-4 h-4" />
                 </Show>
+              </button>
+              <button
+                  class="p-1"
+                  onClick={openConfirm}
+                  disabled={modalProps().isDeleting}
+                  title="Delete Comment"
+                >
+                <TrashIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]" />
               </button>
             </Show>
             <Show when={needsTruncation() || isExpanded()}>
@@ -203,6 +205,13 @@ export default function CommentCard(props) {
           </For>
         </div>
       </Show>
+
+      <ConfirmModal
+        isOpen={showConfirm()}
+        onClose={closeConfirm}
+        onConfirm={confirmDelete}
+        {...modalProps()}
+      />
     </div>
   );
 }

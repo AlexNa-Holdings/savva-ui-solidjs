@@ -4,7 +4,9 @@
   "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
   "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
   "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "8103a530fb79585972d77624473d472bd486c8a2928f923bf42ea1f69f1d8875",
+  "sidebar.yaml": "26b2929be1d59dce23937a39e3b35045183f6d91b81d36688134ca084c3c3e8e",
   "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
-  "core-concepts/showing-posts.md": "a2d42c4ec28035488fb08fb1e52c5d105cc6b98259778aed8de5115de4054e90"
+  "core-concepts/showing-posts.md": "a2d42c4ec28035488fb08fb1e52c5d105cc6b98259778aed8de5115de4054e90",
+  "core-concepts/config-contract.md": "d0390a3d46e6bd6cc6a50b6caa979b608876d04fb9cb174bd67cc2652275e960",
+  "core-concepts/publishing-posts.md": "61774803e87614ea4bc5f6f132ca0fbf74f1b4b84ed41a1a29675f7940ce2e65"
 }
