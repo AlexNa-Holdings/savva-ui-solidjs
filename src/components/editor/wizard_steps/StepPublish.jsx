@@ -1,5 +1,5 @@
 // src/components/editor/wizard_steps/StepPublish.jsx
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount, Show, createEffect, on } from "solid-js";
 import { useApp } from "../../../context/AppContext.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { getSavvaContract } from "../../../blockchain/contracts.js";
@@ -27,6 +27,13 @@ export default function StepPublish(props) {
   const [status, setStatus] = createSignal("waiting_signature");
   const [txHash, setTxHash] = createSignal(null);
 
+  createEffect(() => {
+    dbg.log("StepPublish:Props Update", {
+        publishedData: props.publishedData(),
+        postParams: props.postParams()
+    });
+  });
+
   const attemptPublish = async () => {
     setError(null);
     setTxHash(null);
@@ -39,15 +46,36 @@ export default function StepPublish(props) {
       const descriptorCid = publishedData().descriptorCid;
       const guid = postParams().guid;
 
+      dbg.group("StepPublish: Pre-Flight Check");
+      dbg.log("User:", user);
+      dbg.log("Domain:", domain);
+      dbg.log("Descriptor CID:", descriptorCid);
+      dbg.log("GUID:", guid);
+      dbg.log("Full postParams:", postParams());
+      dbg.log("Full publishedData:", publishedData());
+      dbg.groupEnd();
+
       if (!user?.address || !domain || !descriptorCid || !guid) {
         throw new Error("Missing required data for publishing (user, domain, descriptorCid, or guid).");
       }
 
       let contentType;
-      if (editorMode === 'new_post') {
-        contentType = 'post';
-      } else { // edit_post mode
-        contentType = postParams().publishAsNewPost ? 'post' : 'post-edit';
+      // --- MODIFICATION START ---
+      // Use editorMode as a variable, not a function
+      switch (editorMode) {
+      // --- MODIFICATION END ---
+        case 'new_post':
+          contentType = 'post';
+          break;
+        case 'edit_post':
+          contentType = postParams().publishAsNewPost ? 'post' : 'post-edit';
+          break;
+        case 'new_comment':
+        case 'edit_comment':
+          contentType = 'comment';
+          break;
+        default:
+          throw new Error(`Unknown editor mode for content type: ${editorMode}`);
       }
       
       dbg.log("StepPublish", "Publishing with params:", { domain, author: user.address, guid, ipfs: descriptorCid, contentType });
@@ -101,7 +129,7 @@ export default function StepPublish(props) {
               <button onClick={props.onCancel} class="px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
                 {t("editor.publish.validation.backToEditor")}
               </button>
-              <button onClick={attemptPublish} class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">
+              <button onClick={props.onRetry} class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">
                 {t("common.retry")}
               </button>
             </div>

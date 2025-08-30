@@ -57,7 +57,7 @@ export default function CommentEditor(props) {
         <PostCard
           item={postData()}
           mode="list"
-          compact={true}
+          compact={false}
         />
       </Show>
     </div>

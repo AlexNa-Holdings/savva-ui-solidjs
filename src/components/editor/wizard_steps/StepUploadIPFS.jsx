@@ -34,7 +34,10 @@ export default function StepUploadIPFS(props) {
             reject(new Error("Failed to parse server response."));
           }
         } else {
-          if (xhr.status === 413) {
+          if (xhr.status === 401) {
+            app.handleAuthError?.();
+            reject(new Error("Your session has expired. Please log in again."));
+          } else if (xhr.status === 413) {
             reject(new Error(t("editor.publish.ipfs.errorTooLarge")));
           } else {
             reject(new Error(`Server responded with status ${xhr.status}: ${xhr.responseText}`));

@@ -1,6 +1,5 @@
-// src/components/editor/PostSubmissionWizard.jsx
-
-import { createSignal, createMemo, Show, For, Switch, Match } from "solid-js";
+// src/components/editor/wizard_steps/PostSubmissionWizard.jsx
+import { createSignal, createMemo, Show, For, Switch, Match, createEffect, on } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import StepValidate from "./wizard_steps/StepValidate.jsx";
@@ -8,6 +7,7 @@ import StepCheckRights from "./wizard_steps/StepCheckRights.jsx";
 import StepUploadIPFS from "./wizard_steps/StepUploadIPFS.jsx";
 import StepUploadDescriptor from "./wizard_steps/StepUploadDescriptor.jsx";
 import StepPublish from "./wizard_steps/StepPublish.jsx";
+import { dbg } from "../../utils/debug.js";
 
 const STEPS = [
   { id: "validate",      title: "editor.publish.steps.validate",      help: "editor.publish.steps.validate.help",      component: StepValidate },
@@ -40,10 +40,19 @@ export default function PostSubmissionWizard(props) {
   const [currentStepIndex, setCurrentStepIndex] = createSignal(0);
   const [publishedData, setPublishedData] = createSignal({});
 
+  createEffect(on(() => props.isOpen, (isOpen) => {
+    if (isOpen) {
+      setCurrentStepIndex(0);
+      setPublishedData({});
+    }
+  }));
+
   const activeComponent = createMemo(() => STEPS[currentStepIndex()]?.component);
 
   const handleNextStep = (stepResult) => {
     const currentStep = STEPS[currentStepIndex()];
+    dbg.log("Wizard:handleNextStep", `Completed step '${currentStep.id}'. Received result:`, stepResult);
+
     if (currentStep.id === 'ipfs') {
       setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
     } else if (currentStep.id === 'ipfs_publish') {
@@ -55,6 +64,11 @@ export default function PostSubmissionWizard(props) {
     } else {
       props.onSuccess?.();
     }
+  };
+  
+  const handleRetry = () => {
+    setCurrentStepIndex(0);
+    setPublishedData({});
   };
 
   const getStepStatus = (index) => {
@@ -109,6 +123,7 @@ export default function PostSubmissionWizard(props) {
                     publishedData={publishedData}
                     onComplete={handleNextStep}
                     onCancel={handleValidationBack}
+                    onRetry={handleRetry}
                     editorMode={props.editorMode}
                   />
                 </Match>

@@ -1,4 +1,4 @@
-// src/components/ui/contextMenuBuilder.js
+// src/ui/contextMenuBuilder.js
 import { pushToast } from "../ui/toast.js";
 import { getPostDescriptorPath, getPostContentBaseCid } from "../ipfs/utils.js";
 
@@ -23,7 +23,7 @@ export function getPostAdminItems(post, t) {
 
   const items = [];
   const savvaCid = post.savva_cid;
-  const descriptorCid = getPostDescriptorPath(post)?.split('/')[0];
+  const descriptorPath = getPostDescriptorPath(post);
   const dataCid = getPostContentBaseCid(post);
 
   if (savvaCid) {
@@ -32,10 +32,10 @@ export function getPostAdminItems(post, t) {
       onClick: () => copyToClipboard(savvaCid, "SAVVA CID", t)
     });
   }
-  if (descriptorCid) {
+  if (descriptorPath) {
     items.push({
       label: t("postcard.copyDescriptorCid"), 
-      onClick: () => copyToClipboard(descriptorCid, "Descriptor CID", t)
+      onClick: () => copyToClipboard(descriptorPath, "Descriptor Path", t)
     });
   }
   if (dataCid) {

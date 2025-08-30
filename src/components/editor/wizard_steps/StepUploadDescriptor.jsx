@@ -1,5 +1,5 @@
 // src/components/editor/wizard_steps/StepUploadDescriptor.jsx
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, createEffect, on, Show } from "solid-js";
 import { useApp } from "../../../context/AppContext.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { stringify as toYaml } from "yaml";
@@ -12,20 +12,21 @@ export default function StepUploadDescriptor(props) {
   const { t } = app;
   const [error, setError] = createSignal(null);
   const [isUploading, setIsUploading] = createSignal(true);
+  const [hasStarted, setHasStarted] = createSignal(false);
 
-  const uploadDescriptor = async () => {
-    const { postData, postParams, publishedData } = props;
-    const data_cid = publishedData().ipfsCid;
-
-    if (!data_cid) {
-      throw new Error("IPFS data CID is missing from the previous step.");
-    }
+  const uploadDescriptor = async (data_cid) => {
+    const { postData, postParams } = props;
 
     const descriptor = {
       savva_spec_version: "2.0",
       data_cid: data_cid,
       locales: {}
     };
+
+    if (postParams().parent_savva_cid) {
+        descriptor.parent_savva_cid = postParams().parent_savva_cid;
+        descriptor.root_savva_cid = postParams().parent_savva_cid;
+    }
 
     const gateways = app.info()?.ipfs_gateways;
     if (gateways && Array.isArray(gateways) && gateways.length > 0) {
@@ -97,19 +98,27 @@ export default function StepUploadDescriptor(props) {
     return result.cid;
   };
 
-  onMount(() => {
-    setTimeout(async () => {
-      try {
-        const descriptorCid = await uploadDescriptor();
-        props.onComplete?.(descriptorCid);
-      } catch (e) {
-        dbg.error("StepUploadDescriptor", "An error occurred:", e);
-        setError(e.message);
-      } finally {
-        setIsUploading(false);
-      }
-    }, 500);
+  createEffect(() => {
+    const dataCid = props.publishedData().ipfsCid;
+    // This effect runs when the component mounts AND when props change.
+    // We wait until the ipfsCid is available and ensure we only run once.
+    if (dataCid && !hasStarted()) {
+      setHasStarted(true);
+      
+      setTimeout(async () => {
+        try {
+          const descriptorCid = await uploadDescriptor(dataCid);
+          props.onComplete?.(descriptorCid);
+        } catch (e) {
+          dbg.error("StepUploadDescriptor", "An error occurred:", e);
+          setError(e.message);
+        } finally {
+          setIsUploading(false);
+        }
+      }, 500);
+    }
   });
+
 
   return (
     <div class="flex flex-col items-center justify-center h-full">

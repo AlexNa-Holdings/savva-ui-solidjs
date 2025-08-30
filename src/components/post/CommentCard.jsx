@@ -7,6 +7,8 @@ import MarkdownView from "../docs/MarkdownView";
 import { ipfs } from "../../ipfs";
 import { getPostContentBaseCid } from "../../ipfs/utils";
 import Spinner from "../ui/Spinner";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 
 /**
  * Fetches the full content of a comment's prologue for a specific language.
@@ -42,6 +44,7 @@ export default function CommentCard(props) {
   const level = () => props.level || 0;
   
   const [isExpanded, setIsExpanded] = createSignal(false);
+  const [isHovered, setIsHovered] = createSignal(false);
 
   // Memo for the truncated preview content
   const localizedPreview = createMemo(() => {
@@ -57,7 +60,6 @@ export default function CommentCard(props) {
   // Resource to fetch full content only when expanded
   const [fullContent] = createResource(
     () => ({
-      // This resource will only fetch when isExpanded is true
       shouldFetch: isExpanded(),
       app: app,
       comment: comment(),
@@ -69,24 +71,29 @@ export default function CommentCard(props) {
     }
   );
 
+  const contextMenuItems = createMemo(() => {
+    if (!comment()) return [];
+    return getPostAdminItems(comment(), t);
+  });
+
   // Determine if the "Show More" button should be visible
   const needsTruncation = createMemo(() => {
     const preview = localizedPreview();
-    // A simple heuristic: if the preview is long or explicitly truncated
     return preview.length > 280 || preview.endsWith("...");
   });
 
   return (
     <div
-      class="flex flex-col"
+      class="relative flex flex-col"
       style={{ "padding-left": level() > 0 ? "1.5rem" : "0" }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
         <div class="mb-2">
           <UserCard author={comment().author} compact={false} />
         </div>
         
-        {/* Content Area */}
         <div 
           class="text-sm prose prose-sm max-w-none transition-all duration-300 overflow-hidden"
           classList={{ 
@@ -109,7 +116,6 @@ export default function CommentCard(props) {
           </Switch>
         </div>
 
-        {/* Footer */}
         <div class="mt-2 flex items-center justify-between">
           <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
           <div class="flex items-center gap-4 text-xs font-semibold">
@@ -122,6 +128,12 @@ export default function CommentCard(props) {
           </div>
         </div>
       </div>
+      
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && contextMenuItems().length > 0}>
+        <div class="context-menu-container">
+          <ContextMenu items={contextMenuItems()} />
+        </div>
+      </Show>
       
       <Show when={comment().children?.length > 0}>
         <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">

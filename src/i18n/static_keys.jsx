@@ -42,6 +42,7 @@ t("reactions.rocket")
 t("reactions.star")
 t("reactions.hot")
 t("reactions.trophy")
+t("reactions.ha_ha")
 
 t("tabs.title.leaders") 
 t("tabs.title.actual") 

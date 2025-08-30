@@ -9,10 +9,13 @@ export default function StepValidate(props) {
   const [isValidating, setIsValidating] = createSignal(true);
 
   const validate = () => {
-    const data = props.postData();
+    const { postData, editorMode } = props;
+    const data = postData();
     if (!data) {
       throw new Error("Post data is missing or not a function.");
     }
+
+    const isComment = editorMode === 'new_comment' || editorMode === 'edit_comment';
 
     for (const langCode in data) {
       const langData = data[langCode];
@@ -22,7 +25,15 @@ export default function StepValidate(props) {
       const hasChapters = langData.chapters?.some(c => c.body?.trim().length > 0);
       
       const hasAnyMeaningfulContent = hasTitle || hasBody || hasChapters;
-      const isComplete = hasTitle && (hasBody || hasChapters);
+      
+      let isComplete;
+      if (isComment) {
+        // For comments, only a body is required. A title is not.
+        isComplete = hasBody;
+      } else {
+        // For posts, a title and either a body or chapters are required.
+        isComplete = hasTitle && (hasBody || hasChapters);
+      }
 
       if (hasAnyMeaningfulContent && !isComplete) {
         throw new Error(t("editor.publish.validation.errorIncomplete", { lang: langCode }));
