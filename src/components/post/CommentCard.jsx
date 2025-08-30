@@ -5,7 +5,7 @@ import PostInfo from "../feed/PostInfo";
 import UserCard from "../ui/UserCard";
 import MarkdownView from "../docs/MarkdownView";
 import { ipfs } from "../../ipfs";
-import { getPostContentBaseCid } from "../../ipfs/utils";
+import { getPostContentBaseCid, getPostDescriptorPath } from "../../ipfs/utils";
 import Spinner from "../ui/Spinner";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
@@ -16,28 +16,38 @@ import { pushErrorToast } from "../../ui/toast.js";
 import ConfirmModal from "../ui/ConfirmModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
+import { parse } from "yaml";
 
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
   if (!comment || !lang) return "";
 
-  const locales = comment.savva_content?.locales;
-  const currentLocale = locales?.[lang] || locales?.en || locales?.[Object.keys(locales)[0]];
-  
-  const dataPath = currentLocale?.data_path;
-  if (!dataPath) return currentLocale?.text_preview || "";
-
-  const baseCid = getPostContentBaseCid(comment);
-  if (!baseCid) return "";
-
-  const fullIpfsPath = `${baseCid}/${dataPath}`;
-  
   try {
-    const { res } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways: comment.gateways });
-    return await res.text();
+    const descriptorPath = getPostDescriptorPath(comment);
+    if (!descriptorPath) {
+      return comment.savva_content?.locales?.[lang]?.text_preview || "";
+    }
+
+    const { res: descriptorRes } = await ipfs.fetchBest(app, descriptorPath, { postGateways: comment.gateways });
+    const descriptorText = await descriptorRes.text();
+    const descriptor = parse(descriptorText);
+    if (!descriptor) throw new Error("Could not parse comment descriptor.");
+
+    const dataCidForContent = getPostContentBaseCid(comment);
+    const localizedDescriptor = descriptor.locales?.[lang] || descriptor.locales?.en || descriptor.locales?.[Object.keys(descriptor.locales)[0]];
+    const dataPath = localizedDescriptor?.data_path;
+
+    if (!dataCidForContent || !dataPath) {
+      return localizedDescriptor?.text_preview || "";
+    }
+
+    const fullIpfsPath = `${dataCidForContent}/${dataPath}`;
+    const postGateways = descriptor?.gateways || [];
+    const { res: contentRes } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways });
+    return await contentRes.text();
   } catch (e) {
     console.error("Failed to fetch full comment content:", e);
-    return `Error: Could not load content.`;
+    return `Error: Could not load full content.`;
   }
 }
 
@@ -184,10 +194,10 @@ export default function CommentCard(props) {
             </Show>
             <Show when={needsTruncation() || isExpanded()}>
               <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
-                {isExpanded() ? "Show Less" : "Show More"}
+                {isExpanded() ? t("comment.showLess") : t("comment.showMore")}
               </button>
             </Show>
-            <button class="hover:underline" onClick={handleReply}>Reply</button>
+            <button class="hover:underline" onClick={handleReply}>{t("comment.reply")}</button>
           </div>
         </div>
       </div>

@@ -161,14 +161,19 @@ export default function ReactionInput(props) {
       <button
         onClick={handleMainButtonClick}
         disabled={isProcessing()}
-        class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-[hsl(var(--accent))] disabled:opacity-50 w-[80px]"
+        class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm bg-transparent hover:bg-[hsl(var(--accent))] disabled:opacity-50"
         classList={{
           "text-[hsl(var(--muted-foreground))]": !hasReacted(),
           "text-blue-500": hasReacted()
         }}
       >
-        <ReactionIcon type={reactionType()} class="text-sm"/>
-        <span>{reactionLabel()}</span>
+        <ReactionIcon
+          type={reactionType()}
+          class={`text-sm ${!hasReacted() ? 'grayscale' : ''}`}
+        />
+        <Show when={hasReacted()}>
+          <span>{reactionLabel()}</span>
+        </Show>
       </button>
     </div>
   );

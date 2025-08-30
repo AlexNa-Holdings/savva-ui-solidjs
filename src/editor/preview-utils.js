@@ -12,8 +12,8 @@ function createPostPreview(markdownText) {
 
   let plainText = markdownText
     .replace(/^#+\s+/gm, '') // Headers
-    .replace(/!\[(.*?)\]\(.*?\)/g, '$1') // Images, keeping alt text
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Links, keeping link text
+    .replace(/!\[.*?\]\(.*?\)/g, '') // Images, remove everything
+    .replace(/\[.*?\]\(.*?\)/g, '') // Links, remove everything
     .replace(/(\*\*|__|\*|_|~~)(.*?)\1/g, '$2') // Bold, italic, strikethrough
     .replace(/`([^`]+)`/g, '$1') // Inline code
     .replace(/^\>\s+/gm, '') // Blockquotes

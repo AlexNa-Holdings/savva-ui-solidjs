@@ -269,5 +269,8 @@ export default {
   "wallet.connect": "Connect wallet",
   "wallet.copyAddress": "Copy address",
   "wallet.error.userCanceled": "Transaction canceled.",
-  "wallet.onRequiredNetwork": "On required network"
+  "wallet.onRequiredNetwork": "On required network",
+  "comment.reply": "Reply",
+"comment.showLess": "Show Less",
+"comment.showMore": "Show More"
 };

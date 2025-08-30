@@ -69,7 +69,7 @@ export default function PostInfo(props) {
   const postData = createMemo(() => props.item?._raw || props.item || {});
 
   return (
-    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-2 border-t border-[hsl(var(--border))]'}`}>
+    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-0.5 border-t border-[hsl(var(--border))]'}`}>
       {/* Left-aligned items */}
       <PostTime 
         timestamp={postData().effective_time} 

@@ -29,10 +29,10 @@ export default function UserCard(props) {
 
     return (
         <Show when={author()}>
-            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-8'}`}>
-                <div class="inline-flex items-center gap-2 cursor-pointer" onClick={handleUserClick}>
+            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-10'}`}>
+                <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
                     <Show when={!props.compact}>
-                        <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+                        <div class="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
                             <Show
                                 when={author().avatar}
                                 fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
@@ -48,7 +48,7 @@ export default function UserCard(props) {
 
                     <div class="min-w-0">
                         <Show when={author().display_name && !props.compact}>
-                            <div class="text-xs truncate text-[hsl(var(--foreground))]">
+                            <div class="text-xs truncate text-[hsl(var(--foreground))] w-full">
                                 {author().display_name}
                             </div>
                         </Show>
@@ -69,7 +69,7 @@ export default function UserCard(props) {
 
                             <StakerLevelIcon
                                 staked={author().staked}
-                                class={`${props.compact ? 'w-4 h-4' : 'w-6 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
+                                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
                             />
                         </div>
                     </div>

@@ -134,7 +134,7 @@ export default function PostCard(props) {
   const contentContainerClasses = createMemo(() => {
     return isListMode()
       ? "px-3 py-2 flex-1 flex flex-col min-w-0"
-      : "px-3 pb-3 flex-1 flex flex-col";
+      : "p-3 flex-1 flex flex-col";
   });
 
   const textPreviewClasses = createMemo(() => {
@@ -147,23 +147,24 @@ export default function PostCard(props) {
 
   const ContentBlock = () => (
     <div class={contentContainerClasses()}>
-      <div class="flex-1 space-y-1 min-h-0">
-        <Show when={title()}>
-          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
-            {title()}
-          </h4>
-        </Show>
-        <Show when={textPreview() && !props.compact}>
-          <p class={textPreviewClasses()}>
-            {textPreview()}
-          </p>
-        </Show>
+      <div class="flex-1 flex flex-col space-y-1 min-h-0">
+        <div class="flex-1">
+          <Show when={title()}>
+            <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
+              {title()}
+            </h4>
+          </Show>
+          <Show when={textPreview() && !props.compact}>
+            <p class={textPreviewClasses()}>
+              {textPreview()}
+            </p>
+          </Show>
+        </div>
+        <div class="pt-1">
+          <UserCard author={author()} compact={props.compact} />
+        </div>
       </div>
       
-      <div class="mt-1">
-        <UserCard author={author()} compact={props.compact} />
-      </div>
-
       <Show when={!props.compact}>
         <PostInfo item={item()} mode={props.mode} timeFormat="long" />
       </Show>
