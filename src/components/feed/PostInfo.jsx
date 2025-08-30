@@ -1,5 +1,5 @@
 // src/components/feed/PostInfo.jsx
-import { Show, createMemo } from "solid-js";
+import { Show, createMemo, createSignal, createEffect, on } from "solid-js";
 import { formatUnits } from "viem";
 import { useApp } from "../../context/AppContext.jsx";
 import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
@@ -8,12 +8,29 @@ import PostReactions from "../ui/PostReactions.jsx";
 import ReactionInput from "../post/ReactionInput.jsx";
 
 function PostComments(props) {
-  const count = () => props.item?._raw?.total_childs || props.item?.total_childs || 0;
+  const [isAnimating, setIsAnimating] = createSignal(false);
+  const sourceCount = createMemo(() => props.item?._raw?.total_childs || props.item?.total_childs || 0);
+  const [displayCount, setDisplayCount] = createSignal(sourceCount());
+
+  createEffect(on(sourceCount, (newCount, prevCount) => {
+    if (prevCount === undefined) {
+      setDisplayCount(newCount);
+      return;
+    }
+    setDisplayCount(prevCount);
+    setIsAnimating(true);
+    setTimeout(() => setDisplayCount(newCount), 200);
+    setTimeout(() => setIsAnimating(false), 400);
+  }, { defer: true }));
+
   return (
-    <Show when={count() > 0}>
-      <div class="flex items-center gap-1 text-xs">
+    <Show when={displayCount() > 0 || isAnimating()}>
+      <div 
+        class="flex items-center gap-1 text-xs"
+        classList={{ "default-animation": isAnimating() }}
+      >
         <span>💬</span>
-        <span>{count()}</span>
+        <span>{displayCount()}</span>
       </div>
     </Show>
   );

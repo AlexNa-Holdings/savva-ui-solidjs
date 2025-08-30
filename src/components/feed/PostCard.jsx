@@ -44,14 +44,19 @@ export default function PostCard(props) {
     const baseItem = props.item;
     const update = app.postUpdate();
 
-    if (update && update.type === 'reactionsChanged' && update.cid === baseItem.id) {
-      const updatedRaw = { ...baseItem._raw, reactions: update.data.reactions };
-      
-      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
-        updatedRaw.my_reaction = update.data.reaction;
-      }
-      
-      return { ...baseItem, _raw: updatedRaw };
+    if (update && update.cid === baseItem.id) {
+        let updatedRaw = { ...baseItem._raw };
+        
+        if (update.type === 'reactionsChanged') {
+            updatedRaw.reactions = update.data.reactions;
+            if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+                updatedRaw.my_reaction = update.data.reaction;
+            }
+        } else if (update.type === 'commentCountChanged') {
+            updatedRaw.total_childs = update.data.newTotal;
+        }
+
+        return { ...baseItem, _raw: updatedRaw };
     }
     
     return baseItem;
@@ -79,7 +84,6 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    // This event will now only fire if the user clicks outside the user card's content area
     const postId = props.item.id;
     if (postId) {
       app.setSavedScrollY(window.scrollY);

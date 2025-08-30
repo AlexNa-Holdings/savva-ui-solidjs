@@ -25,16 +25,32 @@ export async function handleContentProcessed(app, payload) {
   const currentItems = app.newFeedItems();
   const isAlreadyVisible = currentItems.some(item => item.id === content.savva_cid);
   
-  if (!isAlreadyVisible) {
+  if (!isAlreadyVisible && content.content_type === 'post') {
     app.setNewContentAvailable(content);
   }
 }
 
+export function handleCommentCounterUpdate(app, payload) {
+    dbg.log("Alerts:comment_counter", "Received comment counter alert", payload);
+    const { savva_cid, n } = payload.data || {};
+    if (!savva_cid) return;
+
+    app.setPostUpdate({
+        cid: savva_cid,
+        type: 'commentCountChanged',
+        data: {
+            newTotal: n,
+        }
+    });
+}
+
 export function handlePing(app) {
+  dbg.log("Alerts:ping", "Received ping, sending pong.");
   app.ws?.sendJson({ type: 'pong' });
 }
 
 export function handlePong() {
+  dbg.log("Alerts:pong", "Received pong.");
   // Do nothing
 }
 

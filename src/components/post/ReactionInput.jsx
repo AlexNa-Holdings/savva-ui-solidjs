@@ -36,34 +36,26 @@ export default function ReactionInput(props) {
     }
   });
   
-  // This effect calculates the palette's horizontal position dynamically
   createEffect(() => {
     if (showPalette() && containerRef) {
       const buttonRect = containerRef.getBoundingClientRect();
       const paletteWidth = 300; // Estimated width of the palette
       const screenPadding = 10;
 
-      // 1. Calculate the ideal centered position's LEFT EDGE relative to the VIEWPORT
       const idealViewportLeft = buttonRect.left + (buttonRect.width / 2) - (paletteWidth / 2);
 
       let finalRelativeLeft;
 
-      // 2. Check for right viewport overflow
       if (idealViewportLeft + paletteWidth > window.innerWidth - screenPadding) {
-        // Align palette's right edge with button's right edge
         finalRelativeLeft = buttonRect.width - paletteWidth;
       } 
-      // 3. Check for left viewport overflow
       else if (idealViewportLeft < screenPadding) {
-        // Align palette's left edge with button's left edge
         finalRelativeLeft = 0;
       } 
-      // 4. Default: Center the palette relative to the button
       else {
         finalRelativeLeft = (buttonRect.width / 2) - (paletteWidth / 2);
       }
       
-      // We only need to set the left property for our absolutely positioned element.
       setPaletteStyle({ left: `${finalRelativeLeft}px` });
     }
   });
@@ -124,7 +116,8 @@ export default function ReactionInput(props) {
     }
   };
 
-  const handleMainButtonClick = () => {
+  const handleMainButtonClick = (e) => {
+    e.stopPropagation();
     const newReaction = myReactionIndex() >= 0 ? -1 : 0; 
     sendReaction(newReaction);
   };
@@ -151,7 +144,10 @@ export default function ReactionInput(props) {
           <For each={REACTION_TYPES}>
             {(type, index) => (
               <button 
-                onClick={() => sendReaction(index())}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sendReaction(index());
+                }}
                 class="p-1 rounded-full hover:bg-[hsl(var(--accent))]"
                 title={t(`reactions.${type}`)}
               >
@@ -171,12 +167,7 @@ export default function ReactionInput(props) {
           "text-blue-500": hasReacted()
         }}
       >
-        <Show
-          when={hasReacted()}
-          fallback={<span class="filter grayscale text-lg">👍</span>}
-        >
-          <ReactionIcon type={reactionType()} class="text-lg" />
-        </Show>
+        <ReactionIcon type={reactionType()} class="text-lg" />
         <span>{reactionLabel()}</span>
       </button>
     </div>

@@ -11,4 +11,5 @@ export const alertRegistry = {
   ping: h.handlePing,
   pong: h.handlePong,
   react: h.handleReact,
+  comment_counter: h.handleCommentCounterUpdate,
 };
