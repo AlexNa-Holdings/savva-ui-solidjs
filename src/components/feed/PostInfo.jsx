@@ -69,22 +69,24 @@ export default function PostInfo(props) {
   const postData = createMemo(() => props.item?._raw || props.item || {});
 
   return (
-    <div class={`flex items-center ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-0.5 border-t border-[hsl(var(--border))]'}`}>
-      {/* Left-aligned items */}
-      <PostTime 
-        timestamp={postData().effective_time} 
-        format={props.timeFormat || "short"} 
-      />
-      <PostReactions item={props.item} />
-      <PostRewards item={props.item} lang={lang} />
-      <PostComments item={props.item} />
-      
-      {/* Right-aligned items */}
-      <div class="ml-auto">
-        <Show when={app.authorizedUser()}>
-          <ReactionInput post={props.item} />
-        </Show>
+    <div class={`flex w-full items-center justify-between ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-0.5 border-t border-[hsl(var(--border))]'}`}>
+      <div class="flex items-center gap-2">
+        <PostTime 
+          timestamp={postData().effective_time} 
+          format={props.timeFormat || "short"} 
+        />
+        <PostReactions item={props.item} />
+        <PostRewards item={props.item} lang={lang} />
+        <PostComments item={props.item} />
       </div>
+      
+      <Show when={!props.hideActions}>
+        <div class="flex-shrink-0">
+          <Show when={app.authorizedUser()}>
+            <ReactionInput post={props.item} />
+          </Show>
+        </div>
+      </Show>
     </div>
   );
 }

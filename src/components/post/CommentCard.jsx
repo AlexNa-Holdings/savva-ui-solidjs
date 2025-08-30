@@ -17,6 +17,7 @@ import ConfirmModal from "../ui/ConfirmModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 import { parse } from "yaml";
+import ReactionInput from "../post/ReactionInput.jsx";
 
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
@@ -54,13 +55,33 @@ async function fetchFullContent(params) {
 export default function CommentCard(props) {
   const app = useApp();
   const { t } = app;
-  const comment = () => props.comment;
   const level = () => props.level || 0;
   
   const [isExpanded, setIsExpanded] = createSignal(false);
   const [isHovered, setIsHovered] = createSignal(false);
   const [isPreparing, setIsPreparing] = createSignal(false);
   
+  // This makes the comment data reactive to global updates
+  const comment = createMemo(() => {
+    const baseComment = props.comment;
+    const update = app.postUpdate();
+
+    if (update && update.cid === baseComment.savva_cid) {
+        let updatedRaw = { ...baseComment };
+        
+        if (update.type === 'reactionsChanged') {
+            updatedRaw.reactions = update.data.reactions;
+            if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+                updatedRaw.my_reaction = update.data.reaction;
+            }
+        }
+        
+        return updatedRaw;
+    }
+    
+    return baseComment;
+  });
+
   const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(comment);
 
   const isAuthor = createMemo(() => {
@@ -175,8 +196,11 @@ export default function CommentCard(props) {
         </div>
 
         <div class="mt-2 flex items-center justify-between">
-          <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
+          <PostInfo item={{ _raw: comment() }} hideTopBorder={true} timeFormat="long" hideActions={true} />
           <div class="flex items-center gap-2 text-xs font-semibold">
+            <Show when={app.authorizedUser()}>
+              <ReactionInput post={{_raw: comment()}} />
+            </Show>
             <Show when={isAuthor()}>
               <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title="Edit Comment">
                 <Show when={isPreparing()} fallback={<EditIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]" />}>
