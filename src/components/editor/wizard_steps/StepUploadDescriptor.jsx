@@ -15,7 +15,11 @@ export default function StepUploadDescriptor(props) {
   const [hasStarted, setHasStarted] = createSignal(false);
 
   const uploadDescriptor = async (data_cid) => {
-    const { postData, postParams } = props;
+    const { postData, postParams, editorMode } = props;
+    dbg.log("StepUploadDescriptor:init", "Received postParams:", postParams());
+
+    const contentType = (editorMode === 'new_comment' || editorMode === 'edit_comment') ? 'comment' : 'post';
+    const params = postParams();
 
     const descriptor = {
       savva_spec_version: "2.0",
@@ -23,20 +27,21 @@ export default function StepUploadDescriptor(props) {
       locales: {}
     };
 
-    if (postParams().parent_savva_cid) {
-        descriptor.parent_savva_cid = postParams().parent_savva_cid;
-        descriptor.root_savva_cid = postParams().root_savva_cid || postParams().parent_savva_cid;
-    }
+    // Explicitly copy required top-level fields from params to the descriptor
+    if (params.guid) descriptor.guid = params.guid;
+    if (params.parent_savva_cid) descriptor.parent_savva_cid = params.parent_savva_cid;
+    if (params.root_savva_cid) descriptor.root_savva_cid = params.root_savva_cid;
+    if (params.nsfw) descriptor.nsfw = params.nsfw;
+    if (params.fundraiser) descriptor.fundraiser = params.fundraiser;
+    if (params.thumbnail) descriptor.thumbnail = params.thumbnail;
 
     const gateways = app.info()?.ipfs_gateways;
     if (gateways && Array.isArray(gateways) && gateways.length > 0) {
       descriptor.gateways = gateways;
     }
-
-    const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
-    Object.assign(descriptor, otherParams);
     
     const content = postData();
+
     for (const lang in content) {
       const data = content[lang];
       const hasTitle = data.title?.trim().length > 0;
@@ -47,11 +52,11 @@ export default function StepUploadDescriptor(props) {
         continue;
       }
       
-      const langParams = paramLocales?.[lang] || {};
+      const langParams = params.locales?.[lang] || {};
       
       const localeObject = {
         title: data.title || "",
-        text_preview: createTextPreview(data.body || ""),
+        text_preview: createTextPreview(data.body || "", contentType),
         tags: langParams.tags || [],
         categories: langParams.categories || [],
         data_path: `${lang}/data.md`,
@@ -100,8 +105,6 @@ export default function StepUploadDescriptor(props) {
 
   createEffect(() => {
     const dataCid = props.publishedData().ipfsCid;
-    // This effect runs when the component mounts AND when props change.
-    // We wait until the ipfsCid is available and ensure we only run once.
     if (dataCid && !hasStarted()) {
       setHasStarted(true);
       

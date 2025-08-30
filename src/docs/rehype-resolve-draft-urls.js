@@ -6,11 +6,13 @@ import { dbg } from "../utils/debug.js";
 const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);
 
 /**
- * A factory that returns a rehype plugin. The plugin resolves relative media URLs 
+ * A rehype plugin factory. The plugin resolves relative media URLs 
  * from the specified draft storage directory.
- * @param {string} baseDir - The base draft directory (e.g., "new_post").
+ * @param {object} [options={}] - The options object.
+ * @param {string} options.baseDir - The base draft directory (e.g., "new_post").
  */
-export function rehypeResolveDraftUrls(baseDir) {
+export function rehypeResolveDraftUrls(options = {}) {
+  const baseDir = options.baseDir;
   return async (tree) => {
     if (!tree || typeof tree !== "object" || !baseDir) {
       dbg.warn("PreviewResolver", "Invalid tree or missing baseDir; skipping URL resolution.");

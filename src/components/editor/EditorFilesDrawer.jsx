@@ -47,6 +47,12 @@ export default function EditorFilesDrawer(props) {
     else setMenuData(null);
   }));
 
+  createEffect(on(() => props.filesRevision, () => {
+    if (props.isOpen) {
+      refreshFiles();
+    }
+  }, { defer: true }));
+
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.currentTarget.files);
     if (selectedFiles.length === 0) return;

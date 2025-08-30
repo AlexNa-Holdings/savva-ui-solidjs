@@ -9,6 +9,7 @@ export default function MarkdownInput(props) {
         ref={props.editorRef}
         value={props.value}
         onInput={(e) => props.onInput(e.currentTarget.value)}
+        onPaste={props.onPaste}
         class="relative w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:z-10"
         placeholder={props.placeholder}
       />

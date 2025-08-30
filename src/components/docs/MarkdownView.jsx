@@ -1,5 +1,5 @@
 // src/components/docs/MarkdownView.jsx
-import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
+import { createEffect, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
 import { rehypeMediaPlayers } from "../../docs/rehype-media-players.js";
@@ -8,29 +8,14 @@ import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypePrettyCode from "rehype-pretty-code";
 import remarkBreaks from "remark-breaks";
 
-function rehypeCopyButton() {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      visit(tree, "element", (node) => {
-        if (node.tagName !== "pre") return;
-        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
-        node.children.push({
-          type: "element", tagName: "button",
-          properties: { className: ["sv-copy-btn"], type: "button" },
-          children: [{ type: "text", value: "Copy" }],
-        });
-      });
-      return tree;
-    });
-}
-
 export default function MarkdownView(props) {
   const { t } = useApp();
   const [html, setHtml] = createSignal("");
   let disposed = false;
   let container;
 
-  async function renderMd() {
+  const renderMd = async () => {
+    if (disposed) return;
     try {
       const [
         { unified }, { default: remarkParse }, { default: remarkGfm },
@@ -68,7 +53,6 @@ export default function MarkdownView(props) {
   
       if (props.rehypePlugins) {
         for (const plugin of props.rehypePlugins) {
-          // This robustly handles both [plugin, options] and just plugin
           processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
         }
       }
@@ -96,7 +80,7 @@ export default function MarkdownView(props) {
       const errorHtml = `<div style="color: red; border: 1px solid red; padding: 1rem;"><strong>Error:</strong><pre>${safeErr}</pre></div>`;
       if (!disposed) setHtml(errorHtml);
     }
-  }
+  };
 
   function copy(text) {
     if (!text) return;
@@ -127,18 +111,19 @@ export default function MarkdownView(props) {
     buttons.forEach(btn => { btn.textContent = t("clipboard.copy"); });
   }
 
-  onMount(() => {
-    renderMd().then(() => relabelButtons());
-    container?.addEventListener("click", onClick);
+  // This effect now re-runs when markdown OR the plugins change.
+  createEffect(async () => {
+    props.markdown; // dependency
+    props.rehypePlugins; // dependency
+    
+    await renderMd();
+    relabelButtons();
   });
 
-  // MODIFICATION: Removed { defer: true } to make updates immediate.
-  createEffect(on(() => props.markdown, (md, prevMd) => {
-    if (md !== prevMd && prevMd !== undefined) {
-      renderMd().then(() => relabelButtons());
-    }
-  }));
-
+  onMount(() => {
+    container?.addEventListener("click", onClick);
+  });
+  
   onCleanup(() => {
     disposed = true;
     container?.removeEventListener("click", onClick);

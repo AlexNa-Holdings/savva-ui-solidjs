@@ -60,10 +60,7 @@ export default function StepPublish(props) {
       }
 
       let contentType;
-      // --- MODIFICATION START ---
-      // Use editorMode as a variable, not a function
       switch (editorMode) {
-      // --- MODIFICATION END ---
         case 'new_post':
           contentType = 'post';
           break;
@@ -71,8 +68,10 @@ export default function StepPublish(props) {
           contentType = postParams().publishAsNewPost ? 'post' : 'post-edit';
           break;
         case 'new_comment':
-        case 'edit_comment':
           contentType = 'comment';
+          break;
+        case 'edit_comment':
+          contentType = 'comment-edit';
           break;
         default:
           throw new Error(`Unknown editor mode for content type: ${editorMode}`);

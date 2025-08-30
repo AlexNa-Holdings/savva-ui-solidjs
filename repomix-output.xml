@@ -19195,15 +19195,14 @@ export async function preparePostForEditing(post, app) {
 <file path="src/editor/preview-utils.js">
 // src/editor/preview-utils.js
 
-const PREVIEW_LENGTH = 265;
+const PREVIEW_LENGTH = 512;
 
 /**
- * Creates a plain-text preview from Markdown content.
- * It strips Markdown syntax and truncates the text.
+ * Creates a plain-text preview for posts, stripping all Markdown.
  * @param {string} markdownText - The input Markdown string.
  * @returns {string} A plain-text preview.
  */
-export function createTextPreview(markdownText) {
+function createPostPreview(markdownText) {
   if (!markdownText) return "";
 
   let plainText = markdownText
@@ -19224,6 +19223,53 @@ export function createTextPreview(markdownText) {
   }
 
   return plainText;
+}
+
+/**
+ * Creates a preview for comments, preserving Markdown but truncating intelligently.
+ * It avoids cutting inside a Markdown tag.
+ * @param {string} markdownText - The input Markdown string.
+ * @returns {string} A truncated Markdown preview.
+ */
+function createCommentPreview(markdownText) {
+  if (!markdownText) return "";
+  if (markdownText.length <= PREVIEW_LENGTH) {
+    return markdownText;
+  }
+
+  // Tokenizes markdown into whole tags, code blocks, links, words, and whitespace.
+  const tokenRegex = /(\[.*?\]\(.*?\)|!\[.*?\]\(.*?\)|`[^`]+`|\*\*.*?\*\*|__.*?__|~~.*?~~|\*.*?\*|_.*?_|\s+|[^\s]+)/g;
+  const tokens = markdownText.match(tokenRegex) || [];
+  
+  let result = "";
+  for (const token of tokens) {
+    if ((result + token).length > PREVIEW_LENGTH) {
+      break;
+    }
+    result += token;
+  }
+
+  // Trim trailing whitespace and add ellipsis if truncated
+  result = result.trim();
+  if (result.length < markdownText.length) {
+    result += "...";
+  }
+
+  return result;
+}
+
+/**
+ * Creates a text preview from Markdown content.
+ * The behavior depends on the type ('post' or 'comment').
+ * @param {string} markdownText - The input Markdown string.
+ * @param {'post' | 'comment'} [type='post'] - The type of content.
+ * @returns {string} A text preview.
+ */
+export function createTextPreview(markdownText, type = 'post') {
+  if (type === 'comment') {
+    return createCommentPreview(markdownText);
+  }
+  return createPostPreview(markdownText);
 }
 </file>
 
@@ -22300,11 +22346,13 @@ import { dbg } from "../utils/debug.js";
 const isRelative = (url) => typeof url === "string" && !/^(#|\/|[a-z]+:)/i.test(url);
 
 /**
- * A factory that returns a rehype plugin. The plugin resolves relative media URLs 
+ * A rehype plugin factory. The plugin resolves relative media URLs 
  * from the specified draft storage directory.
- * @param {string} baseDir - The base draft directory (e.g., "new_post").
+ * @param {object} [options={}] - The options object.
+ * @param {string} options.baseDir - The base draft directory (e.g., "new_post").
  */
-export function rehypeResolveDraftUrls(baseDir) {
+export function rehypeResolveDraftUrls(options = {}) {
+  const baseDir = options.baseDir;
   return async (tree) => {
     if (!tree || typeof tree !== "object" || !baseDir) {
       dbg.warn("PreviewResolver", "Invalid tree or missing baseDir; skipping URL resolution.");
@@ -23695,74 +23743,6 @@ export default function StepUploadIPFS(props) {
 }
 </file>
 
-<file path="src/components/editor/CommentEditor.jsx">
-// src/components/editor/CommentEditor.jsx
-import { createResource, Show } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { toChecksumAddress } from "../../blockchain/utils";
-import PostCard from "../feed/PostCard";
-import Spinner from "../ui/Spinner";
-
-async function fetchPost(params) {
-  const { app, savva_cid } = params;
-  if (!app.wsMethod || !savva_cid) return null;
-
-  const getList = app.wsMethod("content-list");
-  
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    savva_cid: savva_cid,
-    limit: 1,
-  };
-
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-
-  try {
-    const res = await getList(requestParams);
-    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-    return arr[0] ? { id: arr[0].savva_cid, _raw: arr[0] } : null;
-  } catch (err) {
-    console.error(`Failed to fetch post '${savva_cid}':`, err);
-    return { error: err.message };
-  }
-}
-
-export default function CommentEditor(props) {
-  const app = useApp();
-  const { t } = app;
-  
-  const [postData] = createResource(() => ({
-    app: app,
-    savva_cid: props.savva_cid
-  }), fetchPost);
-
-  return (
-    <div class="mb-4">
-      <Show when={postData.loading}>
-        <div class="flex justify-center items-center h-24">
-          <Spinner />
-        </div>
-      </Show>
-      <Show when={postData.error}>
-        <p class="text-xs text-[hsl(var(--destructive))]">
-          {t("common.error")}: {postData.error}
-        </p>
-      </Show>
-      <Show when={!postData.loading && !postData.error && postData()}>
-        <PostCard
-          item={postData()}
-          mode="list"
-          compact={false}
-        />
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/editor/FileGridItem.jsx">
 // src/components/editor/FileGridItem.jsx
 import { Show, createMemo } from "solid-js";
@@ -23893,287 +23873,6 @@ export default function NewPostButton() {
     >
       <NewPostIcon class="w-5 h-5" />
     </button>
-  );
-}
-</file>
-
-<file path="src/components/post/CommentCard.jsx">
-// src/components/post/CommentCard.jsx
-import { For, Show, createMemo, createSignal, createResource, Switch, Match } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import PostInfo from "../feed/PostInfo";
-import UserCard from "../ui/UserCard";
-import MarkdownView from "../docs/MarkdownView";
-import { ipfs } from "../../ipfs";
-import { getPostContentBaseCid } from "../../ipfs/utils";
-import Spinner from "../ui/Spinner";
-import ContextMenu from "../ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
-import { navigate } from "../../routing/hashRouter.js";
-
-/**
- * Fetches the full content of a comment's prologue for a specific language.
- */
-async function fetchFullContent(params) {
-  const { app, comment, lang } = params;
-  if (!comment || !lang) return "";
-
-  const locales = comment.savva_content?.locales;
-  const currentLocale = locales?.[lang] || locales?.en || locales?.[Object.keys(locales)[0]];
-  
-  const dataPath = currentLocale?.data_path;
-  if (!dataPath) return currentLocale?.text_preview || ""; // Fallback to preview if no path
-
-  const baseCid = getPostContentBaseCid(comment);
-  if (!baseCid) return "";
-
-  const fullIpfsPath = `${baseCid}/${dataPath}`;
-  
-  try {
-    const { res } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways: comment.gateways });
-    return await res.text();
-  } catch (e) {
-    console.error("Failed to fetch full comment content:", e);
-    return `Error: Could not load content.`;
-  }
-}
-
-export default function CommentCard(props) {
-  const app = useApp();
-  const { t } = app;
-  const comment = () => props.comment;
-  const level = () => props.level || 0;
-  
-  const [isExpanded, setIsExpanded] = createSignal(false);
-  const [isHovered, setIsHovered] = createSignal(false);
-
-  // Memo for the truncated preview content
-  const localizedPreview = createMemo(() => {
-    const locales = comment().savva_content?.locales;
-    if (!locales) return "";
-    const lang = app.lang();
-    if (locales[lang]?.text_preview) return locales[lang].text_preview;
-    if (locales.en?.text_preview) return locales.en.text_preview;
-    const firstKey = Object.keys(locales)[0];
-    return firstKey ? locales[firstKey].text_preview : "";
-  });
-
-  // Resource to fetch full content only when expanded
-  const [fullContent] = createResource(
-    () => ({
-      shouldFetch: isExpanded(),
-      app: app,
-      comment: comment(),
-      lang: app.lang()
-    }),
-    async (params) => {
-      if (!params.shouldFetch) return null;
-      return fetchFullContent(params);
-    }
-  );
-
-  const contextMenuItems = createMemo(() => {
-    if (!comment()) return [];
-    return getPostAdminItems(comment(), t);
-  });
-
-  // Determine if the "Show More" button should be visible
-  const needsTruncation = createMemo(() => {
-    const preview = localizedPreview();
-    return preview.length > 280 || preview.endsWith("...");
-  });
-
-  const handleReply = (e) => {
-    e.stopPropagation();
-    const commentCid = comment()?.savva_cid;
-    if (commentCid) {
-      navigate(`/editor/new-comment/${commentCid}`);
-    }
-  };
-
-  return (
-    <div
-      class="relative flex flex-col"
-      style={{ "padding-left": level() > 0 ? "1.5rem" : "0" }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-        <div class="mb-2">
-          <UserCard author={comment().author} compact={false} />
-        </div>
-        
-        <div 
-          class="text-sm prose prose-sm max-w-none transition-all duration-300 overflow-hidden"
-          classList={{ 
-            "max-h-24": !isExpanded(), 
-            "max-h-[1000px]": isExpanded() 
-          }}
-        >
-          <Switch>
-            <Match when={isExpanded() && fullContent.loading}>
-              <div class="flex items-center justify-center h-24">
-                <Spinner />
-              </div>
-            </Match>
-            <Match when={isExpanded() && fullContent()}>
-              <MarkdownView markdown={fullContent()} />
-            </Match>
-            <Match when={!isExpanded()}>
-              <MarkdownView markdown={localizedPreview()} />
-            </Match>
-          </Switch>
-        </div>
-
-        <div class="mt-2 flex items-center justify-between">
-          <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
-          <div class="flex items-center gap-4 text-xs font-semibold">
-            <Show when={needsTruncation() || isExpanded()}>
-              <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
-                {isExpanded() ? "Show Less" : "Show More"}
-              </button>
-            </Show>
-            <button class="hover:underline" onClick={handleReply}>Reply</button>
-          </div>
-        </div>
-      </div>
-      
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && contextMenuItems().length > 0}>
-        <div class="context-menu-container">
-          <ContextMenu items={contextMenuItems()} />
-        </div>
-      </Show>
-      
-      <Show when={comment().children?.length > 0}>
-        <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
-          <For each={comment().children}>
-            {(reply) => <CommentCard comment={reply} level={level() + 1} />}
-          </For>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/post/PostComments.jsx">
-// src/components/post/PostComments.jsx
-import { createResource, For, Show, createSignal, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { toChecksumAddress } from "../../blockchain/utils";
-import Spinner from "../ui/Spinner";
-import CommentCard from "./CommentCard";
-import { navigate } from "../../routing/hashRouter.js";
-
-async function fetchComments(params) {
-  const { app, postId, offset = 0 } = params;
-  if (!app.wsMethod || !postId) return { list: [], nextOffset: null };
-
-  const getChildren = app.wsMethod("content-children");
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    savva_cid: postId,
-    max_deep: 4,
-    limit: 20,
-    offset,
-  };
-
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-
-  try {
-    const res = await getChildren(requestParams);
-    const list = Array.isArray(res?.list) ? res.list : [];
-    const nextOffset = res?.next_offset > 0 ? res.next_offset : null;
-    return { list, nextOffset };
-  } catch (err) {
-    console.error(`Failed to fetch comments for post '${postId}':`, err);
-    return { list: [], nextOffset: null, error: err.message };
-  }
-}
-
-export default function PostComments(props) {
-  const app = useApp();
-  const { t } = app;
-  const postId = () => props.post?.savva_cid;
-
-  const [comments, setComments] = createSignal([]);
-  const [nextOffset, setNextOffset] = createSignal(0);
-  const [isLoadingMore, setIsLoadingMore] = createSignal(false);
-
-  const [initialData] = createResource(() => ({ app, postId: postId() }), fetchComments);
-
-  createEffect(() => {
-    const data = initialData();
-    if (data && !initialData.loading) {
-      setComments(data.list || []);
-      setNextOffset(data.nextOffset);
-    }
-  });
-
-  const loadMore = async () => {
-    if (isLoadingMore() || nextOffset() === null) return;
-    setIsLoadingMore(true);
-    const data = await fetchComments({ app, postId: postId(), offset: nextOffset() });
-    if (data.list) {
-      setComments((prev) => [...prev, ...data.list]);
-      setNextOffset(data.nextOffset);
-    }
-    setIsLoadingMore(false);
-  };
-
-  const handleAddComment = () => {
-    navigate(`/editor/new-comment/${postId()}`);
-  };
-
-  return (
-    <div class="mt-8 pt-6 border-t border-[hsl(var(--border))]">
-      <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-xl font-semibold">{t("post.comments")}</h3>
-        <button
-          onClick={handleAddComment}
-          class="text-sm underline text-[hsl(var(--foreground))] hover:opacity-80"
-        >
-          {t("post.addComment")}
-        </button>
-      </div>
-
-      <Show when={initialData.loading}>
-        <div class="flex justify-center p-8"><Spinner /></div>
-      </Show>
-
-      <Show when={initialData.error}>
-        <p class="text-sm text-[hsl(var(--destructive))]">
-          {t("common.error")}: {initialData.error}
-        </p>
-      </Show>
-
-      <Show when={!initialData.loading && !initialData.error && comments().length > 0}>
-        <div class="space-y-4">
-          <For each={comments()}>
-            {(comment) => <CommentCard comment={comment} />}
-          </For>
-        </div>
-      </Show>
-
-      <Show when={!initialData.loading && !initialData.error && comments().length === 0}>
-        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("post.noComments")}</p>
-      </Show>
-
-      <Show when={nextOffset() !== null && !initialData.loading}>
-        <div class="mt-6 text-center">
-          <button
-            onClick={loadMore}
-            disabled={isLoadingMore()}
-            class="px-4 py-2 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-          >
-            {isLoadingMore() ? t("common.loading") : t("post.loadMoreComments")}
-          </button>
-        </div>
-      </Show>
-    </div>
   );
 }
 </file>
@@ -25386,6 +25085,76 @@ export default function DocsContent(props) {
 }
 </file>
 
+<file path="src/components/editor/CommentEditor.jsx">
+// src/components/editor/CommentEditor.jsx
+import { createResource, Show } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { toChecksumAddress } from "../../blockchain/utils";
+import PostCard from "../feed/PostCard";
+import Spinner from "../ui/Spinner";
+import { whenWsOpen } from "../../net/wsRuntime.js";
+
+async function fetchPost(params) {
+  const { app, savva_cid } = params;
+  if (!app.wsMethod || !savva_cid) return null;
+
+  await whenWsOpen();
+  const getList = app.wsMethod("content-list");
+  
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    savva_cid: savva_cid,
+    limit: 1,
+  };
+
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  try {
+    const res = await getList(requestParams);
+    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+    return arr[0] ? { id: arr[0].savva_cid, _raw: arr[0] } : null;
+  } catch (err) {
+    console.error(`Failed to fetch post '${savva_cid}':`, err);
+    return { error: err.message };
+  }
+}
+
+export default function CommentEditor(props) {
+  const app = useApp();
+  const { t } = app;
+  
+  const [postData] = createResource(() => ({
+    app: app,
+    savva_cid: props.savva_cid
+  }), fetchPost);
+
+  return (
+    <div class="mb-4">
+      <Show when={postData.loading}>
+        <div class="flex justify-center items-center h-24">
+          <Spinner />
+        </div>
+      </Show>
+      <Show when={postData.error}>
+        <p class="text-xs text-[hsl(var(--destructive))]">
+          {t("common.error")}: {postData.error}
+        </p>
+      </Show>
+      <Show when={!postData.loading && !postData.error && postData()}>
+        <PostCard
+          item={postData()}
+          mode="list"
+          compact={false}
+        />
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/editor/EditorToolbar.jsx">
 // src/components/editor/EditorToolbar.jsx
 import { useApp } from "../../context/AppContext.jsx";
@@ -25450,6 +25219,7 @@ export default function MarkdownInput(props) {
         ref={props.editorRef}
         value={props.value}
         onInput={(e) => props.onInput(e.currentTarget.value)}
+        onPaste={props.onPaste}
         class="relative w-full h-full p-3 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] focus:z-10"
         placeholder={props.placeholder}
       />
@@ -25495,6 +25265,288 @@ export default function NewContentBanner() {
             }}
           >
             {t("main.newContentAvailable")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/post/CommentCard.jsx">
+// src/components/post/CommentCard.jsx
+import { For, Show, createMemo, createSignal, createResource, Switch, Match } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import PostInfo from "../feed/PostInfo";
+import UserCard from "../ui/UserCard";
+import MarkdownView from "../docs/MarkdownView";
+import { ipfs } from "../../ipfs";
+import { getPostContentBaseCid } from "../../ipfs/utils";
+import Spinner from "../ui/Spinner";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { navigate } from "../../routing/hashRouter.js";
+
+/**
+ * Fetches the full content of a comment's prologue for a specific language.
+ */
+async function fetchFullContent(params) {
+  const { app, comment, lang } = params;
+  if (!comment || !lang) return "";
+
+  const locales = comment.savva_content?.locales;
+  const currentLocale = locales?.[lang] || locales?.en || locales?.[Object.keys(locales)[0]];
+  
+  const dataPath = currentLocale?.data_path;
+  if (!dataPath) return currentLocale?.text_preview || ""; // Fallback to preview if no path
+
+  const baseCid = getPostContentBaseCid(comment);
+  if (!baseCid) return "";
+
+  const fullIpfsPath = `${baseCid}/${dataPath}`;
+  
+  try {
+    const { res } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways: comment.gateways });
+    return await res.text();
+  } catch (e) {
+    console.error("Failed to fetch full comment content:", e);
+    return `Error: Could not load content.`;
+  }
+}
+
+export default function CommentCard(props) {
+  const app = useApp();
+  const { t } = app;
+  const comment = () => props.comment;
+  const level = () => props.level || 0;
+  
+  const [isExpanded, setIsExpanded] = createSignal(false);
+  const [isHovered, setIsHovered] = createSignal(false);
+
+  // Memo for the truncated preview content
+  const localizedPreview = createMemo(() => {
+    const locales = comment().savva_content?.locales;
+    if (!locales) return "";
+    const lang = app.lang();
+    if (locales[lang]?.text_preview) return locales[lang].text_preview;
+    if (locales.en?.text_preview) return locales.en.text_preview;
+    const firstKey = Object.keys(locales)[0];
+    return firstKey ? locales[firstKey].text_preview : "";
+  });
+
+  // Resource to fetch full content only when expanded
+  const [fullContent] = createResource(
+    () => ({
+      shouldFetch: isExpanded(),
+      app: app,
+      comment: comment(),
+      lang: app.lang()
+    }),
+    async (params) => {
+      if (!params.shouldFetch) return null;
+      return fetchFullContent(params);
+    }
+  );
+
+  const contextMenuItems = createMemo(() => {
+    if (!comment()) return [];
+    return getPostAdminItems(comment(), t);
+  });
+
+  // Determine if the "Show More" button should be visible
+  const needsTruncation = createMemo(() => {
+    const preview = localizedPreview();
+    return preview.length > 280 || preview.endsWith("...");
+  });
+
+  const handleReply = (e) => {
+    e.stopPropagation();
+    const commentCid = comment()?.savva_cid;
+    if (commentCid) {
+      navigate(`/editor/new-comment/${commentCid}`);
+    }
+  };
+
+  return (
+    <div
+      class="relative flex flex-col"
+      style={{ "padding-left": level() > 0 ? "1.5rem" : "0" }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+        <div class="mb-2">
+          <UserCard author={comment().author} compact={false} />
+        </div>
+        
+        <div 
+          class="text-sm prose prose-sm max-w-none transition-all duration-300 overflow-hidden"
+          classList={{ 
+            "max-h-24": !isExpanded(), 
+            "max-h-[1000px]": isExpanded() 
+          }}
+        >
+          <Switch>
+            <Match when={isExpanded() && fullContent.loading}>
+              <div class="flex items-center justify-center h-24">
+                <Spinner />
+              </div>
+            </Match>
+            <Match when={isExpanded() && fullContent()}>
+              <MarkdownView markdown={fullContent()} />
+            </Match>
+            <Match when={!isExpanded()}>
+              <MarkdownView markdown={localizedPreview()} />
+            </Match>
+          </Switch>
+        </div>
+
+        <div class="mt-2 flex items-center justify-between">
+          <PostInfo item={{ _raw: comment() }} hideTopBorder={true} />
+          <div class="flex items-center gap-4 text-xs font-semibold">
+            <Show when={needsTruncation() || isExpanded()}>
+              <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
+                {isExpanded() ? "Show Less" : "Show More"}
+              </button>
+            </Show>
+            <button class="hover:underline" onClick={handleReply}>Reply</button>
+          </div>
+        </div>
+      </div>
+      
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && contextMenuItems().length > 0}>
+        <div class="context-menu-container">
+          <ContextMenu items={contextMenuItems()} />
+        </div>
+      </Show>
+      
+      <Show when={comment().children?.length > 0}>
+        <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
+          <For each={comment().children}>
+            {(reply) => <CommentCard comment={reply} level={level() + 1} />}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/post/PostComments.jsx">
+// src/components/editor/PostComments.jsx
+import { createResource, For, Show, createSignal, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { toChecksumAddress } from "../../blockchain/utils";
+import Spinner from "../ui/Spinner";
+import CommentCard from "./CommentCard";
+import { navigate } from "../../routing/hashRouter.js";
+
+async function fetchComments(params) {
+  const { app, postId, offset = 0 } = params;
+  if (!app.wsMethod || !postId) return { list: [], nextOffset: null };
+
+  const getChildren = app.wsMethod("content-children");
+  const requestParams = {
+    domain: app.selectedDomainName(),
+    savva_cid: postId,
+    max_deep: 4,
+    limit: 20,
+    offset,
+  };
+
+  const user = app.authorizedUser();
+  if (user?.address) {
+    requestParams.my_addr = toChecksumAddress(user.address);
+  }
+
+  try {
+    const res = await getChildren(requestParams);
+    const list = Array.isArray(res?.list) ? res.list : [];
+    const nextOffset = res?.next_offset > 0 ? res.next_offset : null;
+    return { list, nextOffset };
+  } catch (err) {
+    console.error(`Failed to fetch comments for post '${postId}':`, err);
+    return { list: [], nextOffset: null, error: err.message };
+  }
+}
+
+export default function PostComments(props) {
+  const app = useApp();
+  const { t } = app;
+  const postId = () => props.post?.savva_cid;
+
+  const [comments, setComments] = createSignal([]);
+  const [nextOffset, setNextOffset] = createSignal(0);
+  const [isLoadingMore, setIsLoadingMore] = createSignal(false);
+
+  const [initialData] = createResource(() => ({ app, postId: postId() }), fetchComments);
+
+  createEffect(() => {
+    const data = initialData();
+    if (data && !initialData.loading) {
+      setComments(data.list || []);
+      setNextOffset(data.nextOffset);
+    }
+  });
+
+  const loadMore = async () => {
+    if (isLoadingMore() || nextOffset() === null) return;
+    setIsLoadingMore(true);
+    const data = await fetchComments({ app, postId: postId(), offset: nextOffset() });
+    if (data.list) {
+      setComments((prev) => [...prev, ...data.list]);
+      setNextOffset(data.nextOffset);
+    }
+    setIsLoadingMore(false);
+  };
+
+  const handleAddComment = () => {
+    navigate(`/editor/new-comment/${postId()}`);
+  };
+
+  return (
+    <div class="mt-8 pt-6 border-t border-[hsl(var(--border))]">
+      {/* Header with link only, no counter */}
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-xl font-semibold">{t("post.comments")}</h3>
+        <button
+          onClick={handleAddComment}
+          class="text-sm underline text-[hsl(var(--foreground))] hover:opacity-80"
+        >
+          {t("post.addComment")}
+        </button>
+      </div>
+
+      <Show when={initialData.loading}>
+        <div class="flex justify-center p-8"><Spinner /></div>
+      </Show>
+
+      <Show when={initialData.error}>
+        <p class="text-sm text-[hsl(var(--destructive))]">
+          {t("common.error")}: {initialData.error}
+        </p>
+      </Show>
+
+      <Show when={!initialData.loading && !initialData.error && comments().length > 0}>
+        <div class="space-y-4">
+          <For each={comments()}>
+            {(comment) => <CommentCard comment={comment} />}
+          </For>
+        </div>
+      </Show>
+
+      <Show when={!initialData.loading && !initialData.error && comments().length === 0}>
+        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("post.noComments")}</p>
+      </Show>
+
+      <Show when={nextOffset() !== null && !initialData.loading}>
+        <div class="mt-6 text-center">
+          <button
+            onClick={loadMore}
+            disabled={isLoadingMore()}
+            class="px-4 py-2 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+          >
+            {isLoadingMore() ? t("common.loading") : t("post.loadMoreComments")}
           </button>
         </div>
       </Show>
@@ -25673,7 +25725,7 @@ export default function ReactionInput(props) {
           "text-blue-500": hasReacted()
         }}
       >
-        <ReactionIcon type={reactionType()} class="text-lg" />
+        <ReactionIcon type={reactionType()} class="text-sm"/>
         <span>{reactionLabel()}</span>
       </button>
     </div>
@@ -26081,149 +26133,6 @@ export const alertRegistry = {
 };
 </file>
 
-<file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
-// src/components/editor/wizard_steps/StepUploadDescriptor.jsx
-import { createSignal, createEffect, on, Show } from "solid-js";
-import { useApp } from "../../../context/AppContext.jsx";
-import Spinner from "../../ui/Spinner.jsx";
-import { stringify as toYaml } from "yaml";
-import { httpBase } from "../../../net/endpoints.js";
-import { dbg } from "../../../utils/debug.js";
-import { createTextPreview } from "../../../editor/preview-utils.js";
-
-export default function StepUploadDescriptor(props) {
-  const app = useApp();
-  const { t } = app;
-  const [error, setError] = createSignal(null);
-  const [isUploading, setIsUploading] = createSignal(true);
-  const [hasStarted, setHasStarted] = createSignal(false);
-
-  const uploadDescriptor = async (data_cid) => {
-    const { postData, postParams } = props;
-
-    const descriptor = {
-      savva_spec_version: "2.0",
-      data_cid: data_cid,
-      locales: {}
-    };
-
-    if (postParams().parent_savva_cid) {
-        descriptor.parent_savva_cid = postParams().parent_savva_cid;
-        descriptor.root_savva_cid = postParams().root_savva_cid || postParams().parent_savva_cid;
-    }
-
-    const gateways = app.info()?.ipfs_gateways;
-    if (gateways && Array.isArray(gateways) && gateways.length > 0) {
-      descriptor.gateways = gateways;
-    }
-
-    const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
-    Object.assign(descriptor, otherParams);
-    
-    const content = postData();
-    for (const lang in content) {
-      const data = content[lang];
-      const hasTitle = data.title?.trim().length > 0;
-      const hasBody = data.body?.trim().length > 0;
-      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
-
-      if (!hasTitle && !hasBody && !hasChapters) {
-        continue;
-      }
-      
-      const langParams = paramLocales?.[lang] || {};
-      
-      const localeObject = {
-        title: data.title || "",
-        text_preview: createTextPreview(data.body || ""),
-        tags: langParams.tags || [],
-        categories: langParams.categories || [],
-        data_path: `${lang}/data.md`,
-        chapters: []
-      };
-
-      if (Array.isArray(data.chapters)) {
-        for (let i = 0; i < data.chapters.length; i++) {
-          const chapterParams = langParams.chapters?.[i] || {};
-          localeObject.chapters.push({
-            title: chapterParams.title || `Chapter ${i + 1}`,
-            data_path: `${lang}/chapters/${i + 1}.md`
-          });
-        }
-      }
-      
-      descriptor.locales[lang] = localeObject;
-    }
-    
-    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
-
-    const yamlStr = toYaml(descriptor);
-    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
-    const formData = new FormData();
-    formData.append('file', descriptorFile);
-
-    const url = `${httpBase()}store`;
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
-    }
-
-    const result = await response.json();
-    if (!result?.cid) {
-      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
-    }
-
-    return result.cid;
-  };
-
-  createEffect(() => {
-    const dataCid = props.publishedData().ipfsCid;
-    // This effect runs when the component mounts AND when props change.
-    // We wait until the ipfsCid is available and ensure we only run once.
-    if (dataCid && !hasStarted()) {
-      setHasStarted(true);
-      
-      setTimeout(async () => {
-        try {
-          const descriptorCid = await uploadDescriptor(dataCid);
-          props.onComplete?.(descriptorCid);
-        } catch (e) {
-          dbg.error("StepUploadDescriptor", "An error occurred:", e);
-          setError(e.message);
-        } finally {
-          setIsUploading(false);
-        }
-      }, 500);
-    }
-  });
-
-
-  return (
-    <div class="flex flex-col items-center justify-center h-full">
-      <Show when={isUploading()}>
-        <Spinner />
-        <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
-      </Show>
-      <Show when={error()}>
-        <div class="text-center p-4">
-          <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
-          <p class="mt-2 text-sm">{error()}</p>
-          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-            {t("editor.publish.validation.backToEditor")}
-          </button>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/editor/EditorFilesDrawer.jsx">
 // src/components/editor/EditorFilesDrawer.jsx
 import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js";
@@ -26273,6 +26182,12 @@ export default function EditorFilesDrawer(props) {
     if (isOpen) refreshFiles();
     else setMenuData(null);
   }));
+
+  createEffect(on(() => props.filesRevision, () => {
+    if (props.isOpen) {
+      refreshFiles();
+    }
+  }, { defer: true }));
 
   const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.currentTarget.files);
@@ -26566,6 +26481,292 @@ export default function App() {
 }
 </file>
 
+<file path="src/components/SwitchConnectDialog.jsx">
+// File: src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
+import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
+
+function isAbortError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  if (e?.name === "AbortError") return true;
+  if (e?.code === 20) return true;
+  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
+  return false;
+}
+
+async function fetchInfoJSON(backendLink, { signal } = {}) {
+  const base = httpBase(backendLink);
+  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+  return await res.json();
+}
+
+export default function SwitchConnectDialog(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains] = createSignal([]); // [{ name }]
+  const [fetching, setFetching] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
+  const [localError, setLocalError] = createSignal("");
+
+  let aborter;
+
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
+  });
+
+  createEffect(async () => {
+    if (!props.open) return;
+
+    setLocalError("");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
+    setDomains([]);
+
+    aborter?.abort();
+    aborter = new AbortController();
+    setFetching(true);
+
+    try {
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
+        const resolved =
+          normalized.find((d) => eq(d.name, wanted)) ||
+          normalized.find((d) => eq(d.name, domain())) ||
+          normalized[0];
+
+        const name = resolved.name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  });
+
+  onCleanup(() => aborter?.abort());
+
+  async function handleReload() {
+    setLocalError("");
+
+    // Normalize the user-entered backend URL (candidate) without touching global config.
+    let candidate = (backendUrl() || "").trim();
+    try {
+      const u = new URL(candidate);
+      if (!/^https?:$/.test(u.protocol)) {
+        throw new Error(t("rightPane.switch.validation.protocol"));
+      }
+      // Ensure trailing slash for consistent "base + 'info'" concatenation.
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
+      candidate = u.toString();
+    } catch (e) {
+      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    setFetching(true);
+    aborter?.abort();
+    aborter = new AbortController();
+
+    try {
+      // Probe the candidate backend’s /info to list available domains.
+      const res = await fetch(candidate + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        // Try to keep current/wanted domain if present; otherwise pick the first.
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
+        const keep =
+          normalized.find((d) => eq(d.name, prefer)) ||
+          normalized.find((d) => eq(d.name, domain()));
+        const name = keep?.name || normalized[0].name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function onApply() {
+    setLocalError("");
+    setApplying(true);
+    try {
+      const newUrl = (backendUrl() || "").trim();
+      const chosenDomain = (domain() || "").trim();
+      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
+
+      const oldBackendBase = httpBase();
+      const newBackendBase = new URL(newUrl);
+      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
+      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
+
+      // --- MODIFICATION START: Logout from the OLD backend first ---
+      if (isSwitchingBackends) {
+        await app.logout?.();
+      }
+      // --- MODIFICATION END ---
+
+      // Now, proceed with switching to the new backend
+      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
+
+      await app.updateConnect?.({ backendLink: httpBase() });
+      await app.setDomain?.(chosenDomain);
+      await app.refreshDomainAssets?.();
+
+      if (app.ws) {
+        app.ws.setUrl(wsUrl());
+        app.ws.reconnect("switch-backend");
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+      setApplying(false);
+      return;
+    }
+
+    setApplying(false);
+    try { aborter?.abort(); } catch { }
+    props.onClose?.();
+  }
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
+            {t("rightPane.switch.title")}
+          </h3>
+
+          <label class="block mb-3">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
+            <div class="mt-1 flex gap-2">
+              <input
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                value={backendUrl()}
+                onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                placeholder={t("rightPane.switch.backend.placeholder")}
+                spellcheck={false}
+              />
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                onClick={handleReload}
+                disabled={fetching()}
+                title={t("rightPane.switch.reload.title")}
+              >
+                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+              </button>
+            </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
+          </label>
+
+          <label class="block mb-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
+          </label>
+          <select
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
+            value={domain()}
+            onChange={(e) => setDomain(e.currentTarget.value)}
+            disabled={fetching() || domains().length === 0}
+          >
+            {domains().map((d) => (
+              <option value={d.name} selected={eq(d.name, domain())}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <Show when={selectedDomainObj()}>
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+              <Show when={selectedDomainObj().website}>
+                <div>
+                  {t("rightPane.switch.domain.website")}:{" "}
+                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                    {selectedDomainObj().website}
+                  </a>
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={localError() || props.error}>
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
+              {t("common.error")}: {localError() || props.error?.message}
+            </p>
+          </Show>
+
+          <div class="mt-4 flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              onClick={props.onReset}
+              title={t("rightPane.switch.reset.title")}
+            >
+              {t("rightPane.switch.reset")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onApply}
+              disabled={props.loading || fetching() || applying()}
+            >
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/context/useAppAuth.js">
 // src/context/useAppAuth.js
 import { createSignal, onMount } from "solid-js";
@@ -26847,6 +27048,149 @@ export default function StepPublish(props) {
 }
 </file>
 
+<file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
+// src/components/editor/wizard_steps/StepUploadDescriptor.jsx
+import { createSignal, createEffect, on, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { stringify as toYaml } from "yaml";
+import { httpBase } from "../../../net/endpoints.js";
+import { dbg } from "../../../utils/debug.js";
+import { createTextPreview } from "../../../editor/preview-utils.js";
+
+export default function StepUploadDescriptor(props) {
+  const app = useApp();
+  const { t } = app;
+  const [error, setError] = createSignal(null);
+  const [isUploading, setIsUploading] = createSignal(true);
+  const [hasStarted, setHasStarted] = createSignal(false);
+
+  const uploadDescriptor = async (data_cid) => {
+    const { postData, postParams } = props;
+
+    const descriptor = {
+      savva_spec_version: "2.0",
+      data_cid: data_cid,
+      locales: {}
+    };
+
+    if (postParams().parent_savva_cid) {
+        descriptor.parent_savva_cid = postParams().parent_savva_cid;
+        descriptor.root_savva_cid = postParams().root_savva_cid || postParams().parent_savva_cid;
+    }
+
+    const gateways = app.info()?.ipfs_gateways;
+    if (gateways && Array.isArray(gateways) && gateways.length > 0) {
+      descriptor.gateways = gateways;
+    }
+
+    const { thumbnail, locales: paramLocales, ...otherParams } = postParams();
+    Object.assign(descriptor, otherParams);
+    
+    const content = postData();
+    for (const lang in content) {
+      const data = content[lang];
+      const hasTitle = data.title?.trim().length > 0;
+      const hasBody = data.body?.trim().length > 0;
+      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
+
+      if (!hasTitle && !hasBody && !hasChapters) {
+        continue;
+      }
+      
+      const langParams = paramLocales?.[lang] || {};
+      
+      const localeObject = {
+        title: data.title || "",
+        text_preview: createTextPreview(data.body || "", contentType),
+        tags: langParams.tags || [],
+        categories: langParams.categories || [],
+        data_path: `${lang}/data.md`,
+        chapters: []
+      };
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterParams = langParams.chapters?.[i] || {};
+          localeObject.chapters.push({
+            title: chapterParams.title || `Chapter ${i + 1}`,
+            data_path: `${lang}/chapters/${i + 1}.md`
+          });
+        }
+      }
+      
+      descriptor.locales[lang] = localeObject;
+    }
+    
+    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
+
+    const yamlStr = toYaml(descriptor);
+    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
+    const formData = new FormData();
+    formData.append('file', descriptorFile);
+
+    const url = `${httpBase()}store`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
+    }
+
+    const result = await response.json();
+    if (!result?.cid) {
+      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
+    }
+
+    return result.cid;
+  };
+
+  createEffect(() => {
+    const dataCid = props.publishedData().ipfsCid;
+    // This effect runs when the component mounts AND when props change.
+    // We wait until the ipfsCid is available and ensure we only run once.
+    if (dataCid && !hasStarted()) {
+      setHasStarted(true);
+      
+      setTimeout(async () => {
+        try {
+          const descriptorCid = await uploadDescriptor(dataCid);
+          props.onComplete?.(descriptorCid);
+        } catch (e) {
+          dbg.error("StepUploadDescriptor", "An error occurred:", e);
+          setError(e.message);
+        } finally {
+          setIsUploading(false);
+        }
+      }, 500);
+    }
+  });
+
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full">
+      <Show when={isUploading()}>
+        <Spinner />
+        <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
+      </Show>
+      <Show when={error()}>
+        <div class="text-center p-4">
+          <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
+          <p class="mt-2 text-sm">{error()}</p>
+          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+            {t("editor.publish.validation.backToEditor")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/editor/EditorFullPreview.jsx">
 // src/components/editor/EditorFullPreview.jsx
 import { createMemo, Show, createSignal } from "solid-js";
@@ -26899,7 +27243,7 @@ export default function EditorFullPreview(props) {
     }
   }));
 
-  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls]);
+  const markdownPlugins = createMemo(() => [[rehypeResolveDraftUrls, { baseDir: props.baseDir }]]);
 
   return (
     <div class="max-w-5xl mx-auto space-y-4">
@@ -27266,292 +27610,6 @@ export default function IpfsImage(props) {
         </Match>
       </Switch>
     </div>
-  );
-}
-</file>
-
-<file path="src/components/SwitchConnectDialog.jsx">
-// File: src/components/SwitchConnectDialog.jsx
-import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext";
-import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
-
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
-
-function isAbortError(e) {
-  const msg = String(e?.message || e || "").toLowerCase();
-  if (e?.name === "AbortError") return true;
-  if (e?.code === 20) return true;
-  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
-  return false;
-}
-
-async function fetchInfoJSON(backendLink, { signal } = {}) {
-  const base = httpBase(backendLink);
-  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
-  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-  return await res.json();
-}
-
-export default function SwitchConnectDialog(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
-  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
-  const [domains, setDomains] = createSignal([]); // [{ name }]
-  const [fetching, setFetching] = createSignal(false);
-  const [applying, setApplying] = createSignal(false);
-  const [localError, setLocalError] = createSignal("");
-
-  let aborter;
-
-  const selectedDomainObj = createMemo(() => {
-    const cur = (domain() || "").trim().toLowerCase();
-    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
-  });
-
-  createEffect(async () => {
-    if (!props.open) return;
-
-    setLocalError("");
-    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
-    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
-    setDomains([]);
-
-    aborter?.abort();
-    aborter = new AbortController();
-    setFetching(true);
-
-    try {
-      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
-      const u = new URL(initialUrl);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-
-      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
-        const resolved =
-          normalized.find((d) => eq(d.name, wanted)) ||
-          normalized.find((d) => eq(d.name, domain())) ||
-          normalized[0];
-
-        const name = resolved.name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  });
-
-  onCleanup(() => aborter?.abort());
-
-  async function handleReload() {
-    setLocalError("");
-
-    // Normalize the user-entered backend URL (candidate) without touching global config.
-    let candidate = (backendUrl() || "").trim();
-    try {
-      const u = new URL(candidate);
-      if (!/^https?:$/.test(u.protocol)) {
-        throw new Error(t("rightPane.switch.validation.protocol"));
-      }
-      // Ensure trailing slash for consistent "base + 'info'" concatenation.
-      if (!u.pathname.endsWith("/")) u.pathname += "/";
-      candidate = u.toString();
-    } catch (e) {
-      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
-      return;
-    }
-
-    setFetching(true);
-    aborter?.abort();
-    aborter = new AbortController();
-
-    try {
-      // Probe the candidate backend’s /info to list available domains.
-      const res = await fetch(candidate + "info", {
-        headers: { Accept: "application/json" },
-        signal: aborter.signal,
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-      const info = await res.json();
-
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        // Try to keep current/wanted domain if present; otherwise pick the first.
-        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
-        const keep =
-          normalized.find((d) => eq(d.name, prefer)) ||
-          normalized.find((d) => eq(d.name, domain()));
-        const name = keep?.name || normalized[0].name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function onApply() {
-    setLocalError("");
-    setApplying(true);
-    try {
-      const newUrl = (backendUrl() || "").trim();
-      const chosenDomain = (domain() || "").trim();
-      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
-
-      const oldBackendBase = httpBase();
-      const newBackendBase = new URL(newUrl);
-      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
-      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
-
-      // --- MODIFICATION START: Logout from the OLD backend first ---
-      if (isSwitchingBackends) {
-        await app.logout?.();
-      }
-      // --- MODIFICATION END ---
-
-      // Now, proceed with switching to the new backend
-      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
-
-      await app.updateConnect?.({ backendLink: httpBase() });
-      await app.setDomain?.(chosenDomain);
-      await app.refreshDomainAssets?.();
-
-      if (app.ws) {
-        app.ws.setUrl(wsUrl());
-        app.ws.reconnect("switch-backend");
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-      setApplying(false);
-      return;
-    }
-
-    setApplying(false);
-    try { aborter?.abort(); } catch { }
-    props.onClose?.();
-  }
-
-  return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 z-40 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-
-        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-3">
-            {t("rightPane.switch.title")}
-          </h3>
-
-          <label class="block mb-3">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
-            <div class="mt-1 flex gap-2">
-              <input
-                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                value={backendUrl()}
-                onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder={t("rightPane.switch.backend.placeholder")}
-                spellcheck={false}
-              />
-              <button
-                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
-                onClick={handleReload}
-                disabled={fetching()}
-                title={t("rightPane.switch.reload.title")}
-              >
-                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
-              </button>
-            </div>
-            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
-          </label>
-
-          <label class="block mb-1">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
-          </label>
-          <select
-            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name} selected={eq(d.name, domain())}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-
-          <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-              <Show when={selectedDomainObj().website}>
-                <div>
-                  {t("rightPane.switch.domain.website")}:{" "}
-                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
-                    {selectedDomainObj().website}
-                  </a>
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
-              {t("common.error")}: {localError() || props.error?.message}
-            </p>
-          </Show>
-
-          <div class="mt-4 flex gap-2 justify-end">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              onClick={props.onReset}
-              title={t("rightPane.switch.reset.title")}
-            >
-              {t("rightPane.switch.reset")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onApply}
-              disabled={props.loading || fetching() || applying()}
-            >
-              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
   );
 }
 </file>
@@ -29760,7 +29818,7 @@ export function handleReact(app, payload) {
 
 <file path="src/components/docs/MarkdownView.jsx">
 // src/components/docs/MarkdownView.jsx
-import { createEffect, on, onCleanup, createSignal, onMount } from "solid-js";
+import { createEffect, onCleanup, createSignal, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
 import { rehypeMediaPlayers } from "../../docs/rehype-media-players.js";
@@ -29769,29 +29827,14 @@ import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypePrettyCode from "rehype-pretty-code";
 import remarkBreaks from "remark-breaks";
 
-function rehypeCopyButton() {
-  return (tree) =>
-    import("unist-util-visit").then(({ visit }) => {
-      visit(tree, "element", (node) => {
-        if (node.tagName !== "pre") return;
-        if (node.children.some((c) => c?.properties?.className?.includes?.("sv-copy-btn"))) return;
-        node.children.push({
-          type: "element", tagName: "button",
-          properties: { className: ["sv-copy-btn"], type: "button" },
-          children: [{ type: "text", value: "Copy" }],
-        });
-      });
-      return tree;
-    });
-}
-
 export default function MarkdownView(props) {
   const { t } = useApp();
   const [html, setHtml] = createSignal("");
   let disposed = false;
   let container;
 
-  async function renderMd() {
+  const renderMd = async () => {
+    if (disposed) return;
     try {
       const [
         { unified }, { default: remarkParse }, { default: remarkGfm },
@@ -29829,7 +29872,6 @@ export default function MarkdownView(props) {
   
       if (props.rehypePlugins) {
         for (const plugin of props.rehypePlugins) {
-          // This robustly handles both [plugin, options] and just plugin
           processor.use(...(Array.isArray(plugin) ? plugin : [plugin]));
         }
       }
@@ -29857,7 +29899,7 @@ export default function MarkdownView(props) {
       const errorHtml = `<div style="color: red; border: 1px solid red; padding: 1rem;"><strong>Error:</strong><pre>${safeErr}</pre></div>`;
       if (!disposed) setHtml(errorHtml);
     }
-  }
+  };
 
   function copy(text) {
     if (!text) return;
@@ -29888,18 +29930,19 @@ export default function MarkdownView(props) {
     buttons.forEach(btn => { btn.textContent = t("clipboard.copy"); });
   }
 
-  onMount(() => {
-    renderMd().then(() => relabelButtons());
-    container?.addEventListener("click", onClick);
+  // This effect now re-runs when markdown OR the plugins change.
+  createEffect(async () => {
+    props.markdown; // dependency
+    props.rehypePlugins; // dependency
+    
+    await renderMd();
+    relabelButtons();
   });
 
-  // MODIFICATION: Removed { defer: true } to make updates immediate.
-  createEffect(on(() => props.markdown, (md, prevMd) => {
-    if (md !== prevMd && prevMd !== undefined) {
-      renderMd().then(() => relabelButtons());
-    }
-  }));
-
+  onMount(() => {
+    container?.addEventListener("click", onClick);
+  });
+  
   onCleanup(() => {
     disposed = true;
     container?.removeEventListener("click", onClick);
@@ -30074,6 +30117,151 @@ export default function Header({ onTogglePane }) {
 }
 </file>
 
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createSignal, Show, createMemo, createEffect } from "solid-js";
+import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import ThemeToggle from "./ui/ThemeToggle.jsx";
+import LangSelector from "./ui/LangSelector.jsx";
+import RightPaneFooter from "./RightPaneFooter.jsx";
+import { dbg } from "../utils/debug.js";
+
+export default function RightPane({ isOpen, onClose }) {
+  const app = useApp();
+  const { t } = app;
+  const [showSwitch, setShowSwitch] = createSignal(false);
+
+  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  const domainLangCodes = createMemo(() => {
+    const config = app.domainAssetsConfig?.();
+    if (!config || !Array.isArray(config.locales)) {
+      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
+      return [];
+    }
+    const codes = config.locales.map((l) => l.code).filter(Boolean);
+    dbg.log("RightPane", "domainLangCodes calculated:", codes);
+    return codes;
+  });
+
+  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
+
+  createEffect(() => {
+    const availableCodes = domainLangCodes();
+    const currentLang = app.lang?.();
+    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
+
+    if (availableCodes.length === 0) {
+      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
+      return;
+    }
+
+    if (!availableCodes.includes(currentLang)) {
+      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
+      app.setLang?.(availableCodes[0]);
+    } else {
+      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
+    }
+  });
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col p-4 space-y-3">
+          <nav class="pt-2">
+            <ul class="space-y-3">
+              <li><ThemeToggle /></li>
+
+              <Show when={showLangSelector()}>
+                <li><LangSelector codes={domainLangCodes()} /></li>
+              </Show>
+
+              {/* Gear settings link */}
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
+
+              {/* Documentation link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/docs"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+              {/* Settings link */}
+              <li>
+                <div
+                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/settings"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+            </ul>
+          </nav>
+          <RightPaneFooter />
+        </div>
+      </div>
+
+      {isOpen() && (
+        <div
+          class="fixed inset-0 z-20"
+          style={{ "background-color": "rgba(0,0,0,0.2)" }}
+          data-testid="overlay"
+          onClick={onClose}
+        />
+      )}
+
+      <Show when={showSwitch()} keyed>
+        <SwitchConnectDialog
+          open={true}
+          domain={app.config()?.domain}
+          backendLink={app.config()?.backendLink}
+          loading={app.loading()}
+          error={app.error()}
+          onApply={() => { }}
+          onReset={app.clearConnectOverride}
+          onClose={() => setShowSwitch(false)}
+        />
+      </Show>
+    </>
+  );
+}
+</file>
+
 <file path="src/editor/storage.js">
 // src/editor/storage.js
 import { dbg } from "../utils/debug";
@@ -30083,7 +30271,7 @@ import { createTextPreview } from "./preview-utils.js";
 export const DRAFT_DIRS = {
   NEW_POST: "new_post",
   NEW_COMMENT: "new_comment",
-  EDIT: "post",
+  EDIT: "edit",
   UPLOADS: "uploads",
 };
 const PARAMS_FILE = "params.json";
@@ -30576,151 +30764,6 @@ export default function NewTab(props) {
         isActivated={props.isActivated}
       />
     </section>
-  );
-}
-</file>
-
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createSignal, Show, createMemo, createEffect } from "solid-js";
-import { navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
-import ThemeToggle from "./ui/ThemeToggle.jsx";
-import LangSelector from "./ui/LangSelector.jsx";
-import RightPaneFooter from "./RightPaneFooter.jsx";
-import { dbg } from "../utils/debug.js";
-
-export default function RightPane({ isOpen, onClose }) {
-  const app = useApp();
-  const { t } = app;
-  const [showSwitch, setShowSwitch] = createSignal(false);
-
-  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
-
-  const domainLangCodes = createMemo(() => {
-    const config = app.domainAssetsConfig?.();
-    if (!config || !Array.isArray(config.locales)) {
-      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
-      return [];
-    }
-    const codes = config.locales.map((l) => l.code).filter(Boolean);
-    dbg.log("RightPane", "domainLangCodes calculated:", codes);
-    return codes;
-  });
-
-  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
-
-  createEffect(() => {
-    const availableCodes = domainLangCodes();
-    const currentLang = app.lang?.();
-    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
-
-    if (availableCodes.length === 0) {
-      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
-      return;
-    }
-
-    if (!availableCodes.includes(currentLang)) {
-      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
-      app.setLang?.(availableCodes[0]);
-    } else {
-      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
-    }
-  });
-
-  return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col p-4 space-y-3">
-          <nav class="pt-2">
-            <ul class="space-y-3">
-              <li><ThemeToggle /></li>
-
-              <Show when={showLangSelector()}>
-                <li><LangSelector codes={domainLangCodes()} /></li>
-              </Show>
-
-              {/* Gear settings link */}
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
-              </Show>
-
-              {/* Documentation link */}
-              <li>
-                <div
-                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/docs"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
-                  aria-label={t("docs.nav")}
-                  title={t("docs.nav")}
-                >
-                  {t("docs.nav")}
-                </div>
-              </li>
-
-              {/* Settings link */}
-              <li>
-                <div
-                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/settings"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
-                >
-                  {t("rightPane.settings")}
-                </div>
-              </li>
-            </ul>
-          </nav>
-          <RightPaneFooter />
-        </div>
-      </div>
-
-      {isOpen() && (
-        <div
-          class="fixed inset-0 z-20"
-          style={{ "background-color": "rgba(0,0,0,0.2)" }}
-          data-testid="overlay"
-          onClick={onClose}
-        />
-      )}
-
-      <Show when={showSwitch()} keyed>
-        <SwitchConnectDialog
-          open={true}
-          domain={app.config()?.domain}
-          backendLink={app.config()?.backendLink}
-          loading={app.loading()}
-          error={app.error()}
-          onApply={() => { }}
-          onReset={app.clearConnectOverride}
-          onClose={() => setShowSwitch(false)}
-        />
-      </Show>
-    </>
   );
 }
 </file>
@@ -31930,7 +31973,7 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft } from "../editor/storage.js";
+import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft, addUploadedFile } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
@@ -31979,7 +32022,8 @@ function TrashIcon(props) {
 }
 
 export default function EditorPage() {
-  const { t, domainAssetsConfig, lastTabRoute } = useApp();
+  const app = useApp();
+  const { t, domainAssetsConfig, lastTabRoute } = app;
   const { route } = useHashRouter();
   let textareaRef;
 
@@ -31996,6 +32040,7 @@ export default function EditorPage() {
   const [showFullPreview, setShowFullPreview] = createSignal(false);
   const [showPublishWizard, setShowPublishWizard] = createSignal(false);
   const [isFullScreen, setIsFullScreen] = createSignal(false);
+  const [filesRevision, setFilesRevision] = createSignal(0);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -32139,6 +32184,36 @@ export default function EditorPage() {
     setShowChapters(chapters.length > 0);
     setEditingChapterIndex(-1);
   }));
+
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    let imagePasted = false;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        e.preventDefault();
+        imagePasted = true;
+
+        const file = item.getAsFile();
+        const extension = file.type.split('/')[1] || 'png';
+        const fileName = `pasted-image-${Date.now()}.${extension}`;
+        const newFile = new File([file], fileName, { type: file.type });
+
+        try {
+          await addUploadedFile(baseDir(), newFile);
+          const markdownText = `![${fileName}](uploads/${fileName})`;
+          insertTextAtCursor(textareaRef, markdownText, handleEditorInput);
+        } catch (err) {
+          dbg.error("EditorPage:Paste", "Failed to save pasted image", err);
+        }
+      }
+    }
+
+    if (imagePasted) {
+      setFilesRevision(r => r + 1);
+    }
+  };
 
   const handlePublishSuccess = () => {
     pushToast({ type: "success", message: t("editor.publish.success") });
@@ -32315,7 +32390,7 @@ export default function EditorPage() {
     }
   });
 
-  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls(baseDir())]);
+  const markdownPlugins = createMemo(() => [[rehypeResolveDraftUrls, { baseDir: baseDir() }]]);
 
   const combinedChapters = createMemo(() => {
     const contentChapters = currentLangData().chapters || [];
@@ -32355,6 +32430,7 @@ export default function EditorPage() {
               setShowFullPreview(false);
               setShowPublishWizard(true);
             }}
+            baseDir={baseDir()}
           />
         }
       >
@@ -32458,6 +32534,7 @@ export default function EditorPage() {
                 editorRef={(el) => (textareaRef = el)}
                 value={currentEditorContent()}
                 onInput={handleEditorInput}
+                onPaste={handlePaste}
                 placeholder={t("editor.bodyPlaceholder")}
                 showPreview={showPreview()}
                 rehypePlugins={markdownPlugins()}
@@ -32546,6 +32623,7 @@ export default function EditorPage() {
         onInsert={handleInsertFile}
         onSetThumbnail={handleSetThumbnail}
         onInsertUrl={handleInsertUrl}
+        filesRevision={filesRevision()}
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}

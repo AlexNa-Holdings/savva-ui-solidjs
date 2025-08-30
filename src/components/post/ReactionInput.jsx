@@ -167,7 +167,7 @@ export default function ReactionInput(props) {
           "text-blue-500": hasReacted()
         }}
       >
-        <ReactionIcon type={reactionType()} class="text-lg" />
+        <ReactionIcon type={reactionType()} class="text-sm"/>
         <span>{reactionLabel()}</span>
       </button>
     </div>

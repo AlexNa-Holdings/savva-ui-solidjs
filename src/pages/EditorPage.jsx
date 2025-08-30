@@ -9,7 +9,7 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft } from "../editor/storage.js";
+import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft, addUploadedFile } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
@@ -25,9 +25,9 @@ import { whenWsOpen } from "../net/wsRuntime.js";
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
   if (!identifier || !domain || !app.wsMethod) return null;
-  
+
   await whenWsOpen();
-  
+
   const contentList = app.wsMethod("content-list");
   const requestParams = {
     domain: domain,
@@ -76,9 +76,14 @@ export default function EditorPage() {
   const [showFullPreview, setShowFullPreview] = createSignal(false);
   const [showPublishWizard, setShowPublishWizard] = createSignal(false);
   const [isFullScreen, setIsFullScreen] = createSignal(false);
+  const [filesRevision, setFilesRevision] = createSignal(0);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
+
+  createEffect(() => {
+    dbg.log("EditorPage:paramsSignal", "postParams signal updated:", postParams());
+  });
 
   const routeParams = createMemo(() => {
     const path = route();
@@ -90,7 +95,7 @@ export default function EditorPage() {
   });
 
   const editorMode = () => routeParams().mode;
-  
+
   const baseDir = createMemo(() => {
     const mode = editorMode();
     if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
@@ -111,16 +116,16 @@ export default function EditorPage() {
         await clearDraft(baseDir());
         const parentCid = routeParams().parent_savva_cid;
         const parentObject = await fetchPostByIdentifier({
-            identifier: parentCid,
-            domain: app.selectedDomainName(),
-            app,
-            lang: app.lang()
+          identifier: parentCid,
+          domain: app.selectedDomainName(),
+          app,
+          lang: app.lang()
         });
         if (!parentObject) throw new Error("Parent content not found.");
-        
+
         const isReplyToComment = !!parentObject.parent_savva_cid;
-        const newPostParams = { 
-          locales: {}, 
+        const newPostParams = {
+          locales: {},
           guid: crypto.randomUUID(),
           parent_savva_cid: parentObject.savva_cid,
           root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid
@@ -128,8 +133,8 @@ export default function EditorPage() {
 
         const newPostData = {};
         for (const langCode of domainLangCodes()) {
-            newPostData[langCode] = { title: "", body: "", chapters: [] };
-            newPostParams.locales[langCode] = { chapters: [] };
+          newPostData[langCode] = { title: "", body: "", chapters: [] };
+          newPostParams.locales[langCode] = { chapters: [] };
         }
         batch(() => {
           setPostData(newPostData);
@@ -138,25 +143,25 @@ export default function EditorPage() {
       } else {
         const draft = await loadDraft(baseDir());
         if (draft && draft.content) {
-            batch(() => {
-              setPostData(draft.content);
-              const params = draft.params || {};
-              if (editorMode() === "new_post" && !params.guid) {
-                  params.guid = crypto.randomUUID();
-              }
-              setPostParams(params);
-            });
-        } else if (editorMode() === "new_post") {
-            const newPostData = {};
-            const newPostParams = { locales: {}, guid: crypto.randomUUID() };
-            for (const langCode of domainLangCodes()) {
-                newPostData[langCode] = { title: "", body: "", chapters: [] };
-                newPostParams.locales[langCode] = { chapters: [] };
+          batch(() => {
+            setPostData(draft.content);
+            const params = draft.params || {};
+            if (editorMode() === "new_post" && !params.guid) {
+              params.guid = crypto.randomUUID();
             }
-            batch(() => {
-              setPostData(newPostData);
-              setPostParams(newPostParams);
-            });
+            setPostParams(params);
+          });
+        } else if (editorMode() === "new_post") {
+          const newPostData = {};
+          const newPostParams = { locales: {}, guid: crypto.randomUUID() };
+          for (const langCode of domainLangCodes()) {
+            newPostData[langCode] = { title: "", body: "", chapters: [] };
+            newPostParams.locales[langCode] = { chapters: [] };
+          }
+          batch(() => {
+            setPostData(newPostData);
+            setPostParams(newPostParams);
+          });
         } else {
           dbg.error("EditorPage", `Draft not found for edit mode in '${baseDir()}', navigating back.`);
           navigate(lastTabRoute() || "/");
@@ -208,17 +213,47 @@ export default function EditorPage() {
 
   createEffect(on(activeLang, (lang) => {
     if (!postData()?.[lang]) {
-        setPostData(p => ({...p, [lang]: { title: "", body: "", chapters: [] }}));
-        setPostParams(p => {
-            const locales = {...(p.locales || {})};
-            if (!locales[lang]) locales[lang] = { chapters: [] };
-            return {...p, locales};
-        });
+      setPostData(p => ({ ...p, [lang]: { title: "", body: "", chapters: [] } }));
+      setPostParams(p => {
+        const locales = { ...(p.locales || {}) };
+        if (!locales[lang]) locales[lang] = { chapters: [] };
+        return { ...p, locales };
+      });
     }
     const chapters = postData()?.[lang]?.chapters || [];
     setShowChapters(chapters.length > 0);
     setEditingChapterIndex(-1);
   }));
+
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    let imagePasted = false;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        e.preventDefault();
+        imagePasted = true;
+
+        const file = item.getAsFile();
+        const extension = file.type.split('/')[1] || 'png';
+        const fileName = `pasted-image-${Date.now()}.${extension}`;
+        const newFile = new File([file], fileName, { type: file.type });
+
+        try {
+          await addUploadedFile(baseDir(), newFile);
+          const markdownText = `![${fileName}](uploads/${fileName})`;
+          insertTextAtCursor(textareaRef, markdownText, handleEditorInput);
+        } catch (err) {
+          dbg.error("EditorPage:Paste", "Failed to save pasted image", err);
+        }
+      }
+    }
+
+    if (imagePasted) {
+      setFilesRevision(r => r + 1);
+    }
+  };
 
   const handlePublishSuccess = () => {
     pushToast({ type: "success", message: t("editor.publish.success") });
@@ -241,7 +276,7 @@ export default function EditorPage() {
   const updateParam = (field, value) => {
     setPostParams(prev => ({ ...prev, [field]: value }));
   };
-  
+
   const handleConfirmClear = () => {
     const newPostData = {};
     const newPostParams = {
@@ -251,20 +286,20 @@ export default function EditorPage() {
     };
 
     if (editorMode() === 'new_comment') {
-        newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
+      newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
     }
 
     for (const langCode of domainLangCodes()) {
-        newPostData[langCode] = { title: "", body: "", chapters: [] };
-        newPostParams.locales[langCode] = { chapters: [] };
+      newPostData[langCode] = { title: "", body: "", chapters: [] };
+      newPostParams.locales[langCode] = { chapters: [] };
     }
 
     batch(() => {
-        setPostData(newPostData);
-        setPostParams(newPostParams);
-        setEditingChapterIndex(-1);
-        setShowChapters(false);
-        setThumbnailUrl(null);
+      setPostData(newPostData);
+      setPostParams(newPostParams);
+      setEditingChapterIndex(-1);
+      setShowChapters(false);
+      setThumbnailUrl(null);
     });
   };
 
@@ -311,10 +346,10 @@ export default function EditorPage() {
     if (editingChapterIndex() === -1) return;
     setShowConfirmDelete(true);
   };
-  
+
   const confirmRemoveChapter = () => {
     const indexToRemove = editingChapterIndex();
-    
+
     batch(() => {
       setPostData(prev => {
         const lang = activeLang();
@@ -345,16 +380,16 @@ export default function EditorPage() {
     if (index === -1) return langData.body;
     return langData.chapters?.[index]?.body || "";
   });
-  
+
   const handleEditorInput = (value) => {
     const index = editingChapterIndex();
     if (index === -1) {
       updateField('body', value);
     } else {
-        const lang = activeLang();
-        const chapters = [...(postData()[lang]?.chapters || [])];
-        chapters[index] = { ...chapters[index], body: value };
-        updateField('chapters', chapters);
+      const lang = activeLang();
+      const chapters = [...(postData()[lang]?.chapters || [])];
+      chapters[index] = { ...chapters[index], body: value };
+      updateField('chapters', chapters);
     }
   };
 
@@ -395,7 +430,7 @@ export default function EditorPage() {
     }
   });
 
-  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls(baseDir())]);
+  const markdownPlugins = createMemo(() => [[rehypeResolveDraftUrls, { baseDir: baseDir() }]]);
 
   const combinedChapters = createMemo(() => {
     const contentChapters = currentLangData().chapters || [];
@@ -410,8 +445,8 @@ export default function EditorPage() {
     const data = postData();
     if (!data) return [];
     return domainLangCodes().filter(langCode => {
-        const langData = data[langCode];
-        return langData && langData.title?.trim() && (langData.body?.trim() || langData.chapters?.some(c => c.body?.trim()));
+      const langData = data[langCode];
+      return langData && langData.title?.trim() && (langData.body?.trim() || langData.chapters?.some(c => c.body?.trim()));
     });
   });
 
@@ -423,7 +458,7 @@ export default function EditorPage() {
       <Show
         when={!showFullPreview()}
         fallback={
-          <EditorFullPreview 
+          <EditorFullPreview
             postData={postData()}
             postParams={postParams()}
             activeLang={activeLang()}
@@ -435,6 +470,7 @@ export default function EditorPage() {
               setShowFullPreview(false);
               setShowPublishWizard(true);
             }}
+            baseDir={baseDir()}
           />
         }
       >
@@ -451,7 +487,7 @@ export default function EditorPage() {
                     >
                       <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
                       <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button 
+                        <button
                           onClick={handleDeleteThumbnail}
                           title={t("editor.thumbnail.delete")}
                           class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
@@ -463,9 +499,9 @@ export default function EditorPage() {
                   </div>
                   <div class="flex justify-center">
                     <LangSelector
-                        codes={domainLangCodes()}
-                        value={activeLang()}
-                        onChange={setActiveLang}
+                      codes={domainLangCodes()}
+                      value={activeLang()}
+                      onChange={setActiveLang}
                     />
                   </div>
                 </div>
@@ -490,7 +526,7 @@ export default function EditorPage() {
                       </div>
                     </div>
                   </Show>
-                  
+
                   <Show when={editorMode() === 'new_post' || editorMode() === 'edit_post'}>
                     <div class="flex items-center gap-4 mb-4">
                       <input
@@ -510,22 +546,22 @@ export default function EditorPage() {
                       </div>
                     </div>
                   </Show>
-                  
+
                   <Show when={showChapters() && editorMode() !== 'new_comment' && editorMode() !== 'edit_comment'}>
                     <div class="mb-4">
-                        <EditorChapterSelector
-                            chapters={combinedChapters()}
-                            activeIndex={editingChapterIndex()}
-                            onSelectIndex={setEditingChapterIndex}
-                            onAdd={handleAddChapter}
-                            onRemove={handleRemoveChapter}
-                            onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
-                        />
+                      <EditorChapterSelector
+                        chapters={combinedChapters()}
+                        activeIndex={editingChapterIndex()}
+                        onSelectIndex={setEditingChapterIndex}
+                        onAdd={handleAddChapter}
+                        onRemove={handleRemoveChapter}
+                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                      />
                     </div>
                   </Show>
                 </>
               </Show>
-              
+
               <EditorToolbar
                 isPreview={showPreview()}
                 onTogglePreview={() => setShowPreview(!showPreview())}
@@ -538,6 +574,7 @@ export default function EditorPage() {
                 editorRef={(el) => (textareaRef = el)}
                 value={currentEditorContent()}
                 onInput={handleEditorInput}
+                onPaste={handlePaste}
                 placeholder={t("editor.bodyPlaceholder")}
                 showPreview={showPreview()}
                 rehypePlugins={markdownPlugins()}
@@ -598,14 +635,14 @@ export default function EditorPage() {
                   </div>
 
                   <div class="mt-6 flex justify-end items-center gap-4">
-                    <button 
+                    <button
                       onClick={() => setShowConfirmClear(true)}
                       title={t("editor.clearDraft")}
                       class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
                     >
                       <TrashIcon />
                     </button>
-                    <button 
+                    <button
                       onClick={() => setShowFullPreview(true)}
                       class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
                     >
@@ -619,13 +656,14 @@ export default function EditorPage() {
         </>
       </Show>
 
-      <EditorFilesDrawer 
+      <EditorFilesDrawer
         isOpen={showFiles()}
         onClose={() => setShowFiles(false)}
         baseDir={baseDir()}
         onInsert={handleInsertFile}
         onSetThumbnail={handleSetThumbnail}
         onInsertUrl={handleInsertUrl}
+        filesRevision={filesRevision()}
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}
@@ -634,14 +672,14 @@ export default function EditorPage() {
         title={t("editor.chapters.confirmDeleteTitle")}
         message={t("editor.chapters.confirmDeleteMessage")}
       />
-       <ConfirmModal
+      <ConfirmModal
         isOpen={showConfirmClear()}
         onClose={() => setShowConfirmClear(false)}
         onConfirm={handleConfirmClear}
         title={t("editor.clearDraftTitle")}
         message={t("editor.clearDraftMessage")}
       />
-      <PostSubmissionWizard 
+      <PostSubmissionWizard
         isOpen={showPublishWizard()}
         onClose={() => setShowPublishWizard(false)}
         onSuccess={handlePublishSuccess}

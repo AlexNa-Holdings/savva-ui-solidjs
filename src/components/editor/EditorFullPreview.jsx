@@ -49,7 +49,7 @@ export default function EditorFullPreview(props) {
     }
   }));
 
-  const markdownPlugins = createMemo(() => [rehypeResolveDraftUrls]);
+  const markdownPlugins = createMemo(() => [[rehypeResolveDraftUrls, { baseDir: props.baseDir }]]);
 
   return (
     <div class="max-w-5xl mx-auto space-y-4">

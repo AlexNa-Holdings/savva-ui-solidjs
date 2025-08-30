@@ -2,7 +2,7 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { useApp } from "../../../context/AppContext.jsx";
 import Spinner from "../../ui/Spinner.jsx";
-import { getAllUploadedFileNames, getUploadedFileAsFileObject } from "../../../editor/storage.js";
+import { getAllUploadedFileNames, getUploadedFileAsFileObject, DRAFT_DIRS } from "../../../editor/storage.js";
 import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
 
@@ -59,7 +59,15 @@ export default function StepUploadIPFS(props) {
 
   const uploadToIPFS = async () => {
     dbg.log("StepUploadIPFS", "Starting IPFS folder upload process...");
-    const { postData } = props;
+    const { postData, editorMode } = props;
+    
+    const baseDir = (() => {
+      if (editorMode === "new_post") return DRAFT_DIRS.NEW_POST;
+      if (editorMode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
+      if (["edit_post", "edit_comment"].includes(editorMode)) return DRAFT_DIRS.EDIT;
+      return "unknown";
+    })();
+
     const formData = new FormData();
 
     const content = postData();
@@ -69,7 +77,6 @@ export default function StepUploadIPFS(props) {
       const hasBody = data.body?.trim().length > 0;
       const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
 
-      // Skip this language if it has no meaningful content
       if (!hasTitle && !hasBody && !hasChapters) {
         dbg.log("StepUploadIPFS", `Skipping empty language: ${lang}`);
         continue;
@@ -89,9 +96,9 @@ export default function StepUploadIPFS(props) {
       }
     }
 
-    const assetFileNames = await getAllUploadedFileNames();
+    const assetFileNames = await getAllUploadedFileNames(baseDir);
     for (const fileName of assetFileNames) {
-      const file = await getUploadedFileAsFileObject(fileName);
+      const file = await getUploadedFileAsFileObject(baseDir, fileName);
       if (file) {
         formData.append('file', file, `uploads/${fileName}`);
       }
