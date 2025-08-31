@@ -19,8 +19,7 @@ import SubscribersTab from "../components/profile/SubscribersTab.jsx";
 import TokenValue from "../components/ui/TokenValue.jsx";
 
 // Data fetcher for the user profile
-async function fetchUserProfile(params) {
-  const { app, identifier } = params;
+async function fetchUserProfile({ app, identifier }) {
   if (!identifier || !app.wsCall) return null;
 
   try {
@@ -118,7 +117,7 @@ export default function ProfilePage() {
             <div class="space-y-6">
               {/* Profile Header */}
               <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                <div class="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
+                <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden shrink-0 bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
                   <IpfsImage 
                     src={user().avatar}
                     alt={`${user().name} avatar`}
@@ -198,4 +197,6 @@ export default function ProfilePage() {
     </main>
   );
 }
+
+
 
