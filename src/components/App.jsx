@@ -20,6 +20,7 @@ import EditorPage from "../pages/EditorPage.jsx";
 import AlertManager from "../alerts/AlertManager.jsx";
 import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
+import ProfileEditPage from "../pages/ProfileEditPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -31,6 +32,7 @@ export default function App() {
     if (r.startsWith("/post/")) return "post";
     if (r.startsWith("/settings")) return "settings";
     if (r.startsWith("/docs")) return "docs";
+    if (r.startsWith("/profile-edit/")) return "profile-edit";
     if (r.startsWith("/editor/")) return "editor";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
@@ -116,6 +118,9 @@ export default function App() {
                 </Match>
                 <Match when={currentView() === 'editor'}>
                   <EditorPage />
+                </Match>
+                <Match when={currentView() === 'profile-edit'}>
+                  <ProfileEditPage />
                 </Match>
               </Switch>
             </>

@@ -385,5 +385,13 @@ export default {
 "settings.pinning.test.hide_details": "Hide Details",
 "settings.pinning.test.show_details": "Show Details",
 "settings.pinning.test.errorDetails": "Test failed: {details}",
-"settings.pinning.test.details.verify_pending": "Attempting to fetch from: {url}"
+"settings.pinning.test.details.verify_pending": "Attempting to fetch from: {url}",
+"profile.edit.title": "Edit Profile",
+"profile.edit.placeholder": "Profile editing form will be here.",
+"profile.edit.generalInfo": "General Info",
+"profile.edit.generalInfo": "General Info",
+"profile.edit.avatar.title": "Edit Avatar",
+"profile.edit.avatar.save": "Save",
+"profile.edit.avatar.success": "Avatar update transaction sent.",
+"profile.edit.avatar.select": "Select an image file...",
 };

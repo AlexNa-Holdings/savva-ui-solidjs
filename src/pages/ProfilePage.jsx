@@ -18,6 +18,7 @@ import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
 import WalletTab from "../components/profile/WalletTab.jsx";
 import TokenValue from "../components/ui/TokenValue.jsx";
 import { walletAccount } from "../blockchain/wallet.js";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
 
 // Data fetcher for the user profile
 async function fetchUserProfile({ app, identifier }) {
@@ -70,6 +71,21 @@ export default function ProfilePage() {
   
   const [activeTab, setActiveTab] = createSignal('posts');
   
+  const isMyProfile = createMemo(() => {
+    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
+    const profileAddr = userResource()?.address?.toLowerCase();
+    return !!authorizedAddr && authorizedAddr === profileAddr;
+  });
+
+  const canEdit = createMemo(() => {
+    const connectedWallet = walletAccount()?.toLowerCase();
+    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
+  });
+
+  const handleEditProfile = () => {
+    navigate(`/profile-edit/${identifier()}`);
+  };
+
   const TABS = createMemo(() => {
     const tabs = [
       { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
@@ -77,7 +93,7 @@ export default function ProfilePage() {
       { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
     ];
 
-    if (walletAccount()) {
+    if (isMyProfile()) {
       tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
     }
 
@@ -130,66 +146,82 @@ export default function ProfilePage() {
           {(user) =>
             <div class="space-y-6">
               {/* Profile Header */}
-              <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                <div class="flex flex-col items-center gap-4 shrink-0">
-                  <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                    <IpfsImage 
-                      src={user().avatar}
-                      alt={`${user().name} avatar`}
-                      class="w-full h-full object-cover"
-                      fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
-                    />
-                  </div>
-                  <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
-                    <Show 
-                      when={!isSubscribed()}
-                      fallback={
-                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
-                          {t("profile.unsubscribe")}
+              <div class="flex justify-between items-end gap-4">
+                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                  <div class="flex flex-col items-center gap-4 shrink-0">
+                    <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
+                      <IpfsImage 
+                        src={user().avatar}
+                        alt={`${user().name} avatar`}
+                        class="w-full h-full object-cover"
+                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    </div>
+                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
+                      <Show 
+                        when={!isSubscribed()}
+                        fallback={
+                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                            {t("profile.unsubscribe")}
+                          </button>
+                        }
+                      >
+                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
+                          {t("profile.subscribe")}
                         </button>
-                      }
-                    >
-                      <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
-                        {t("profile.subscribe")}
-                      </button>
+                      </Show>
                     </Show>
-                  </Show>
-                </div>
-                
-                <div class="flex-1 w-full text-center sm:text-left space-y-3">
-                  <div class="flex flex-col items-center sm:items-start">
-                    <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
-                    <Show when={user().name}>
-                      <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                        <span>{user().name.toUpperCase()}</span>
-                        <VerifiedBadge class="w-4 h-4" />
-                      </div>
-                    </Show>
-                    <div class="mt-1">
-                      <Address address={user().address} format="full" />
-                    </div>
-                    <div class="flex items-center gap-2 mt-2 text-sm">
-                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
-                      <TokenValue amount={user().staked} />
-                      <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
-                    </div>
-                    <div class="flex items-center gap-2 mt-1 text-sm">
-                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
-                      <TokenValue amount={user().total_sponsoring} />
-                      <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                    </div>
-                    <div class="flex items-center gap-2 mt-1 text-sm">
-                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
-                      <TokenValue amount={user().total_sponsored} />
-                      <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                    </div>
                   </div>
+                  
+                  <div class="flex-1 w-full text-center sm:text-left space-y-3">
+                    <div class="flex flex-col items-center sm:items-start">
+                      <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
+                      <Show when={user().name}>
+                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
+                          <span>{user().name.toUpperCase()}</span>
+                          <VerifiedBadge class="w-4 h-4" />
+                        </div>
+                      </Show>
+                      <div class="mt-1">
+                        <Address address={user().address} format="full" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-2 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
+                        <TokenValue amount={user().staked} />
+                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                        <TokenValue amount={user().total_sponsoring} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                        <TokenValue amount={user().total_sponsored} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                    </div>
 
-                  <Show when={aboutText()}>
-                    <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
+                    <Show when={aboutText()}>
+                      <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* Edit Profile Button */}
+                <div class="flex-shrink-0">
+                  <Show when={canEdit()}>
+                    <button
+                      onClick={handleEditProfile}
+                      class="p-2 rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                      title={t("profile.edit.title")}
+                    >
+                      <EditIcon class="w-5 h-5" />
+                    </button>
                   </Show>
                 </div>
               </div>
+
 
               {/* Profile Tabs */}
               <div>

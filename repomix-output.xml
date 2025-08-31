@@ -242,6 +242,7 @@ src/
       PostTags.jsx
       ReactionInput.jsx
     profile/
+      AvatarEditorModal.jsx
       PostsTab.jsx
       SubscribersTab.jsx
       SubscriptionsTab.jsx
@@ -353,6 +354,7 @@ src/
     Docs.jsx
     EditorPage.jsx
     PostPage.jsx
+    ProfileEditPage.jsx
     ProfilePage.jsx
     Settings.jsx
   routing/
@@ -900,587 +902,216 @@ export async function switchOrAddChain(meta) {
 export { walletAccount, walletChainId };
 </file>
 
-<file path="src/components/profile/SubscriptionsTab.jsx">
-// src/components/profile/SubscriptionsTab.jsx
-import { createSignal, createMemo, For, Show, createEffect, on, onMount, onCleanup } from "solid-js";
+<file path="src/components/profile/AvatarEditorModal.jsx">
+// src/components/profile/AvatarEditorModal.jsx
+import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
-import TokenValue from "../ui/TokenValue.jsx";
 
-async function fetchSponsees(params) {
-  const { app, user_addr, n_weeks, offset, limit } = params;
-  if (!app.wsMethod || !user_addr) return { sponsees: [], next_offset: null };
-  try {
-    const getSponsees = app.wsMethod("get-sponsees");
-    const res = await getSponsees({
-      domain: "", // Empty domain to get sponsees across all domains
-      user_addr,
-      n_weeks,
-      limit,
-      offset,
-    });
-    return {
-      sponsees: Array.isArray(res?.sponsees) ? res.sponsees : [],
-      next_offset: res?.next_offset ?? null,
-    };
-  } catch (e) {
-    console.error("Failed to fetch sponsees:", e);
-    return { sponsees: [], next_offset: null };
-  }
-}
+const CROP_SIZE = 256; // Final avatar size in pixels
+const HANDLE_SIZE = 10; // Size of resize handles
 
-export default function SubscriptionsTab(props) {
-  const app = useApp();
-  const { t } = app;
-  const user = () => props.user;
+export default function AvatarEditorModal(props) {
+  const { t } = useApp();
+  const [sourceImage, setSourceImage] = createSignal(null);
+  const [crop, setCrop] = createSignal({ x: 10, y: 10, size: 200 });
+  const [action, setAction] = createSignal(null); // 'drag', 'resize-br', etc.
+  const [dragStart, setDragStart] = createSignal(null);
+  const [isProcessing, setIsProcessing] = createSignal(false);
 
-  const [showActiveOnly, setShowActiveOnly] = createSignal(true);
-  const nWeeks = createMemo(() => showActiveOnly() ? 1 : 0);
-  
-  const [sponsees, setSponsees] = createSignal([]);
-  const [offset, setOffset] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
+  let canvasRef;
+  let fileInputRef;
 
-  const loadMore = async () => {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-    
-    const result = await fetchSponsees({ 
-      app, 
-      user_addr: user().address, 
-      n_weeks: nWeeks(), 
-      offset: offset(), 
-      limit: 20 
-    });
-    
-    if (result.sponsees.length > 0) {
-      setSponsees(prev => [...prev, ...result.sponsees]);
-    }
-    
-    if (result.next_offset) {
-      setOffset(result.next_offset);
-    } else {
-      setHasMore(false);
-    }
-
-    setLoading(false);
+  const getCanvasMousePos = (e) => {
+    const rect = canvasRef.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
   
-  createEffect(on(nWeeks, () => {
-    setSponsees([]);
-    setOffset(0);
-    setHasMore(true);
-    loadMore();
-  }));
-  
-  onMount(() => {
-    loadMore(); // Initial load
-    const handleScroll = () => {
-      const scrollThreshold = 300;
-      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (nearBottom) {
-        loadMore();
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    onCleanup(() => window.removeEventListener('scroll', handleScroll));
+  const draw = () => {
+    const canvas = canvasRef;
+    if (!canvas || !sourceImage()) return;
+    const ctx = canvas.getContext("2d");
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(sourceImage(), 0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const c = crop();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(c.x, c.y, c.size, c.size);
+    ctx.clip();
+    ctx.drawImage(sourceImage(), 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(c.x, c.y, c.size, c.size);
+  };
+
+  createEffect(() => { if (props.isOpen) draw(); });
+
+  const getActionForPos = (pos) => {
+    const c = crop();
+    const hs = HANDLE_SIZE;
+    if (pos.x > c.x + c.size - hs && pos.x < c.x + c.size && pos.y > c.y + c.size - hs && pos.y < c.y + c.size) return 'resize-br';
+    if (pos.x > c.x && pos.x < c.x + hs && pos.y > c.y && pos.y < c.y + hs) return 'resize-tl';
+    if (pos.x > c.x && pos.x < c.x + c.size && pos.y > c.y && pos.y < c.y + c.size) return 'drag';
+    return null;
+  };
+
+  const handleMouseDown = (e) => {
+    const pos = getCanvasMousePos(e);
+    const currentAction = getActionForPos(pos);
+    if (currentAction) {
+      setAction(currentAction);
+      setDragStart({ mouseX: pos.x, mouseY: pos.y, cropX: crop().x, cropY: crop().y, cropSize: crop().size });
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    const pos = getCanvasMousePos(e);
+    const act = action();
+    
+    if (!act) {
+      const hoverAction = getActionForPos(pos);
+      if (hoverAction?.startsWith('resize')) canvasRef.style.cursor = 'se-resize';
+      else if (hoverAction === 'drag') canvasRef.style.cursor = 'move';
+      else canvasRef.style.cursor = 'default';
+      return;
+    }
+
+    const start = dragStart();
+    const dx = pos.x - start.mouseX;
+    const dy = pos.y - start.mouseY;
+
+    if (act === 'drag') {
+      const newX = Math.max(0, Math.min(start.cropX + dx, canvasRef.width - crop().size));
+      const newY = Math.max(0, Math.min(start.cropY + dy, canvasRef.height - crop().size));
+      setCrop(c => ({ ...c, x: newX, y: newY }));
+    } else { // Resizing
+        let { x, y, size } = crop();
+        if (act === 'resize-br') {
+            const newSize = Math.max(HANDLE_SIZE * 4, start.cropSize + Math.max(dx, dy));
+            size = Math.min(newSize, canvasRef.width - x, canvasRef.height - y);
+        } else if (act === 'resize-tl') {
+            const delta = Math.max(dx, dy);
+            const newSize = Math.max(HANDLE_SIZE * 4, start.cropSize - delta);
+            const newX = start.cropX + delta;
+            const newY = start.cropY + delta;
+            if (newX >= 0 && newY >= 0) {
+                x = newX;
+                y = newY;
+                size = newSize;
+            }
+        }
+        setCrop({ x, y, size });
+    }
+  };
+
+  const handleMouseUp = () => setAction(null);
+
+  const handleFileChange = (e) => {
+    const file = e.currentTarget.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          setSourceImage(img);
+          const canvas = canvasRef;
+          const aspect = img.width / img.height;
+          canvas.width = aspect > 1 ? 500 : 500 * aspect;
+          canvas.height = aspect > 1 ? 500 / aspect : 500;
+          const initialSize = Math.min(canvas.width, canvas.height) * 0.8;
+          setCrop({
+            x: (canvas.width - initialSize) / 2,
+            y: (canvas.height - initialSize) / 2,
+            size: initialSize,
+          });
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  createEffect(() => {
+    if (props.isOpen) {
+      setSourceImage(null);
+      
+      const onFocus = () => {
+        window.removeEventListener('focus', onFocus);
+        setTimeout(() => {
+          // If after a delay the input is still empty, user canceled.
+          if (!fileInputRef.files.length) {
+            props.onClose();
+          }
+        }, 300);
+      };
+      
+      window.addEventListener('focus', onFocus);
+      onCleanup(() => window.removeEventListener('focus', onFocus));
+
+      fileInputRef.click();
+    }
   });
 
-  return (
-    <div class="px-2">
-      <div class="flex items-center justify-end mb-4">
-        <label class="flex items-center gap-2 text-sm cursor-pointer">
-          <input 
-            type="checkbox" 
-            class="rounded"
-            checked={showActiveOnly()} 
-            onChange={e => setShowActiveOnly(e.currentTarget.checked)} 
-          />
-          {t("profile.subscribers.showActiveOnly")}
-        </label>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
-          <thead class="text-xs text-[hsl(var(--muted-foreground))] uppercase bg-[hsl(var(--muted))]">
-            <tr>
-              <th scope="col" class="px-4 py-2">{t("profile.subscribers.table.user")}</th>
-              <th scope="col" class="px-4 py-2">{t("profile.subscribers.table.domain")}</th>
-              <th scope="col" class="px-4 py-2 text-center">{t("profile.subscribers.table.weeks")}</th>
-              <th scope="col" class="px-4 py-2 text-right">{t("profile.subscribers.table.amount")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={sponsees()}>
-              {(sponsee) => (
-                <tr class="border-b border-[hsl(var(--border))]">
-                  <td class="px-4 py-2 font-medium">
-                    <UserCard author={sponsee.user} />
-                  </td>
-                  <td class="px-4 py-2">{sponsee.domain}</td>
-                  <td class="px-4 py-2 text-center">
-                    {sponsee.weeks < 1 ? t("profile.subscribers.table.expired") : sponsee.weeks}
-                  </td>
-                  <td class="px-4 py-2 flex justify-end">
-                    <TokenValue amount={sponsee.amount} format="vertical" />
-                  </td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-        <Show when={loading()}>
-          <div class="flex justify-center p-4"><Spinner /></div>
-        </Show>
-        <Show when={!loading() && sponsees().length === 0}>
-          <p class="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-            {t("profile.subscribers.noResults")}
-          </p>
-        </Show>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/profile/WalletTab.jsx">
-// src/components/profile/WalletTab.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import TokenValue from "../ui/TokenValue.jsx";
-import { createMemo, createResource, Show } from "solid-js";
-import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
-import Spinner from "../ui/Spinner.jsx";
-import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
-
-async function fetchWalletData({ app, user }) {
-  if (!user?.address || !app.desiredChain()) return null;
-
-  try {
-    const publicClient = createPublicClient({
-      chain: app.desiredChain(),
-      transport: http(app.desiredChain().rpcUrls[0]),
-    });
-
-    const savvaTokenContract = await getSavvaContract(app, "SavvaToken");
-    const contentFundContract = await getSavvaContract(app, "ContentFund");
-    const stakingContract = await getSavvaContract(app, "Staking");
-
-    const [
-      savvaBalance,
-      baseTokenBalance,
-      nftEarnings,
-      stakedBalance,
-      stakingReward
-    ] = await Promise.all([
-      savvaTokenContract.read.balanceOf([user.address]),
-      publicClient.getBalance({ address: user.address }),
-      contentFundContract.read.claimableNftGain([user.address]),
-      stakingContract.read.balanceOf([user.address]),
-      stakingContract.read.claimable([user.address])
-    ]);
-
-    return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward };
-  } catch (error) {
-    console.error("Failed to fetch wallet data:", error);
-    return { error };
-  }
-}
-
-const WalletSection = (props) => (
-  <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-    <div class="flex justify-between items-center">
-        <h3 class="text-lg font-medium">{props.title}</h3>
-        <Show when={props.headerAction}>
-            <div>{props.headerAction}</div>
-        </Show>
-    </div>
-    {props.children}
-  </section>
-);
-
-const WalletRow = (props) => (
-  <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
-    <div class="flex justify-between items-start">
-      <div class="pr-4">
-        <h4 class="font-semibold">{props.title}</h4>
-        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
-      </div>
-      <div class="flex-shrink-0">
-        <TokenValue amount={props.amount || "0"} format="vertical" tokenAddress={props.tokenAddress} />
-      </div>
-    </div>
-  </div>
-);
-
-export default function WalletTab(props) {
-  const app = useApp();
-  const { t } = app;
-  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user }), fetchWalletData);
-
-  const desiredChain = createMemo(() => app.desiredChain());
-  const baseTokenSymbol = createMemo(() => desiredChain()?.nativeCurrency?.symbol || "PLS");
-  
-  const RefreshButton = () => (
-    <button onClick={refetch} disabled={walletData.loading} class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed">
-        <RefreshIcon class="w-5 h-5" />
-    </button>
-  );
-  
-  return (
-    <div class="px-2 space-y-6">
-      <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
-        <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error.message}</p>}>
-            <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
-                <WalletRow 
-                    title={t("profile.wallet.savva.title")}
-                    description={t("profile.wallet.savva.description")}
-                    amount={walletData()?.savvaBalance}
-                />
-                <WalletRow 
-                    title={baseTokenSymbol()}
-                    description={t("profile.wallet.pls.description")}
-                    amount={walletData()?.baseTokenBalance}
-                    tokenAddress="0"
-                />
-            </WalletSection>
-          
-            <WalletSection title={t("profile.wallet.nft.title")}>
-                <WalletRow 
-                    title={t("profile.wallet.nftEarnings.title")}
-                    description={t("profile.wallet.nftEarnings.description")}
-                    amount={walletData()?.nftEarnings}
-                />
-            </WalletSection>
-
-            <WalletSection title={t("profile.wallet.staking.title")}>
-                <WalletRow 
-                    title={t("profile.wallet.staked.title")}
-                    description={t("profile.wallet.staked.description")}
-                    amount={walletData()?.stakedBalance}
-                />
-                <WalletRow 
-                    title={t("profile.wallet.reward.title")}
-                    description={t("profile.wallet.reward.description")}
-                    amount={walletData()?.stakingReward}
-                />
-            </WalletSection>
-        </Show>
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/settings/PinningServiceModal.jsx">
-// src/components/settings/PinningServiceModal.jsx
-import { createSignal, Show, createEffect, on } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-const PRESETS = {
-  pinata: {
-    name: "Pinata",
-    apiUrl: "https://api.pinata.cloud/pinning/pinFileToIPFS",
-    gatewayUrl: "https://gateway.pinata.cloud",
-  },
-  filebase: {
-    name: "Filebase",
-    apiUrl: "https://api.filebase.io/v1/ipfs/pins",
-    gatewayUrl: "https://ipfs.filebase.io",
-  },
-  '4everland': {
-    name: "4EVERLAND",
-    apiUrl: "https://api.4everland.dev/pinning/pins",
-    gatewayUrl: "https://4everland.io",
-  },
-};
-
-export default function PinningServiceModal(props) {
-  const { t } = useApp();
-  const [name, setName] = createSignal("");
-  const [apiUrl, setApiUrl] = createSignal("");
-  const [apiKey, setApiKey] = createSignal("");
-  const [gatewayUrl, setGatewayUrl] = createSignal("");
-  const [preset, setPreset] = createSignal("custom");
-
-  createEffect(on(() => props.service, (service) => {
-    if (service) {
-      setName(service.name || "");
-      setApiUrl(service.apiUrl || "");
-      setApiKey(service.apiKey || "");
-      setGatewayUrl(service.gatewayUrl || "");
-      setPreset("custom");
-    } else {
-      // Reset to default when adding a new one
-      handlePresetChange("pinata");
-    }
-  }, { defer: true }));
-
-  const handlePresetChange = (key) => {
-    setPreset(key);
-    const p = PRESETS[key];
-    if (p) {
-      setName(p.name);
-      setApiUrl(p.apiUrl);
-      setGatewayUrl(p.gatewayUrl);
-      setApiKey("");
-    } else {
-      setName("");
-      setApiUrl("");
-      setGatewayUrl("");
-      setApiKey("");
-    }
+  const handleSave = async () => {
+    if (!sourceImage()) return;
+    setIsProcessing(true);
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = CROP_SIZE;
+    tempCanvas.height = CROP_SIZE;
+    const ctx = tempCanvas.getContext("2d");
+    
+    const c = crop();
+    const scale = sourceImage().naturalWidth / canvasRef.width;
+    ctx.drawImage(sourceImage(), c.x * scale, c.y * scale, c.size * scale, c.size * scale, 0, 0, CROP_SIZE, CROP_SIZE);
+    
+    tempCanvas.toBlob(async (blob) => {
+      try {
+        await props.onSave(blob);
+        props.onClose();
+      } catch (e) { /* Parent handles error */ } finally {
+        setIsProcessing(false);
+      }
+    }, "image/png");
   };
-
-  const handleSave = () => {
-    props.onSave?.({
-      id: props.service?.id,
-      name: name().trim(),
-      apiUrl: apiUrl().trim(),
-      apiKey: apiKey().trim(),
-      gatewayUrl: gatewayUrl().trim(),
-    });
-  };
-
-  const title = () => props.service ? t("settings.pinning.modal.editTitle") : t("settings.pinning.modal.addTitle");
 
   return (
     <Show when={props.isOpen}>
       <div class="fixed inset-0 z-[60] flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
         <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-lg p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-4">{title()}</h3>
-          <div class="space-y-3">
-            <select
-              value={preset()}
-              onChange={(e) => handlePresetChange(e.currentTarget.value)}
-              class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            >
-              <option value="custom" disabled>{t("settings.pinning.preset")}</option>
-              <option value="pinata">{t("settings.pinning.preset.pinata")}</option>
-              <option value="filebase">{t("settings.pinning.preset.filebase")}</option>
-              <option value="4everland">{t("settings.pinning.preset.4everland")}</option>
-            </select>
-            <input type="text" value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("settings.pinning.modal.name.placeholder")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
-            <input type="text" value={apiUrl()} onInput={(e) => setApiUrl(e.currentTarget.value)} placeholder={t("settings.pinning.modal.apiUrl.placeholder")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
-            <input type="password" value={apiKey()} onInput={(e) => setApiKey(e.currentTarget.value)} placeholder={t("settings.pinning.modal.apiKey.label")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
-            <div>
-              <input type="text" value={gatewayUrl()} onInput={(e) => setGatewayUrl(e.currentTarget.value)} placeholder={t("settings.pinning.modal.gatewayUrl.placeholder")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
-              <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("settings.pinning.modal.gatewayUrl.help")}</p>
-            </div>
+          <h3 class="text-lg font-semibold mb-4">{t("profile.edit.avatar.title")}</h3>
+          <input type="file" ref={fileInputRef} class="hidden" accept="image/*" onChange={handleFileChange} />
+
+          <div class="flex justify-center items-center mb-4 min-h-[200px]">
+            <Show when={sourceImage()} fallback={<p>{t("profile.edit.avatar.select")}</p>}>
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                class="max-w-full max-h-[50vh]"
+              />
+            </Show>
           </div>
+
           <div class="flex gap-2 justify-end mt-4">
-            <button onClick={props.onClose} class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">{t("common.cancel")}</button>
-            <button onClick={handleSave} class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">{t("settings.pinning.modal.save")}</button>
+            <button class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90" onClick={props.onClose}>{t("common.cancel")}</button>
+            <button class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={handleSave} disabled={isProcessing() || !sourceImage()}>
+              <Show when={isProcessing()} fallback={<span>{t("profile.edit.avatar.save")}</span>}>
+                <Spinner class="w-5 h-5" />
+              </Show>
+            </button>
           </div>
         </div>
       </div>
     </Show>
-  );
-}
-</file>
-
-<file path="src/components/settings/PinningServicesSection.jsx">
-// src/components/settings/PinningServicesSection.jsx
-import { createSignal, For, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { getPinningServices, addPinningService, updatePinningService, deletePinningService, isPinningEnabled, setPinningEnabled } from "../../ipfs/pinning/storage.js";
-import { testService } from "../../ipfs/pinning/manager.js";
-import { pushToast } from "../../ui/toast.js";
-import PinningServiceModal from "./PinningServiceModal.jsx";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
-import Spinner from "../ui/Spinner.jsx";
-
-const TestStepRow = (props) => {
-  const { t } = useApp();
-  const statusColor = () => {
-    if (props.step.status === 'success') return 'text-emerald-500';
-    if (props.step.status === 'error') return 'text-red-500';
-    return 'text-[hsl(var(--muted-foreground))]';
-  };
-  const detailsText = () => {
-    const { step, details } = props.step;
-    if (typeof details === 'object') {
-      return t(`settings.pinning.test.details.${step}_ok`, details);
-    }
-    return details || t(`settings.pinning.test.status.${props.step.status}`);
-  };
-
-  return (
-    <div class="grid grid-cols-[2rem_1fr] items-start gap-2">
-      <div class="flex justify-center pt-1">
-        <Show when={props.step.status === 'pending'}><Spinner class="w-4 h-4" /></Show>
-        <Show when={props.step.status === 'success'}><span class="text-emerald-500">✓</span></Show>
-        <Show when={props.step.status === 'error'}><span class="text-red-500">✗</span></Show>
-      </div>
-      <div>
-        <p class="font-semibold text-xs">{t(`settings.pinning.test.step.${props.step.step}`)}</p>
-        <p class={`text-xs break-all ${statusColor()}`}>{detailsText()}</p>
-      </div>
-    </div>
-  );
-};
-
-export default function PinningServicesSection() {
-  const { t } = useApp();
-  const [services, setServices] = createSignal(getPinningServices());
-  const [usePinning, setUsePinning] = createSignal(isPinningEnabled());
-  const [isModalOpen, setIsModalOpen] = createSignal(false);
-  const [editingService, setEditingService] = createSignal(null);
-  const [deletingService, setDeletingService] = createSignal(null);
-  const [testingId, setTestingId] = createSignal(null);
-  const [testDetails, setTestDetails] = createSignal(null);
-
-  const refreshServices = () => setServices(getPinningServices());
-
-  const handleTogglePinning = (e) => {
-    const isEnabled = e.currentTarget.checked;
-    setPinningEnabled(isEnabled);
-    setUsePinning(isEnabled);
-  };
-
-  const handleAdd = () => {
-    setEditingService(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (service) => {
-    setEditingService(service);
-    setIsModalOpen(true);
-  };
-
-  const handleSave = (service) => {
-    if (service.id) {
-      updatePinningService(service);
-    } else {
-      addPinningService(service);
-    }
-    refreshServices();
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (service) => {
-    deletePinningService(service.id);
-    refreshServices();
-  };
-
-  const handleTest = async (service) => {
-    setTestingId(service.id);
-    setTestDetails({ serviceId: service.id, steps: [], error: null });
-
-    const handleProgress = (progress) => {
-      setTestDetails(prev => {
-        const steps = [...prev.steps];
-        const existingIndex = steps.findIndex(s => s.step === progress.step);
-        if (existingIndex > -1) {
-          steps[existingIndex] = progress;
-        } else {
-          steps.push(progress);
-        }
-        return { ...prev, steps };
-      });
-      return lastReportedStep;
-    };
-
-    try {
-      await testService(service, { onProgress: handleProgress });
-      pushToast({ type: "success", message: t("settings.pinning.test.success") });
-    } catch (e) {
-      setTestDetails(prev => ({ ...prev, error: e.message }));
-      pushToast({ type: "error", message: t("settings.pinning.test.error") });
-    } finally {
-      setTestingId(null);
-    }
-  };
-
-  return (
-    <>
-      <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-medium">{t("settings.pinning.title")}</h3>
-          <button onClick={handleAdd} class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]">{t("settings.pinning.add")}</button>
-        </div>
-        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.pinning.description")}</p>
-        
-        <div class="pt-2">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input 
-              type="checkbox"
-              class="rounded"
-              checked={usePinning()}
-              onChange={handleTogglePinning}
-            />
-            <span class="text-sm font-medium">{t("settings.pinning.enable.label")}</span>
-          </label>
-          <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 pl-6">{t("settings.pinning.enable.help")}</p>
-        </div>
-
-        <div class="space-y-2">
-          <For each={services()}>
-            {(service) => (
-              <div class="p-2 rounded border border-[hsl(var(--border))]">
-                <div class="flex items-center justify-between">
-                  <div class="font-semibold text-sm">{service.name}</div>
-                  <div class="flex items-center gap-2">
-                    <button onClick={() => handleTest(service)} disabled={!!testingId()} class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] disabled:opacity-50">
-                      {testingId() === service.id ? t("settings.pinning.testing") : t("settings.pinning.test")}
-                    </button>
-                    <button onClick={() => handleEdit(service)} class="px-2 py-1 text-xs">{t("settings.pinning.edit")}</button>
-                    <button onClick={() => setDeletingService(service)} class="px-2 py-1 text-xs text-[hsl(var(--destructive))]">{t("settings.pinning.delete")}</button>
-                  </div>
-                </div>
-                <Show when={testDetails()?.serviceId === service.id}>
-                  <div class="mt-2 pt-2 border-t border-[hsl(var(--border))] space-y-2">
-                    <For each={testDetails().steps}>
-                      {(step) => <TestStepRow step={step} />}
-                    </For>
-                    <Show when={testDetails().error}>
-                      <p class="text-xs text-red-500 font-semibold">{t("settings.pinning.test.errorDetails", {details: testDetails().error})}</p>
-                    </Show>
-                    <button onClick={() => setTestDetails(null)} class="text-xs hover:underline">{t("settings.pinning.test.hide_details")}</button>
-                  </div>
-                </Show>
-              </div>
-            )}
-          </For>
-        </div>
-      </section>
-      
-      <PinningServiceModal 
-        isOpen={isModalOpen()}
-        service={editingService()}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSave}
-      />
-      
-      <ConfirmModal 
-        isOpen={!!deletingService()}
-        onClose={() => setDeletingService(null)}
-        onConfirm={() => {
-          handleDelete(deletingService());
-          setDeletingService(null);
-        }}
-        title={t("settings.pinning.confirmDelete.title")}
-        message={t("settings.pinning.confirmDelete.message")}
-      />
-    </>
-  );
-}
-</file>
-
-<file path="src/components/ui/icons/RefreshIcon.jsx">
-// src/components/ui/icons/RefreshIcon.jsx
-export default function RefreshIcon(props) {
-  return (
-    <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="none" {...props}>
-        <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-        <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-        <g id="SVGRepo_iconCarrier">
-            <path fill="currentColor" fill-rule="evenodd" d="M7.997 16.99a1 1 0 10.292-1.98C5.89 14.657 4 12.508 4 9.86c0-2.294 1.416-4.21 3.358-4.914L6.367 7.25a1 1 0 101.837.79L9.92 4.053a1 1 0 00-.256-1.143l-3-2.658a1 1 0 10-1.326 1.496L6.78 3.027C3.988 3.986 2 6.702 2 9.86c0 3.603 2.581 6.624 5.997 7.13zm4.006-13.98a1 1 0 00-.292 1.98C14.11 5.343 16 7.492 16 10.14c0 2.294-1.416 4.21-3.358 4.913l.991-2.303a1 1 0 00-1.837-.79l-1.715 3.987a1 1 0 00.256 1.143l3 2.659a1 1 0 001.326-1.497l-1.443-1.279c2.792-.958 4.78-3.675 4.78-6.833 0-3.603-2.581-6.624-5.997-7.13z"></path>
-        </g>
-    </svg>
   );
 }
 </file>
@@ -1548,122 +1179,6 @@ export function tabIconFor(type) {
     case "for-you":   return <HeartIcon />;
     default:          return null;
   }
-}
-</file>
-
-<file path="src/components/ui/BrandLogo.jsx">
-// src/components/ui/BrandLogo.jsx
-import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { dbg } from "../../utils/debug";
-import { navigate } from "../../routing/hashRouter.js";
-
-export default function BrandLogo(props) {
-  const app = useApp();
-  const { t, domainAssetsConfig, assetUrl } = app;
-
-  // Single source of truth for the domain name (falls back to i18n brand name)
-  const domainTitle = createMemo(() => {
-    const fromCfg = app.config?.()?.domain?.trim();
-    const fallback = t("brand.name");
-    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
-  });
-
-  // Theme + mobile detection
-  const [isDark, setIsDark] = createSignal(false);
-  const [isMobile, setIsMobile] = createSignal(false);
-  onMount(() => {
-    const el = document.documentElement;
-    const updateDark = () => setIsDark(el.classList.contains("dark"));
-    updateDark();
-    const mo = new MutationObserver(updateDark);
-    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
-
-    const mql = window.matchMedia("(max-width: 640px)");
-    const onMQ = (e) => setIsMobile(!!e.matches);
-    onMQ(mql);
-    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
-
-    onCleanup(() => {
-      mo.disconnect();
-      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
-    });
-  });
-
-  // logos from active domain assets config
-  const logos = createMemo(() => {
-    const cfg = domainAssetsConfig?.();
-    const raw = cfg?.logos ?? cfg?.logo ?? null;
-    if (!raw) return null;
-    if (typeof raw === "string") return { default: raw };
-    return {
-      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
-      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-      mobile:       raw.mobile       ?? null,
-      dark:         raw.dark         ?? null,
-      light:        raw.light        ?? null,
-      default:      raw.default      ?? raw.fallback     ?? null,
-    };
-  });
-
-  const relPath = createMemo(() => {
-    const l = logos();
-    if (!l) return "";
-    const dark = isDark();
-    const mobile = isMobile();
-    const order = dark
-      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
-      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
-    return order.find(Boolean) || "";
-  });
-
-  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
-
-  // 🔎 Debug: log whenever the chosen logo src changes
-  createEffect(() => {
-    const s = src();
-    if (!s) return;
-    dbg.log("logo", "BrandLogo src picked", {
-      src: s,
-      relPath: relPath(),
-      dark: isDark(),
-      mobile: isMobile(),
-      domain: app.config?.()?.domain,
-      activePrefix: app.domainAssetsPrefix?.(),
-      source: app.domainAssetsSource?.(),
-    });
-  });
-
-  const [imgBroken, setImgBroken] = createSignal(false);
-  // reset broken flag whenever src changes
-  createMemo(() => { src(); setImgBroken(false); });
-
-  const handleLogoClick = (e) => {
-    e.preventDefault();
-    navigate("/");
-  };
-
-  return (
-    <a href="/#/" onClick={handleLogoClick} class="cursor-pointer">
-      <div class="flex items-center">
-        <Show when={src() && !imgBroken()} fallback={
-          <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
-        }>
-          <img
-            src={src()}
-            alt={t("brand.logoAlt", { domain: domainTitle() })}
-            class={props.class || "h-8 w-auto"}
-            decoding="async"
-            loading="eager"
-            onError={() => {
-              dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
-              setImgBroken(true);
-            }}
-          />
-        </Show>
-      </div>
-    </a>
-  );
 }
 </file>
 
@@ -1748,188 +1263,206 @@ export function useTheme() {
 }
 </file>
 
-<file path="src/ipfs/pinning/manager.js">
-// src/ipfs/pinning/manager.js
-import { fetchWithTimeout } from "../../utils/net";
+<file path="src/pages/ProfileEditPage.jsx">
+// src/pages/ProfileEditPage.jsx
+import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import { useHashRouter } from "../routing/hashRouter.js";
+import { walletAccount } from "../blockchain/wallet.js";
+import { getSavvaContract } from "../blockchain/contracts.js";
+import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
+import { ipfs } from "../ipfs/index.js";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
+import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast, pushToast } from "../ui/toast.js";
 
-function cleanUrl(url) {
-  return (url || "").trim().replace(/\/+$/, "");
-}
+async function fetchProfileForEdit(params) {
+    const { app, identifier } = params;
+    if (!identifier) return { error: "No identifier provided." };
 
-/**
- * Pins a directory of files to a single pinning service.
- */
-export async function pinDirectory(serviceConfig, files, options = {}) {
-  const { onProgress } = options;
-  const formData = new FormData();
+    try {
+        const userProfileContract = await getSavvaContract(app, 'UserProfile');
+        let userAddress;
 
-  for (const { file, path } of files) {
-    formData.append('file', file, path);
-  }
+        if (identifier.startsWith('@')) {
+            const userName = identifier.substring(1).toLowerCase();
+            const address = await userProfileContract.read.owners([userName]);
+            if (!address || address === '0x0000000000000000000000000000000000000000') {
+                return { error: "User does not exist." };
+            }
+            userAddress = toChecksumAddress(address);
+        } else {
+            userAddress = toChecksumAddress(identifier);
+        }
 
-  if (serviceConfig.apiUrl.includes('pinata')) {
-    const pinataMetadata = JSON.stringify({ name: `savva-post-${Date.now()}` });
-    formData.append('pinataMetadata', pinataMetadata);
-  }
+        const avatarCid = await userProfileContract.read.avatars([userAddress]);
+        const profileCid = await userProfileContract.read.getString([
+            userAddress,
+            toHexBytes32(app.selectedDomainName()),
+            toHexBytes32("profile_cid")
+        ]);
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', serviceConfig.apiUrl, true);
-    xhr.setRequestHeader('Authorization', `Bearer ${serviceConfig.apiKey}`);
+        let ipfsData = {};
+        if (profileCid) {
+            const { data } = await ipfs.getJSONBest(app, profileCid);
+            ipfsData = data || {};
+        }
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress?.(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const res = JSON.parse(xhr.responseText);
-          const cid = res?.IpfsHash;
-          if (!cid) throw new Error("API response did not include an IpfsHash.");
-          resolve(cid);
-        } catch (e) { reject(e); }
-      } else {
-        reject(new Error(`API responded with status ${xhr.status}: ${xhr.responseText}`));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error("Network error during upload."));
-    xhr.ontimeout = () => reject(new Error("The upload request timed out."));
-    xhr.send(formData);
-  });
-}
-
-/**
- * Tests a pinning service by uploading a single file, verifying it, and reporting progress.
- */
-export async function testService(serviceConfig, options = {}) {
-  const { onProgress } = options;
-  let lastReportedStep = null; // Hoisted to the function scope
-  const report = (step, status, details = "") => {
-    lastReportedStep = { step, status, details };
-    onProgress?.(lastReportedStep);
-  };
-  
-  try {
-    // 1. Create a unique file object
-    report('create_file', 'pending');
-    const testContent = `SAVVA Pin Test @ ${new Date().toISOString()}`;
-    const testFile = new File([testContent], 'savva-test.txt', { type: 'text/plain' });
-    report('create_file', 'success', { bytes: testFile.size });
-
-    // 2. Pin the file via API
-    report('pinning', 'pending', serviceConfig.apiUrl);
-    const formData = new FormData();
-    formData.append('file', testFile);
-    if (serviceConfig.apiUrl.includes('pinata')) {
-      formData.append('pinataOptions', JSON.stringify({ wrapWithDirectory: false }));
+        return {
+            address: userAddress,
+            avatar: avatarCid,
+            profile: ipfsData
+        };
+    } catch (e) {
+        console.error("Failed to fetch profile for editing:", e);
+        return { error: e.message };
     }
+}
 
-    const res = await fetchWithTimeout(serviceConfig.apiUrl, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${serviceConfig.apiKey}` },
-      body: formData,
-      timeoutMs: 20000,
+export default function ProfileEditPage() {
+    const app = useApp();
+    const { t, lang: uiLang, domainAssetsConfig } = app;
+    const { route } = useHashRouter();
+
+    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
+
+    const identifier = createMemo(() => {
+        const path = route();
+        return path.split('/')[2] || "";
     });
-    if (!res.ok) {
-        const errorBody = await res.text();
-        throw new Error(`API responded with status ${res.status}: ${errorBody}`);
-    }
-    const pinResponse = await res.json();
-    report('pinning', 'success', { status: res.status });
 
-    // 3. Get the CID from the response
-    report('get_cid', 'pending');
-    const cid = pinResponse?.IpfsHash;
-    if (!cid) throw new Error("API response did not include an IpfsHash.");
-    report('get_cid', 'success', { cid });
+    const [profileData] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
 
-    // 4. Verify availability on the gateway
-    const gateway = cleanUrl(serviceConfig.gatewayUrl);
-    const verifyUrl = `${gateway}/ipfs/${cid}`;
-    report('verify', 'pending', verifyUrl);
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    const [avatar, setAvatar] = createSignal("");
+    const [about, setAbout] = createSignal({});
+    const [activeLang, setActiveLang] = createSignal(uiLang());
+
+    createEffect(() => {
+        const data = profileData();
+        if (data && !data.error) {
+            setAvatar(data.avatar || "");
+
+            const profileAbout = data.profile?.about;
+            if (typeof profileAbout === 'string') {
+                setAbout({ [activeLang()]: profileAbout });
+            } else if (typeof profileAbout === 'object' && profileAbout !== null) {
+                setAbout(profileAbout);
+            } else {
+                setAbout({});
+            }
+        }
+    });
+
+    const domainLangCodes = createMemo(() => {
+        const locales = domainAssetsConfig?.()?.locales || [];
+        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
+    });
     
-    const verifyRes = await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
-    if (!verifyRes.ok) throw new Error(`Gateway responded with status ${verifyRes.status}`);
-    const fetchedText = await verifyRes.text();
-    if (fetchedText.trim() !== testContent.trim()) {
-      throw new Error("Gateway returned incorrect data.");
-    }
-    report('verify', 'success');
-    
-    return { success: true };
+    const handleAboutChange = (e) => {
+        const newText = e.currentTarget.value;
+        setAbout(prev => ({ ...prev, [activeLang()]: newText }));
+    };
 
-  } catch (e) {
-    if (lastReportedStep) {
-      report(lastReportedStep.step, 'error', e.message);
-    }
-    throw new Error(`Test failed at step '${lastReportedStep?.step || 'unknown'}': ${e.message}`);
-  }
-}
-</file>
+    const handleAvatarSave = async (blob) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', blob, 'avatar.png');
 
-<file path="src/ipfs/pinning/storage.js">
-// src/ipfs/pinning/storage.js
-import { dbg } from "../../utils/debug";
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
 
-const STORAGE_KEY = "ipfs_pinning_services";
-const PINNING_ENABLED_KEY = "ipfs_pinning_enabled";
+            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
+            const result = await response.json();
+            const newCid = result?.cid;
+            if (!newCid) throw new Error("API did not return a CID for the avatar.");
 
-export function getPinningServices() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    dbg.error("PinningStorage", "Failed to load services", e);
-    return [];
-  }
-}
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            await contract.write.setAvatar([newCid]);
+            
+            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
+        } catch (e) {
+            pushErrorToast(e, { context: "Avatar update failed" });
+            throw e; // re-throw to keep modal's processing state correct
+        }
+    };
 
-export function savePinningServices(services) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(services));
-  } catch (e) {
-    dbg.error("PinningStorage", "Failed to save services", e);
-  }
-}
+    return (
+        <>
+            <main class="p-4 max-w-3xl mx-auto space-y-6">
+                <ClosePageButton />
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
+                </div>
 
-export function addPinningService(service) {
-  const services = getPinningServices();
-  const newService = { ...service, id: crypto.randomUUID() };
-  savePinningServices([...services, newService]);
-  return newService;
-}
-
-export function updatePinningService(updatedService) {
-  const services = getPinningServices();
-  const newServices = services.map(s => s.id === updatedService.id ? updatedService : s);
-  savePinningServices(newServices);
-}
-
-export function deletePinningService(serviceId) {
-  const services = getPinningServices();
-  const newServices = services.filter(s => s.id !== serviceId);
-  savePinningServices(newServices);
-}
-
-export function isPinningEnabled() {
-  try {
-    return localStorage.getItem(PINNING_ENABLED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function setPinningEnabled(isEnabled) {
-  try {
-    localStorage.setItem(PINNING_ENABLED_KEY, isEnabled ? "1" : "0");
-  } catch (e) {
-    dbg.error("PinningStorage", "Failed to set pinning enabled state", e);
-  }
+                <Show when={walletAccount()} fallback={
+                    <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                        <p class="text-[hsl(var(--muted-foreground))] text-center">Please connect your wallet to edit the profile.</p>
+                    </div>
+                }>
+                    <Switch>
+                        <Match when={profileData.loading}>
+                            <div class="flex justify-center items-center h-48"><Spinner /></div>
+                        </Match>
+                        <Match when={profileData()?.error}>
+                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+                                <p class="text-red-500 text-center">{profileData().error}</p>
+                            </div>
+                        </Match>
+                        <Match when={profileData()}>
+                            <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                <h3 class="text-lg font-semibold">{t("profile.edit.generalInfo")}</h3>
+                                <div class="flex items-center gap-6">
+                                    <div 
+                                        onClick={() => setShowAvatarEditor(true)}
+                                        class="relative group w-48 h-48 rounded-full overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
+                                    >
+                                        <IpfsImage
+                                            src={avatar()}
+                                            alt="User Avatar"
+                                            class="w-full h-full object-cover"
+                                            fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
+                                        />
+                                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <EditIcon class="w-10 h-10 text-white" />
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 space-y-2">
+                                        <div class="flex justify-end">
+                                            <LangSelector
+                                                codes={domainLangCodes()}
+                                                value={activeLang()}
+                                                onChange={setActiveLang}
+                                            />
+                                        </div>
+                                        <textarea
+                                            value={about()[activeLang()] || ""}
+                                            onInput={handleAboutChange}
+                                            class="w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                            placeholder="Tell us about yourself..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </Match>
+                    </Switch>
+                </Show>
+            </main>
+            <AvatarEditorModal 
+                isOpen={showAvatarEditor()}
+                onClose={() => setShowAvatarEditor(false)}
+                onSave={handleAvatarSave}
+            />
+        </>
+    );
 }
 </file>
 
@@ -20050,144 +19583,6 @@ export default function PostTags(props) {
 }
 </file>
 
-<file path="src/components/profile/PostsTab.jsx">
-// src/components/profile/PostsTab.jsx
-import { createSignal, createResource, createMemo, For, Show, Switch, Match } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-import TagList from "./TagList.jsx";
-import { useDomainCategories } from "../../hooks/useDomainCategories.js";
-
-async function fetchUserTags(params) {
-  const { app, user_addr, lang } = params;
-  if (!app.wsMethod || !user_addr || !lang) return [];
-  try {
-    const getTags = app.wsMethod("get-user-tags");
-    const res = await getTags({
-      domain: app.selectedDomainName(),
-      user_addr: user_addr,
-      locale: lang,
-    });
-    return Array.isArray(res) ? res.sort() : [];
-  } catch (e) {
-    console.error("Failed to fetch user tags:", e);
-    return [];
-  }
-}
-
-export default function PostsTab(props) {
-  const app = useApp();
-  const { t } = app;
-  const lang = () => app.lang();
-  const user = () => props.user;
-
-  const [selectedTags, setSelectedTags] = createSignal([]);
-  const [selectedCategory, setSelectedCategory] = createSignal("ALL");
-
-  const [tagsResource] = createResource(() => ({
-    app,
-    user_addr: user()?.address,
-    lang: lang()
-  }), fetchUserTags);
-
-  const categoriesResource = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesResource() || [])]);
-
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-  const feedResetKey = createMemo(() => `${selectedCategory()}|${selectedTags().join(',')}`);
-
-  async function fetchPage(page, pageSize) {
-    if (!contentList || !user()?.address) return [];
-    
-    const params = {
-      domain: app.selectedDomainName(),
-      author_addr: toChecksumAddress(user().address),
-      my_addr: app.authorizedUser()?.address ? toChecksumAddress(app.authorizedUser().address) : undefined,
-      content_type: "post",
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
-      lang: lang(),
-    };
-
-    const cat = selectedCategory();
-    if (cat && cat !== "ALL") params.category = `${lang()}:${cat}`;
-    
-    const tags = selectedTags();
-    if (tags.length > 0) params.tags = tags.map(tag => `${lang()}:${tag}`);
-
-    try {
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({ id: it.savva_cid, _raw: it }));
-    } catch (err) {
-      console.error("PostsTab fetchPage error:", err);
-      return [];
-    }
-  }
-
-  const handleTagToggle = (tag) => {
-    setSelectedTags(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(tag)) newSet.delete(tag);
-      else newSet.add(tag);
-      return Array.from(newSet);
-    });
-  };
-
-  const RightPanel = () => (
-    <section class="w-full">
-      <div class="mb-3 flex flex-wrap items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={selectedCategory()}
-            onInput={(e) => setSelectedCategory(e.currentTarget.value)}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? t("categories.all") : c}</option>}
-            </For>
-          </select>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={false}
-        isActivated={true}
-      />
-    </section>
-  );
-
-  return (
-    <Switch>
-      <Match when={!tagsResource.loading && tagsResource()?.length > 0}>
-        <div class="grid grid-cols-[180px_minmax(0,1fr)] gap-6 items-start">
-          <aside class="sticky top-[120px]">
-            <h4 class="text-sm font-semibold mb-2">{t("profile.tabs.tags")}</h4>
-            <TagList 
-              tags={tagsResource()} 
-              loading={tagsResource.loading}
-              selectedTags={selectedTags()} 
-              onTagToggle={handleTagToggle} 
-            />
-          </aside>
-          <RightPanel />
-        </div>
-      </Match>
-      <Match when={true}>
-        <RightPanel />
-      </Match>
-    </Switch>
-  );
-}
-</file>
-
 <file path="src/components/profile/SubscribersTab.jsx">
 // src/components/profile/SubscribersTab.jsx
 import { createSignal, createMemo, For, Show, createEffect, on, onMount, onCleanup } from "solid-js";
@@ -20333,6 +19728,151 @@ export default function SubscribersTab(props) {
 }
 </file>
 
+<file path="src/components/profile/SubscriptionsTab.jsx">
+// src/components/profile/SubscriptionsTab.jsx
+import { createSignal, createMemo, For, Show, createEffect, on, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import UserCard from "../ui/UserCard.jsx";
+import Spinner from "../ui/Spinner.jsx";
+import TokenValue from "../ui/TokenValue.jsx";
+
+async function fetchSponsees(params) {
+  const { app, user_addr, n_weeks, offset, limit } = params;
+  if (!app.wsMethod || !user_addr) return { sponsees: [], next_offset: null };
+  try {
+    const getSponsees = app.wsMethod("get-sponsees");
+    const res = await getSponsees({
+      domain: "", // Empty domain to get sponsees across all domains
+      user_addr,
+      n_weeks,
+      limit,
+      offset,
+    });
+    return {
+      sponsees: Array.isArray(res?.sponsees) ? res.sponsees : [],
+      next_offset: res?.next_offset ?? null,
+    };
+  } catch (e) {
+    console.error("Failed to fetch sponsees:", e);
+    return { sponsees: [], next_offset: null };
+  }
+}
+
+export default function SubscriptionsTab(props) {
+  const app = useApp();
+  const { t } = app;
+  const user = () => props.user;
+
+  const [showActiveOnly, setShowActiveOnly] = createSignal(true);
+  const nWeeks = createMemo(() => showActiveOnly() ? 1 : 0);
+  
+  const [sponsees, setSponsees] = createSignal([]);
+  const [offset, setOffset] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+
+  const loadMore = async () => {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    
+    const result = await fetchSponsees({ 
+      app, 
+      user_addr: user().address, 
+      n_weeks: nWeeks(), 
+      offset: offset(), 
+      limit: 20 
+    });
+    
+    if (result.sponsees.length > 0) {
+      setSponsees(prev => [...prev, ...result.sponsees]);
+    }
+    
+    if (result.next_offset) {
+      setOffset(result.next_offset);
+    } else {
+      setHasMore(false);
+    }
+
+    setLoading(false);
+  };
+  
+  createEffect(on(nWeeks, () => {
+    setSponsees([]);
+    setOffset(0);
+    setHasMore(true);
+    loadMore();
+  }));
+  
+  onMount(() => {
+    loadMore(); // Initial load
+    const handleScroll = () => {
+      const scrollThreshold = 300;
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
+      if (nearBottom) {
+        loadMore();
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    onCleanup(() => window.removeEventListener('scroll', handleScroll));
+  });
+
+  return (
+    <div class="px-2">
+      <div class="flex items-center justify-end mb-4">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input 
+            type="checkbox" 
+            class="rounded"
+            checked={showActiveOnly()} 
+            onChange={e => setShowActiveOnly(e.currentTarget.checked)} 
+          />
+          {t("profile.subscribers.showActiveOnly")}
+        </label>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="text-xs text-[hsl(var(--muted-foreground))] uppercase bg-[hsl(var(--muted))]">
+            <tr>
+              <th scope="col" class="px-4 py-2">{t("profile.subscribers.table.user")}</th>
+              <th scope="col" class="px-4 py-2">{t("profile.subscribers.table.domain")}</th>
+              <th scope="col" class="px-4 py-2 text-center">{t("profile.subscribers.table.weeks")}</th>
+              <th scope="col" class="px-4 py-2 text-right">{t("profile.subscribers.table.amount")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <For each={sponsees()}>
+              {(sponsee) => (
+                <tr class="border-b border-[hsl(var(--border))]">
+                  <td class="px-4 py-2 font-medium">
+                    <UserCard author={sponsee.user} />
+                  </td>
+                  <td class="px-4 py-2">{sponsee.domain}</td>
+                  <td class="px-4 py-2 text-center">
+                    {sponsee.weeks < 1 ? t("profile.subscribers.table.expired") : sponsee.weeks}
+                  </td>
+                  <td class="px-4 py-2 flex justify-end">
+                    <TokenValue amount={sponsee.amount} format="vertical" />
+                  </td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+        </table>
+        <Show when={loading()}>
+          <div class="flex justify-center p-4"><Spinner /></div>
+        </Show>
+        <Show when={!loading() && sponsees().length === 0}>
+          <p class="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
+            {t("profile.subscribers.noResults")}
+          </p>
+        </Show>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/profile/TagList.jsx">
 // src/pages/profile/TagList.jsx
 import { For, Show } from "solid-js";
@@ -20361,6 +19901,135 @@ export default function TagList(props) {
             </button>
           )}
         </For>
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/profile/WalletTab.jsx">
+// src/components/profile/WalletTab.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import TokenValue from "../ui/TokenValue.jsx";
+import { createMemo, createResource, Show } from "solid-js";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import { createPublicClient, http } from "viem";
+import Spinner from "../ui/Spinner.jsx";
+import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
+
+async function fetchWalletData({ app, user }) {
+  if (!user?.address || !app.desiredChain()) return null;
+
+  try {
+    const publicClient = createPublicClient({
+      chain: app.desiredChain(),
+      transport: http(app.desiredChain().rpcUrls[0]),
+    });
+
+    const savvaTokenContract = await getSavvaContract(app, "SavvaToken");
+    const contentFundContract = await getSavvaContract(app, "ContentFund");
+    const stakingContract = await getSavvaContract(app, "Staking");
+
+    const [
+      savvaBalance,
+      baseTokenBalance,
+      nftEarnings,
+      stakedBalance,
+      stakingReward
+    ] = await Promise.all([
+      savvaTokenContract.read.balanceOf([user.address]),
+      publicClient.getBalance({ address: user.address }),
+      contentFundContract.read.claimableNftGain([user.address]),
+      stakingContract.read.balanceOf([user.address]),
+      stakingContract.read.claimable([user.address])
+    ]);
+
+    return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward };
+  } catch (error) {
+    console.error("Failed to fetch wallet data:", error);
+    return { error };
+  }
+}
+
+const WalletSection = (props) => (
+  <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+    <div class="flex justify-between items-center">
+        <h3 class="text-lg font-medium">{props.title}</h3>
+        <Show when={props.headerAction}>
+            <div>{props.headerAction}</div>
+        </Show>
+    </div>
+    {props.children}
+  </section>
+);
+
+const WalletRow = (props) => (
+  <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
+    <div class="flex justify-between items-start">
+      <div class="pr-4">
+        <h4 class="font-semibold">{props.title}</h4>
+        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
+      </div>
+      <div class="flex-shrink-0">
+        <TokenValue amount={props.amount || "0"} format="vertical" tokenAddress={props.tokenAddress} />
+      </div>
+    </div>
+  </div>
+);
+
+export default function WalletTab(props) {
+  const app = useApp();
+  const { t } = app;
+  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user }), fetchWalletData);
+
+  const desiredChain = createMemo(() => app.desiredChain());
+  const baseTokenSymbol = createMemo(() => desiredChain()?.nativeCurrency?.symbol || "PLS");
+  
+  const RefreshButton = () => (
+    <button onClick={refetch} disabled={walletData.loading} class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed">
+        <RefreshIcon class="w-5 h-5" />
+    </button>
+  );
+  
+  return (
+    <div class="px-2 space-y-6">
+      <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
+        <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error.message}</p>}>
+            <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
+                <WalletRow 
+                    title={t("profile.wallet.savva.title")}
+                    description={t("profile.wallet.savva.description")}
+                    amount={walletData()?.savvaBalance}
+                />
+                <WalletRow 
+                    title={baseTokenSymbol()}
+                    description={t("profile.wallet.pls.description")}
+                    amount={walletData()?.baseTokenBalance}
+                    tokenAddress="0"
+                />
+            </WalletSection>
+          
+            <WalletSection title={t("profile.wallet.nft.title")}>
+                <WalletRow 
+                    title={t("profile.wallet.nftEarnings.title")}
+                    description={t("profile.wallet.nftEarnings.description")}
+                    amount={walletData()?.nftEarnings}
+                />
+            </WalletSection>
+
+            <WalletSection title={t("profile.wallet.staking.title")}>
+                <WalletRow 
+                    title={t("profile.wallet.staked.title")}
+                    description={t("profile.wallet.staked.description")}
+                    amount={walletData()?.stakedBalance}
+                />
+                <WalletRow 
+                    title={t("profile.wallet.reward.title")}
+                    description={t("profile.wallet.reward.description")}
+                    amount={walletData()?.stakingReward}
+                />
+            </WalletSection>
+        </Show>
       </Show>
     </div>
   );
@@ -20519,6 +20188,307 @@ export default function Assets() {
         </div>
       </Show>
     </section>
+  );
+}
+</file>
+
+<file path="src/components/settings/PinningServiceModal.jsx">
+// src/components/settings/PinningServiceModal.jsx
+import { createSignal, Show, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+const PRESETS = {
+  pinata: {
+    name: "Pinata",
+    apiUrl: "https://api.pinata.cloud/pinning/pinFileToIPFS",
+    gatewayUrl: "https://gateway.pinata.cloud",
+  },
+  // filebase: {
+  //   name: "Filebase",
+  //   apiUrl: "https://api.filebase.io/v1/ipfs/pins",
+  //   gatewayUrl: "https://ipfs.filebase.io",
+  // },
+  // '4everland': {
+  //   name: "4EVERLAND",
+  //   apiUrl: "https://api.4everland.dev/pinning/pins",
+  //   gatewayUrl: "https://4everland.io",
+  // },
+};
+
+export default function PinningServiceModal(props) {
+  const { t } = useApp();
+  const [name, setName] = createSignal("");
+  const [apiUrl, setApiUrl] = createSignal("");
+  const [apiKey, setApiKey] = createSignal("");
+  const [gatewayUrl, setGatewayUrl] = createSignal("");
+  const [preset, setPreset] = createSignal("custom");
+
+  createEffect(on(() => props.service, (service) => {
+    if (service) {
+      setName(service.name || "");
+      setApiUrl(service.apiUrl || "");
+      setApiKey(service.apiKey || "");
+      setGatewayUrl(service.gatewayUrl || "");
+      setPreset("custom");
+    } else {
+      // Reset to default when adding a new one
+      handlePresetChange("pinata");
+    }
+  }, { defer: true }));
+
+  const handlePresetChange = (key) => {
+    setPreset(key);
+    const p = PRESETS[key];
+    if (p) {
+      setName(p.name);
+      setApiUrl(p.apiUrl);
+      setGatewayUrl(p.gatewayUrl);
+      setApiKey("");
+    } else {
+      setName("");
+      setApiUrl("");
+      setGatewayUrl("");
+      setApiKey("");
+    }
+  };
+
+  const handleSave = () => {
+    props.onSave?.({
+      id: props.service?.id,
+      name: name().trim(),
+      apiUrl: apiUrl().trim(),
+      apiKey: apiKey().trim(),
+      gatewayUrl: gatewayUrl().trim(),
+    });
+  };
+
+  const title = () => props.service ? t("settings.pinning.modal.editTitle") : t("settings.pinning.modal.addTitle");
+
+  return (
+    <Show when={props.isOpen}>
+      <div class="fixed inset-0 z-[60] flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-lg p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-4">{title()}</h3>
+          <div class="space-y-3">
+            <select
+              value={preset()}
+              onChange={(e) => handlePresetChange(e.currentTarget.value)}
+              class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            >
+              <option value="custom" disabled>{t("settings.pinning.preset")}</option>
+              <option value="pinata">{t("settings.pinning.preset.pinata")}</option>
+              {/* <option value="filebase">{t("settings.pinning.preset.filebase")}</option> */}
+              {/* <option value="4everland">{t("settings.pinning.preset.4everland")}</option> */}
+            </select>
+            <input type="text" value={name()} onInput={(e) => setName(e.currentTarget.value)} placeholder={t("settings.pinning.modal.name.placeholder")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
+            <input type="text" value={apiUrl()} onInput={(e) => setApiUrl(e.currentTarget.value)} placeholder={t("settings.pinning.modal.apiUrl.placeholder")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
+            <input type="password" value={apiKey()} onInput={(e) => setApiKey(e.currentTarget.value)} placeholder={t("settings.pinning.modal.apiKey.label")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
+            <div>
+              <input type="text" value={gatewayUrl()} onInput={(e) => setGatewayUrl(e.currentTarget.value)} placeholder={t("settings.pinning.modal.gatewayUrl.placeholder")} class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]" />
+              <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("settings.pinning.modal.gatewayUrl.help")}</p>
+            </div>
+          </div>
+          <div class="flex gap-2 justify-end mt-4">
+            <button onClick={props.onClose} class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">{t("common.cancel")}</button>
+            <button onClick={handleSave} class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90">{t("settings.pinning.modal.save")}</button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
+<file path="src/components/settings/PinningServicesSection.jsx">
+// src/components/settings/PinningServicesSection.jsx
+import { createSignal, For, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { getPinningServices, addPinningService, updatePinningService, deletePinningService, isPinningEnabled, setPinningEnabled } from "../../ipfs/pinning/storage.js";
+import { testService } from "../../ipfs/pinning/manager.js";
+import { pushToast } from "../../ui/toast.js";
+import PinningServiceModal from "./PinningServiceModal.jsx";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import Spinner from "../ui/Spinner.jsx";
+
+const TestStepRow = (props) => {
+  const { t } = useApp();
+  const statusColor = () => {
+    if (props.step.status === 'success') return 'text-emerald-500';
+    if (props.step.status === 'error') return 'text-red-500';
+    return 'text-[hsl(var(--muted-foreground))]';
+  };
+  const detailsText = () => {
+    const { step, status, details } = props.step;
+    if (typeof details === 'object' && details !== null) {
+      if (status === 'pending' && details.url) {
+        return t(`settings.pinning.test.details.${step}_pending`, details);
+      }
+      if (status === 'error' && details.url && details.error) {
+        return t(`settings.pinning.test.details.${step}_error`, details);
+      }
+      return t(`settings.pinning.test.details.${step}_ok`, details);
+    }
+    return details || t(`settings.pinning.test.status.${props.step.status}`);
+  };
+
+  return (
+    <div class="grid grid-cols-[2rem_1fr] items-start gap-2">
+      <div class="flex justify-center pt-1">
+        <Show when={props.step.status === 'pending'}><Spinner class="w-4 h-4" /></Show>
+        <Show when={props.step.status === 'success'}><span class="text-emerald-500">✓</span></Show>
+        <Show when={props.step.status === 'error'}><span class="text-red-500">✗</span></Show>
+      </div>
+      <div>
+        <p class="font-semibold text-xs">{t(`settings.pinning.test.step.${props.step.step}`)}</p>
+        <p class={`text-xs break-all ${statusColor()}`}>{detailsText()}</p>
+      </div>
+    </div>
+  );
+};
+
+export default function PinningServicesSection() {
+  const { t } = useApp();
+  const [services, setServices] = createSignal(getPinningServices());
+  const [usePinning, setUsePinning] = createSignal(isPinningEnabled());
+  const [isModalOpen, setIsModalOpen] = createSignal(false);
+  const [editingService, setEditingService] = createSignal(null);
+  const [deletingService, setDeletingService] = createSignal(null);
+  const [testingId, setTestingId] = createSignal(null);
+  const [testDetails, setTestDetails] = createSignal(null);
+
+  const refreshServices = () => setServices(getPinningServices());
+
+  const handleTogglePinning = (e) => {
+    const isEnabled = e.currentTarget.checked;
+    setPinningEnabled(isEnabled);
+    setUsePinning(isEnabled);
+  };
+
+  const handleAdd = () => {
+    setEditingService(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (service) => {
+    setEditingService(service);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = (service) => {
+    if (service.id) {
+      updatePinningService(service);
+    } else {
+      addPinningService(service);
+    }
+    refreshServices();
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (service) => {
+    deletePinningService(service.id);
+    refreshServices();
+  };
+
+  const handleTest = async (service) => {
+    setTestingId(service.id);
+    setTestDetails({ serviceId: service.id, steps: [], error: null });
+
+    const handleProgress = (progress) => {
+      setTestDetails(prev => {
+        const steps = [...prev.steps];
+        const existingIndex = steps.findIndex(s => s.step === progress.step);
+        if (existingIndex > -1) {
+          steps[existingIndex] = progress;
+        } else {
+          steps.push(progress);
+        }
+        return { ...prev, steps };
+      });
+    };
+
+    try {
+      await testService(service, { onProgress: handleProgress });
+      pushToast({ type: "success", message: t("settings.pinning.test.success") });
+    } catch (e) {
+      setTestDetails(prev => ({ ...prev, error: e.message }));
+      pushToast({ type: "error", message: t("settings.pinning.test.error") });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  return (
+    <>
+      <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium">{t("settings.pinning.title")}</h3>
+          <button onClick={handleAdd} class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]">{t("settings.pinning.add")}</button>
+        </div>
+        <p class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.pinning.description")}</p>
+
+        <div class="pt-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              class="rounded"
+              checked={usePinning()}
+              onChange={handleTogglePinning}
+            />
+            <span class="text-sm font-medium">{t("settings.pinning.enable.label")}</span>
+          </label>
+          <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1 pl-6">{t("settings.pinning.enable.help")}</p>
+        </div>
+
+        <div class="space-y-2">
+          <For each={services()}>
+            {(service) => (
+              <div class="p-2 rounded border border-[hsl(var(--border))]">
+                <div class="flex items-center justify-between">
+                  <div class="font-semibold text-sm">{service.name}</div>
+                  <div class="flex items-center gap-2">
+                    <button onClick={() => handleTest(service)} disabled={!!testingId()} class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] disabled:opacity-50">
+                      {testingId() === service.id ? t("settings.pinning.testing") : t("settings.pinning.test")}
+                    </button>
+                    <button onClick={() => handleEdit(service)} class="px-2 py-1 text-xs">{t("settings.pinning.edit")}</button>
+                    <button onClick={() => setDeletingService(service)} class="px-2 py-1 text-xs text-[hsl(var(--destructive))]">{t("settings.pinning.delete")}</button>
+                  </div>
+                </div>
+                <Show when={testDetails()?.serviceId === service.id}>
+                  <div class="mt-2 pt-2 border-t border-[hsl(var(--border))] space-y-2">
+                    <For each={testDetails().steps}>
+                      {(step) => <TestStepRow step={step} />}
+                    </For>
+                    <Show when={testDetails().error}>
+                      <p class="text-xs text-red-500 font-semibold">{t("settings.pinning.test.errorDetails", { details: testDetails().error })}</p>
+                    </Show>
+                    <button onClick={() => setTestDetails(null)} class="text-xs hover:underline">{t("settings.pinning.test.hide_details")}</button>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
+        </div>
+      </section>
+
+      <PinningServiceModal
+        isOpen={isModalOpen()}
+        service={editingService()}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSave}
+      />
+
+      <ConfirmModal
+        isOpen={!!deletingService()}
+        onClose={() => setDeletingService(null)}
+        onConfirm={() => {
+          handleDelete(deletingService());
+          setDeletingService(null);
+        }}
+        title={t("settings.pinning.confirmDelete.title")}
+        message={t("settings.pinning.confirmDelete.message")}
+      />
+    </>
   );
 }
 </file>
@@ -20702,6 +20672,21 @@ export default function NftBadge(props) {
 }
 </file>
 
+<file path="src/components/ui/icons/RefreshIcon.jsx">
+// src/components/ui/icons/RefreshIcon.jsx
+export default function RefreshIcon(props) {
+  return (
+    <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="none" {...props}>
+        <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+        <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+        <g id="SVGRepo_iconCarrier">
+            <path fill="currentColor" fill-rule="evenodd" d="M7.997 16.99a1 1 0 10.292-1.98C5.89 14.657 4 12.508 4 9.86c0-2.294 1.416-4.21 3.358-4.914L6.367 7.25a1 1 0 101.837.79L9.92 4.053a1 1 0 00-.256-1.143l-3-2.658a1 1 0 10-1.326 1.496L6.78 3.027C3.988 3.986 2 6.702 2 9.86c0 3.603 2.581 6.624 5.997 7.13zm4.006-13.98a1 1 0 00-.292 1.98C14.11 5.343 16 7.492 16 10.14c0 2.294-1.416 4.21-3.358 4.913l.991-2.303a1 1 0 00-1.837-.79l-1.715 3.987a1 1 0 00.256 1.143l3 2.659a1 1 0 001.326-1.497l-1.443-1.279c2.792-.958 4.78-3.675 4.78-6.833 0-3.603-2.581-6.624-5.997-7.13z"></path>
+        </g>
+    </svg>
+  );
+}
+</file>
+
 <file path="src/components/ui/icons/SavvaTokenIcon.jsx">
 // src/components/ui/icons/SavvaTokenIcon.jsx
 export default function SavvaTokenIcon(props) {
@@ -20775,59 +20760,118 @@ export default function Address(props) {
 }
 </file>
 
-<file path="src/components/ui/ClosePageButton.jsx">
-// src/components/ui/ClosePageButton.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter } from "../../routing/hashRouter";
+<file path="src/components/ui/BrandLogo.jsx">
+// src/components/ui/BrandLogo.jsx
+import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { dbg } from "../../utils/debug";
+import { navigate } from "../../routing/hashRouter.js";
 
-/**
- * Close (go to main tabs view) or Back (go to previous history entry) floating button.
- * @param {object} props
- * @param {string} [props.mode='back'] - 'back' for history.back(), 'close' to navigate to the main feed.
- */
-export default function ClosePageButton(props) {
+export default function BrandLogo(props) {
   const app = useApp();
-  const { navigate } = useHashRouter();
-  const { t } = app;
-  const label = props.title || t("settings.back");
-  const offsetTop = props.offsetTop ?? 56;
-  const mode = props.mode || 'back';
+  const { t, domainAssetsConfig, assetUrl } = app;
 
-  const handleClick = () => {
-    if (mode === 'close') {
-      navigate(app.lastTabRoute() || "/");
-    } else {
-      window.history.back();
-    }
+  // Single source of truth for the domain name (falls back to i18n brand name)
+  const domainTitle = createMemo(() => {
+    const fromCfg = app.config?.()?.domain?.trim();
+    const fallback = t("brand.name");
+    return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
+  });
+
+  // Theme + mobile detection
+  const [isDark, setIsDark] = createSignal(false);
+  const [isMobile, setIsMobile] = createSignal(false);
+  onMount(() => {
+    const el = document.documentElement;
+    const updateDark = () => setIsDark(el.classList.contains("dark"));
+    updateDark();
+    const mo = new MutationObserver(updateDark);
+    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+
+    const mql = window.matchMedia("(max-width: 640px)");
+    const onMQ = (e) => setIsMobile(!!e.matches);
+    onMQ(mql);
+    mql.addEventListener ? mql.addEventListener("change", onMQ) : mql.addListener(onMQ);
+
+    onCleanup(() => {
+      mo.disconnect();
+      mql.removeEventListener ? mql.removeEventListener("change", onMQ) : mql.removeListener(onMQ);
+    });
+  });
+
+  // logos from active domain assets config
+  const logos = createMemo(() => {
+    const cfg = domainAssetsConfig?.();
+    const raw = cfg?.logos ?? cfg?.logo ?? null;
+    if (!raw) return null;
+    if (typeof raw === "string") return { default: raw };
+    return {
+      dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+      light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+      mobile:       raw.mobile       ?? null,
+      dark:         raw.dark         ?? null,
+      light:        raw.light        ?? null,
+      default:      raw.default      ?? raw.fallback     ?? null,
+    };
+  });
+
+  const relPath = createMemo(() => {
+    const l = logos();
+    if (!l) return "";
+    const dark = isDark();
+    const mobile = isMobile();
+    const order = dark
+      ? (mobile ? [l.dark_mobile, l.dark, l.mobile, l.default, l.light] : [l.dark, l.default, l.light, l.mobile])
+      : (mobile ? [l.light_mobile, l.light, l.mobile, l.default, l.dark] : [l.light, l.default, l.dark, l.mobile]);
+    return order.find(Boolean) || "";
+  });
+
+  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
+
+  // 🔎 Debug: log whenever the chosen logo src changes
+  createEffect(() => {
+    const s = src();
+    if (!s) return;
+    dbg.log("logo", "BrandLogo src picked", {
+      src: s,
+      relPath: relPath(),
+      dark: isDark(),
+      mobile: isMobile(),
+      domain: app.config?.()?.domain,
+      activePrefix: app.domainAssetsPrefix?.(),
+      source: app.domainAssetsSource?.(),
+    });
+  });
+
+  const [imgBroken, setImgBroken] = createSignal(false);
+  // reset broken flag whenever src changes
+  createMemo(() => { src(); setImgBroken(false); });
+
+  const handleLogoClick = (e) => {
+    e.preventDefault();
+    navigate("/");
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label={label}
-      title={label}
-      class="fixed right-3 z-20 p-2 rounded-full
-             bg-[hsl(var(--background))]/70
-             hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] 
-             shadow-sm transition-colors"
-      style={{ top: `${offsetTop}px` }}
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="w-5 h-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <line x1="18" y1="6" x2="6" y2="18" />
-        <line x1="6" y1="6" x2="18" y2="18" />
-      </svg>
-    </button>
+    <a href="/#/" onClick={handleLogoClick} class="cursor-pointer">
+      <div class="flex items-center">
+        <Show when={src() && !imgBroken()} fallback={
+          <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
+        }>
+          <img
+            src={src()}
+            alt={t("brand.logoAlt", { domain: domainTitle() })}
+            class={props.class || "h-8 w-auto"}
+            decoding="async"
+            loading="eager"
+            onError={() => {
+              dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
+              setImgBroken(true);
+            }}
+          />
+        </Show>
+      </div>
+    </a>
   );
 }
 </file>
@@ -20932,112 +20976,6 @@ export default function Spinner(props) {
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
       />
     </svg>
-  );
-}
-</file>
-
-<file path="src/components/ui/TokenValue.jsx">
-// src/components/ui/TokenValue.jsx
-import { createMemo, Show, createSignal, createEffect, on } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { formatUnits } from "viem";
-import SavvaTokenIcon from "./icons/SavvaTokenIcon.jsx";
-import { getChainLogo } from "../../blockchain/chainLogos.js";
-
-export default function TokenValue(props) {
-  const app = useApp();
-  const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
-  const desiredChain = createMemo(() => app.desiredChain());
-
-  const isBaseToken = createMemo(() => props.tokenAddress === "0");
-  const tokenAddress = createMemo(() => props.tokenAddress || savvaTokenAddress());
-  const isSavvaToken = createMemo(() => !isBaseToken() && tokenAddress()?.toLowerCase() === savvaTokenAddress()?.toLowerCase());
-
-  const formattedAmount = createMemo(() => {
-    try {
-      const amount = parseFloat(formatUnits(BigInt(props.amount || 0), 18));
-      return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } catch {
-      return "0.00";
-    }
-  });
-
-  const sourceUsdValue = createMemo(() => {
-    let priceData = null;
-    if (isSavvaToken()) {
-      priceData = app.savvaTokenPrice();
-    } else if (isBaseToken()) {
-      priceData = app.baseTokenPrice();
-    }
-    
-    if (!priceData?.price) return null;
-
-    try {
-      const amount = parseFloat(formatUnits(BigInt(props.amount || 0), 18));
-      const price = priceData.price;
-      const total = amount * price;
-      return total.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-    } catch {
-      return null;
-    }
-  });
-
-  const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
-  const [isAnimating, setIsAnimating] = createSignal(false);
-
-  createEffect(on(sourceUsdValue, (newValue, prevValue) => {
-    if (prevValue === undefined || prevValue === null) {
-      setDisplayUsdValue(newValue);
-      return;
-    }
-    setDisplayUsdValue(prevValue);
-    setIsAnimating(true);
-    setTimeout(() => { setDisplayUsdValue(newValue); }, 200);
-    setTimeout(() => { setIsAnimating(false); }, 400);
-  }, { defer: true }));
-
-  const TokenIcon = () => {
-    if (isSavvaToken()) {
-      return <SavvaTokenIcon class="w-4 h-4" />;
-    }
-    if (isBaseToken()) {
-        const logoSrc = getChainLogo(desiredChain()?.id);
-        if (logoSrc) {
-            return <img src={logoSrc} alt={desiredChain()?.nativeCurrency.symbol} class="w-5 h-5" />;
-        }
-    }
-    return null;
-  };
-
-  const isVertical = () => props.format === 'vertical';
-
-  return (
-    <Show
-      when={isVertical()}
-      fallback={
-        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`}>
-          <TokenIcon />
-          <span class="font-semibold">{formattedAmount()}</span>
-          <Show when={displayUsdValue()}>
-            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
-              ({displayUsdValue()})
-            </span>
-          </Show>
-        </div>
-      }
-    >
-      <div class={`flex flex-col items-end text-sm ${props.class || ''}`}>
-        <div class="flex items-center gap-1.5">
-          <TokenIcon />
-          <span class="font-semibold">{formattedAmount()}</span>
-        </div>
-        <Show when={displayUsdValue()}>
-          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
-            ({displayUsdValue()})
-          </span>
-        </Show>
-      </div>
-    </Show>
   );
 }
 </file>
@@ -21150,56 +21088,6 @@ export default function RightPaneFooter() {
 }
 </file>
 
-<file path="src/context/useTokenPrices.js">
-// src/context/useTokenPrices.js
-import { createSignal, onMount, onCleanup, createMemo } from "solid-js";
-import { whenWsOpen, getWsApi } from "../net/wsRuntime";
-import { dbg } from "../utils/debug";
-
-export function useTokenPrices(app) {
-  const [prices, setPrices] = createSignal({});
-
-  const updatePrices = (data) => {
-    if (!data || !data.tokens) return;
-    setPrices(prev => ({ ...prev, ...data.tokens }));
-  };
-
-  const fetchInitialPrices = async () => {
-    try {
-      await whenWsOpen();
-      const api = getWsApi();
-      const data = await api.call("get-token-prices");
-      dbg.log("TokenPrices", "Fetched initial prices", data);
-      updatePrices(data);
-    } catch (error) {
-      dbg.error("TokenPrices", "Failed to fetch initial token prices", error);
-    }
-  };
-
-  onMount(() => {
-    fetchInitialPrices();
-  });
-  
-  const savvaTokenPrice = createMemo(() => {
-    const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
-    if (!savvaTokenAddress) return null;
-    return prices()[savvaTokenAddress] || null;
-  });
-  
-  const baseTokenPrice = createMemo(() => {
-    // The key for the base/native token is an empty string
-    return prices()[""] || null; 
-  });
-
-  return {
-    allTokenPrices: prices,
-    savvaTokenPrice,
-    baseTokenPrice,
-    updateTokenPrices: updatePrices
-  };
-}
-</file>
-
 <file path="src/dev/AssetDebugTap.jsx">
 // src/dev/AssetDebugTap.jsx
 /* src/dev/AssetDebugTap.jsx */
@@ -21289,78 +21177,6 @@ export default function AssetDebugTap() {
 
     // Nothing to render
     return null;
-}
-</file>
-
-<file path="src/docs/rehype-media-players.js">
-// src/docs/rehype-media-players.js
-import { visit } from "unist-util-visit";
-
-const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
-const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
-const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
-
-function isVideoUrl(url, altText = "") {
-  return VIDEO_EXTENSIONS.test(url) || VIDEO_EXTENSIONS.test(altText);
-}
-
-function isAudioUrl(url, altText = "") {
-  return AUDIO_EXTENSIONS.test(url) || AUDIO_EXTENSIONS.test(altText);
-}
-
-function getYouTubeId(url) {
-  const match = url.match(YOUTUBE_REGEX);
-  return match ? match[1] : null;
-}
-
-export function rehypeMediaPlayers() {
-  return (tree) => {
-    visit(tree, "element", (node) => {
-      if (node.tagName !== "img" || !node.properties?.src) {
-        return;
-      }
-
-      const url = node.properties.src;
-      const alt = node.properties.alt;
-      const youtubeId = getYouTubeId(url);
-
-      if (youtubeId) {
-        node.tagName = "div";
-        node.properties = {
-          className: "youtube-container",
-          style: "position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%;"
-        };
-        node.children = [{
-          type: "element",
-          tagName: "iframe",
-          properties: {
-            src: `https://www.youtube.com/embed/${youtubeId}`,
-            frameborder: "0",
-            allowfullscreen: true,
-            style: "position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-          },
-          children: []
-        }];
-      } else if (isVideoUrl(url, alt)) {
-        node.tagName = "video";
-        node.properties = {
-          src: url,
-          controls: true,
-          style: "width: 100%; border-radius: 0.5rem;"
-        };
-        node.children = [];
-      } else if (isAudioUrl(url, alt)) {
-        node.tagName = "audio";
-        node.properties = {
-          src: url,
-          controls: true,
-          style: "width: 100%;"
-        };
-        node.children = [];
-      }
-    });
-    return tree;
-  };
 }
 </file>
 
@@ -21595,6 +21411,206 @@ export function useDomainCategories(app) {
     }
   });
   return cats;
+}
+</file>
+
+<file path="src/ipfs/pinning/manager.js">
+// src/ipfs/pinning/manager.js
+import { fetchWithTimeout } from "../../utils/net";
+
+function cleanUrl(url) {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+
+/**
+ * Pins a directory of files to a single pinning service.
+ */
+export async function pinDirectory(serviceConfig, files, options = {}) {
+  const { onProgress } = options;
+  const formData = new FormData();
+
+  // Create a single root directory name for the entire upload.
+  const directoryName = `savva-post-${Date.now()}`;
+
+  for (const { file, path } of files) {
+    // Prepend the root directory name to each file's path.
+    formData.append('file', file, `${directoryName}/${path}`);
+  }
+
+  if (serviceConfig.apiUrl.includes('pinata')) {
+    // The metadata name should match the directory name for clarity in the Pinata UI.
+    const pinataMetadata = JSON.stringify({ name: directoryName });
+    formData.append('pinataMetadata', pinataMetadata);
+    // The `wrapWithDirectory` option is no longer needed as we are manually creating the structure.
+  }
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', serviceConfig.apiUrl, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${serviceConfig.apiKey}`);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          const cid = res?.IpfsHash;
+          if (!cid) throw new Error("API response did not include an IpfsHash.");
+          resolve(cid);
+        } catch (e) { reject(e); }
+      } else {
+        reject(new Error(`API responded with status ${xhr.status}: ${xhr.responseText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.ontimeout = () => reject(new Error("The upload request timed out."));
+    xhr.send(formData);
+  });
+}
+
+/**
+ * Tests a pinning service by uploading a single file, verifying it, and reporting progress.
+ */
+export async function testService(serviceConfig, options = {}) {
+  const { onProgress } = options;
+  let lastReportedStep = null; // Hoisted to the function scope
+  const report = (step, status, details = "") => {
+    lastReportedStep = { step, status, details };
+    onProgress?.(lastReportedStep);
+  };
+
+  try {
+    // 1. Create a unique file object
+    report("create_file", "pending");
+    const testContent = `SAVVA Pin Test @ ${new Date().toISOString()}`;
+    const testFile = new File([testContent], "savva-test.txt", {
+      type: "text/plain",
+    });
+    report("create_file", "success", { bytes: testFile.size });
+
+    // 2. Pin the file via API
+    report("pinning", "pending", serviceConfig.apiUrl);
+    const formData = new FormData();
+    formData.append("file", testFile);
+    if (serviceConfig.apiUrl.includes("pinata")) {
+      formData.append(
+        "pinataOptions",
+        JSON.stringify({ wrapWithDirectory: false })
+      );
+    }
+
+    const res = await fetchWithTimeout(serviceConfig.apiUrl, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceConfig.apiKey}` },
+      body: formData,
+      timeoutMs: 20000,
+    });
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`API responded with status ${res.status}: ${errorBody}`);
+    }
+    const pinResponse = await res.json();
+    report("pinning", "success", { status: res.status });
+
+    // 3. Get the CID from the response
+    report("get_cid", "pending");
+    const cid = pinResponse?.IpfsHash;
+    if (!cid) throw new Error("API response did not include an IpfsHash.");
+    report("get_cid", "success", { cid });
+
+    // 4. Verify availability on the gateway
+    const gateway = cleanUrl(serviceConfig.gatewayUrl);
+    const verifyUrl = `${gateway}/ipfs/${cid}`;
+    report("verify", "pending", verifyUrl);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const verifyRes = await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
+    if (!verifyRes.ok)
+      throw new Error(`Gateway responded with status ${verifyRes.status}`);
+    const fetchedText = await verifyRes.text();
+    if (fetchedText.trim() !== testContent.trim()) {
+      throw new Error("Gateway returned incorrect data.");
+    }
+    report("verify", "success");
+
+    return { success: true };
+  } catch (e) {
+    if (lastReportedStep) {
+      report(lastReportedStep.step, "error", e.message);
+    }
+    throw new Error(
+      `Test failed at step '${lastReportedStep?.step || "unknown"}': ${
+        e.message
+      }`
+    );
+  }
+}
+</file>
+
+<file path="src/ipfs/pinning/storage.js">
+// src/ipfs/pinning/storage.js
+import { dbg } from "../../utils/debug";
+
+const STORAGE_KEY = "ipfs_pinning_services";
+const PINNING_ENABLED_KEY = "ipfs_pinning_enabled";
+
+export function getPinningServices() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    dbg.error("PinningStorage", "Failed to load services", e);
+    return [];
+  }
+}
+
+export function savePinningServices(services) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(services));
+  } catch (e) {
+    dbg.error("PinningStorage", "Failed to save services", e);
+  }
+}
+
+export function addPinningService(service) {
+  const services = getPinningServices();
+  const newService = { ...service, id: crypto.randomUUID() };
+  savePinningServices([...services, newService]);
+  return newService;
+}
+
+export function updatePinningService(updatedService) {
+  const services = getPinningServices();
+  const newServices = services.map(s => s.id === updatedService.id ? updatedService : s);
+  savePinningServices(newServices);
+}
+
+export function deletePinningService(serviceId) {
+  const services = getPinningServices();
+  const newServices = services.filter(s => s.id !== serviceId);
+  savePinningServices(newServices);
+}
+
+export function isPinningEnabled() {
+  try {
+    return localStorage.getItem(PINNING_ENABLED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setPinningEnabled(isEnabled) {
+  try {
+    localStorage.setItem(PINNING_ENABLED_KEY, isEnabled ? "1" : "0");
+  } catch (e) {
+    dbg.error("PinningStorage", "Failed to set pinning enabled state", e);
+  }
 }
 </file>
 
@@ -23711,6 +23727,144 @@ export default function WsConnector() {
 }
 </file>
 
+<file path="src/components/profile/PostsTab.jsx">
+// src/components/profile/PostsTab.jsx
+import { createSignal, createResource, createMemo, For, Show, Switch, Match } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import TagList from "./TagList.jsx";
+import { useDomainCategories } from "../../hooks/useDomainCategories.js";
+
+async function fetchUserTags(params) {
+  const { app, user_addr, lang } = params;
+  if (!app.wsMethod || !user_addr || !lang) return [];
+  try {
+    const getTags = app.wsMethod("get-user-tags");
+    const res = await getTags({
+      domain: app.selectedDomainName(),
+      user_addr: user_addr,
+      locale: lang,
+    });
+    return Array.isArray(res) ? res.sort() : [];
+  } catch (e) {
+    console.error("Failed to fetch user tags:", e);
+    return [];
+  }
+}
+
+export default function PostsTab(props) {
+  const app = useApp();
+  const { t } = app;
+  const lang = () => app.lang();
+  const user = () => props.user;
+
+  const [selectedTags, setSelectedTags] = createSignal([]);
+  const [selectedCategory, setSelectedCategory] = createSignal("ALL");
+
+  const [tagsResource] = createResource(() => ({
+    app,
+    user_addr: user()?.address,
+    lang: lang()
+  }), fetchUserTags);
+
+  const categoriesResource = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesResource() || [])]);
+
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+  const feedResetKey = createMemo(() => `${selectedCategory()}|${selectedTags().join(',')}`);
+
+  async function fetchPage(page, pageSize) {
+    if (!contentList || !user()?.address) return [];
+    
+    const params = {
+      domain: app.selectedDomainName(),
+      author_addr: toChecksumAddress(user().address),
+      my_addr: app.authorizedUser()?.address ? toChecksumAddress(app.authorizedUser().address) : undefined,
+      content_type: "post",
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      lang: lang(),
+    };
+
+    const cat = selectedCategory();
+    if (cat && cat !== "ALL") params.category = `${lang()}:${cat}`;
+    
+    const tags = selectedTags();
+    if (tags.length > 0) params.tags = tags.map(tag => `${lang()}:${tag}`);
+
+    try {
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({ id: it.savva_cid, _raw: it }));
+    } catch (err) {
+      console.error("PostsTab fetchPage error:", err);
+      return [];
+    }
+  }
+
+  const handleTagToggle = (tag) => {
+    setSelectedTags(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) newSet.delete(tag);
+      else newSet.add(tag);
+      return Array.from(newSet);
+    });
+  };
+
+  const RightPanel = () => (
+    <section class="w-full">
+      <div class="mb-3 flex flex-wrap items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={selectedCategory()}
+            onInput={(e) => setSelectedCategory(e.currentTarget.value)}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? t("categories.all") : c}</option>}
+            </For>
+          </select>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={false}
+        isActivated={true}
+      />
+    </section>
+  );
+
+  return (
+    <Switch>
+      <Match when={!tagsResource.loading && tagsResource()?.length > 0}>
+        <div class="grid grid-cols-[180px_minmax(0,1fr)] gap-6 items-start">
+          <aside class="sticky top-[120px]">
+            <h4 class="text-sm font-semibold mb-2">{t("profile.tabs.tags")}</h4>
+            <TagList 
+              tags={tagsResource()} 
+              loading={tagsResource.loading}
+              selectedTags={selectedTags()} 
+              onTagToggle={handleTagToggle} 
+            />
+          </aside>
+          <RightPanel />
+        </div>
+      </Match>
+      <Match when={true}>
+        <RightPanel />
+      </Match>
+    </Switch>
+  );
+}
+</file>
+
 <file path="src/components/settings/DeveloperSection.jsx">
 // src/components/settings/DeveloperSection.jsx
 import { useApp } from "../../context/AppContext.jsx";
@@ -24027,6 +24181,63 @@ export function WalletIcon(props) {
     <Svg {...props}>
       <path d="M18 8V7.2C18 6.0799 18 5.51984 17.782 5.09202C17.5903 4.71569 17.2843 4.40973 16.908 4.21799C16.4802 4 15.9201 4 14.8 4H6.2C5.07989 4 4.51984 4 4.09202 4.21799C3.71569 4.40973 3.40973 4.71569 3.21799 5.09202C3 5.51984 3 6.0799 3 7.2V8M21 12H19C17.8954 12 17 12.8954 17 14C17 15.1046 17.8954 16 19 16H21M3 8V16.8C3 17.9201 3 18.4802 3.21799 18.908C3.40973 19.2843 3.71569 19.5903 4.09202 19.782C4.51984 20 5.07989 20 6.2 20H17.8C18.9201 20 19.4802 20 19.908 19.782C20.2843 19.5903 20.5903 19.2843 20.782 18.908C21 18.4802 21 17.9201 21 16.8V11.2C21 10.0799 21 9.51984 20.782 9.09202C20.5903 8.71569 20.2843 8.40973 19.908 8.21799C19.4802 8 18.9201 8 17.8 8H3Z"></path>
     </Svg>
+  );
+}
+</file>
+
+<file path="src/components/ui/ClosePageButton.jsx">
+// src/components/ui/ClosePageButton.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import { useHashRouter } from "../../routing/hashRouter";
+
+/**
+ * Close (go to main tabs view) or Back (go to previous history entry) floating button.
+ * @param {object} props
+ * @param {string} [props.mode='back'] - 'back' for history.back(), 'close' to navigate to the main feed.
+ */
+export default function ClosePageButton(props) {
+  const app = useApp();
+  const { navigate } = useHashRouter();
+  const { t } = app;
+  const label = props.title || t("settings.back");
+  const offsetTop = props.offsetTop ?? 56;
+  const mode = props.mode || 'back';
+
+  const handleClick = () => {
+    if (mode === 'close') {
+      navigate(app.lastTabRoute() || "/");
+    } else {
+      window.history.back();
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={label}
+      title={label}
+      class="fixed right-3 z-20 p-2 rounded-full
+             bg-[hsl(var(--background))]/70
+             hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] 
+             shadow-sm transition-colors"
+      style={{ top: `${offsetTop}px` }}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-5 h-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
   );
 }
 </file>
@@ -24378,6 +24589,112 @@ export default function Tabs(props) {
         }}
       </For>
     </ul>
+  );
+}
+</file>
+
+<file path="src/components/ui/TokenValue.jsx">
+// src/components/ui/TokenValue.jsx
+import { createMemo, Show, createSignal, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { formatUnits } from "viem";
+import SavvaTokenIcon from "./icons/SavvaTokenIcon.jsx";
+import { getChainLogo } from "../../blockchain/chainLogos.js";
+
+export default function TokenValue(props) {
+  const app = useApp();
+  const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
+  const desiredChain = createMemo(() => app.desiredChain());
+
+  const isBaseToken = createMemo(() => props.tokenAddress === "0");
+  const tokenAddress = createMemo(() => props.tokenAddress || savvaTokenAddress());
+  const isSavvaToken = createMemo(() => !isBaseToken() && tokenAddress()?.toLowerCase() === savvaTokenAddress()?.toLowerCase());
+
+  const formattedAmount = createMemo(() => {
+    try {
+      const amount = parseFloat(formatUnits(BigInt(props.amount || 0), 18));
+      return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch {
+      return "0.00";
+    }
+  });
+
+  const sourceUsdValue = createMemo(() => {
+    let priceData = null;
+    if (isSavvaToken()) {
+      priceData = app.savvaTokenPrice();
+    } else if (isBaseToken()) {
+      priceData = app.baseTokenPrice();
+    }
+    
+    if (!priceData?.price) return null;
+
+    try {
+      const amount = parseFloat(formatUnits(BigInt(props.amount || 0), 18));
+      const price = priceData.price;
+      const total = amount * price;
+      return total.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+    } catch {
+      return null;
+    }
+  });
+
+  const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
+  const [isAnimating, setIsAnimating] = createSignal(false);
+
+  createEffect(on(sourceUsdValue, (newValue, prevValue) => {
+    if (prevValue === undefined || prevValue === null) {
+      setDisplayUsdValue(newValue);
+      return;
+    }
+    setDisplayUsdValue(prevValue);
+    setIsAnimating(true);
+    setTimeout(() => { setDisplayUsdValue(newValue); }, 200);
+    setTimeout(() => { setIsAnimating(false); }, 400);
+  }, { defer: true }));
+
+  const TokenIcon = () => {
+    if (isSavvaToken()) {
+      return <SavvaTokenIcon class="w-4 h-4" />;
+    }
+    if (isBaseToken()) {
+        const logoSrc = getChainLogo(desiredChain()?.id);
+        if (logoSrc) {
+            return <img src={logoSrc} alt={desiredChain()?.nativeCurrency.symbol} class="w-5 h-5" />;
+        }
+    }
+    return null;
+  };
+
+  const isVertical = () => props.format === 'vertical';
+
+  return (
+    <Show
+      when={isVertical()}
+      fallback={
+        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`}>
+          <TokenIcon />
+          <span class="font-semibold">{formattedAmount()}</span>
+          <Show when={displayUsdValue()}>
+            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
+              ({displayUsdValue()})
+            </span>
+          </Show>
+        </div>
+      }
+    >
+      <div class={`flex flex-col items-end text-sm ${props.class || ''}`}>
+        <div class="flex items-center gap-1.5">
+          <TokenIcon />
+          <span class="font-semibold">{formattedAmount()}</span>
+        </div>
+        <Show when={displayUsdValue()}>
+          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
+            ({displayUsdValue()})
+          </span>
+        </Show>
+      </div>
+    </Show>
   );
 }
 </file>
@@ -24735,6 +25052,128 @@ export default function Toaster() {
       </div>
     </div>
   );
+}
+</file>
+
+<file path="src/context/useTokenPrices.js">
+// src/context/useTokenPrices.js
+import { createSignal, onMount, onCleanup, createMemo } from "solid-js";
+import { whenWsOpen, getWsApi } from "../net/wsRuntime";
+import { dbg } from "../utils/debug";
+
+export function useTokenPrices(app) {
+  const [prices, setPrices] = createSignal({});
+
+  const updatePrices = (data) => {
+    if (!data || !data.tokens) return;
+    setPrices(prev => ({ ...prev, ...data.tokens }));
+  };
+
+  const fetchInitialPrices = async () => {
+    try {
+      await whenWsOpen();
+      const api = getWsApi();
+      const data = await api.call("get-token-prices");
+      dbg.log("TokenPrices", "Fetched initial prices", data);
+      updatePrices(data);
+    } catch (error) {
+      dbg.error("TokenPrices", "Failed to fetch initial token prices", error);
+    }
+  };
+
+  onMount(() => {
+    fetchInitialPrices();
+  });
+  
+  const savvaTokenPrice = createMemo(() => {
+    const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
+    if (!savvaTokenAddress) return null;
+    return prices()[savvaTokenAddress] || null;
+  });
+  
+  const baseTokenPrice = createMemo(() => {
+    // The key for the base/native token is an empty string
+    return prices()[""] || null; 
+  });
+
+  return {
+    allTokenPrices: prices,
+    savvaTokenPrice,
+    baseTokenPrice,
+    updateTokenPrices: updatePrices
+  };
+}
+</file>
+
+<file path="src/docs/rehype-media-players.js">
+// src/docs/rehype-media-players.js
+import { visit } from "unist-util-visit";
+
+const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
+
+function isVideoUrl(url, altText = "") {
+  return VIDEO_EXTENSIONS.test(url) || VIDEO_EXTENSIONS.test(altText);
+}
+
+function isAudioUrl(url, altText = "") {
+  return AUDIO_EXTENSIONS.test(url) || AUDIO_EXTENSIONS.test(altText);
+}
+
+function getYouTubeId(url) {
+  const match = url.match(YOUTUBE_REGEX);
+  return match ? match[1] : null;
+}
+
+export function rehypeMediaPlayers() {
+  return (tree) => {
+    visit(tree, "element", (node) => {
+      if (node.tagName !== "img" || !node.properties?.src) {
+        return;
+      }
+
+      const url = node.properties.src;
+      const alt = node.properties.alt;
+      const youtubeId = getYouTubeId(url);
+
+      if (youtubeId) {
+        node.tagName = "div";
+        node.properties = {
+          className: "youtube-container",
+          style: "position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%;"
+        };
+        node.children = [{
+          type: "element",
+          tagName: "iframe",
+          properties: {
+            src: `https://www.youtube.com/embed/${youtubeId}`,
+            frameborder: "0",
+            allowfullscreen: true,
+            style: "position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+          },
+          children: []
+        }];
+      } else if (isVideoUrl(url, alt)) {
+        node.tagName = "video";
+        node.properties = {
+          src: url,
+          controls: true,
+          style: "width: 100%; border-radius: 0.5rem;"
+        };
+        node.children = [];
+      } else if (isAudioUrl(url, alt)) {
+        node.tagName = "audio";
+        node.properties = {
+          src: url,
+          controls: true,
+          style: "width: 100%;"
+        };
+        node.children = [];
+      }
+    });
+    return tree;
+  };
 }
 </file>
 
@@ -26689,229 +27128,6 @@ export function createTextPreview(markdownText, type = 'post') {
 }
 </file>
 
-<file path="src/pages/ProfilePage.jsx">
-// src/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../routing/hashRouter.js";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import Spinner from "../components/ui/Spinner.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
-import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
-import Tabs from "../components/ui/Tabs.jsx";
-import Address from "../components/ui/Address.jsx";
-import { ipfs } from "../ipfs/index.js";
-import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
-import PostsTab from "../components/profile/PostsTab.jsx";
-import SubscribersTab from "../components/profile/SubscribersTab.jsx";
-import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
-import WalletTab from "../components/profile/WalletTab.jsx";
-import TokenValue from "../components/ui/TokenValue.jsx";
-import { walletAccount } from "../blockchain/wallet.js";
-
-// Data fetcher for the user profile
-async function fetchUserProfile({ app, identifier }) {
-  if (!identifier || !app.wsCall) return null;
-
-  try {
-    const wsParams = { domain: app.selectedDomainName() };
-    const currentUser = app.authorizedUser();
-    if (currentUser) {
-      wsParams.caller = currentUser.address;
-    }
-
-    if (identifier.startsWith('@')) {
-      wsParams.user_name = identifier.substring(1);
-    } else {
-      wsParams.user_addr = identifier;
-    }
-
-    return await app.wsCall('get-user', wsParams);
-  } catch (error) {
-    console.error("Failed to fetch user profile:", error);
-    return { error: error.message };
-  }
-}
-
-// Data fetcher for the profile details from IPFS
-async function fetchProfileDetails(cid, app) {
-  if (!cid) return null;
-  try {
-    const { data } = await ipfs.getJSONBest(app, cid);
-    return data;
-  } catch (e) {
-    console.error(`Failed to fetch profile details from IPFS CID: ${cid}`, e);
-    return { error: e.message };
-  }
-}
-
-export default function ProfilePage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-
-  const identifier = createMemo(() => {
-    const path = route();
-    return path.startsWith('/') ? path.substring(1) : path;
-  });
-
-  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
-  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
-  
-  const [activeTab, setActiveTab] = createSignal('posts');
-  
-  const TABS = createMemo(() => {
-    const tabs = [
-      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-    ];
-
-    if (walletAccount()) {
-      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
-    }
-
-    return tabs;
-  });
-  
-  createEffect(() => {
-    const availableTabs = TABS();
-    const currentActive = activeTab();
-    if (!availableTabs.some(tab => tab.id === currentActive)) {
-        setActiveTab('posts');
-    }
-  });
-
-  const aboutText = createMemo(() => {
-    const details = profileDetails();
-    if (!details || !details.about) return "";
-
-    const aboutData = details.about;
-    if (typeof aboutData === 'string') {
-      return aboutData;
-    }
-    if (typeof aboutData === 'object') {
-      const lang = app.lang();
-      return aboutData[lang] || aboutData.en || Object.values(aboutData)[0] || "";
-    }
-    return "";
-  });
-  
-  const isSubscribed = createMemo(() => {
-      const u = userResource();
-      return u && u.i_sponsor_for > 0;
-  });
-
-  return (
-    <main class="sv-container p-4 max-w-4xl mx-auto">
-      <ClosePageButton />
-      
-      <Switch>
-        <Match when={userResource.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
-        </Match>
-        <Match when={userResource.error || userResource()?.error}>
-          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("profile.error.title")}</h3>
-            <p class="text-sm mt-1">{userResource.error?.message || userResource()?.error}</p>
-          </div>
-        </Match>
-        <Match when={userResource()}>
-          {(user) =>
-            <div class="space-y-6">
-              {/* Profile Header */}
-              <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                <div class="flex flex-col items-center gap-4 shrink-0">
-                  <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                    <IpfsImage 
-                      src={user().avatar}
-                      alt={`${user().name} avatar`}
-                      class="w-full h-full object-cover"
-                      fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
-                    />
-                  </div>
-                  <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
-                    <Show 
-                      when={!isSubscribed()}
-                      fallback={
-                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
-                          {t("profile.unsubscribe")}
-                        </button>
-                      }
-                    >
-                      <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
-                        {t("profile.subscribe")}
-                      </button>
-                    </Show>
-                  </Show>
-                </div>
-                
-                <div class="flex-1 w-full text-center sm:text-left space-y-3">
-                  <div class="flex flex-col items-center sm:items-start">
-                    <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
-                    <Show when={user().name}>
-                      <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                        <span>{user().name.toUpperCase()}</span>
-                        <VerifiedBadge class="w-4 h-4" />
-                      </div>
-                    </Show>
-                    <div class="mt-1">
-                      <Address address={user().address} format="full" />
-                    </div>
-                    <div class="flex items-center gap-2 mt-2 text-sm">
-                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
-                      <TokenValue amount={user().staked} />
-                      <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
-                    </div>
-                    <div class="flex items-center gap-2 mt-1 text-sm">
-                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
-                      <TokenValue amount={user().total_sponsoring} />
-                      <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                    </div>
-                    <div class="flex items-center gap-2 mt-1 text-sm">
-                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
-                      <TokenValue amount={user().total_sponsored} />
-                      <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                    </div>
-                  </div>
-
-                  <Show when={aboutText()}>
-                    <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
-                  </Show>
-                </div>
-              </div>
-
-              {/* Profile Tabs */}
-              <div>
-                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
-                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
-                  <Switch>
-                    <Match when={activeTab() === 'posts'}>
-                      <PostsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'subscribers'}>
-                      <SubscribersTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'subscriptions'}>
-                      <SubscriptionsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'wallet'}>
-                      <WalletTab user={user()} />
-                    </Match>
-                  </Switch>
-                </div>
-              </div>
-            </div>
-          }
-        </Match>
-      </Switch>
-    </main>
-  );
-}
-</file>
-
 <file path="public/dev_docs/fr/sidebar.yaml">
 sections:
   - title: Commencer
@@ -27491,171 +27707,6 @@ export default function DocsContent(props) {
       }>
         <MarkdownView markdown={doc()?.text || ""} />
         <DocsPager activeRelPath={props.relPath} onPick={props.onPick} />
-      </Show>
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/editor/wizard_steps/StepUploadIPFS.jsx">
-// src/components/editor/wizard_steps/StepUploadIPFS.jsx
-import { createSignal, onMount, Show } from "solid-js";
-import { useApp } from "../../../context/AppContext.jsx";
-import Spinner from "../../ui/Spinner.jsx";
-import { getAllUploadedFileNames, getUploadedFileAsFileObject, DRAFT_DIRS } from "../../../editor/storage.js";
-import { httpBase } from "../../../net/endpoints.js";
-import { dbg } from "../../../utils/debug.js";
-import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
-import { pinDirectory } from "../../../ipfs/pinning/manager.js";
-import { fetchWithTimeout } from "../../../utils/net.js";
-
-export default function StepUploadIPFS(props) {
-  const app = useApp();
-  const { t } = app;
-  const [error, setError] = createSignal(null);
-  const [isUploading, setIsUploading] = createSignal(true);
-  const [uploadProgress, setUploadProgress] = createSignal(0);
-  const [uploadMessage, setUploadMessage] = createSignal(t("editor.publish.uploadingToIpfs"));
-
-  const getFilesFromDraft = async () => {
-    const { postData, editorMode } = props;
-    const files = [];
-    
-    const baseDir = (() => {
-      if (editorMode === "new_post") return DRAFT_DIRS.NEW_POST;
-      if (editorMode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
-      if (["edit_post", "edit_comment"].includes(editorMode)) return DRAFT_DIRS.EDIT;
-      return "unknown";
-    })();
-
-    const content = postData();
-    for (const lang in content) {
-      const data = content[lang];
-      const path = `${lang}/data.md`;
-      files.push({ file: new File([data.body || ""], path, { type: 'text/markdown' }), path });
-
-      if (Array.isArray(data.chapters)) {
-        for (let i = 0; i < data.chapters.length; i++) {
-          const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          files.push({ file: new File([data.chapters[i].body || ""], chapterPath, { type: 'text/markdown' }), path: chapterPath });
-        }
-      }
-    }
-
-    const assetNames = await getAllUploadedFileNames(baseDir);
-    for (const name of assetNames) {
-      const file = await getUploadedFileAsFileObject(baseDir, name);
-      if (file) {
-        files.push({ file, path: `uploads/${name}` });
-      }
-    }
-    return files;
-  };
-
-  const uploadToPinningServices = async () => {
-    setUploadMessage(t("editor.publish.uploadingToPinServices"));
-    const services = getPinningServices();
-    if (services.length === 0) {
-      throw new Error(t("editor.publish.ipfs.errorNoServices"));
-    }
-
-    const filesToUpload = await getFilesFromDraft();
-    const progressMap = new Map(services.map(s => [s.id, 0]));
-
-    const updateTotalProgress = () => {
-      const sum = Array.from(progressMap.values()).reduce((a, b) => a + b, 0);
-      setUploadProgress(Math.round(sum / services.length));
-    };
-
-    const cids = await Promise.all(services.map(async (service) => {
-      try {
-        const cid = await pinDirectory(service, filesToUpload, {
-          onProgress: (p) => {
-            progressMap.set(service.id, p);
-            updateTotalProgress();
-          }
-        });
-
-        // Verification
-        const firstLangWithContent = Object.keys(props.postData())[0];
-        const verificationPath = `${firstLangWithContent}/data.md`;
-        const gatewayUrl = service.gatewayUrl.trim().replace(/\/+$/, "");
-        const verifyUrl = `${gatewayUrl}/ipfs/${cid}/${verificationPath}`;
-        
-        // Add a delay before verifying
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
-
-        return cid;
-      } catch (e) {
-        throw new Error(`Failed on service '${service.name}': ${e.message}`);
-      }
-    }));
-    
-    const firstCid = cids[0];
-    if (!cids.every(cid => cid === firstCid)) {
-      throw new Error("Inconsistent CIDs returned from pinning services.");
-    }
-    
-    return firstCid;
-  };
-
-  const uploadToBackend = async () => {
-    const { postData, editorMode } = props;
-    const baseDir = editorMode === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
-    
-    const formData = new FormData();
-    const content = postData();
-    // (This part remains the same as your existing implementation)
-    for (const lang in content) {
-      // ... same logic to append markdown files
-    }
-    const assetFileNames = await getAllUploadedFileNames(baseDir);
-    for (const fileName of assetFileNames) {
-      const file = await getUploadedFileAsFileObject(baseDir, fileName);
-      if (file) formData.append('file', file, `uploads/${fileName}`);
-    }
-    
-    return await uploadWithProgress(`${httpBase()}store-dir`, formData);
-  };
-  
-  const uploadWithProgress = (url, formData) => {
-    // (This remains the same as your existing implementation)
-  };
-  
-  onMount(() => {
-    setTimeout(async () => {
-      try {
-        const usePinners = isPinningEnabled();
-        const cid = usePinners ? await uploadToPinningServices() : await uploadToBackend();
-        props.onComplete?.(cid);
-      } catch (e) {
-        dbg.error("StepUploadIPFS", "An error occurred in the upload process:", e);
-        setError(e.message);
-      } finally {
-        setIsUploading(false);
-      }
-    }, 500);
-  });
-
-  return (
-    <div class="flex flex-col items-center justify-center h-full">
-      <Show when={isUploading()}>
-        <Spinner />
-        <p class="mt-2 text-sm">{uploadMessage()}</p>
-        <div class="w-full max-w-sm bg-[hsl(var(--muted))] rounded-full h-2.5 mt-4">
-          <div class="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress()}%` }}></div>
-        </div>
-        <p class="text-xs mt-1">{uploadProgress()}%</p>
-      </Show>
-      <Show when={error()}>
-        <div class="text-center p-4">
-          <h4 class="font-bold text-red-600">{t("editor.publish.ipfs.errorTitle")}</h4>
-          <p class="mt-2 text-sm">{error()}</p>
-          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-            {t("editor.publish.validation.backToEditor")}
-          </button>
-        </div>
       </Show>
     </div>
   );
@@ -28443,171 +28494,256 @@ t("tabs.title.for-you")
 */
 </file>
 
-<file path="src/ipfs/index.js">
-// src/ipfs/index.js
-import { fetchWithTimeout } from "../utils/net.js";
+<file path="src/pages/ProfilePage.jsx">
+// src/pages/ProfilePage.jsx
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { useHashRouter, navigate } from "../routing/hashRouter.js";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
+import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
+import Tabs from "../components/ui/Tabs.jsx";
+import Address from "../components/ui/Address.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
+import PostsTab from "../components/profile/PostsTab.jsx";
+import SubscribersTab from "../components/profile/SubscribersTab.jsx";
+import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
+import WalletTab from "../components/profile/WalletTab.jsx";
+import TokenValue from "../components/ui/TokenValue.jsx";
+import { walletAccount } from "../blockchain/wallet.js";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
 
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+// Data fetcher for the user profile
+async function fetchUserProfile({ app, identifier }) {
+  if (!identifier || !app.wsCall) return null;
 
-function normalizeInput(input) {
-  let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
-  return s;
-}
-
-function buildUrl(baseGateway, cidPath) {
-  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
-  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
-  if (!base || !path) return "";
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
-  return prefix + path;
-}
-
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) {
-        return { res, url, gateway: gw };
-      }
-
-      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
-      httpError.url = url;
-      httpError.status = res.status;
-      errors.push(httpError);
-
-    } catch (e) {
-      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
-      networkError.url = url;
-      errors.push(networkError);
+  try {
+    const wsParams = { domain: app.selectedDomainName() };
+    const currentUser = app.authorizedUser();
+    if (currentUser) {
+      wsParams.caller = currentUser.address;
     }
+
+    if (identifier.startsWith('@')) {
+      wsParams.user_name = identifier.substring(1);
+    } else {
+      wsParams.user_addr = identifier;
+    }
+
+    return await app.wsCall('get-user', wsParams);
+  } catch (error) {
+    console.error("Failed to fetch user profile:", error);
+    return { error: error.message };
   }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  if (errors.some(e => e.status === 404)) {
-      err.is404 = true;
-  }
-  throw err;
 }
 
-async function fetchBest(app, ipfsPath, options = {}) {
-  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
-  const cidPath = normalizeInput(ipfsPath);
-  let gatewaysToTry = [];
-  
-  let effectiveTimeout = timeoutMs;
-
-  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-    gatewaysToTry = [app.localIpfsGateway()];
-    effectiveTimeout = 30000;
-  } else {
-    const systemGateways = app.remoteIpfsGateways() || [];
-    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
+// Data fetcher for the profile details from IPFS
+async function fetchProfileDetails(cid, app) {
+  if (!cid) return null;
+  try {
+    const { data } = await ipfs.getJSONBest(app, cid);
+    return data;
+  } catch (e) {
+    console.error(`Failed to fetch profile details from IPFS CID: ${cid}`, e);
+    return { error: e.message };
   }
-
-  if (gatewaysToTry.length === 0) {
-    throw new Error("No IPFS gateways available to try.");
-  }
-
-  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
 }
 
-async function getJSONBest(app, ipfsPath, options = {}) {
-  const { res, url, gateway } = await fetchBest(app, ipfsPath, {
-    ...options,
-    headers: { Accept: "application/json", ...(options.headers || {}) },
-  });
-  return { data: await res.json(), url, gateway };
-}
-
-export const ipfs = {
-  fetchBest,
-  getJSONBest,
-  normalizeInput,
-  buildUrl,
-};
-</file>
-
-<file path="src/pages/Docs.jsx">
-// src/pages/Docs.jsx
-import { createMemo } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { useHashRouter } from "../routing/hashRouter";
-import DocsIndex from "../components/docs/DocsIndex.jsx";
-import DocsContent from "../components/docs/DocsContent.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-
-const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
-const fileFromRoute = (route) => {
-  if (!String(route || "").startsWith("/docs")) return "index.md";
-  const rest = String(route).slice("/docs".length);
-  return trim(rest) || "index.md";
-};
-
-export default function Docs() {
-  const app = useApp();
-  const { route, navigate } = useHashRouter();
-  const file = createMemo(() => fileFromRoute(route()));
-  const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
-  const title = createMemo(() => app.t("docs.title"));
-
-  return (
-    <div class="sv-container sv-container--no-gutter">
-      <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
-      <ClosePageButton mode="close" />
-        {/* Left sidebar */}
-        <aside class="min-w-0">
-          <div>
-            <div class="flex items-center justify-between">
-              <h2 class="text-sm font-semibold mb-2">{title()}</h2>
-            </div>
-            <DocsIndex active={file()} onPick={onPick} />
-          </div>
-        </aside>
-
-        {/* Right content */}
-        <main class="min-w-0">
-          <DocsContent relPath={file()} onPick={onPick} />
-        </main>
-      </div>
-    </div>
-  );
-}
-</file>
-
-<file path="src/pages/Settings.jsx">
-// src/pages/Settings.jsx
-import { useApp } from "../context/AppContext.jsx";
-import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
-import Assets from "../components/settings/Assets.jsx";
-import DeveloperSection from "../components/settings/DeveloperSection.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import PinningServicesSection from "../components/settings/PinningServicesSection.jsx";
-
-export default function Settings() {
+export default function ProfilePage() {
   const app = useApp();
   const { t } = app;
+  const { route } = useHashRouter();
+
+  const identifier = createMemo(() => {
+    const path = route();
+    return path.startsWith('/') ? path.substring(1) : path;
+  });
+
+  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
+  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
+  
+  const [activeTab, setActiveTab] = createSignal('posts');
+  
+  const isMyProfile = createMemo(() => {
+    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
+    const profileAddr = userResource()?.address?.toLowerCase();
+    return !!authorizedAddr && authorizedAddr === profileAddr;
+  });
+
+  const canEdit = createMemo(() => {
+    const connectedWallet = walletAccount()?.toLowerCase();
+    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
+  });
+
+  const handleEditProfile = () => {
+    navigate(`/profile-edit/${identifier()}`);
+  };
+
+  const TABS = createMemo(() => {
+    const tabs = [
+      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+    ];
+
+    if (isMyProfile()) {
+      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
+    }
+
+    return tabs;
+  });
+  
+  createEffect(() => {
+    const availableTabs = TABS();
+    const currentActive = activeTab();
+    if (!availableTabs.some(tab => tab.id === currentActive)) {
+        setActiveTab('posts');
+    }
+  });
+
+  const aboutText = createMemo(() => {
+    const details = profileDetails();
+    if (!details || !details.about) return "";
+
+    const aboutData = details.about;
+    if (typeof aboutData === 'string') {
+      return aboutData;
+    }
+    if (typeof aboutData === 'object') {
+      const lang = app.lang();
+      return aboutData[lang] || aboutData.en || Object.values(aboutData)[0] || "";
+    }
+    return "";
+  });
+  
+  const isSubscribed = createMemo(() => {
+      const u = userResource();
+      return u && u.i_sponsor_for > 0;
+  });
 
   return (
-    <main class="p-4 max-w-3xl mx-auto space-y-6">
-
+    <main class="sv-container p-4 max-w-4xl mx-auto">
       <ClosePageButton />
+      
+      <Switch>
+        <Match when={userResource.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={userResource.error || userResource()?.error}>
+          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("profile.error.title")}</h3>
+            <p class="text-sm mt-1">{userResource.error?.message || userResource()?.error}</p>
+          </div>
+        </Match>
+        <Match when={userResource()}>
+          {(user) =>
+            <div class="space-y-6">
+              {/* Profile Header */}
+              <div class="flex justify-between items-end gap-4">
+                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                  <div class="flex flex-col items-center gap-4 shrink-0">
+                    <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
+                      <IpfsImage 
+                        src={user().avatar}
+                        alt={`${user().name} avatar`}
+                        class="w-full h-full object-cover"
+                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    </div>
+                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
+                      <Show 
+                        when={!isSubscribed()}
+                        fallback={
+                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                            {t("profile.unsubscribe")}
+                          </button>
+                        }
+                      >
+                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
+                          {t("profile.subscribe")}
+                        </button>
+                      </Show>
+                    </Show>
+                  </div>
+                  
+                  <div class="flex-1 w-full text-center sm:text-left space-y-3">
+                    <div class="flex flex-col items-center sm:items-start">
+                      <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
+                      <Show when={user().name}>
+                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
+                          <span>{user().name.toUpperCase()}</span>
+                          <VerifiedBadge class="w-4 h-4" />
+                        </div>
+                      </Show>
+                      <div class="mt-1">
+                        <Address address={user().address} format="full" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-2 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
+                        <TokenValue amount={user().staked} />
+                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                        <TokenValue amount={user().total_sponsoring} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                        <TokenValue amount={user().total_sponsored} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                    </div>
 
-      <div class="flex items-center justify-between">
-        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
-      </div>
+                    <Show when={aboutText()}>
+                      <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
+                    </Show>
+                  </div>
+                </div>
 
-      <LocalIpfsSection />
-      <PinningServicesSection />
-      <Assets />
-      <DeveloperSection />
+                {/* Edit Profile Button */}
+                <div class="flex-shrink-0">
+                  <Show when={canEdit()}>
+                    <button
+                      onClick={handleEditProfile}
+                      class="p-2 rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                      title={t("profile.edit.title")}
+                    >
+                      <EditIcon class="w-5 h-5" />
+                    </button>
+                  </Show>
+                </div>
+              </div>
+
+
+              {/* Profile Tabs */}
+              <div>
+                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
+                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
+                  <Switch>
+                    <Match when={activeTab() === 'posts'}>
+                      <PostsTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'subscribers'}>
+                      <SubscribersTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'subscriptions'}>
+                      <SubscriptionsTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'wallet'}>
+                      <WalletTab user={user()} />
+                    </Match>
+                  </Switch>
+                </div>
+              </div>
+            </div>
+          }
+        </Match>
+      </Switch>
     </main>
   );
 }
@@ -28878,6 +29014,171 @@ export const alertRegistry = {
 };
 </file>
 
+<file path="src/components/editor/wizard_steps/StepUploadIPFS.jsx">
+// src/components/editor/wizard_steps/StepUploadIPFS.jsx
+import { createSignal, onMount, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { getAllUploadedFileNames, getUploadedFileAsFileObject, DRAFT_DIRS } from "../../../editor/storage.js";
+import { httpBase } from "../../../net/endpoints.js";
+import { dbg } from "../../../utils/debug.js";
+import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
+import { pinDirectory } from "../../../ipfs/pinning/manager.js";
+import { fetchWithTimeout } from "../../../utils/net.js";
+
+export default function StepUploadIPFS(props) {
+  const app = useApp();
+  const { t } = app;
+  const [error, setError] = createSignal(null);
+  const [isUploading, setIsUploading] = createSignal(true);
+  const [uploadProgress, setUploadProgress] = createSignal(0);
+  const [uploadMessage, setUploadMessage] = createSignal(t("editor.publish.uploadingToIpfs"));
+
+  const getFilesFromDraft = async () => {
+    const { postData, editorMode } = props;
+    const files = [];
+    
+    const baseDir = (() => {
+      if (editorMode === "new_post") return DRAFT_DIRS.NEW_POST;
+      if (editorMode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
+      if (["edit_post", "edit_comment"].includes(editorMode)) return DRAFT_DIRS.EDIT;
+      return "unknown";
+    })();
+
+    const content = postData();
+    for (const lang in content) {
+      const data = content[lang];
+      const path = `${lang}/data.md`;
+      files.push({ file: new File([data.body || ""], path, { type: 'text/markdown' }), path });
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterPath = `${lang}/chapters/${i + 1}.md`;
+          files.push({ file: new File([data.chapters[i].body || ""], chapterPath, { type: 'text/markdown' }), path: chapterPath });
+        }
+      }
+    }
+
+    const assetNames = await getAllUploadedFileNames(baseDir);
+    for (const name of assetNames) {
+      const file = await getUploadedFileAsFileObject(baseDir, name);
+      if (file) {
+        files.push({ file, path: `uploads/${name}` });
+      }
+    }
+    return files;
+  };
+
+  const uploadToPinningServices = async () => {
+    setUploadMessage(t("editor.publish.uploadingToPinServices"));
+    const services = getPinningServices();
+    if (services.length === 0) {
+      throw new Error(t("editor.publish.ipfs.errorNoServices"));
+    }
+
+    const filesToUpload = await getFilesFromDraft();
+    const progressMap = new Map(services.map(s => [s.id, 0]));
+
+    const updateTotalProgress = () => {
+      const sum = Array.from(progressMap.values()).reduce((a, b) => a + b, 0);
+      setUploadProgress(Math.round(sum / services.length));
+    };
+
+    const cids = await Promise.all(services.map(async (service) => {
+      try {
+        const cid = await pinDirectory(service, filesToUpload, {
+          onProgress: (p) => {
+            progressMap.set(service.id, p);
+            updateTotalProgress();
+          }
+        });
+
+        // Verification
+        const firstLangWithContent = Object.keys(props.postData())[0];
+        const verificationPath = `${firstLangWithContent}/data.md`;
+        const gatewayUrl = service.gatewayUrl.trim().replace(/\/+$/, "");
+        const verifyUrl = `${gatewayUrl}/ipfs/${cid}/${verificationPath}`;
+        
+        // Add a delay before verifying
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
+
+        return cid;
+      } catch (e) {
+        throw new Error(`Failed on service '${service.name}': ${e.message}`);
+      }
+    }));
+    
+    const firstCid = cids[0];
+    if (!cids.every(cid => cid === firstCid)) {
+      throw new Error("Inconsistent CIDs returned from pinning services.");
+    }
+    
+    return firstCid;
+  };
+
+  const uploadToBackend = async () => {
+    const { postData, editorMode } = props;
+    const baseDir = editorMode === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
+    
+    const formData = new FormData();
+    const content = postData();
+    // (This part remains the same as your existing implementation)
+    for (const lang in content) {
+      // ... same logic to append markdown files
+    }
+    const assetFileNames = await getAllUploadedFileNames(baseDir);
+    for (const fileName of assetFileNames) {
+      const file = await getUploadedFileAsFileObject(baseDir, fileName);
+      if (file) formData.append('file', file, `uploads/${fileName}`);
+    }
+    
+    return await uploadWithProgress(`${httpBase()}store-dir`, formData);
+  };
+  
+  const uploadWithProgress = (url, formData) => {
+    // (This remains the same as your existing implementation)
+  };
+  
+  onMount(() => {
+    setTimeout(async () => {
+      try {
+        const usePinners = isPinningEnabled();
+        const cid = usePinners ? await uploadToPinningServices() : await uploadToBackend();
+        props.onComplete?.(cid);
+      } catch (e) {
+        dbg.error("StepUploadIPFS", "An error occurred in the upload process:", e);
+        setError(e.message);
+      } finally {
+        setIsUploading(false);
+      }
+    }, 500);
+  });
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full">
+      <Show when={isUploading()}>
+        <Spinner />
+        <p class="mt-2 text-sm">{uploadMessage()}</p>
+        <div class="w-full max-w-sm bg-[hsl(var(--muted))] rounded-full h-2.5 mt-4">
+          <div class="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress()}%` }}></div>
+        </div>
+        <p class="text-xs mt-1">{uploadProgress()}%</p>
+      </Show>
+      <Show when={error()}>
+        <div class="text-center p-4">
+          <h4 class="font-bold text-red-600">{t("editor.publish.ipfs.errorTitle")}</h4>
+          <p class="mt-2 text-sm">{error()}</p>
+          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+            {t("editor.publish.validation.backToEditor")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/editor/MarkdownInput.jsx">
 // src/components/editor/MarkdownInput.jsx
 import { Show } from "solid-js";
@@ -28995,6 +29296,185 @@ export function useAppAuth() {
   }
 
   return { authorizedUser, login, logout, handleAuthError };
+}
+</file>
+
+<file path="src/ipfs/index.js">
+// src/ipfs/index.js
+import { fetchWithTimeout } from "../utils/net.js";
+
+function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
+function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
+
+// New helper function to ensure a URL has a protocol
+function ensureProtocol(url) {
+  if (!url || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `https://${url}`;
+}
+
+function normalizeInput(input) {
+  let s = String(input || "").trim();
+  if (!s) throw new Error("ipfs: empty input");
+  s = stripPrefix(s, "ipfs://");
+  s = stripPrefix(s, "/ipfs/");
+  s = stripPrefix(s, "ipfs/");
+  return s;
+}
+
+function buildUrl(baseGateway, cidPath) {
+  const normalizedGateway = ensureProtocol(String(baseGateway || "").trim());
+  const base = normalizedGateway.replace(/\/+$/, "");
+  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
+  if (!base || !path) return "";
+  const hasIpfs = /\/ipfs$/i.test(base);
+  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
+  return prefix + path;
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) {
+        return { res, url, gateway: gw };
+      }
+
+      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
+      httpError.url = url;
+      httpError.status = res.status;
+      errors.push(httpError);
+
+    } catch (e) {
+      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
+      networkError.url = url;
+      errors.push(networkError);
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  if (errors.some(e => e.status === 404)) {
+      err.is404 = true;
+  }
+  throw err;
+}
+
+async function fetchBest(app, ipfsPath, options = {}) {
+  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
+  const cidPath = normalizeInput(ipfsPath);
+  let gatewaysToTry = [];
+  
+  let effectiveTimeout = timeoutMs;
+
+  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+    gatewaysToTry = [app.localIpfsGateway()];
+    effectiveTimeout = 30000;
+  } else {
+    const systemGateways = app.remoteIpfsGateways() || [];
+    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
+  }
+
+  if (gatewaysToTry.length === 0) {
+    throw new Error("No IPFS gateways available to try.");
+  }
+
+  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
+}
+
+async function getJSONBest(app, ipfsPath, options = {}) {
+  const { res, url, gateway } = await fetchBest(app, ipfsPath, {
+    ...options,
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+  });
+  return { data: await res.json(), url, gateway };
+}
+
+export const ipfs = {
+  fetchBest,
+  getJSONBest,
+  normalizeInput,
+  buildUrl,
+};
+</file>
+
+<file path="src/pages/Docs.jsx">
+// src/pages/Docs.jsx
+import { createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { useHashRouter } from "../routing/hashRouter";
+import DocsIndex from "../components/docs/DocsIndex.jsx";
+import DocsContent from "../components/docs/DocsContent.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+
+const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
+const fileFromRoute = (route) => {
+  if (!String(route || "").startsWith("/docs")) return "index.md";
+  const rest = String(route).slice("/docs".length);
+  return trim(rest) || "index.md";
+};
+
+export default function Docs() {
+  const app = useApp();
+  const { route, navigate } = useHashRouter();
+  const file = createMemo(() => fileFromRoute(route()));
+  const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
+  const title = createMemo(() => app.t("docs.title"));
+
+  return (
+    <div class="sv-container sv-container--no-gutter">
+      <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
+      <ClosePageButton mode="close" />
+        {/* Left sidebar */}
+        <aside class="min-w-0">
+          <div>
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm font-semibold mb-2">{title()}</h2>
+            </div>
+            <DocsIndex active={file()} onPick={onPick} />
+          </div>
+        </aside>
+
+        {/* Right content */}
+        <main class="min-w-0">
+          <DocsContent relPath={file()} onPick={onPick} />
+        </main>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/pages/Settings.jsx">
+// src/pages/Settings.jsx
+import { useApp } from "../context/AppContext.jsx";
+import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
+import Assets from "../components/settings/Assets.jsx";
+import DeveloperSection from "../components/settings/DeveloperSection.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import PinningServicesSection from "../components/settings/PinningServicesSection.jsx";
+
+export default function Settings() {
+  const app = useApp();
+  const { t } = app;
+
+  return (
+    <main class="p-4 max-w-3xl mx-auto space-y-6">
+
+      <ClosePageButton />
+
+      <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
+      </div>
+
+      <LocalIpfsSection />
+      <PinningServicesSection />
+      <Assets />
+      <DeveloperSection />
+    </main>
+  );
 }
 </file>
 
@@ -30001,6 +30481,7 @@ import EditorPage from "../pages/EditorPage.jsx";
 import AlertManager from "../alerts/AlertManager.jsx";
 import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
+import ProfileEditPage from "../pages/ProfileEditPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -30012,6 +30493,7 @@ export default function App() {
     if (r.startsWith("/post/")) return "post";
     if (r.startsWith("/settings")) return "settings";
     if (r.startsWith("/docs")) return "docs";
+    if (r.startsWith("/profile-edit/")) return "profile-edit";
     if (r.startsWith("/editor/")) return "editor";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
@@ -30097,6 +30579,9 @@ export default function App() {
                 </Match>
                 <Match when={currentView() === 'editor'}>
                   <EditorPage />
+                </Match>
+                <Match when={currentView() === 'profile-edit'}>
+                  <ProfileEditPage />
                 </Match>
               </Switch>
             </>
@@ -30615,162 +31100,6 @@ export default function StepPublish(props) {
 }
 </file>
 
-<file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
-// src/components/editor/wizard_steps/StepUploadDescriptor.jsx
-import { createSignal, createEffect, on, Show } from "solid-js";
-import { useApp } from "../../../context/AppContext.jsx";
-import Spinner from "../../ui/Spinner.jsx";
-import { stringify as toYaml } from "yaml";
-import { httpBase } from "../../../net/endpoints.js";
-import { dbg } from "../../../utils/debug.js";
-import { createTextPreview } from "../../../editor/preview-utils.js";
-import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
-
-export default function StepUploadDescriptor(props) {
-  const app = useApp();
-  const { t } = app;
-  const [error, setError] = createSignal(null);
-  const [isUploading, setIsUploading] = createSignal(true);
-  const [hasStarted, setHasStarted] = createSignal(false);
-
-  const uploadDescriptor = async (data_cid) => {
-    const { postData, postParams, editorMode } = props;
-    dbg.log("StepUploadDescriptor:init", "Received postParams:", postParams());
-
-    const contentType = (editorMode === 'new_comment' || editorMode === 'edit_comment') ? 'comment' : 'post';
-    const params = postParams();
-
-    const descriptor = {
-      savva_spec_version: "2.0",
-      data_cid: data_cid,
-      locales: {}
-    };
-
-    // Explicitly copy required top-level fields from params to the descriptor
-    if (params.guid) descriptor.guid = params.guid;
-    if (params.parent_savva_cid) descriptor.parent_savva_cid = params.parent_savva_cid;
-    if (params.root_savva_cid) descriptor.root_savva_cid = params.root_savva_cid;
-    if (params.nsfw) descriptor.nsfw = params.nsfw;
-    if (params.fundraiser) descriptor.fundraiser = params.fundraiser;
-    if (params.thumbnail) descriptor.thumbnail = params.thumbnail;
-
-    // Conditionally add gateways based on user settings
-    if (isPinningEnabled()) {
-      const userServices = getPinningServices();
-      const userGateways = userServices.map(s => s.gatewayUrl).filter(Boolean);
-      if (userGateways.length > 0) {
-        descriptor.gateways = userGateways;
-      }
-    } else {
-      const systemGateways = app.info()?.ipfs_gateways || [];
-      if (systemGateways.length > 0) {
-        descriptor.gateways = systemGateways;
-      }
-    }
-    
-    const content = postData();
-
-    for (const lang in content) {
-      const data = content[lang];
-      const hasTitle = data.title?.trim().length > 0;
-      const hasBody = data.body?.trim().length > 0;
-      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
-
-      if (!hasTitle && !hasBody && !hasChapters) {
-        continue;
-      }
-      
-      const langParams = params.locales?.[lang] || {};
-      
-      const localeObject = {
-        title: data.title || "",
-        text_preview: createTextPreview(data.body || "", contentType),
-        tags: langParams.tags || [],
-        categories: langParams.categories || [],
-        data_path: `${lang}/data.md`,
-        chapters: []
-      };
-
-      if (Array.isArray(data.chapters)) {
-        for (let i = 0; i < data.chapters.length; i++) {
-          const chapterParams = langParams.chapters?.[i] || {};
-          localeObject.chapters.push({
-            title: chapterParams.title || `Chapter ${i + 1}`,
-            data_path: `${lang}/chapters/${i + 1}.md`
-          });
-        }
-      }
-      
-      descriptor.locales[lang] = localeObject;
-    }
-    
-    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
-
-    const yamlStr = toYaml(descriptor);
-    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
-    const formData = new FormData();
-    formData.append('file', descriptorFile);
-
-    const url = `${httpBase()}store`;
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
-    }
-
-    const result = await response.json();
-    if (!result?.cid) {
-      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
-    }
-
-    return result.cid;
-  };
-
-  createEffect(() => {
-    const dataCid = props.publishedData().ipfsCid;
-    if (dataCid && !hasStarted()) {
-      setHasStarted(true);
-      
-      setTimeout(async () => {
-        try {
-          const descriptorCid = await uploadDescriptor(dataCid);
-          props.onComplete?.(descriptorCid);
-        } catch (e) {
-          dbg.error("StepUploadDescriptor", "An error occurred:", e);
-          setError(e.message);
-        } finally {
-          setIsUploading(false);
-        }
-      }, 500);
-    }
-  });
-
-
-  return (
-    <div class="flex flex-col items-center justify-center h-full">
-      <Show when={isUploading()}>
-        <Spinner />
-        <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
-      </Show>
-      <Show when={error()}>
-        <div class="text-center p-4">
-          <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
-          <p class="mt-2 text-sm">{error()}</p>
-          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
-            {t("editor.publish.validation.backToEditor")}
-          </button>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/editor/EditorFullPreview.jsx">
 // src/components/editor/EditorFullPreview.jsx
 import { createMemo, Show, createSignal } from "solid-js";
@@ -31269,6 +31598,162 @@ export function useI18n() {
     };
   }
   return i18nSingleton;
+}
+</file>
+
+<file path="src/components/editor/wizard_steps/StepUploadDescriptor.jsx">
+// src/components/editor/wizard_steps/StepUploadDescriptor.jsx
+import { createSignal, createEffect, on, Show } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import { stringify as toYaml } from "yaml";
+import { httpBase } from "../../../net/endpoints.js";
+import { dbg } from "../../../utils/debug.js";
+import { createTextPreview } from "../../../editor/preview-utils.js";
+import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
+
+export default function StepUploadDescriptor(props) {
+  const app = useApp();
+  const { t } = app;
+  const [error, setError] = createSignal(null);
+  const [isUploading, setIsUploading] = createSignal(true);
+  const [hasStarted, setHasStarted] = createSignal(false);
+
+  const uploadDescriptor = async (data_cid) => {
+    const { postData, postParams, editorMode } = props;
+    dbg.log("StepUploadDescriptor:init", "Received postParams:", postParams());
+
+    const contentType = (editorMode === 'new_comment' || editorMode === 'edit_comment') ? 'comment' : 'post';
+    const params = postParams();
+
+    const descriptor = {
+      savva_spec_version: "2.0",
+      data_cid: data_cid,
+      locales: {}
+    };
+
+    // Explicitly copy required top-level fields from params to the descriptor
+    if (params.guid) descriptor.guid = params.guid;
+    if (params.parent_savva_cid) descriptor.parent_savva_cid = params.parent_savva_cid;
+    if (params.root_savva_cid) descriptor.root_savva_cid = params.root_savva_cid;
+    if (params.nsfw) descriptor.nsfw = params.nsfw;
+    if (params.fundraiser) descriptor.fundraiser = params.fundraiser;
+    if (params.thumbnail) descriptor.thumbnail = params.thumbnail;
+
+    // Conditionally add gateways based on user settings
+    if (isPinningEnabled()) {
+      const userServices = getPinningServices();
+      const userGateways = userServices.map(s => s.gatewayUrl).filter(Boolean);
+      if (userGateways.length > 0) {
+        descriptor.gateways = userGateways;
+      }
+    } else {
+      const systemGateways = app.info()?.ipfs_gateways || [];
+      if (systemGateways.length > 0) {
+        descriptor.gateways = systemGateways;
+      }
+    }
+    
+    const content = postData();
+
+    for (const lang in content) {
+      const data = content[lang];
+      const hasTitle = data.title?.trim().length > 0;
+      const hasBody = data.body?.trim().length > 0;
+      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
+
+      if (!hasTitle && !hasBody && !hasChapters) {
+        continue;
+      }
+      
+      const langParams = params.locales?.[lang] || {};
+      
+      const localeObject = {
+        title: data.title || "",
+        text_preview: createTextPreview(data.body || "", contentType),
+        tags: langParams.tags || [],
+        categories: langParams.categories || [],
+        data_path: `${lang}/data.md`,
+        chapters: []
+      };
+
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          const chapterParams = langParams.chapters?.[i] || {};
+          localeObject.chapters.push({
+            title: chapterParams.title || `Chapter ${i + 1}`,
+            data_path: `${lang}/chapters/${i + 1}.md`
+          });
+        }
+      }
+      
+      descriptor.locales[lang] = localeObject;
+    }
+    
+    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
+
+    const yamlStr = toYaml(descriptor);
+    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
+    const formData = new FormData();
+    formData.append('file', descriptorFile);
+
+    const url = `${httpBase()}store`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
+    }
+
+    const result = await response.json();
+    if (!result?.cid) {
+      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
+    }
+
+    return result.cid;
+  };
+
+  createEffect(() => {
+    const dataCid = props.publishedData().ipfsCid;
+    if (dataCid && !hasStarted()) {
+      setHasStarted(true);
+      
+      setTimeout(async () => {
+        try {
+          const descriptorCid = await uploadDescriptor(dataCid);
+          props.onComplete?.(descriptorCid);
+        } catch (e) {
+          dbg.error("StepUploadDescriptor", "An error occurred:", e);
+          setError(e.message);
+        } finally {
+          setIsUploading(false);
+        }
+      }, 500);
+    }
+  });
+
+
+  return (
+    <div class="flex flex-col items-center justify-center h-full">
+      <Show when={isUploading()}>
+        <Spinner />
+        <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
+      </Show>
+      <Show when={error()}>
+        <div class="text-center p-4">
+          <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
+          <p class="mt-2 text-sm">{error()}</p>
+          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+            {t("editor.publish.validation.backToEditor")}
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
 }
 </file>
 
@@ -35298,7 +35783,7 @@ export default function EditorPage() {
   const handleInsertFile = (fileName, fileType) => {
     const url = `uploads/${fileName}`;
     let markdown;
-    if (fileType === 'image') {
+    if (fileType === 'image' || fileType === 'video') {
       markdown = `![${fileName}](${url})`;
     } else {
       markdown = `[${fileName}](${url})`;
@@ -35981,7 +36466,16 @@ export default {
 "settings.pinning.test.details.verify_ok": "Content verified successfully.",
 "settings.pinning.test.hide_details": "Hide Details",
 "settings.pinning.test.show_details": "Show Details",
-"settings.pinning.test.errorDetails": "Test failed: {details}"
+"settings.pinning.test.errorDetails": "Test failed: {details}",
+"settings.pinning.test.details.verify_pending": "Attempting to fetch from: {url}",
+"profile.edit.title": "Edit Profile",
+"profile.edit.placeholder": "Profile editing form will be here.",
+"profile.edit.generalInfo": "General Info",
+"profile.edit.generalInfo": "General Info",
+"profile.edit.avatar.title": "Edit Avatar",
+"profile.edit.avatar.save": "Save",
+"profile.edit.avatar.success": "Avatar update transaction sent.",
+"profile.edit.avatar.select": "Select an image file...",
 };
 </file>
 
