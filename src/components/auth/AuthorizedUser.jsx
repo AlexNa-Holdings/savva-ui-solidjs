@@ -52,7 +52,7 @@ export default function AuthorizedUser() {
           aria-haspopup="true"
           aria-expanded={menuOpen()}
         >
-          <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+          <div class="w-7 h-7 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
             <IpfsImage
               src={user().avatar}
               alt="User Avatar"

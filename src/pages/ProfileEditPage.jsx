@@ -35,11 +35,14 @@ async function fetchProfileForEdit(params) {
             userAddress = toChecksumAddress(identifier);
         }
 
-        const avatarCid = await userProfileContract.read.avatars([userAddress]);
-        const profileCid = await userProfileContract.read.getString([
-            userAddress,
-            toHexBytes32(app.selectedDomainName()),
-            toHexBytes32("profile_cid")
+        const [avatarCid, profileCid, name] = await Promise.all([
+            userProfileContract.read.avatars([userAddress]),
+            userProfileContract.read.getString([
+                userAddress,
+                toHexBytes32(app.selectedDomainName()),
+                toHexBytes32("profile_cid")
+            ]),
+            userProfileContract.read.names([userAddress])
         ]);
 
         let ipfsData = {};
@@ -51,7 +54,8 @@ async function fetchProfileForEdit(params) {
         return {
             address: userAddress,
             avatar: avatarCid,
-            profile: ipfsData
+            profile: ipfsData,
+            name: name
         };
     } catch (e) {
         console.error("Failed to fetch profile for editing:", e);
@@ -63,8 +67,13 @@ export default function ProfileEditPage() {
     const app = useApp();
     const { t, lang: uiLang, domainAssetsConfig } = app;
     const { route } = useHashRouter();
+    let debounceTimer;
 
     const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
+    const [initialName, setInitialName] = createSignal("");
+    const [nameInput, setNameInput] = createSignal("");
+    const [nameError, setNameError] = createSignal("");
+    const [isCheckingName, setIsCheckingName] = createSignal(false);
 
     const identifier = createMemo(() => {
         const path = route();
@@ -81,6 +90,9 @@ export default function ProfileEditPage() {
         const data = profileData();
         if (data && !data.error) {
             setAvatar(data.avatar || "");
+            const currentName = data.name || "";
+            setInitialName(currentName);
+            setNameInput(currentName);
 
             const profileAbout = data.profile?.about;
             if (typeof profileAbout === 'string') {
@@ -102,6 +114,52 @@ export default function ProfileEditPage() {
         const newText = e.currentTarget.value;
         setAbout(prev => ({ ...prev, [activeLang()]: newText }));
     };
+
+    const handleNameInput = (e) => {
+        const lowerValue = e.currentTarget.value.toLowerCase();
+        setNameInput(lowerValue);
+        setNameError("");
+
+        if (lowerValue === initialName()) {
+            setIsCheckingName(false);
+            clearTimeout(debounceTimer);
+            return;
+        }
+
+        const validCharRegex = /^[a-z0-9.-]*$/;
+        if (!validCharRegex.test(lowerValue)) {
+            setNameError(t("profile.edit.name.errorInvalidChar"));
+            return;
+        }
+        
+        clearTimeout(debounceTimer);
+        if (lowerValue) {
+            setIsCheckingName(true);
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const contract = await getSavvaContract(app, 'UserProfile');
+                    const ownerAddress = await contract.read.owners([lowerValue]);
+                    const checksummedOwner = ownerAddress !== '0x0000000000000000000000000000000000000000' 
+                        ? toChecksumAddress(ownerAddress) 
+                        : null;
+                    
+                    if (checksummedOwner && checksummedOwner.toLowerCase() !== profileData().address.toLowerCase()) {
+                        setNameError(t("profile.edit.name.errorTaken"));
+                    }
+                } catch (err) {
+                    console.error("Error checking name uniqueness:", err);
+                } finally {
+                    setIsCheckingName(false);
+                }
+            }, 500);
+        } else {
+            setIsCheckingName(false);
+        }
+    };
+
+    const isRegisterDisabled = createMemo(() => {
+        return isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
+    });
 
     const handleAvatarSave = async (blob) => {
         try {
@@ -137,11 +195,14 @@ export default function ProfileEditPage() {
                     <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
                 </div>
 
-                <Show when={walletAccount()} fallback={
-                    <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-                        <p class="text-[hsl(var(--muted-foreground))] text-center">Please connect your wallet to edit the profile.</p>
-                    </div>
-                }>
+                <Show 
+                    when={walletAccount()} 
+                    fallback={
+                        <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                            <p class="text-[hsl(var(--muted-foreground))] text-center">{t("profile.edit.connectWallet")}</p>
+                        </div>
+                    }
+                >
                     <Switch>
                         <Match when={profileData.loading}>
                             <div class="flex justify-center items-center h-48"><Spinner /></div>
@@ -152,24 +213,62 @@ export default function ProfileEditPage() {
                             </div>
                         </Match>
                         <Match when={profileData()}>
-                            <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                                <h3 class="text-lg font-semibold">{t("profile.edit.generalInfo")}</h3>
-                                <div class="flex items-center gap-6">
-                                    <div 
-                                        onClick={() => setShowAvatarEditor(true)}
-                                        class="relative group w-48 h-48 rounded-full overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
-                                    >
-                                        <IpfsImage
-                                            src={avatar()}
-                                            alt="User Avatar"
-                                            class="w-full h-full object-cover"
-                                            fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
-                                        />
-                                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <EditIcon class="w-10 h-10 text-white" />
+                            <div class="space-y-6">
+                                {/* Section 1: Cross Domain Settings */}
+                                <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <h3 class="text-lg font-semibold">{t("profile.edit.crossDomainSettings")}</h3>
+                                    <div class="flex items-start gap-6">
+                                        <div 
+                                            onClick={() => setShowAvatarEditor(true)}
+                                            class="relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
+                                        >
+                                            <IpfsImage
+                                                src={avatar()}
+                                                alt="User Avatar"
+                                                class="w-full h-full object-cover"
+                                                fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
+                                            />
+                                            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <EditIcon class="w-10 h-10 text-white" />
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 space-y-4">
+                                            <div>
+                                                <label for="registered-name" class="font-medium">{t("profile.edit.registeredName")}</label>
+                                                <input
+                                                    id="registered-name"
+                                                    type="text"
+                                                    value={nameInput()}
+                                                    onInput={handleNameInput}
+                                                    classList={{ "border-[hsl(var(--destructive))]": !!nameError() }}
+                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
+                                                />
+                                                <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+                                                    <p>{t("profile.edit.name.help.line1")}</p>
+                                                    <p>{t("profile.edit.name.help.line2")}</p>
+                                                    <p>{t("profile.edit.name.help.line3")}</p>
+                                                </div>
+                                                <Show when={nameError()}>
+                                                  <p class="mt-1 text-xs text-[hsl(var(--destructive))]">{nameError()}</p>
+                                                </Show>
+                                                <button 
+                                                    class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                                                    disabled={isRegisterDisabled()}
+                                                >
+                                                    {isCheckingName() ? <Spinner class="w-5 h-5" /> : t("profile.edit.registerName")}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="flex-1 space-y-2">
+                                </div>
+
+                                {/* Section 2: Domain Specific Parameters */}
+                                <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <h3 class="text-lg font-semibold">{t("profile.edit.domainSpecificParams")}</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                        {t("profile.edit.domainLabel")}: <strong>{app.selectedDomainName()}</strong>
+                                    </p>
+                                    <div class="mt-2 space-y-2">
                                         <div class="flex justify-end">
                                             <LangSelector
                                                 codes={domainLangCodes()}

@@ -902,216 +902,158 @@ export async function switchOrAddChain(meta) {
 export { walletAccount, walletChainId };
 </file>
 
-<file path="src/components/profile/AvatarEditorModal.jsx">
-// src/components/profile/AvatarEditorModal.jsx
-import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
+<file path="src/components/settings/Assets.jsx">
+// src/components/settings/Assets.jsx
+import { createSignal, createMemo, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import Spinner from "../ui/Spinner.jsx";
+import { assessAssets } from "../../utils/assetsDiagnostics";
 
-const CROP_SIZE = 256; // Final avatar size in pixels
-const HANDLE_SIZE = 10; // Size of resize handles
+export default function Assets() {
+  const app = useApp();
+  const { t } = app;
 
-export default function AvatarEditorModal(props) {
-  const { t } = useApp();
-  const [sourceImage, setSourceImage] = createSignal(null);
-  const [crop, setCrop] = createSignal({ x: 10, y: 10, size: 200 });
-  const [action, setAction] = createSignal(null); // 'drag', 'resize-br', etc.
-  const [dragStart, setDragStart] = createSignal(null);
-  const [isProcessing, setIsProcessing] = createSignal(false);
+  const env = createMemo(() => app.assetsEnv?.() || "prod");
+  const [busySwitch, setBusySwitch] = createSignal(false);
+  async function switchEnv(next) {
+    if (next === env()) return;
+    try {
+      setBusySwitch(true);
+      app.setAssetsEnv?.(next);
+      await app.refreshDomainAssets?.();
+    } finally { setBusySwitch(false); }
+  }
 
-  let canvasRef;
-  let fileInputRef;
+  const [busyDiag, setBusyDiag] = createSignal(false);
+  const [report, setReport] = createSignal(null);
+  const [err, setErr] = createSignal(null);
 
-  const getCanvasMousePos = (e) => {
-    const rect = canvasRef.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-  
-  const draw = () => {
-    const canvas = canvasRef;
-    if (!canvas || !sourceImage()) return;
-    const ctx = canvas.getContext("2d");
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(sourceImage(), 0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  async function runDiagnostics() {
+    setBusyDiag(true); setErr(null);
+    try {
+      const r = await assessAssets({
+        env: app.assetsEnv?.(),
+        assetsBaseUrl: app.assetsBaseUrl?.(),
+        selectedDomainName: (() => { const d = app.selectedDomain?.(); return typeof d === "string" ? d : (d?.name || ""); })(),
+        domainAssetsPrefixActive: app.domainAssetsPrefix?.(),
+        domainAssetsConfig: app.domainAssetsConfig?.(),
+        domainAssetsSource: app.domainAssetsSource?.(),
+      });
+      setReport(r);
+    } catch (e) { setErr(e); } finally { setBusyDiag(false); }
+  }
 
-    const c = crop();
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(c.x, c.y, c.size, c.size);
-    ctx.clip();
-    ctx.drawImage(sourceImage(), 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(c.x, c.y, c.size, c.size);
-  };
-
-  createEffect(() => { if (props.isOpen) draw(); });
-
-  const getActionForPos = (pos) => {
-    const c = crop();
-    const hs = HANDLE_SIZE;
-    if (pos.x > c.x + c.size - hs && pos.x < c.x + c.size && pos.y > c.y + c.size - hs && pos.y < c.y + c.size) return 'resize-br';
-    if (pos.x > c.x && pos.x < c.x + hs && pos.y > c.y && pos.y < c.y + hs) return 'resize-tl';
-    if (pos.x > c.x && pos.x < c.x + c.size && pos.y > c.y && pos.y < c.y + c.size) return 'drag';
-    return null;
-  };
-
-  const handleMouseDown = (e) => {
-    const pos = getCanvasMousePos(e);
-    const currentAction = getActionForPos(pos);
-    if (currentAction) {
-      setAction(currentAction);
-      setDragStart({ mouseX: pos.x, mouseY: pos.y, cropX: crop().x, cropY: crop().y, cropSize: crop().size });
-    }
-  };
-
-  const handleMouseMove = (e) => {
-    const pos = getCanvasMousePos(e);
-    const act = action();
-    
-    if (!act) {
-      const hoverAction = getActionForPos(pos);
-      if (hoverAction?.startsWith('resize')) canvasRef.style.cursor = 'se-resize';
-      else if (hoverAction === 'drag') canvasRef.style.cursor = 'move';
-      else canvasRef.style.cursor = 'default';
-      return;
-    }
-
-    const start = dragStart();
-    const dx = pos.x - start.mouseX;
-    const dy = pos.y - start.mouseY;
-
-    if (act === 'drag') {
-      const newX = Math.max(0, Math.min(start.cropX + dx, canvasRef.width - crop().size));
-      const newY = Math.max(0, Math.min(start.cropY + dy, canvasRef.height - crop().size));
-      setCrop(c => ({ ...c, x: newX, y: newY }));
-    } else { // Resizing
-        let { x, y, size } = crop();
-        if (act === 'resize-br') {
-            const newSize = Math.max(HANDLE_SIZE * 4, start.cropSize + Math.max(dx, dy));
-            size = Math.min(newSize, canvasRef.width - x, canvasRef.height - y);
-        } else if (act === 'resize-tl') {
-            const delta = Math.max(dx, dy);
-            const newSize = Math.max(HANDLE_SIZE * 4, start.cropSize - delta);
-            const newX = start.cropX + delta;
-            const newY = start.cropY + delta;
-            if (newX >= 0 && newY >= 0) {
-                x = newX;
-                y = newY;
-                size = newSize;
-            }
-        }
-        setCrop({ x, y, size });
-    }
-  };
-
-  const handleMouseUp = () => setAction(null);
-
-  const handleFileChange = (e) => {
-    const file = e.currentTarget.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          setSourceImage(img);
-          const canvas = canvasRef;
-          const aspect = img.width / img.height;
-          canvas.width = aspect > 1 ? 500 : 500 * aspect;
-          canvas.height = aspect > 1 ? 500 / aspect : 500;
-          const initialSize = Math.min(canvas.width, canvas.height) * 0.8;
-          setCrop({
-            x: (canvas.width - initialSize) / 2,
-            y: (canvas.height - initialSize) / 2,
-            size: initialSize,
-          });
-        };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  createEffect(() => {
-    if (props.isOpen) {
-      setSourceImage(null);
-      
-      const onFocus = () => {
-        window.removeEventListener('focus', onFocus);
-        setTimeout(() => {
-          // If after a delay the input is still empty, user canceled.
-          if (!fileInputRef.files.length) {
-            props.onClose();
-          }
-        }, 300);
-      };
-      
-      window.addEventListener('focus', onFocus);
-      onCleanup(() => window.removeEventListener('focus', onFocus));
-
-      fileInputRef.click();
-    }
-  });
-
-  const handleSave = async () => {
-    if (!sourceImage()) return;
-    setIsProcessing(true);
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = CROP_SIZE;
-    tempCanvas.height = CROP_SIZE;
-    const ctx = tempCanvas.getContext("2d");
-    
-    const c = crop();
-    const scale = sourceImage().naturalWidth / canvasRef.width;
-    ctx.drawImage(sourceImage(), c.x * scale, c.y * scale, c.size * scale, c.size * scale, 0, 0, CROP_SIZE, CROP_SIZE);
-    
-    tempCanvas.toBlob(async (blob) => {
-      try {
-        await props.onSave(blob);
-        props.onClose();
-      } catch (e) { /* Parent handles error */ } finally {
-        setIsProcessing(false);
-      }
-    }, "image/png");
-  };
+  const Row = (props) => (
+    <div class="grid grid-cols-[160px_1fr] gap-2 py-1">
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">{props.label}</div>
+      <div class="text-sm break-all">{props.children}</div>
+    </div>
+  );
 
   return (
-    <Show when={props.isOpen}>
-      <div class="fixed inset-0 z-[60] flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-lg p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-4">{t("profile.edit.avatar.title")}</h3>
-          <input type="file" ref={fileInputRef} class="hidden" accept="image/*" onChange={handleFileChange} />
-
-          <div class="flex justify-center items-center mb-4 min-h-[200px]">
-            <Show when={sourceImage()} fallback={<p>{t("profile.edit.avatar.select")}</p>}>
-              <canvas
-                ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                class="max-w-full max-h-[50vh]"
-              />
-            </Show>
-          </div>
-
-          <div class="flex gap-2 justify-end mt-4">
-            <button class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90" onClick={props.onClose}>{t("common.cancel")}</button>
-            <button class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={handleSave} disabled={isProcessing() || !sourceImage()}>
-              <Show when={isProcessing()} fallback={<span>{t("profile.edit.avatar.save")}</span>}>
-                <Spinner class="w-5 h-5" />
-              </Show>
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h3 class="text-lg font-medium">{t("settings.dev.assets.title")}</h3>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.env")}</span>
+          <div class="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
+            <button
+              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
+              disabled={busySwitch()} onClick={() => switchEnv("prod")}
+            >
+              {t("settings.dev.assets.env.prod")}
+            </button>
+            <button
+              class={`px-3 py-1.5 text-sm border-l border-[hsl(var(--border))] ${env() === "test" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
+              disabled={busySwitch()} onClick={() => switchEnv("test")}
+            >
+              {t("settings.dev.assets.env.test")}
             </button>
           </div>
         </div>
       </div>
-    </Show>
+
+      <div class="rounded-md bg-[hsl(var(--muted))] p-3 space-y-1">
+        <Row label={t("settings.dev.assets.env")}>{env()}</Row>
+        <Row label={t("settings.dev.assets.baseUrl")}>{app.assetsBaseUrl?.() || "—"}</Row>
+        <Row label={t("settings.dev.assets.prefix.active")}>{app.domainAssetsPrefix?.() || "—"}</Row>
+        <Row label={t("settings.dev.assets.source")}>{app.domainAssetsSource?.() || "—"}</Row>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div class="text-sm font-medium">{t("settings.dev.assets.diagnostics.title")}</div>
+        <button
+          class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+          onClick={runDiagnostics}
+          disabled={busyDiag()}
+        >
+          {busyDiag() ? t("common.loading") : t("settings.dev.assets.diagnostics.run")}
+        </button>
+      </div>
+
+      {err() && <div class="text-sm text-[hsl(var(--destructive))]">
+        {t("settings.dev.assets.diagnostics.error")}: {String(err())}
+      </div>}
+
+      <Show when={report()}>
+        <div class="space-y-2">
+          <Row label={t("settings.dev.assets.domain")}>{report().domain || "—"}</Row>
+          <Row label={t("settings.dev.assets.prefix.computed")}>{report().computedDomainPrefix || "—"}</Row>
+
+          {/* Active config (what the app is really using) */}
+          <Row label={t("settings.dev.assets.configUrl")}>
+            <Show when={report().appConfigUrl} fallback={"—"}>
+              <span class="inline-flex items-center gap-2">
+                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="underline">{report().appConfigUrl}</a>
+                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
+              </span>
+            </Show>
+          </Row>
+
+          {/* Also show the env+domain computed config */}
+          <Row label={t("settings.dev.assets.configUrl.computed")}>
+            <Show when={report().computedDomainPrefix} fallback={"—"}>
+              <span class="inline-flex items-center gap-2">
+                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="underline">
+                  {report().computedDomainPrefix + "config.yaml"}
+                </a>
+                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
+              </span>
+            </Show>
+          </Row>
+
+          {/* Checks */}
+          <div class="pt-2 text-xs space-y-1">
+            <div><b>{t("settings.dev.assets.diagnostics.primary")}</b>: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
+            <Show when={report().primaryConfig.status === -1 && report().primaryConfig.error}>
+              <div class="text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.diagnostics.noteNetwork")} {report().primaryConfig.error}</div>
+            </Show>
+            <div><b>{t("settings.dev.assets.diagnostics.default")}</b>: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
+          </div>
+
+          {/* Summary */}
+          <div class="pt-2 text-xs space-y-1">
+            <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
+            <div>• {t("settings.dev.assets.diagnostics.hasFavicon")}: {String(report().appParsedConfigPresence.hasFavicon)}</div>
+          </div>
+
+          {/* Sample fetches */}
+          <Show when={report().resolvedSamples?.length}>
+            <div class="pt-2">
+              <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.sampleFetches")}</div>
+              <ul class="mt-1 space-y-1 text-xs">
+                {report().resolvedSamples.map((s) => (
+                  <li>{s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})</li>
+                ))}
+              </ul>
+            </div>
+          </Show>
+        </div>
+      </Show>
+    </section>
   );
 }
 </file>
@@ -1260,209 +1202,6 @@ export function useTheme() {
   useTheme.theme = theme;
 
   return [theme, toggleTheme];
-}
-</file>
-
-<file path="src/pages/ProfileEditPage.jsx">
-// src/pages/ProfileEditPage.jsx
-import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
-import { walletAccount } from "../blockchain/wallet.js";
-import { getSavvaContract } from "../blockchain/contracts.js";
-import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
-import { ipfs } from "../ipfs/index.js";
-import Spinner from "../components/ui/Spinner.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
-import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
-import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast, pushToast } from "../ui/toast.js";
-
-async function fetchProfileForEdit(params) {
-    const { app, identifier } = params;
-    if (!identifier) return { error: "No identifier provided." };
-
-    try {
-        const userProfileContract = await getSavvaContract(app, 'UserProfile');
-        let userAddress;
-
-        if (identifier.startsWith('@')) {
-            const userName = identifier.substring(1).toLowerCase();
-            const address = await userProfileContract.read.owners([userName]);
-            if (!address || address === '0x0000000000000000000000000000000000000000') {
-                return { error: "User does not exist." };
-            }
-            userAddress = toChecksumAddress(address);
-        } else {
-            userAddress = toChecksumAddress(identifier);
-        }
-
-        const avatarCid = await userProfileContract.read.avatars([userAddress]);
-        const profileCid = await userProfileContract.read.getString([
-            userAddress,
-            toHexBytes32(app.selectedDomainName()),
-            toHexBytes32("profile_cid")
-        ]);
-
-        let ipfsData = {};
-        if (profileCid) {
-            const { data } = await ipfs.getJSONBest(app, profileCid);
-            ipfsData = data || {};
-        }
-
-        return {
-            address: userAddress,
-            avatar: avatarCid,
-            profile: ipfsData
-        };
-    } catch (e) {
-        console.error("Failed to fetch profile for editing:", e);
-        return { error: e.message };
-    }
-}
-
-export default function ProfileEditPage() {
-    const app = useApp();
-    const { t, lang: uiLang, domainAssetsConfig } = app;
-    const { route } = useHashRouter();
-
-    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
-
-    const identifier = createMemo(() => {
-        const path = route();
-        return path.split('/')[2] || "";
-    });
-
-    const [profileData] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
-
-    const [avatar, setAvatar] = createSignal("");
-    const [about, setAbout] = createSignal({});
-    const [activeLang, setActiveLang] = createSignal(uiLang());
-
-    createEffect(() => {
-        const data = profileData();
-        if (data && !data.error) {
-            setAvatar(data.avatar || "");
-
-            const profileAbout = data.profile?.about;
-            if (typeof profileAbout === 'string') {
-                setAbout({ [activeLang()]: profileAbout });
-            } else if (typeof profileAbout === 'object' && profileAbout !== null) {
-                setAbout(profileAbout);
-            } else {
-                setAbout({});
-            }
-        }
-    });
-
-    const domainLangCodes = createMemo(() => {
-        const locales = domainAssetsConfig?.()?.locales || [];
-        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
-    });
-    
-    const handleAboutChange = (e) => {
-        const newText = e.currentTarget.value;
-        setAbout(prev => ({ ...prev, [activeLang()]: newText }));
-    };
-
-    const handleAvatarSave = async (blob) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', blob, 'avatar.png');
-
-            const response = await fetch(`${httpBase()}store`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
-            const result = await response.json();
-            const newCid = result?.cid;
-            if (!newCid) throw new Error("API did not return a CID for the avatar.");
-
-            const contract = await getSavvaContract(app, "UserProfile", { write: true });
-            await contract.write.setAvatar([newCid]);
-            
-            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
-        } catch (e) {
-            pushErrorToast(e, { context: "Avatar update failed" });
-            throw e; // re-throw to keep modal's processing state correct
-        }
-    };
-
-    return (
-        <>
-            <main class="p-4 max-w-3xl mx-auto space-y-6">
-                <ClosePageButton />
-                <div class="flex items-center justify-between">
-                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
-                </div>
-
-                <Show when={walletAccount()} fallback={
-                    <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-                        <p class="text-[hsl(var(--muted-foreground))] text-center">Please connect your wallet to edit the profile.</p>
-                    </div>
-                }>
-                    <Switch>
-                        <Match when={profileData.loading}>
-                            <div class="flex justify-center items-center h-48"><Spinner /></div>
-                        </Match>
-                        <Match when={profileData()?.error}>
-                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-                                <p class="text-red-500 text-center">{profileData().error}</p>
-                            </div>
-                        </Match>
-                        <Match when={profileData()}>
-                            <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                                <h3 class="text-lg font-semibold">{t("profile.edit.generalInfo")}</h3>
-                                <div class="flex items-center gap-6">
-                                    <div 
-                                        onClick={() => setShowAvatarEditor(true)}
-                                        class="relative group w-48 h-48 rounded-full overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
-                                    >
-                                        <IpfsImage
-                                            src={avatar()}
-                                            alt="User Avatar"
-                                            class="w-full h-full object-cover"
-                                            fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
-                                        />
-                                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <EditIcon class="w-10 h-10 text-white" />
-                                        </div>
-                                    </div>
-                                    <div class="flex-1 space-y-2">
-                                        <div class="flex justify-end">
-                                            <LangSelector
-                                                codes={domainLangCodes()}
-                                                value={activeLang()}
-                                                onChange={setActiveLang}
-                                            />
-                                        </div>
-                                        <textarea
-                                            value={about()[activeLang()] || ""}
-                                            onInput={handleAboutChange}
-                                            class="w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                                            placeholder="Tell us about yourself..."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </Match>
-                    </Switch>
-                </Show>
-            </main>
-            <AvatarEditorModal 
-                isOpen={showAvatarEditor()}
-                onClose={() => setShowAvatarEditor(false)}
-                onSave={handleAvatarSave}
-            />
-        </>
-    );
 }
 </file>
 
@@ -1773,6 +1512,123 @@ export async function loadAssetResource(app, relPath, opts = {}) {
     default:
       return text;
   }
+}
+</file>
+
+<file path="src/utils/assetsDiagnostics.js">
+// src/utils/assetsDiagnostics.js
+// Utility to assess domain asset resources and common pitfalls.
+
+import { fetchWithTimeout } from "./net";
+
+function join(base, rel) {
+  const b = base?.endsWith("/") ? base : (base || "") + "/";
+  const r = String(rel || "").replace(/^\/+/, "");
+  return b + r;
+}
+
+function summarizeLogos(cfg) {
+  if (!cfg) return { has: false, fields: [], pickable: [] };
+  const raw = cfg.logos ?? cfg.logo ?? null;
+  if (!raw) return { has: false, fields: [], pickable: [] };
+  if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
+  const l = {
+    dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
+    light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
+    mobile:       raw.mobile ?? null,
+    dark:         raw.dark   ?? null,
+    light:        raw.light  ?? null,
+    default:      raw.default?? raw.fallback ?? null,
+  };
+  const fields = Object.entries(l).filter(([,v]) => !!v).map(([k]) => k);
+  return { has: fields.length > 0, fields, pickable: fields };
+}
+
+export async function assessAssets(p) {
+  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
+  const base = String(p.assetsBaseUrl || "");
+  const domain = String(p.selectedDomainName || "");
+  const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
+  const activePrefix = String(p.domainAssetsPrefixActive || "");
+  const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
+  const defaultConfigUrl = "/domain_default/config.yaml";
+
+  async function check(url) {
+    if (!url) return { url, ok: false, status: 0, exists: false, error: null };
+    let res, method = "HEAD";
+    try {
+      res = await fetcher(url, { method, cache: "no-store" });
+    } catch (e) {
+      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
+      catch (e2) { return { url, ok: false, status: -1, exists: false, error: String(e2) }; }
+    }
+    if (method === "HEAD" && !res.ok && res.status !== 404) {
+      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
+      catch (e3) { return { url, ok: false, status: -1, exists: false, error: String(e3) }; }
+    }
+    const exists = res.ok && res.status !== 404;
+    return { url, ok: res.ok, status: res.status, exists, error: null };
+  }
+
+  const primary = primaryConfigUrl ? await check(primaryConfigUrl) : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
+  const fallback = await check(defaultConfigUrl);
+
+  const appConfigUrl = join(activePrefix, "config.yaml");
+
+  const cfg = p.domainAssetsConfig || null;
+  const logos = summarizeLogos(cfg);
+  const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
+  const hasTabs       = !!(cfg && (cfg.modules?.tabs || cfg.tabs || cfg.ui?.tabs));            // fixed
+  const hasCategories = !!(cfg && (cfg.modules?.categories || cfg.categories || cfg.ui?.categories)); // fixed
+
+  const fav = cfg?.favicon || null;
+  const hasFavicon = !!(fav && (fav.base || fav["16"] || fav["32"] || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href));
+
+  const sampleFiles = [];
+  if (logos.has) {
+    const key = logos.pickable[0];
+    const rel = (typeof (cfg?.logos ?? cfg?.logo) === "string")
+      ? (cfg?.logos ?? cfg?.logo)
+      : (cfg?.logos?.[key] ?? cfg?.logo?.[key]);
+    if (rel) sampleFiles.push({ kind: "logo", relPath: rel });
+  }
+  if (cfg?.locales?.length) {
+    const fr = cfg.locales.find(x => x?.path || x?.dictionary) || cfg.locales[0];
+    const rel = fr?.path || fr?.dictionary;
+    if (rel) sampleFiles.push({ kind: "locale", relPath: rel });
+  }
+  if (cfg?.modules?.tabs || cfg?.tabs?.path) {
+    const rel = cfg?.modules?.tabs || cfg?.tabs?.path;
+    sampleFiles.push({ kind: "tabs", relPath: rel });
+  }
+  if (hasFavicon) {
+    const favRel = fav["32"] || fav["16"] || fav.base || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href;
+    if (favRel) sampleFiles.push({ kind: "favicon", relPath: favRel });
+  }
+
+  const resolvedSamples = await Promise.all(sampleFiles.map(async (sf) => {
+    const url = join(activePrefix, sf.relPath);
+    const r = await check(url);
+    return { ...sf, url, exists: r.exists, status: r.status };
+  }));
+
+  return {
+    env: p.env || "prod",
+    domain,
+    assetsBaseUrl: base,
+    computedDomainPrefix,
+    activePrefix,
+    appSource: p.domainAssetsSource || null,
+    appConfigUrl,                   // active pack’s config (may be /domain_default/)
+    primaryConfig: { url: primary.url, exists: !!primary.exists, status: primary.status, error: primary.error },
+    defaultConfig: { url: fallback.url, exists: !!fallback.exists, status: fallback.status },
+    appParsedConfigPresence: {
+      hasConfigObject: !!cfg,
+      hasLogos: !!logos.has, logoFields: logos.fields,
+      hasLocales, hasTabs, hasCategories, hasFavicon
+    },
+    resolvedSamples,
+  };
 }
 </file>
 
@@ -19583,6 +19439,290 @@ export default function PostTags(props) {
 }
 </file>
 
+<file path="src/components/profile/AvatarEditorModal.jsx">
+// src/components/profile/AvatarEditorModal.jsx
+import { createSignal, onCleanup, Show, createEffect } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import Spinner from "../ui/Spinner.jsx";
+
+const CROP_SIZE = 256;
+const HANDLE_VISUAL = 12;   // drawn handle square
+const HANDLE_HOT = 22;      // generous hit area for mouse
+const MIN_SIZE = 48;
+
+export default function AvatarEditorModal(props) {
+  const { t } = useApp();
+
+  const [imgEl, setImgEl] = createSignal(null);
+  const [crop, setCrop] = createSignal({ x: 10, y: 10, size: 200 });
+  const [drag, setDrag] = createSignal(null); // {mode:'drag'|'tl'|'br', startX, startY, startCrop}
+  const [processing, setProcessing] = createSignal(false);
+
+  let canvas;
+  let fileInput;
+
+  // DPR helpers (we draw in CSS px; canvas backing store scaled by DPR)
+  const dpr = () => (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
+  const cssRect = () => {
+    const wCss = parseInt(canvas?.style.width || "0", 10) || Math.round((canvas?.width || 0) / dpr());
+    const hCss = parseInt(canvas?.style.height || "0", 10) || Math.round((canvas?.height || 0) / dpr());
+    return { wCss, hCss };
+  };
+  const canvasPoint = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
+  // Hit-test utils
+  const inRect = (p, x, y, w, h) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+  const getHoverAction = (pos) => {
+    const c = crop();
+    // Corner hot rectangles (generous)
+    const tl = { x: c.x, y: c.y, w: HANDLE_HOT, h: HANDLE_HOT };
+    const br = { x: c.x + c.size - HANDLE_HOT, y: c.y + c.size - HANDLE_HOT, w: HANDLE_HOT, h: HANDLE_HOT };
+
+    if (inRect(pos, br.x, br.y, br.w, br.h)) return "br";
+    if (inRect(pos, tl.x, tl.y, tl.w, tl.h)) return "tl";
+
+    // Inside crop
+    if (inRect(pos, c.x, c.y, c.size, c.size)) return "drag";
+    return null;
+  };
+  const setCursor = (pos) => {
+    const mode = getHoverAction(pos);
+    canvas.style.cursor = mode === "drag" ? "move" : mode ? "se-resize" : "default";
+  };
+
+  function fitCanvasToImage(image) {
+    const maxCss = 500;
+    const aspect = image.width / image.height;
+    const cssW = aspect > 1 ? maxCss : Math.round(maxCss * aspect);
+    const cssH = aspect > 1 ? Math.round(maxCss / aspect) : maxCss;
+
+    const ratio = dpr();
+    canvas.width = Math.round(cssW * ratio);
+    canvas.height = Math.round(cssH * ratio);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+
+    const initial = Math.floor(Math.min(cssW, cssH) * 0.8);
+    setCrop({
+      x: Math.round((cssW - initial) / 2),
+      y: Math.round((cssH - initial) / 2),
+      size: Math.max(initial, MIN_SIZE),
+    });
+  }
+
+  function draw() {
+    const image = imgEl();
+    if (!canvas || !image) return;
+
+    const { wCss, hCss } = cssRect();
+    const ratio = dpr();
+    const ctx = canvas.getContext("2d");
+    ctx.save();
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0); // draw in CSS px
+    ctx.clearRect(0, 0, wCss, hCss);
+
+    // base
+    ctx.drawImage(image, 0, 0, wCss, hCss);
+
+    // dim
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(0, 0, wCss, hCss);
+
+    // crop window
+    const c = crop();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(c.x, c.y, c.size, c.size);
+    ctx.clip();
+    ctx.drawImage(image, 0, 0, wCss, hCss);
+    ctx.restore();
+
+    // outline
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(c.x, c.y, c.size, c.size);
+
+    // visual handles (TL & BR)
+    ctx.fillStyle = "rgba(255,255,255,0.96)";
+    // TL
+    ctx.fillRect(c.x - 1, c.y - 1, HANDLE_VISUAL, HANDLE_VISUAL);
+    // BR
+    ctx.fillRect(c.x + c.size - HANDLE_VISUAL + 1, c.y + c.size - HANDLE_VISUAL + 1, HANDLE_VISUAL, HANDLE_VISUAL);
+
+    ctx.restore();
+  }
+
+  createEffect(draw);
+  createEffect(() => { props.isOpen && draw(); });
+
+  function onDown(e) {
+    e.preventDefault();
+    const p = canvasPoint(e);
+    const mode = getHoverAction(p);
+    if (!mode) return;
+    setDrag({ mode, startX: p.x, startY: p.y, startCrop: { ...crop() } });
+  }
+
+  function onMove(e) {
+    const p = canvasPoint(e);
+    const state = drag();
+    if (!state) {
+      setCursor(p);
+      return;
+    }
+
+    const { wCss, hCss } = cssRect();
+    const { mode, startX, startY, startCrop } = state;
+    const dx = p.x - startX;
+    const dy = p.y - startY;
+
+    if (mode === "drag") {
+      const nx = Math.max(0, Math.min(startCrop.x + dx, wCss - startCrop.size));
+      const ny = Math.max(0, Math.min(startCrop.y + dy, hCss - startCrop.size));
+      setCrop({ x: nx, y: ny, size: startCrop.size });
+    } else if (mode === "br") {
+      // resize from bottom-right; clamp against canvas using original TL
+      const grow = Math.max(dx, dy);
+      let size = Math.max(MIN_SIZE, Math.min(startCrop.size + grow, wCss - startCrop.x, hCss - startCrop.y));
+      setCrop({ x: startCrop.x, y: startCrop.y, size });
+    } else if (mode === "tl") {
+      // resize from top-left; keep BR fixed
+      const delta = Math.min(dx, dy); // move right/down => shrink
+      let x = startCrop.x + delta;
+      let y = startCrop.y + delta;
+      let size = Math.max(MIN_SIZE, startCrop.size - delta);
+      if (x < 0) { size += x; x = 0; }
+      if (y < 0) { size += y; y = 0; }
+      size = Math.min(size, (startCrop.y + startCrop.size) - y, (startCrop.x + startCrop.size) - x);
+      setCrop({ x, y, size: Math.max(MIN_SIZE, size) });
+    }
+
+    draw();
+  }
+
+  function onUp() { setDrag(null); }
+
+  function onFileChange(e) {
+    const f = e.currentTarget.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const i = new Image();
+      i.onload = () => {
+        setImgEl(i);
+        fitCanvasToImage(i);
+        draw();
+      };
+      i.src = ev.target.result;
+    };
+    reader.readAsDataURL(f);
+  }
+
+  createEffect(() => {
+    if (!props.isOpen) return;
+    setImgEl(null);
+    setTimeout(() => fileInput?.click(), 0);
+
+    const onFocus = () => {
+      window.removeEventListener("focus", onFocus);
+      setTimeout(() => {
+        if (!fileInput?.files?.length) props.onClose?.();
+      }, 300);
+    };
+    window.addEventListener("focus", onFocus);
+    onCleanup(() => window.removeEventListener("focus", onFocus));
+  });
+
+  async function onSave() {
+    const image = imgEl();
+    if (!image) return;
+    setProcessing(true);
+
+    const { wCss } = cssRect();
+    const scaleX = image.naturalWidth / wCss;
+    const c = crop();
+
+    const sx = Math.max(0, Math.round(c.x * scaleX));
+    const sy = Math.max(0, Math.round(c.y * scaleX));
+    const sSize = Math.min(
+      image.naturalWidth - sx,
+      image.naturalHeight - sy,
+      Math.round(c.size * scaleX)
+    );
+
+    const out = document.createElement("canvas");
+    out.width = CROP_SIZE;
+    out.height = CROP_SIZE;
+    const octx = out.getContext("2d");
+    octx.imageSmoothingQuality = "high";
+    octx.drawImage(image, sx, sy, sSize, sSize, 0, 0, CROP_SIZE, CROP_SIZE);
+
+    out.toBlob(async (blob) => {
+      try {
+        if (!blob) throw new Error("Render failed");
+        await props.onSave?.(blob);
+        props.onClose?.();
+      } finally {
+        setProcessing(false);
+      }
+    }, "image/png");
+  }
+
+  return (
+    <Show when={props.isOpen}>
+      <div class="fixed inset-0 z-[60] flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+        <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-lg p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-4">{t("profile.edit.avatar.title")}</h3>
+
+          <input
+            type="file"
+            ref={el => (fileInput = el)}
+            class="hidden"
+            accept="image/*"
+            onChange={onFileChange}
+          />
+
+          <div class="flex justify-center items-center mb-4 min-h-[200px]">
+            <Show when={imgEl()} fallback={<p>{t("profile.edit.avatar.select")}</p>}>
+              <canvas
+                ref={el => (canvas = el)}
+                class="max-w-full max-h-[60vh] touch-none select-none"
+                onMouseDown={onDown}
+                onMouseMove={onMove}
+                onMouseUp={onUp}
+                onMouseLeave={onUp}
+              />
+            </Show>
+          </div>
+
+          <div class="flex gap-2 justify-end mt-4">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onSave}
+              disabled={processing() || !imgEl()}
+            >
+              <Show when={processing()} fallback={<span>{t("profile.edit.avatar.save")}</span>}>
+                <Spinner class="w-5 h-5" />
+              </Show>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/components/profile/SubscribersTab.jsx">
 // src/components/profile/SubscribersTab.jsx
 import { createSignal, createMemo, For, Show, createEffect, on, onMount, onCleanup } from "solid-js";
@@ -20036,157 +20176,38 @@ export default function WalletTab(props) {
 }
 </file>
 
-<file path="src/components/settings/Assets.jsx">
-// src/components/settings/Assets.jsx
-import { createSignal, createMemo, Show } from "solid-js";
+<file path="src/components/settings/DeveloperSection.jsx">
+// src/components/settings/DeveloperSection.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { assessAssets } from "../../utils/assetsDiagnostics";
+import { dbg } from "../../utils/debug";
 
-export default function Assets() {
+export default function DeveloperSection() {
   const app = useApp();
   const { t } = app;
 
-  const env = createMemo(() => app.assetsEnv?.() || "prod");
-  const [busySwitch, setBusySwitch] = createSignal(false);
-  async function switchEnv(next) {
-    if (next === env()) return;
-    try {
-      setBusySwitch(true);
-      app.setAssetsEnv?.(next);
-      await app.refreshDomainAssets?.();
-    } finally { setBusySwitch(false); }
-  }
-
-  const [busyDiag, setBusyDiag] = createSignal(false);
-  const [report, setReport] = createSignal(null);
-  const [err, setErr] = createSignal(null);
-
-  async function runDiagnostics() {
-    setBusyDiag(true); setErr(null);
-    try {
-      const r = await assessAssets({
-        env: app.assetsEnv?.(),
-        assetsBaseUrl: app.assetsBaseUrl?.(),
-        selectedDomainName: (() => { const d = app.selectedDomain?.(); return typeof d === "string" ? d : (d?.name || ""); })(),
-        domainAssetsPrefixActive: app.domainAssetsPrefix?.(),
-        domainAssetsConfig: app.domainAssetsConfig?.(),
-        domainAssetsSource: app.domainAssetsSource?.(),
-      });
-      setReport(r);
-    } catch (e) { setErr(e); } finally { setBusyDiag(false); }
-  }
-
-  const Row = (props) => (
-    <div class="grid grid-cols-[160px_1fr] gap-2 py-1">
-      <div class="text-sm text-[hsl(var(--muted-foreground))]">{props.label}</div>
-      <div class="text-sm break-all">{props.children}</div>
-    </div>
-  );
-
   return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h3 class="text-lg font-medium">{t("settings.dev.assets.title")}</h3>
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.env")}</span>
-          <div class="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
-            <button
-              class={`px-3 py-1.5 text-sm ${env() === "prod" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
-              disabled={busySwitch()} onClick={() => switchEnv("prod")}
-            >
-              {t("settings.dev.assets.env.prod")}
-            </button>
-            <button
-              class={`px-3 py-1.5 text-sm border-l border-[hsl(var(--border))] ${env() === "test" ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" : "text-[hsl(var(--foreground))]"}`}
-              disabled={busySwitch()} onClick={() => switchEnv("test")}
-            >
-              {t("settings.dev.assets.env.test")}
-            </button>
-          </div>
-        </div>
-      </div>
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
 
-      <div class="rounded-md bg-[hsl(var(--muted))] p-3 space-y-1">
-        <Row label={t("settings.dev.assets.env")}>{env()}</Row>
-        <Row label={t("settings.dev.assets.baseUrl")}>{app.assetsBaseUrl?.() || "—"}</Row>
-        <Row label={t("settings.dev.assets.prefix.active")}>{app.domainAssetsPrefix?.() || "—"}</Row>
-        <Row label={t("settings.dev.assets.source")}>{app.domainAssetsSource?.() || "—"}</Row>
-      </div>
+      {/* Show translation keys */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={app.showKeys()}
+          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.showKeys")}</span>
+      </label>
 
-      <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">{t("settings.dev.assets.diagnostics.title")}</div>
-        <button
-          class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
-          onClick={runDiagnostics}
-          disabled={busyDiag()}
-        >
-          {busyDiag() ? t("common.loading") : t("settings.dev.assets.diagnostics.run")}
-        </button>
-      </div>
-
-      {err() && <div class="text-sm text-[hsl(var(--destructive))]">
-        {t("settings.dev.assets.diagnostics.error")}: {String(err())}
-      </div>}
-
-      <Show when={report()}>
-        <div class="space-y-2">
-          <Row label={t("settings.dev.assets.domain")}>{report().domain || "—"}</Row>
-          <Row label={t("settings.dev.assets.prefix.computed")}>{report().computedDomainPrefix || "—"}</Row>
-
-          {/* Active config (what the app is really using) */}
-          <Row label={t("settings.dev.assets.configUrl")}>
-            <Show when={report().appConfigUrl} fallback={"—"}>
-              <span class="inline-flex items-center gap-2">
-                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="underline">{report().appConfigUrl}</a>
-                <a href={report().appConfigUrl} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
-              </span>
-            </Show>
-          </Row>
-
-          {/* Also show the env+domain computed config */}
-          <Row label={t("settings.dev.assets.configUrl.computed")}>
-            <Show when={report().computedDomainPrefix} fallback={"—"}>
-              <span class="inline-flex items-center gap-2">
-                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="underline">
-                  {report().computedDomainPrefix + "config.yaml"}
-                </a>
-                <a href={report().computedDomainPrefix + "config.yaml"} target="_blank" rel="noreferrer" class="px-2 py-0.5 rounded-md border border-[hsl(var(--border))] text-xs hover:bg-[hsl(var(--accent))]" aria-label={t("settings.dev.assets.configUrl.open")} title={t("settings.dev.assets.configUrl.open")}>↗</a>
-              </span>
-            </Show>
-          </Row>
-
-          {/* Checks */}
-          <div class="pt-2 text-xs space-y-1">
-            <div><b>{t("settings.dev.assets.diagnostics.primary")}</b>: {report().primaryConfig.url} — {report().primaryConfig.exists ? t("common.exists") : t("common.notFound")} ({report().primaryConfig.status})</div>
-            <Show when={report().primaryConfig.status === -1 && report().primaryConfig.error}>
-              <div class="text-[hsl(var(--muted-foreground))]">{t("settings.dev.assets.diagnostics.noteNetwork")} {report().primaryConfig.error}</div>
-            </Show>
-            <div><b>{t("settings.dev.assets.diagnostics.default")}</b>: {report().defaultConfig.url} — {report().defaultConfig.exists ? t("common.exists") : t("common.notFound")} ({report().defaultConfig.status})</div>
-          </div>
-
-          {/* Summary */}
-          <div class="pt-2 text-xs space-y-1">
-            <div>• {t("settings.dev.assets.diagnostics.hasConfig")}: {String(report().appParsedConfigPresence.hasConfigObject)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasLogos")}: {String(report().appParsedConfigPresence.hasLogos)} ({(report().appParsedConfigPresence.logoFields || []).join(", ") || "—"})</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasLocales")}: {String(report().appParsedConfigPresence.hasLocales)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasTabs")}: {String(report().appParsedConfigPresence.hasTabs)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasCategories")}: {String(report().appParsedConfigPresence.hasCategories)}</div>
-            <div>• {t("settings.dev.assets.diagnostics.hasFavicon")}: {String(report().appParsedConfigPresence.hasFavicon)}</div>
-          </div>
-
-          {/* Sample fetches */}
-          <Show when={report().resolvedSamples?.length}>
-            <div class="pt-2">
-              <div class="text-sm font-semibold">{t("settings.dev.assets.diagnostics.sampleFetches")}</div>
-              <ul class="mt-1 space-y-1 text-xs">
-                {report().resolvedSamples.map((s) => (
-                  <li>{s.kind}: {s.url} — {s.exists ? t("common.ok") : t("common.fail")} ({s.status})</li>
-                ))}
-              </ul>
-            </div>
-          </Show>
-        </div>
-      </Show>
+      {/* Enable debug logging */}
+      <label class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={dbg.enabled()}
+          onInput={(e) => dbg.enable(e.currentTarget.checked)}
+        />
+        <span>{t("settings.developer.debug.enable")}</span>
+      </label>
     </section>
   );
 }
@@ -21088,6 +21109,96 @@ export default function RightPaneFooter() {
 }
 </file>
 
+<file path="src/components/Toaster.jsx">
+// src/components/Toaster.jsx
+import { For, Show } from "solid-js";
+import { toasts, dismissToast, toggleToast } from "../ui/toast";
+
+const typeStyles = {
+  info:    "bg-blue-600",
+  success: "bg-emerald-600",
+  warning: "bg-amber-600",
+  error:   "bg-red-600",
+};
+
+function pretty(obj) {
+  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); } catch {}
+}
+
+export default function Toaster() {
+  return (
+    // Full-width bottom bar container; toasts align right when compact.
+    // We disable pointer events on the container so it doesn't block the page,
+    // and re-enable them on each toast.
+    <div class="fixed inset-x-0 bottom-0 z-[1000] p-3 pointer-events-none">
+      <div class="flex flex-col gap-2 items-end">
+        <For each={toasts()}>
+          {(t) => {
+            const headerColor = typeStyles[t.type] || typeStyles.info;
+            return (
+              // When expanded: stretch to full width; when compact: hug right (max ~28rem)
+              <div
+                class={`pointer-events-auto w-full ${
+                  t.expanded ? "" : "sm:w-[28rem] max-w-[92vw]"
+                }`}
+              >
+                <div class="text-white rounded shadow overflow-hidden">
+                  {/* Header bar */}
+                  <div class={`flex items-center justify-between px-3 py-2 ${headerColor}`}>
+                    <span class="text-sm font-medium">{t.message}</span>
+                    <div class="flex items-center gap-1">
+                      <Show when={t.details}>
+                        <button
+                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
+                          onClick={() => toggleToast(t.id)}
+                          aria-expanded={t.expanded}
+                          title={t.expanded ? "Hide details" : "Show details"}
+                        >
+                          {t.expanded ? "Hide" : "Details"}
+                        </button>
+                      </Show>
+                      <button
+                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
+                        onClick={() => dismissToast(t.id)}
+                        aria-label="Close notification"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Details panel — takes full width, tall & scrollable */}
+                  <Show when={t.expanded && t.details}>
+                    <div class="bg-gray-900 text-gray-100 px-4 py-3 max-h-[60vh] overflow-auto">
+                      <pre class="whitespace-pre-wrap break-words text-[12px] leading-tight">
+{pretty(t.details)}
+                      </pre>
+                      <div class="mt-2 flex justify-end">
+                        <button
+                          class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
+                          onClick={() => copy(pretty(t.details))}
+                          title="Copy details to clipboard"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/dev/AssetDebugTap.jsx">
 // src/dev/AssetDebugTap.jsx
 /* src/dev/AssetDebugTap.jsx */
@@ -21696,6 +21807,209 @@ export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
 }
 </file>
 
+<file path="src/pages/ProfileEditPage.jsx">
+// src/pages/ProfileEditPage.jsx
+import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import { useHashRouter } from "../routing/hashRouter.js";
+import { walletAccount } from "../blockchain/wallet.js";
+import { getSavvaContract } from "../blockchain/contracts.js";
+import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
+import { ipfs } from "../ipfs/index.js";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
+import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast, pushToast } from "../ui/toast.js";
+
+async function fetchProfileForEdit(params) {
+    const { app, identifier } = params;
+    if (!identifier) return { error: "No identifier provided." };
+
+    try {
+        const userProfileContract = await getSavvaContract(app, 'UserProfile');
+        let userAddress;
+
+        if (identifier.startsWith('@')) {
+            const userName = identifier.substring(1).toLowerCase();
+            const address = await userProfileContract.read.owners([userName]);
+            if (!address || address === '0x0000000000000000000000000000000000000000') {
+                return { error: "User does not exist." };
+            }
+            userAddress = toChecksumAddress(address);
+        } else {
+            userAddress = toChecksumAddress(identifier);
+        }
+
+        const avatarCid = await userProfileContract.read.avatars([userAddress]);
+        const profileCid = await userProfileContract.read.getString([
+            userAddress,
+            toHexBytes32(app.selectedDomainName()),
+            toHexBytes32("profile_cid")
+        ]);
+
+        let ipfsData = {};
+        if (profileCid) {
+            const { data } = await ipfs.getJSONBest(app, profileCid);
+            ipfsData = data || {};
+        }
+
+        return {
+            address: userAddress,
+            avatar: avatarCid,
+            profile: ipfsData
+        };
+    } catch (e) {
+        console.error("Failed to fetch profile for editing:", e);
+        return { error: e.message };
+    }
+}
+
+export default function ProfileEditPage() {
+    const app = useApp();
+    const { t, lang: uiLang, domainAssetsConfig } = app;
+    const { route } = useHashRouter();
+
+    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
+
+    const identifier = createMemo(() => {
+        const path = route();
+        return path.split('/')[2] || "";
+    });
+
+    const [profileData] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
+
+    const [avatar, setAvatar] = createSignal("");
+    const [about, setAbout] = createSignal({});
+    const [activeLang, setActiveLang] = createSignal(uiLang());
+
+    createEffect(() => {
+        const data = profileData();
+        if (data && !data.error) {
+            setAvatar(data.avatar || "");
+
+            const profileAbout = data.profile?.about;
+            if (typeof profileAbout === 'string') {
+                setAbout({ [activeLang()]: profileAbout });
+            } else if (typeof profileAbout === 'object' && profileAbout !== null) {
+                setAbout(profileAbout);
+            } else {
+                setAbout({});
+            }
+        }
+    });
+
+    const domainLangCodes = createMemo(() => {
+        const locales = domainAssetsConfig?.()?.locales || [];
+        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
+    });
+    
+    const handleAboutChange = (e) => {
+        const newText = e.currentTarget.value;
+        setAbout(prev => ({ ...prev, [activeLang()]: newText }));
+    };
+
+    const handleAvatarSave = async (blob) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', blob, 'avatar.png');
+
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
+            const result = await response.json();
+            const newCid = result?.cid;
+            if (!newCid) throw new Error("API did not return a CID for the avatar.");
+
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            await contract.write.setAvatar([newCid]);
+            
+            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
+        } catch (e) {
+            pushErrorToast(e, { context: "Avatar update failed" });
+            throw e; // re-throw to keep modal's processing state correct
+        }
+    };
+
+    return (
+        <>
+            <main class="p-4 max-w-3xl mx-auto space-y-6">
+                <ClosePageButton />
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
+                </div>
+
+                <Show when={walletAccount()} fallback={
+                    <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                        <p class="text-[hsl(var(--muted-foreground))] text-center">Please connect your wallet to edit the profile.</p>
+                    </div>
+                }>
+                    <Switch>
+                        <Match when={profileData.loading}>
+                            <div class="flex justify-center items-center h-48"><Spinner /></div>
+                        </Match>
+                        <Match when={profileData()?.error}>
+                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+                                <p class="text-red-500 text-center">{profileData().error}</p>
+                            </div>
+                        </Match>
+                        <Match when={profileData()}>
+                            <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                <h3 class="text-lg font-semibold">{t("profile.edit.generalInfo")}</h3>
+                                <div class="flex items-center gap-6">
+                                    <div 
+                                        onClick={() => setShowAvatarEditor(true)}
+                                        class="relative group w-48 h-48 rounded-full overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
+                                    >
+                                        <IpfsImage
+                                            src={avatar()}
+                                            alt="User Avatar"
+                                            class="w-full h-full object-cover"
+                                            fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
+                                        />
+                                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <EditIcon class="w-10 h-10 text-white" />
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 space-y-2">
+                                        <div class="flex justify-end">
+                                            <LangSelector
+                                                codes={domainLangCodes()}
+                                                value={activeLang()}
+                                                onChange={setActiveLang}
+                                            />
+                                        </div>
+                                        <textarea
+                                            value={about()[activeLang()] || ""}
+                                            onInput={handleAboutChange}
+                                            class="w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                            placeholder="Tell us about yourself..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </Match>
+                    </Switch>
+                </Show>
+            </main>
+            <AvatarEditorModal 
+                isOpen={showAvatarEditor()}
+                onClose={() => setShowAvatarEditor(false)}
+                onSave={handleAvatarSave}
+            />
+        </>
+    );
+}
+</file>
+
 <file path="src/routing/hashRouter.js">
 // src/routing/hashRouter.js
 import { createSignal } from "solid-js";
@@ -21824,123 +22138,6 @@ export function pushErrorToast(err, context = {}) {
 }
 </file>
 
-<file path="src/utils/assetsDiagnostics.js">
-// src/utils/assetsDiagnostics.js
-// Utility to assess domain asset resources and common pitfalls.
-
-import { fetchWithTimeout } from "./net";
-
-function join(base, rel) {
-  const b = base?.endsWith("/") ? base : (base || "") + "/";
-  const r = String(rel || "").replace(/^\/+/, "");
-  return b + r;
-}
-
-function summarizeLogos(cfg) {
-  if (!cfg) return { has: false, fields: [], pickable: [] };
-  const raw = cfg.logos ?? cfg.logo ?? null;
-  if (!raw) return { has: false, fields: [], pickable: [] };
-  if (typeof raw === "string") return { has: true, fields: ["default"], pickable: ["default"] };
-  const l = {
-    dark_mobile:  raw.dark_mobile  ?? raw.mobile_dark  ?? null,
-    light_mobile: raw.light_mobile ?? raw.mobile_light ?? null,
-    mobile:       raw.mobile ?? null,
-    dark:         raw.dark   ?? null,
-    light:        raw.light  ?? null,
-    default:      raw.default?? raw.fallback ?? null,
-  };
-  const fields = Object.entries(l).filter(([,v]) => !!v).map(([k]) => k);
-  return { has: fields.length > 0, fields, pickable: fields };
-}
-
-export async function assessAssets(p) {
-  const fetcher = p.fetcher || ((url, opts) => fetchWithTimeout(url, { timeoutMs: 8000, ...(opts || {}) }));
-  const base = String(p.assetsBaseUrl || "");
-  const domain = String(p.selectedDomainName || "");
-  const computedDomainPrefix = base && domain ? join(base, domain + "/") : "";
-  const activePrefix = String(p.domainAssetsPrefixActive || "");
-  const primaryConfigUrl = computedDomainPrefix ? join(computedDomainPrefix, "config.yaml") : "";
-  const defaultConfigUrl = "/domain_default/config.yaml";
-
-  async function check(url) {
-    if (!url) return { url, ok: false, status: 0, exists: false, error: null };
-    let res, method = "HEAD";
-    try {
-      res = await fetcher(url, { method, cache: "no-store" });
-    } catch (e) {
-      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
-      catch (e2) { return { url, ok: false, status: -1, exists: false, error: String(e2) }; }
-    }
-    if (method === "HEAD" && !res.ok && res.status !== 404) {
-      try { method = "GET"; res = await fetcher(url, { method, cache: "no-store" }); }
-      catch (e3) { return { url, ok: false, status: -1, exists: false, error: String(e3) }; }
-    }
-    const exists = res.ok && res.status !== 404;
-    return { url, ok: res.ok, status: res.status, exists, error: null };
-  }
-
-  const primary = primaryConfigUrl ? await check(primaryConfigUrl) : { url: primaryConfigUrl, ok: false, status: 0, exists: false };
-  const fallback = await check(defaultConfigUrl);
-
-  const appConfigUrl = join(activePrefix, "config.yaml");
-
-  const cfg = p.domainAssetsConfig || null;
-  const logos = summarizeLogos(cfg);
-  const hasLocales    = !!(cfg && (cfg.locales || cfg.i18n));
-  const hasTabs       = !!(cfg && (cfg.modules?.tabs || cfg.tabs || cfg.ui?.tabs));            // fixed
-  const hasCategories = !!(cfg && (cfg.modules?.categories || cfg.categories || cfg.ui?.categories)); // fixed
-
-  const fav = cfg?.favicon || null;
-  const hasFavicon = !!(fav && (fav.base || fav["16"] || fav["32"] || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href));
-
-  const sampleFiles = [];
-  if (logos.has) {
-    const key = logos.pickable[0];
-    const rel = (typeof (cfg?.logos ?? cfg?.logo) === "string")
-      ? (cfg?.logos ?? cfg?.logo)
-      : (cfg?.logos?.[key] ?? cfg?.logo?.[key]);
-    if (rel) sampleFiles.push({ kind: "logo", relPath: rel });
-  }
-  if (cfg?.locales?.length) {
-    const fr = cfg.locales.find(x => x?.path || x?.dictionary) || cfg.locales[0];
-    const rel = fr?.path || fr?.dictionary;
-    if (rel) sampleFiles.push({ kind: "locale", relPath: rel });
-  }
-  if (cfg?.modules?.tabs || cfg?.tabs?.path) {
-    const rel = cfg?.modules?.tabs || cfg?.tabs?.path;
-    sampleFiles.push({ kind: "tabs", relPath: rel });
-  }
-  if (hasFavicon) {
-    const favRel = fav["32"] || fav["16"] || fav.base || fav["apple-touch-icon"] || fav.manifest || fav["mask-icon"]?.href;
-    if (favRel) sampleFiles.push({ kind: "favicon", relPath: favRel });
-  }
-
-  const resolvedSamples = await Promise.all(sampleFiles.map(async (sf) => {
-    const url = join(activePrefix, sf.relPath);
-    const r = await check(url);
-    return { ...sf, url, exists: r.exists, status: r.status };
-  }));
-
-  return {
-    env: p.env || "prod",
-    domain,
-    assetsBaseUrl: base,
-    computedDomainPrefix,
-    activePrefix,
-    appSource: p.domainAssetsSource || null,
-    appConfigUrl,                   // active pack’s config (may be /domain_default/)
-    primaryConfig: { url: primary.url, exists: !!primary.exists, status: primary.status, error: primary.error },
-    defaultConfig: { url: fallback.url, exists: !!fallback.exists, status: fallback.status },
-    appParsedConfigPresence: {
-      hasConfigObject: !!cfg,
-      hasLogos: !!logos.has, logoFields: logos.fields,
-      hasLocales, hasTabs, hasCategories, hasFavicon
-    },
-    resolvedSamples,
-  };
-}
-</file>
-
 <file path="src/utils/debug.js">
 // src/utils/debug.js
 const STORE_KEY = "savva_debug_enabled";
@@ -22018,6 +22215,61 @@ export async function fetchWithTimeout(
     clearTimeout(timer);
   }
 }
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVVA · SolidJS</title>
+
+  <!-- Preload theme to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      } catch { }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
+      if (!location.hash) {
+        let path = location.pathname;
+        let newHash = "";
+
+        // NEW: Check for legacy /content/ URL
+        if (path.startsWith("/content/")) {
+          const savvaId = path.substring("/content/".length);
+          newHash = "#/post/" + savvaId;
+        } else if (path !== "/") {
+          newHash = "#" + path + location.search;
+        }
+
+        if (newHash) {
+          history.replaceState(null, "", "/" + newHash);
+        }
+      }
+    })();
+  </script>
+
+
+  <!-- Load app after theme class is set -->
+  <script type="module" src="/src/index.jsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
 </file>
 
 <file path="public/dev_docs/en/core-concepts/showing-posts.md">
@@ -23865,43 +24117,6 @@ export default function PostsTab(props) {
 }
 </file>
 
-<file path="src/components/settings/DeveloperSection.jsx">
-// src/components/settings/DeveloperSection.jsx
-import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug";
-
-export default function DeveloperSection() {
-  const app = useApp();
-  const { t } = app;
-
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <h3 class="text-lg font-medium">{t("settings.developer.title")}</h3>
-
-      {/* Show translation keys */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={app.showKeys()}
-          onInput={(e) => app.setShowKeys(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.showKeys")}</span>
-      </label>
-
-      {/* Enable debug logging */}
-      <label class="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={dbg.enabled()}
-          onInput={(e) => dbg.enable(e.currentTarget.checked)}
-        />
-        <span>{t("settings.developer.debug.enable")}</span>
-      </label>
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/tabs/CommentsTab.jsx">
 // src/components/tabs/CommentsTab.jsx
 import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
@@ -24965,96 +25180,6 @@ export default function HtmlBlock(props) {
 }
 </file>
 
-<file path="src/components/Toaster.jsx">
-// src/components/Toaster.jsx
-import { For, Show } from "solid-js";
-import { toasts, dismissToast, toggleToast } from "../ui/toast";
-
-const typeStyles = {
-  info:    "bg-blue-600",
-  success: "bg-emerald-600",
-  warning: "bg-amber-600",
-  error:   "bg-red-600",
-};
-
-function pretty(obj) {
-  try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
-}
-
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); } catch {}
-}
-
-export default function Toaster() {
-  return (
-    // Full-width bottom bar container; toasts align right when compact.
-    // We disable pointer events on the container so it doesn't block the page,
-    // and re-enable them on each toast.
-    <div class="fixed inset-x-0 bottom-0 z-[1000] p-3 pointer-events-none">
-      <div class="flex flex-col gap-2 items-end">
-        <For each={toasts()}>
-          {(t) => {
-            const headerColor = typeStyles[t.type] || typeStyles.info;
-            return (
-              // When expanded: stretch to full width; when compact: hug right (max ~28rem)
-              <div
-                class={`pointer-events-auto w-full ${
-                  t.expanded ? "" : "sm:w-[28rem] max-w-[92vw]"
-                }`}
-              >
-                <div class="text-white rounded shadow overflow-hidden">
-                  {/* Header bar */}
-                  <div class={`flex items-center justify-between px-3 py-2 ${headerColor}`}>
-                    <span class="text-sm font-medium">{t.message}</span>
-                    <div class="flex items-center gap-1">
-                      <Show when={t.details}>
-                        <button
-                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                          onClick={() => toggleToast(t.id)}
-                          aria-expanded={t.expanded}
-                          title={t.expanded ? "Hide details" : "Show details"}
-                        >
-                          {t.expanded ? "Hide" : "Details"}
-                        </button>
-                      </Show>
-                      <button
-                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
-                        onClick={() => dismissToast(t.id)}
-                        aria-label="Close notification"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Details panel — takes full width, tall & scrollable */}
-                  <Show when={t.expanded && t.details}>
-                    <div class="bg-gray-900 text-gray-100 px-4 py-3 max-h-[60vh] overflow-auto">
-                      <pre class="whitespace-pre-wrap break-words text-[12px] leading-tight">
-{pretty(t.details)}
-                      </pre>
-                      <div class="mt-2 flex justify-end">
-                        <button
-                          class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
-                          onClick={() => copy(pretty(t.details))}
-                          title="Copy details to clipboard"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  </Show>
-                </div>
-              </div>
-            );
-          }}
-        </For>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/context/useTokenPrices.js">
 // src/context/useTokenPrices.js
 import { createSignal, onMount, onCleanup, createMemo } from "solid-js";
@@ -25694,61 +25819,6 @@ export function getPinningItems(post, t) {
     }];
   }
 }
-</file>
-
-<file path="index.html">
-<!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAVVA · SolidJS</title>
-
-  <!-- Preload theme to avoid flash -->
-  <script>
-    (function () {
-      try {
-        const saved = localStorage.getItem("theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved || (systemDark ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", theme === "dark");
-      } catch { }
-    })();
-  </script>
-
-  <script>
-    (function () {
-      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
-      if (!location.hash) {
-        let path = location.pathname;
-        let newHash = "";
-
-        // NEW: Check for legacy /content/ URL
-        if (path.startsWith("/content/")) {
-          const savvaId = path.substring("/content/".length);
-          newHash = "#/post/" + savvaId;
-        } else if (path !== "/") {
-          newHash = "#" + path + location.search;
-        }
-
-        if (newHash) {
-          history.replaceState(null, "", "/" + newHash);
-        }
-      }
-    })();
-  </script>
-
-
-  <!-- Load app after theme class is set -->
-  <script type="module" src="/src/index.jsx"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-</body>
-
-</html>
 </file>
 
 <file path="public/dev_docs/en/getting-started.md">
@@ -26565,6 +26635,292 @@ export default function PostReactions(props) {
 }
 </file>
 
+<file path="src/components/SwitchConnectDialog.jsx">
+// File: src/components/SwitchConnectDialog.jsx
+import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
+import { useApp } from "../context/AppContext";
+import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
+
+function isAbortError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  if (e?.name === "AbortError") return true;
+  if (e?.code === 20) return true;
+  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
+  return false;
+}
+
+async function fetchInfoJSON(backendLink, { signal } = {}) {
+  const base = httpBase(backendLink);
+  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
+  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+  return await res.json();
+}
+
+export default function SwitchConnectDialog(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
+  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
+  const [domains, setDomains] = createSignal([]); // [{ name }]
+  const [fetching, setFetching] = createSignal(false);
+  const [applying, setApplying] = createSignal(false);
+  const [localError, setLocalError] = createSignal("");
+
+  let aborter;
+
+  const selectedDomainObj = createMemo(() => {
+    const cur = (domain() || "").trim().toLowerCase();
+    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
+  });
+
+  createEffect(async () => {
+    if (!props.open) return;
+
+    setLocalError("");
+    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
+    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
+    setDomains([]);
+
+    aborter?.abort();
+    aborter = new AbortController();
+    setFetching(true);
+
+    try {
+      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
+      const u = new URL(initialUrl);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+
+      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
+        const resolved =
+          normalized.find((d) => eq(d.name, wanted)) ||
+          normalized.find((d) => eq(d.name, domain())) ||
+          normalized[0];
+
+        const name = resolved.name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  });
+
+  onCleanup(() => aborter?.abort());
+
+  async function handleReload() {
+    setLocalError("");
+
+    // Normalize the user-entered backend URL (candidate) without touching global config.
+    let candidate = (backendUrl() || "").trim();
+    try {
+      const u = new URL(candidate);
+      if (!/^https?:$/.test(u.protocol)) {
+        throw new Error(t("rightPane.switch.validation.protocol"));
+      }
+      // Ensure trailing slash for consistent "base + 'info'" concatenation.
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
+      candidate = u.toString();
+    } catch (e) {
+      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
+      return;
+    }
+
+    setFetching(true);
+    aborter?.abort();
+    aborter = new AbortController();
+
+    try {
+      // Probe the candidate backend’s /info to list available domains.
+      const res = await fetch(candidate + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
+
+      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        // Try to keep current/wanted domain if present; otherwise pick the first.
+        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
+        const keep =
+          normalized.find((d) => eq(d.name, prefer)) ||
+          normalized.find((d) => eq(d.name, domain()));
+        const name = keep?.name || normalized[0].name;
+        setDomain(name);
+        queueMicrotask(() => setDomain(name));
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function onApply() {
+    setLocalError("");
+    setApplying(true);
+    try {
+      const newUrl = (backendUrl() || "").trim();
+      const chosenDomain = (domain() || "").trim();
+      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
+
+      const oldBackendBase = httpBase();
+      const newBackendBase = new URL(newUrl);
+      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
+      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
+
+      // --- MODIFICATION START: Logout from the OLD backend first ---
+      if (isSwitchingBackends) {
+        await app.logout?.();
+      }
+      // --- MODIFICATION END ---
+
+      // Now, proceed with switching to the new backend
+      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
+
+      await app.updateConnect?.({ backendLink: httpBase() });
+      await app.setDomain?.(chosenDomain);
+      await app.refreshDomainAssets?.();
+
+      if (app.ws) {
+        app.ws.setUrl(wsUrl());
+        app.ws.reconnect("switch-backend");
+      }
+    } catch (e) {
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
+      setApplying(false);
+      return;
+    }
+
+    setApplying(false);
+    try { aborter?.abort(); } catch { }
+    props.onClose?.();
+  }
+
+  return (
+    <Show when={props.open}>
+      <div class="fixed inset-0 z-40 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+
+        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <h3 class="text-lg font-semibold mb-3">
+            {t("rightPane.switch.title")}
+          </h3>
+
+          <label class="block mb-3">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
+            <div class="mt-1 flex gap-2">
+              <input
+                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                value={backendUrl()}
+                onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                placeholder={t("rightPane.switch.backend.placeholder")}
+                spellcheck={false}
+              />
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                onClick={handleReload}
+                disabled={fetching()}
+                title={t("rightPane.switch.reload.title")}
+              >
+                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+              </button>
+            </div>
+            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
+          </label>
+
+          <label class="block mb-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
+          </label>
+          <select
+            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
+            value={domain()}
+            onChange={(e) => setDomain(e.currentTarget.value)}
+            disabled={fetching() || domains().length === 0}
+          >
+            {domains().map((d) => (
+              <option value={d.name} selected={eq(d.name, domain())}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <Show when={selectedDomainObj()}>
+            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+              <Show when={selectedDomainObj().website}>
+                <div>
+                  {t("rightPane.switch.domain.website")}:{" "}
+                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                    {selectedDomainObj().website}
+                  </a>
+                </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={localError() || props.error}>
+            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
+              {t("common.error")}: {localError() || props.error?.message}
+            </p>
+          </Show>
+
+          <div class="mt-4 flex gap-2 justify-end">
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              onClick={props.onReset}
+              title={t("rightPane.switch.reset.title")}
+            >
+              {t("rightPane.switch.reset")}
+            </button>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              onClick={onApply}
+              disabled={props.loading || fetching() || applying()}
+            >
+              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/context/useAppConnection.js">
 // src/context/useAppConnection.js
 import { createSignal, onMount } from "solid-js";
@@ -27125,6 +27481,149 @@ export function createTextPreview(markdownText, type = 'post') {
     return createCommentPreview(markdownText);
   }
   return createPostPreview(markdownText);
+}
+</file>
+
+<file path="src/styles/tabs.css">
+/* src/styles/tabs.css */
+
+.tabs {
+  --tabs-active-bg: hsl(var(--background));
+  --tabs-active-fg: hsl(var(--foreground));
+  --tabs-inactive-bg: hsl(var(--secondary));
+  --tabs-inactive-fg: hsl(var(--secondary-foreground));
+  --tabs-background: hsl(var(--card));
+
+  list-style: none;
+  margin: 0;
+  padding-top: 5px;
+
+  background: var(--tabs-background);
+  background: var(--gradient);
+
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.tabs li {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tabs a {
+  display: block;
+  text-decoration: none;
+  padding: 7px clamp(5px, 5vw, 80px);
+  white-space: nowrap;
+  color: var(--tabs-inactive-fg);
+  background: var(--tabs-inactive-bg);
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
+}
+
+.tabs .active { z-index: 3; }
+.tabs .active a {
+  color: var(--tabs-active-fg);
+  background: var(--tabs-active-bg);
+}
+
+.tabs li:before,
+.tabs li:after,
+.tabs li a:before,
+.tabs li a:after {
+  position: absolute;
+  bottom: 0;
+}
+
+.tabs li:last-child:after,
+.tabs li:last-child a:after,
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs .active:after,
+.tabs .active:before,
+.tabs .active a:after,
+.tabs .active a:before {
+  content: "";
+}
+
+.tabs .active:before,
+.tabs .active:after {
+  background: var(--tabs-active-bg);
+  z-index: 1;
+}
+
+.tabs li:before,
+.tabs li:after {
+  background: var(--tabs-inactive-bg);
+  width: 10px;
+  height: 10px;
+}
+.tabs li:before { left: -10px; }
+.tabs li:after  { right: -10px; }
+
+.tabs li a:before,
+.tabs li a:after {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--tabs-background);
+  z-index: 2;
+}
+
+.tabs .active a:after,
+.tabs .active a:before {
+  background: var(--tabs-inactive-bg);
+}
+
+.tabs li:first-child.active a:before,
+.tabs li:last-child.active a:after {
+  background: var(--tabs-background);
+}
+
+.tabs li a:before { left: -20px; }
+.tabs li a:after  { right: -20px; }
+
+.tabs li:first-child:before,
+.tabs li:first-child a:before,
+.tabs li:last-child:after,
+.tabs li:last-child a:after {
+  content: none;
+}
+
+.tabs_panel {
+  position: relative;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 1rem;
+}
+
+.tabs a .tab__icon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  line-height: 0;
+}
+.tabs a .tab__icon svg { width: 18px; height: 18px; }
+
+/* --- compact mode --- */
+.tabs[data-compact="true"] a .tab__icon {
+  margin-right: 0;
+}
+.tabs[data-compact="true"] a {
+  padding: 7px clamp(5px, 6vw, 80px);
+}
+.tabs[data-compact="true"] a .tab__label {
+  /* Visually hide but keep in accessibility tree */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 </file>
 
@@ -28149,292 +28648,6 @@ export default function RightRailLayout(props) {
 }
 </file>
 
-<file path="src/components/SwitchConnectDialog.jsx">
-// File: src/components/SwitchConnectDialog.jsx
-import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
-import { useApp } from "../context/AppContext";
-import { httpBase, configureEndpoints, wsUrl } from "../net/endpoints";
-
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
-
-function isAbortError(e) {
-  const msg = String(e?.message || e || "").toLowerCase();
-  if (e?.name === "AbortError") return true;
-  if (e?.code === 20) return true;
-  if (msg.includes("aborted") || msg.includes("abort") || msg.includes("the operation was aborted")) return true;
-  return false;
-}
-
-async function fetchInfoJSON(backendLink, { signal } = {}) {
-  const base = httpBase(backendLink);
-  const res = await fetch(base + "info", { headers: { Accept: "application/json" }, signal });
-  if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-  return await res.json();
-}
-
-export default function SwitchConnectDialog(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
-  const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
-  const [domains, setDomains] = createSignal([]); // [{ name }]
-  const [fetching, setFetching] = createSignal(false);
-  const [applying, setApplying] = createSignal(false);
-  const [localError, setLocalError] = createSignal("");
-
-  let aborter;
-
-  const selectedDomainObj = createMemo(() => {
-    const cur = (domain() || "").trim().toLowerCase();
-    return (domains() || []).find((d) => eq(dn(d), cur)) || null;
-  });
-
-  createEffect(async () => {
-    if (!props.open) return;
-
-    setLocalError("");
-    setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
-    setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
-    setDomains([]);
-
-    aborter?.abort();
-    aborter = new AbortController();
-    setFetching(true);
-
-    try {
-      const initialUrl = props.backendLink ?? app.config?.()?.backendLink ?? "";
-      const u = new URL(initialUrl);
-      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-
-      const info = await fetchInfoJSON(initialUrl, { signal: aborter.signal });
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        const wanted = dn(props.domain) || (app.config?.()?.domain || "");
-        const resolved =
-          normalized.find((d) => eq(d.name, wanted)) ||
-          normalized.find((d) => eq(d.name, domain())) ||
-          normalized[0];
-
-        const name = resolved.name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  });
-
-  onCleanup(() => aborter?.abort());
-
-  async function handleReload() {
-    setLocalError("");
-
-    // Normalize the user-entered backend URL (candidate) without touching global config.
-    let candidate = (backendUrl() || "").trim();
-    try {
-      const u = new URL(candidate);
-      if (!/^https?:$/.test(u.protocol)) {
-        throw new Error(t("rightPane.switch.validation.protocol"));
-      }
-      // Ensure trailing slash for consistent "base + 'info'" concatenation.
-      if (!u.pathname.endsWith("/")) u.pathname += "/";
-      candidate = u.toString();
-    } catch (e) {
-      setLocalError(e.message || t("rightPane.switch.validation.protocol"));
-      return;
-    }
-
-    setFetching(true);
-    aborter?.abort();
-    aborter = new AbortController();
-
-    try {
-      // Probe the candidate backend’s /info to list available domains.
-      const res = await fetch(candidate + "info", {
-        headers: { Accept: "application/json" },
-        signal: aborter.signal,
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-      const info = await res.json();
-
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => (typeof d === "string" ? { name: d } : d))
-        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0);
-
-      normalized.sort((a, b) => (a.name > b.name ? 1 : -1));
-      setDomains(normalized);
-
-      if (normalized.length > 0) {
-        // Try to keep current/wanted domain if present; otherwise pick the first.
-        const prefer = dn(props.domain) || (app.config?.()?.domain || "") || domain();
-        const keep =
-          normalized.find((d) => eq(d.name, prefer)) ||
-          normalized.find((d) => eq(d.name, domain()));
-        const name = keep?.name || normalized[0].name;
-        setDomain(name);
-        queueMicrotask(() => setDomain(name));
-      } else {
-        setLocalError(t("rightPane.switch.noDomains"));
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-    } finally {
-      setFetching(false);
-    }
-  }
-
-  async function onApply() {
-    setLocalError("");
-    setApplying(true);
-    try {
-      const newUrl = (backendUrl() || "").trim();
-      const chosenDomain = (domain() || "").trim();
-      if (!newUrl || !chosenDomain) throw new Error("URL and domain are required.");
-
-      const oldBackendBase = httpBase();
-      const newBackendBase = new URL(newUrl);
-      if (!newBackendBase.pathname.endsWith("/")) newBackendBase.pathname += "/";
-      const isSwitchingBackends = oldBackendBase !== newBackendBase.toString();
-
-      // --- MODIFICATION START: Logout from the OLD backend first ---
-      if (isSwitchingBackends) {
-        await app.logout?.();
-      }
-      // --- MODIFICATION END ---
-
-      // Now, proceed with switching to the new backend
-      configureEndpoints({ backendLink: newUrl, domain: chosenDomain });
-
-      await app.updateConnect?.({ backendLink: httpBase() });
-      await app.setDomain?.(chosenDomain);
-      await app.refreshDomainAssets?.();
-
-      if (app.ws) {
-        app.ws.setUrl(wsUrl());
-        app.ws.reconnect("switch-backend");
-      }
-    } catch (e) {
-      if (!isAbortError(e)) setLocalError(e.message || String(e));
-      setApplying(false);
-      return;
-    }
-
-    setApplying(false);
-    try { aborter?.abort(); } catch { }
-    props.onClose?.();
-  }
-
-  return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 z-40 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-
-        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-3">
-            {t("rightPane.switch.title")}
-          </h3>
-
-          <label class="block mb-3">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
-            <div class="mt-1 flex gap-2">
-              <input
-                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                value={backendUrl()}
-                onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder={t("rightPane.switch.backend.placeholder")}
-                spellcheck={false}
-              />
-              <button
-                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
-                onClick={handleReload}
-                disabled={fetching()}
-                title={t("rightPane.switch.reload.title")}
-              >
-                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
-              </button>
-            </div>
-            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
-          </label>
-
-          <label class="block mb-1">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
-          </label>
-          <select
-            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name} selected={eq(d.name, domain())}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-
-          <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-              <Show when={selectedDomainObj().website}>
-                <div>
-                  {t("rightPane.switch.domain.website")}:{" "}
-                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
-                    {selectedDomainObj().website}
-                  </a>
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
-              {t("common.error")}: {localError() || props.error?.message}
-            </p>
-          </Show>
-
-          <div class="mt-4 flex gap-2 justify-end">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              onClick={props.onReset}
-              title={t("rightPane.switch.reset.title")}
-            >
-              {t("rightPane.switch.reset")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onApply}
-              disabled={props.loading || fetching() || applying()}
-            >
-              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
-  );
-}
-</file>
-
 <file path="src/i18n/static_keys.jsx">
 //--------------------------------------------------------
 // i18n techical comments.'
@@ -28494,402 +28707,270 @@ t("tabs.title.for-you")
 */
 </file>
 
-<file path="src/pages/ProfilePage.jsx">
-// src/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../routing/hashRouter.js";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import Spinner from "../components/ui/Spinner.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
-import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
-import Tabs from "../components/ui/Tabs.jsx";
-import Address from "../components/ui/Address.jsx";
-import { ipfs } from "../ipfs/index.js";
-import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
-import PostsTab from "../components/profile/PostsTab.jsx";
-import SubscribersTab from "../components/profile/SubscribersTab.jsx";
-import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
-import WalletTab from "../components/profile/WalletTab.jsx";
-import TokenValue from "../components/ui/TokenValue.jsx";
-import { walletAccount } from "../blockchain/wallet.js";
-import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
+<file path="src/styles/themed-controls.css">
+/* src/styles/themed-controls.css
+──────────────────────────────────────────────────────────────
+Contents
+1) Themed segmented controls
+2) Light 1px dialog borders
+3) Docs typography (.sv-docs)
+4) Code & syntax highlighting (Shiki / pretty-code)
+────────────────────────────────────────────────────────────── */
 
-// Data fetcher for the user profile
-async function fetchUserProfile({ app, identifier }) {
-  if (!identifier || !app.wsCall) return null;
+/* ---------------------------------------------- */
+/* 1) Themed segmented controls                   */
+/* ---------------------------------------------- */
 
-  try {
-    const wsParams = { domain: app.selectedDomainName() };
-    const currentUser = app.authorizedUser();
-    if (currentUser) {
-      wsParams.caller = currentUser.address;
-    }
-
-    if (identifier.startsWith('@')) {
-      wsParams.user_name = identifier.substring(1);
-    } else {
-      wsParams.user_addr = identifier;
-    }
-
-    return await app.wsCall('get-user', wsParams);
-  } catch (error) {
-    console.error("Failed to fetch user profile:", error);
-    return { error: error.message };
-  }
-}
-
-// Data fetcher for the profile details from IPFS
-async function fetchProfileDetails(cid, app) {
-  if (!cid) return null;
-  try {
-    const { data } = await ipfs.getJSONBest(app, cid);
-    return data;
-  } catch (e) {
-    console.error(`Failed to fetch profile details from IPFS CID: ${cid}`, e);
-    return { error: e.message };
-  }
-}
-
-export default function ProfilePage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-
-  const identifier = createMemo(() => {
-    const path = route();
-    return path.startsWith('/') ? path.substring(1) : path;
-  });
-
-  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
-  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
-  
-  const [activeTab, setActiveTab] = createSignal('posts');
-  
-  const isMyProfile = createMemo(() => {
-    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
-    const profileAddr = userResource()?.address?.toLowerCase();
-    return !!authorizedAddr && authorizedAddr === profileAddr;
-  });
-
-  const canEdit = createMemo(() => {
-    const connectedWallet = walletAccount()?.toLowerCase();
-    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
-  });
-
-  const handleEditProfile = () => {
-    navigate(`/profile-edit/${identifier()}`);
-  };
-
-  const TABS = createMemo(() => {
-    const tabs = [
-      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-    ];
-
-    if (isMyProfile()) {
-      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
-    }
-
-    return tabs;
-  });
-  
-  createEffect(() => {
-    const availableTabs = TABS();
-    const currentActive = activeTab();
-    if (!availableTabs.some(tab => tab.id === currentActive)) {
-        setActiveTab('posts');
-    }
-  });
-
-  const aboutText = createMemo(() => {
-    const details = profileDetails();
-    if (!details || !details.about) return "";
-
-    const aboutData = details.about;
-    if (typeof aboutData === 'string') {
-      return aboutData;
-    }
-    if (typeof aboutData === 'object') {
-      const lang = app.lang();
-      return aboutData[lang] || aboutData.en || Object.values(aboutData)[0] || "";
-    }
-    return "";
-  });
-  
-  const isSubscribed = createMemo(() => {
-      const u = userResource();
-      return u && u.i_sponsor_for > 0;
-  });
-
-  return (
-    <main class="sv-container p-4 max-w-4xl mx-auto">
-      <ClosePageButton />
-      
-      <Switch>
-        <Match when={userResource.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
-        </Match>
-        <Match when={userResource.error || userResource()?.error}>
-          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("profile.error.title")}</h3>
-            <p class="text-sm mt-1">{userResource.error?.message || userResource()?.error}</p>
-          </div>
-        </Match>
-        <Match when={userResource()}>
-          {(user) =>
-            <div class="space-y-6">
-              {/* Profile Header */}
-              <div class="flex justify-between items-end gap-4">
-                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                  <div class="flex flex-col items-center gap-4 shrink-0">
-                    <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                      <IpfsImage 
-                        src={user().avatar}
-                        alt={`${user().name} avatar`}
-                        class="w-full h-full object-cover"
-                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
-                      />
-                    </div>
-                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
-                      <Show 
-                        when={!isSubscribed()}
-                        fallback={
-                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
-                            {t("profile.unsubscribe")}
-                          </button>
-                        }
-                      >
-                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
-                          {t("profile.subscribe")}
-                        </button>
-                      </Show>
-                    </Show>
-                  </div>
-                  
-                  <div class="flex-1 w-full text-center sm:text-left space-y-3">
-                    <div class="flex flex-col items-center sm:items-start">
-                      <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
-                      <Show when={user().name}>
-                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                          <span>{user().name.toUpperCase()}</span>
-                          <VerifiedBadge class="w-4 h-4" />
-                        </div>
-                      </Show>
-                      <div class="mt-1">
-                        <Address address={user().address} format="full" />
-                      </div>
-                      <div class="flex items-center gap-2 mt-2 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
-                        <TokenValue amount={user().staked} />
-                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
-                      </div>
-                      <div class="flex items-center gap-2 mt-1 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
-                        <TokenValue amount={user().total_sponsoring} />
-                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                      </div>
-                      <div class="flex items-center gap-2 mt-1 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
-                        <TokenValue amount={user().total_sponsored} />
-                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                      </div>
-                    </div>
-
-                    <Show when={aboutText()}>
-                      <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
-                    </Show>
-                  </div>
-                </div>
-
-                {/* Edit Profile Button */}
-                <div class="flex-shrink-0">
-                  <Show when={canEdit()}>
-                    <button
-                      onClick={handleEditProfile}
-                      class="p-2 rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                      title={t("profile.edit.title")}
-                    >
-                      <EditIcon class="w-5 h-5" />
-                    </button>
-                  </Show>
-                </div>
-              </div>
-
-
-              {/* Profile Tabs */}
-              <div>
-                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
-                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
-                  <Switch>
-                    <Match when={activeTab() === 'posts'}>
-                      <PostsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'subscribers'}>
-                      <SubscribersTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'subscriptions'}>
-                      <SubscriptionsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'wallet'}>
-                      <WalletTab user={user()} />
-                    </Match>
-                  </Switch>
-                </div>
-              </div>
-            </div>
-          }
-        </Match>
-      </Switch>
-    </main>
-  );
-}
-</file>
-
-<file path="src/styles/tabs.css">
-/* src/styles/tabs.css */
-
-.tabs {
-  --tabs-active-bg: hsl(var(--background));
-  --tabs-active-fg: hsl(var(--foreground));
-  --tabs-inactive-bg: hsl(var(--secondary));
-  --tabs-inactive-fg: hsl(var(--secondary-foreground));
-  --tabs-background: hsl(var(--card));
-
-  list-style: none;
-  margin: 0;
-  padding-top: 5px;
-
-  background: var(--tabs-background);
-  background: var(--gradient);
-
-  display: flex;
-  justify-content: center;
-  overflow-x: auto;
-}
-
-.tabs li {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.tabs a {
-  display: block;
-  text-decoration: none;
-  padding: 7px clamp(5px, 5vw, 80px);
-  white-space: nowrap;
-  color: var(--tabs-inactive-fg);
-  background: var(--tabs-inactive-bg);
-  border-top-left-radius: 15px;
-  border-top-right-radius: 15px;
-}
-
-.tabs .active { z-index: 3; }
-.tabs .active a {
-  color: var(--tabs-active-fg);
-  background: var(--tabs-active-bg);
-}
-
-.tabs li:before,
-.tabs li:after,
-.tabs li a:before,
-.tabs li a:after {
-  position: absolute;
-  bottom: 0;
-}
-
-.tabs li:last-child:after,
-.tabs li:last-child a:after,
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs .active:after,
-.tabs .active:before,
-.tabs .active a:after,
-.tabs .active a:before {
-  content: "";
-}
-
-.tabs .active:before,
-.tabs .active:after {
-  background: var(--tabs-active-bg);
-  z-index: 1;
-}
-
-.tabs li:before,
-.tabs li:after {
-  background: var(--tabs-inactive-bg);
-  width: 10px;
-  height: 10px;
-}
-.tabs li:before { left: -10px; }
-.tabs li:after  { right: -10px; }
-
-.tabs li a:before,
-.tabs li a:after {
-  width: 20px;
-  height: 20px;
-  border-radius: 10px;
-  background: var(--tabs-background);
-  z-index: 2;
-}
-
-.tabs .active a:after,
-.tabs .active a:before {
-  background: var(--tabs-inactive-bg);
-}
-
-.tabs li:first-child.active a:before,
-.tabs li:last-child.active a:after {
-  background: var(--tabs-background);
-}
-
-.tabs li a:before { left: -20px; }
-.tabs li a:after  { right: -20px; }
-
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs li:last-child:after,
-.tabs li:last-child a:after {
-  content: none;
-}
-
-.tabs_panel {
-  position: relative;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  padding: 1rem;
-}
-
-.tabs a .tab__icon {
+.themed-segment {
   display: inline-flex;
-  vertical-align: middle;
-  margin-right: 0.5rem;
-  line-height: 0;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--muted));
 }
-.tabs a .tab__icon svg { width: 18px; height: 18px; }
 
-/* --- compact mode --- */
-.tabs[data-compact="true"] a .tab__icon {
-  margin-right: 0;
+.themed-pill {
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  line-height: 1;
+  font-weight: 600;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  outline: none;
 }
-.tabs[data-compact="true"] a {
-  padding: 7px clamp(5px, 6vw, 80px);
+.themed-pill:hover {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
 }
-.tabs[data-compact="true"] a .tab__label {
-  /* Visually hide but keep in accessibility tree */
-  position: absolute;
-  width: 1px;
-  height: 1px;
+.themed-pill.is-active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+/* Keyboard focus (accessible) */
+.themed-pill:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+.themed-pill--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+}
+.themed-pill--icon svg { display: block; }
+
+/* ---------------------------------------------- */
+/* 2) Light 1px dialog/panel border               */
+/* ---------------------------------------------- */
+
+.themed-dialog {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem; /* preserves rounding if none set on element */
+}
+
+/* ---------------------------------------------- */
+/* 3) Docs typography (.sv-docs)                  */
+/* ---------------------------------------------- */
+
+.sv-docs h1 {
+  margin: 0 0 1rem;
+  font-size: 1.75rem;
+  line-height: 1.25;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.sv-docs h2 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.sv-docs h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs p {
+  margin: 0.5rem 0 0.85rem;
+  line-height: 1.65;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs ul,
+.sv-docs ol {
+  margin: 0.6rem 0 0.9rem 1.25rem;
   padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
 }
+.sv-docs li { margin: 0.25rem 0; }
+
+.sv-docs a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sv-docs a:hover { opacity: 0.9; }
+
+.sv-docs blockquote {
+  margin: 1rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid hsl(var(--border));
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border-radius: 0.25rem;
+}
+
+.sv-docs table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.sv-docs th,
+.sv-docs td {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid hsl(var(--border));
+}
+.sv-docs th {
+  text-align: left;
+  background: hsl(var(--muted));
+}
+
+/* ---------------------------------------------- */
+/* 4) Code & syntax highlighting                  */
+/*    (rehype-pretty-code + Shiki)                */
+/* ---------------------------------------------- */
+
+/* Tweak here to change density in one place */
+.sv-docs { --docs-code-lh: 0.9; } 
+
+.sv-docs pre {
+  position: relative;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.125rem;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  line-height: var(--docs-code-lh); /* was 1.45 */
+}
+
+/* Avoid double backgrounds inside fenced blocks */
+.sv-docs pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* pretty-code: each line is a span; keep them block-level and inherit the tighter line-height */
+.sv-docs pre code > span {
+  display: block;
+  line-height: inherit; /* ensures tighter spacing applies to each line */
+}
+
+/* Inline code */
+.sv-docs :not(pre) > code {
+  display: inline;
+  padding: 0.12rem 0.35rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  font-size: 0.9em;
+}
+
+/* Dual-theme token colors produced by Shiki */
+.sv-docs code[data-theme*=" "],
+.sv-docs code[data-theme*=" "] span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+html.dark .sv-docs code[data-theme*=" "],
+html.dark .sv-docs code[data-theme*=" "] span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+/* Optional: line/word highlights from pretty-code */
+.sv-docs .line--highlighted { background: hsl(var(--accent)); }
+.sv-docs .word--highlighted {
+  padding: 0.05rem 0.2rem;
+  border-radius: 0.2rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* Heading anchors */
+.sv-docs .anchor {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+}
+.sv-docs .anchor:hover { text-decoration: underline; }
+
+/* Copy button */
+.sv-docs pre .sv-copy-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+.sv-docs pre:hover .sv-copy-btn { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sv-docs pre .sv-copy-btn { transition: none; }
+}
+
+/* Let <pre> background follow computed theme vars from Shiki */
+.sv-docs pre[data-theme] {
+  background: var(--shiki-light-bg, hsl(var(--muted)));
+  color: var(--shiki-light, hsl(var(--foreground)));
+}
+.dark .sv-docs pre[data-theme] {
+  background: var(--shiki-dark-bg, hsl(var(--muted)));
+  color: var(--shiki-dark, hsl(var(--foreground)));
+}
+
+/* Scroll-to-top floating button */
+.sv-to-top {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(12px, 2.5vh, 24px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+
+  background: color-mix(in oklab, hsl(var(--card)) 88%, transparent);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+
+  opacity: .85;
+  backdrop-filter: blur(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 60;
+}
+.sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
+.sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
 <file path="src/index.jsx">
@@ -29447,6 +29528,261 @@ export default function Docs() {
 }
 </file>
 
+<file path="src/pages/ProfilePage.jsx">
+// src/pages/ProfilePage.jsx
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { useHashRouter, navigate } from "../routing/hashRouter.js";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
+import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
+import Tabs from "../components/ui/Tabs.jsx";
+import Address from "../components/ui/Address.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
+import PostsTab from "../components/profile/PostsTab.jsx";
+import SubscribersTab from "../components/profile/SubscribersTab.jsx";
+import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
+import WalletTab from "../components/profile/WalletTab.jsx";
+import TokenValue from "../components/ui/TokenValue.jsx";
+import { walletAccount } from "../blockchain/wallet.js";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
+
+// Data fetcher for the user profile
+async function fetchUserProfile({ app, identifier }) {
+  if (!identifier || !app.wsCall) return null;
+
+  try {
+    const wsParams = { domain: app.selectedDomainName() };
+    const currentUser = app.authorizedUser();
+    if (currentUser) {
+      wsParams.caller = currentUser.address;
+    }
+
+    if (identifier.startsWith('@')) {
+      wsParams.user_name = identifier.substring(1);
+    } else {
+      wsParams.user_addr = identifier;
+    }
+
+    return await app.wsCall('get-user', wsParams);
+  } catch (error) {
+    console.error("Failed to fetch user profile:", error);
+    return { error: error.message };
+  }
+}
+
+// Data fetcher for the profile details from IPFS
+async function fetchProfileDetails(cid, app) {
+  if (!cid) return null;
+  try {
+    const { data } = await ipfs.getJSONBest(app, cid);
+    return data;
+  } catch (e) {
+    console.error(`Failed to fetch profile details from IPFS CID: ${cid}`, e);
+    return { error: e.message };
+  }
+}
+
+export default function ProfilePage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+
+  const identifier = createMemo(() => {
+    const path = route();
+    return path.startsWith('/') ? path.substring(1) : path;
+  });
+
+  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
+  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
+  
+  const [activeTab, setActiveTab] = createSignal('posts');
+  
+  const isMyProfile = createMemo(() => {
+    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
+    const profileAddr = userResource()?.address?.toLowerCase();
+    return !!authorizedAddr && authorizedAddr === profileAddr;
+  });
+
+  const canEdit = createMemo(() => {
+    const connectedWallet = walletAccount()?.toLowerCase();
+    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
+  });
+
+  const handleEditProfile = () => {
+    navigate(`/profile-edit/${identifier()}`);
+  };
+
+  const TABS = createMemo(() => {
+    const tabs = [
+      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+    ];
+
+    if (isMyProfile()) {
+      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
+    }
+
+    return tabs;
+  });
+  
+  createEffect(() => {
+    const availableTabs = TABS();
+    const currentActive = activeTab();
+    if (!availableTabs.some(tab => tab.id === currentActive)) {
+        setActiveTab('posts');
+    }
+  });
+
+  const aboutText = createMemo(() => {
+    const details = profileDetails();
+    if (!details || !details.about) return "";
+
+    const aboutData = details.about;
+    if (typeof aboutData === 'string') {
+      return aboutData;
+    }
+    if (typeof aboutData === 'object') {
+      const lang = app.lang();
+      return aboutData[lang] || aboutData.en || Object.values(aboutData)[0] || "";
+    }
+    return "";
+  });
+  
+  const isSubscribed = createMemo(() => {
+      const u = userResource();
+      return u && u.i_sponsor_for > 0;
+  });
+
+  return (
+    <main class="sv-container p-4 max-w-4xl mx-auto">
+      <ClosePageButton />
+      
+      <Switch>
+        <Match when={userResource.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={userResource.error || userResource()?.error}>
+          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("profile.error.title")}</h3>
+            <p class="text-sm mt-1">{userResource.error?.message || userResource()?.error}</p>
+          </div>
+        </Match>
+        <Match when={userResource()}>
+          {(user) =>
+            <div class="space-y-6">
+              {/* Profile Header */}
+              <div class="flex justify-between items-end gap-4">
+                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                  <div class="flex flex-col items-center gap-4 shrink-0">
+                    <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
+                      <IpfsImage 
+                        src={user().avatar}
+                        alt={`${user().name} avatar`}
+                        class="w-full h-full object-cover"
+                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    </div>
+                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
+                      <Show 
+                        when={!isSubscribed()}
+                        fallback={
+                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                            {t("profile.unsubscribe")}
+                          </button>
+                        }
+                      >
+                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
+                          {t("profile.subscribe")}
+                        </button>
+                      </Show>
+                    </Show>
+                  </div>
+                  
+                  <div class="flex-1 w-full text-center sm:text-left space-y-3">
+                    <div class="flex flex-col items-center sm:items-start">
+                      <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
+                      <Show when={user().name}>
+                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
+                          <span>{user().name.toUpperCase()}</span>
+                          <VerifiedBadge class="w-4 h-4" />
+                        </div>
+                      </Show>
+                      <div class="mt-1">
+                        <Address address={user().address} format="full" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-2 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
+                        <TokenValue amount={user().staked} />
+                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                        <TokenValue amount={user().total_sponsoring} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                        <TokenValue amount={user().total_sponsored} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                    </div>
+
+                    <Show when={aboutText()}>
+                      <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* Edit Profile Button */}
+                <div class="flex-shrink-0">
+                  <Show when={canEdit()}>
+                    <button
+                      onClick={handleEditProfile}
+                      class="p-2 rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                      title={t("profile.edit.title")}
+                    >
+                      <EditIcon class="w-5 h-5" />
+                    </button>
+                  </Show>
+                </div>
+              </div>
+
+
+              {/* Profile Tabs */}
+              <div>
+                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
+                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
+                  <Switch>
+                    <Match when={activeTab() === 'posts'}>
+                      <PostsTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'subscribers'}>
+                      <SubscribersTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'subscriptions'}>
+                      <SubscriptionsTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'wallet'}>
+                      <WalletTab user={user()} />
+                    </Match>
+                  </Switch>
+                </div>
+              </div>
+            </div>
+          }
+        </Match>
+      </Switch>
+    </main>
+  );
+}
+</file>
+
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -29476,272 +29812,6 @@ export default function Settings() {
     </main>
   );
 }
-</file>
-
-<file path="src/styles/themed-controls.css">
-/* src/styles/themed-controls.css
-──────────────────────────────────────────────────────────────
-Contents
-1) Themed segmented controls
-2) Light 1px dialog borders
-3) Docs typography (.sv-docs)
-4) Code & syntax highlighting (Shiki / pretty-code)
-────────────────────────────────────────────────────────────── */
-
-/* ---------------------------------------------- */
-/* 1) Themed segmented controls                   */
-/* ---------------------------------------------- */
-
-.themed-segment {
-  display: inline-flex;
-  gap: 6px;
-  padding: 4px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 9999px;
-  background: hsl(var(--muted));
-}
-
-.themed-pill {
-  appearance: none;
-  cursor: pointer;
-  border: 0;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  line-height: 1;
-  font-weight: 600;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  outline: none;
-}
-.themed-pill:hover {
-  background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-}
-.themed-pill.is-active {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-/* Keyboard focus (accessible) */
-.themed-pill:focus-visible {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
-}
-
-.themed-pill--icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
-}
-.themed-pill--icon svg { display: block; }
-
-/* ---------------------------------------------- */
-/* 2) Light 1px dialog/panel border               */
-/* ---------------------------------------------- */
-
-.themed-dialog {
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem; /* preserves rounding if none set on element */
-}
-
-/* ---------------------------------------------- */
-/* 3) Docs typography (.sv-docs)                  */
-/* ---------------------------------------------- */
-
-.sv-docs h1 {
-  margin: 0 0 1rem;
-  font-size: 1.75rem;
-  line-height: 1.25;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-}
-.sv-docs h2 {
-  margin: 1.5rem 0 0.75rem;
-  font-size: 1.25rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-.sv-docs h3 {
-  margin: 1.25rem 0 0.5rem;
-  font-size: 1.05rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-
-.sv-docs p {
-  margin: 0.5rem 0 0.85rem;
-  line-height: 1.65;
-  color: hsl(var(--foreground));
-}
-
-.sv-docs ul,
-.sv-docs ol {
-  margin: 0.6rem 0 0.9rem 1.25rem;
-  padding: 0;
-}
-.sv-docs li { margin: 0.25rem 0; }
-
-.sv-docs a {
-  color: hsl(var(--primary));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.sv-docs a:hover { opacity: 0.9; }
-
-.sv-docs blockquote {
-  margin: 1rem 0;
-  padding: 0.6rem 0.9rem;
-  border-left: 3px solid hsl(var(--border));
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  border-radius: 0.25rem;
-}
-
-.sv-docs table {
-  width: 100%;
-  margin: 1rem 0;
-  border-collapse: collapse;
-  font-size: 0.95rem;
-}
-.sv-docs th,
-.sv-docs td {
-  padding: 0.5rem 0.6rem;
-  border: 1px solid hsl(var(--border));
-}
-.sv-docs th {
-  text-align: left;
-  background: hsl(var(--muted));
-}
-
-/* ---------------------------------------------- */
-/* 4) Code & syntax highlighting                  */
-/*    (rehype-pretty-code + Shiki)                */
-/* ---------------------------------------------- */
-
-/* Tweak here to change density in one place */
-.sv-docs { --docs-code-lh: 0.9; } 
-
-.sv-docs pre {
-  position: relative;
-  margin: 1rem 0 1.25rem;
-  padding: 1rem 1.125rem;
-  overflow-x: auto;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  font-size: 0.9rem;
-  line-height: var(--docs-code-lh); /* was 1.45 */
-}
-
-/* Avoid double backgrounds inside fenced blocks */
-.sv-docs pre code {
-  background: transparent;
-  padding: 0;
-}
-
-/* pretty-code: each line is a span; keep them block-level and inherit the tighter line-height */
-.sv-docs pre code > span {
-  display: block;
-  line-height: inherit; /* ensures tighter spacing applies to each line */
-}
-
-/* Inline code */
-.sv-docs :not(pre) > code {
-  display: inline;
-  padding: 0.12rem 0.35rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.35rem;
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  font-size: 0.9em;
-}
-
-/* Dual-theme token colors produced by Shiki */
-.sv-docs code[data-theme*=" "],
-.sv-docs code[data-theme*=" "] span {
-  color: var(--shiki-light);
-  background-color: var(--shiki-light-bg);
-}
-html.dark .sv-docs code[data-theme*=" "],
-html.dark .sv-docs code[data-theme*=" "] span {
-  color: var(--shiki-dark);
-  background-color: var(--shiki-dark-bg);
-}
-
-/* Optional: line/word highlights from pretty-code */
-.sv-docs .line--highlighted { background: hsl(var(--accent)); }
-.sv-docs .word--highlighted {
-  padding: 0.05rem 0.2rem;
-  border-radius: 0.2rem;
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-/* Heading anchors */
-.sv-docs .anchor {
-  position: relative;
-  color: inherit;
-  text-decoration: none;
-}
-.sv-docs .anchor:hover { text-decoration: underline; }
-
-/* Copy button */
-.sv-docs pre .sv-copy-btn {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.35rem;
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  font-size: 0.75rem;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-.sv-docs pre:hover .sv-copy-btn { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .sv-docs pre .sv-copy-btn { transition: none; }
-}
-
-/* Let <pre> background follow computed theme vars from Shiki */
-.sv-docs pre[data-theme] {
-  background: var(--shiki-light-bg, hsl(var(--muted)));
-  color: var(--shiki-light, hsl(var(--foreground)));
-}
-.dark .sv-docs pre[data-theme] {
-  background: var(--shiki-dark-bg, hsl(var(--muted)));
-  color: var(--shiki-dark, hsl(var(--foreground)));
-}
-
-/* Scroll-to-top floating button */
-.sv-to-top {
-  position: fixed;
-  left: 50%;
-  bottom: clamp(12px, 2.5vh, 24px);
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 38px;
-  height: 38px;
-  border-radius: 9999px;
-
-  background: color-mix(in oklab, hsl(var(--card)) 88%, transparent);
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 6px 18px rgba(0,0,0,.12);
-
-  opacity: .85;
-  backdrop-filter: blur(6px);
-  transition: opacity .18s ease, transform .18s ease;
-  z-index: 60;
-}
-.sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
-.sv-to-top:active { transform: translateX(-50%) translateY(0); }
 </file>
 
 <file path="package.json">
@@ -30455,152 +30525,6 @@ export default function UserCard(props) {
             </div>
         </Show>
     );
-}
-</file>
-
-<file path="src/components/App.jsx">
-// src/components/App.jsx
-import { createSignal, onMount, Show, createMemo, createEffect, on, Switch, Match } from "solid-js";
-import Header from "./Header";
-import RightPane from "./RightPane";
-import Settings from "../pages/Settings";
-import Docs from "../pages/Docs";
-import { useHashRouter, navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import Toaster from "./Toaster";
-import MainView from "./main/MainView";
-import DomainCssLoader from "../theme/DomainCssLoader.jsx";
-import FaviconLoader from "../theme/FaviconLoader.jsx";
-import GoogleAnalyticsLoader from "../theme/GoogleAnalyticsLoader.jsx";
-import WsConnector from "./net/WsConnector.jsx";
-import ConnectionError from "./main/ConnectionError.jsx";
-import Spinner from "./ui/Spinner.jsx";
-import AssetDebugTap from "../dev/AssetDebugTap.jsx";
-import PostPage from "../pages/PostPage";
-import EditorPage from "../pages/EditorPage.jsx";
-import AlertManager from "../alerts/AlertManager.jsx";
-import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
-import ProfilePage from "../pages/ProfilePage.jsx";
-import ProfileEditPage from "../pages/ProfileEditPage.jsx";
-
-export default function App() {
-  const [isPaneOpen, setIsPaneOpen] = createSignal(false);
-  const { route } = useHashRouter();
-  const app = useApp();
-
-  const currentView = createMemo(() => {
-    const r = route();
-    if (r.startsWith("/post/")) return "post";
-    if (r.startsWith("/settings")) return "settings";
-    if (r.startsWith("/docs")) return "docs";
-    if (r.startsWith("/profile-edit/")) return "profile-edit";
-    if (r.startsWith("/editor/")) return "editor";
-    if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
-    return "main";
-  });
-
-  // ADD THIS BLOCK BACK
-  const domainRevision = createMemo(() => {
-    if (app.loading()) return null;
-    const domainName = app.selectedDomainName?.();
-    const source = app.domainAssetsSource?.();
-    const cfg = app.domainAssetsConfig?.();
-    const cid = cfg?.assets_cid || cfg?.cid || "";
-    const tabsPath = cfg?.modules?.tabs || "";
-    return `${domainName}|${source}|${cid}|${tabsPath}`;
-  });
-
-  onMount(() => {
-    const handleKeydown = (e) => {
-      if (e.key !== "Escape") return;
-      
-      const view = currentView();
-      if (view !== 'main') {
-        navigate(app.lastTabRoute() || "/");
-        return; 
-      }
-      
-      setIsPaneOpen(false);
-    };
-    document.addEventListener("keydown", handleKeydown);
-    return () => document.removeEventListener("keydown", handleKeydown);
-  });
-
-  createEffect(on(currentView, (view) => {
-    if (view === 'main') {
-      requestAnimationFrame(() => {
-        const y = app.savedScrollY();
-        window.scrollTo(0, y);
-      });
-    }
-  }));
-
-  const togglePane = () => setIsPaneOpen(!isPaneOpen());
-
-  return (
-    <Show
-      when={!app.loading()}
-      fallback={
-        <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
-          <Spinner class="w-8 h-8" />
-        </div>
-      }
-    >
-      <Show
-        when={!app.error()}
-        fallback={<ConnectionError error={app.error()} />}
-      >
-        <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
-          <DomainCssLoader />
-          <FaviconLoader />
-          <GoogleAnalyticsLoader />
-          <WsConnector />
-          <AlertManager />
-          
-          <Show when={domainRevision()} keyed>
-            <>
-              <Header onTogglePane={togglePane} />
-              
-              <Switch>
-                <Match when={currentView() === 'main'}>
-                  <MainView />
-                </Match>
-                <Match when={currentView() === 'post'}>
-                  <PostPage />
-                </Match>
-                <Match when={currentView() === 'profile'}>
-                  <ProfilePage />
-                </Match>
-                <Match when={currentView() === 'settings'}>
-                  <Settings />
-                </Match>
-                <Match when={currentView() === 'docs'}>
-                  <Docs />
-                </Match>
-                <Match when={currentView() === 'editor'}>
-                  <EditorPage />
-                </Match>
-                <Match when={currentView() === 'profile-edit'}>
-                  <ProfileEditPage />
-                </Match>
-              </Switch>
-            </>
-          </Show>
-          
-          <RightPane isOpen={isPaneOpen} onClose={togglePane} />
-          <Toaster />
-          <AssetDebugTap />
-          
-          <SwitchAccountModal
-            isOpen={app.isSwitchAccountModalOpen()}
-            requiredAddress={app.requiredAccount()}
-            onSuccess={app.resolveSwitchAccountPrompt}
-            onCancel={app.rejectSwitchAccountPrompt}
-          />
-        </div>
-      </Show>
-    </Show>
-  );
 }
 </file>
 
@@ -31462,6 +31386,353 @@ export default function ContentFeed(props) {
 }
 </file>
 
+<file path="src/components/settings/LocalIpfsSection.jsx">
+// src/components/settings/LocalIpfsSection.jsx
+import { createSignal, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { fetchWithTimeout } from "../../utils/net.js";
+
+export default function LocalIpfsSection() {
+  const app = useApp();
+  const { t } = app;
+
+  const [testing, setTesting] = createSignal(false);
+  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://127.0.0.1:5001");
+
+  const [diagRunning, setDiagRunning] = createSignal(false);
+  const [diagResults, setDiagResults] = createSignal(null);
+
+  async function runDiagnostics() {
+    setDiagRunning(true);
+    setDiagResults([]);
+    const results = [];
+    
+    const localApi = apiUrl().trim().replace(/\/+$/, "");
+    const localGateway = localApi.replace(/:\d+$/, ":8080");
+    const currentOrigin = window.location.origin;
+
+    // Step 1: Check basic API liveness and fetch config
+    let config = null;
+    try {
+      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
+      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
+      config = await res.json();
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok") });
+    } catch (err) {
+      const originsJson = JSON.stringify([currentOrigin]);
+      const fixCommand = 
+`# 1. ${t("ipfs.diag.fix.daemon")}
+ipfs daemon
+
+# 2. ${t("ipfs.diag.fix.browser")}
+
+# 3. ${t("ipfs.diag.fix.cors")}
+ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
+
+      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error"), fixCommand: fixCommand });
+      setDiagResults(results);
+      setDiagRunning(false);
+      return;
+    }
+    setDiagResults([...results]);
+
+    // Step 2: Analyze Gateway CORS Configuration
+    const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
+    if (gatewayOrigins.includes(currentOrigin) || gatewayOrigins.includes("*")) {
+      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok") });
+    } else {
+      const newOriginsList = [...new Set([currentOrigin, ...gatewayOrigins])];
+      const fixCommand = `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${JSON.stringify(newOriginsList)}'`;
+      results.push({
+        name: t("ipfs.diag.cors.name"),
+        status: "error",
+        details: t("ipfs.diag.cors.error"),
+        fixCommand: fixCommand
+      });
+    }
+    
+    // Step 3: Final Live Gateway Fetch Test
+    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
+    if (testCID) {
+      try {
+        const testUrl = `${localGateway}/ipfs/${testCID}`;
+        await fetchWithTimeout(testUrl);
+        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok") });
+      } catch (err) {
+        // MODIFICATION START
+        const singleOriginJson = JSON.stringify([currentOrigin]);
+        const wildcardOriginJson = JSON.stringify(['*']);
+
+        const fixCommand = 
+`# ${t("ipfs.diag.fix.gatewayTitle")}
+
+# ${t("ipfs.diag.fix.gatewaySingleOrigin")}
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${singleOriginJson}'
+
+# --- OR ---
+
+# ${t("ipfs.diag.fix.gatewayWildcard")}
+ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOriginJson}'
+`;
+
+        results.push({
+          name: t("ipfs.diag.fetch.name"),
+          status: "error",
+          details: t("ipfs.diag.fetch.errorFirewall"),
+          fixCommand: fixCommand
+        });
+        // MODIFICATION END
+      }
+    } else {
+      results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
+    }
+
+    setDiagResults(results);
+    setDiagRunning(false);
+  }
+
+  async function onEnableLocal() {
+    setTesting(true);
+    try {
+      await app.enableLocalIpfs(apiUrl().trim());
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const statusColorClass = (status) => {
+    if (status === 'ok') return 'text-emerald-600';
+    if (status === 'error') return 'text-red-600';
+    return 'text-amber-500'; // for 'warn'
+  };
+
+  return (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+        <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
+        <label class="flex items-center gap-2">
+            <input type="checkbox" checked={app.localIpfsEnabled()} onInput={(e) => {
+                const checked = e.currentTarget.checked;
+                if (checked) { onEnableLocal(); } else { app.disableLocalIpfs(); }
+            }}/>
+            <span>{t("settings.localIpfs.enableCheckbox")}</span>
+        </label>
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
+            <label class="block">
+                <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
+                <input class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                    value={apiUrl()}
+                    onInput={(e) => {
+                        const val = e.currentTarget.value;
+                        setApiUrl(val);
+                        app.setLocalIpfsApiUrl?.(val);
+                    }}
+                    placeholder="http://127.0.0.1:5001" spellcheck={false}/>
+            </label>
+            <div class="flex md:self-end">
+                <Show when={!app.localIpfsEnabled()}
+                    fallback={<button class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={()=> app.disableLocalIpfs()}>{t("settings.localIpfs.disable")}</button>}>
+                    <button class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={onEnableLocal} disabled={testing()} title={t("settings.localIpfs.testEnable")}>
+                        {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
+                    </button>
+                </Show>
+            </div>
+        </div>
+        <div class="text-sm text-[hsl(var(--muted-foreground))]">
+            {t("settings.localIpfs.status.label")}:{" "}
+            <span class={app.localIpfsStatus()==='ok' ? "text-[hsl(var(--primary))]" : app.localIpfsStatus()==='down' ? "text-[hsl(var(--destructive))]" : "opacity-70"}>
+                {app.localIpfsStatus()}
+            </span>
+            <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
+                <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
+            </Show>
+        </div>
+
+        <Show when={app.localIpfsEnabled()}>
+            <div class="pt-2 border-t border-[hsl(var(--border))]">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
+                    <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+                        onClick={runDiagnostics}
+                        disabled={diagRunning()}>
+                        {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
+                    </button>
+                </div>
+                <Show when={diagResults() && diagResults().length > 0}>
+                    <div class="mt-2 space-y-2 text-xs">
+                        <For each={diagResults()}>
+                            {(result) => (
+                                <div class="p-2 rounded bg-[hsl(var(--muted))]">
+                                    <div class="flex items-center">
+                                        <span class={`font-bold ${statusColorClass(result.status)}`}>
+                                            {result.status.toUpperCase()}:
+                                        </span>
+                                        <span class="font-semibold ml-2">{result.name}</span>
+                                    </div>
+                                    <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
+                                    <Show when={result.fixCommand}>
+                                        <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
+                                        <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
+                                            {result.fixCommand}
+                                        </pre>
+                                    </Show>
+                                </div>
+                            )}
+                        </For>
+                    </div>
+                </Show>
+            </div>
+        </Show>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/App.jsx">
+// src/components/App.jsx
+import { createSignal, onMount, Show, createMemo, createEffect, on, Switch, Match } from "solid-js";
+import Header from "./Header";
+import RightPane from "./RightPane";
+import Settings from "../pages/Settings";
+import Docs from "../pages/Docs";
+import { useHashRouter, navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import Toaster from "./Toaster";
+import MainView from "./main/MainView";
+import DomainCssLoader from "../theme/DomainCssLoader.jsx";
+import FaviconLoader from "../theme/FaviconLoader.jsx";
+import GoogleAnalyticsLoader from "../theme/GoogleAnalyticsLoader.jsx";
+import WsConnector from "./net/WsConnector.jsx";
+import ConnectionError from "./main/ConnectionError.jsx";
+import Spinner from "./ui/Spinner.jsx";
+import AssetDebugTap from "../dev/AssetDebugTap.jsx";
+import PostPage from "../pages/PostPage";
+import EditorPage from "../pages/EditorPage.jsx";
+import AlertManager from "../alerts/AlertManager.jsx";
+import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
+import ProfilePage from "../pages/ProfilePage.jsx";
+import ProfileEditPage from "../pages/ProfileEditPage.jsx";
+
+export default function App() {
+  const [isPaneOpen, setIsPaneOpen] = createSignal(false);
+  const { route } = useHashRouter();
+  const app = useApp();
+
+  const currentView = createMemo(() => {
+    const r = route();
+    if (r.startsWith("/post/")) return "post";
+    if (r.startsWith("/settings")) return "settings";
+    if (r.startsWith("/docs")) return "docs";
+    if (r.startsWith("/profile-edit/")) return "profile-edit";
+    if (r.startsWith("/editor/")) return "editor";
+    if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
+    return "main";
+  });
+
+  // ADD THIS BLOCK BACK
+  const domainRevision = createMemo(() => {
+    if (app.loading()) return null;
+    const domainName = app.selectedDomainName?.();
+    const source = app.domainAssetsSource?.();
+    const cfg = app.domainAssetsConfig?.();
+    const cid = cfg?.assets_cid || cfg?.cid || "";
+    const tabsPath = cfg?.modules?.tabs || "";
+    return `${domainName}|${source}|${cid}|${tabsPath}`;
+  });
+
+  onMount(() => {
+    const handleKeydown = (e) => {
+      if (e.key !== "Escape") return;
+      
+      const view = currentView();
+      if (view !== 'main') {
+        navigate(app.lastTabRoute() || "/");
+        return; 
+      }
+      
+      setIsPaneOpen(false);
+    };
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  });
+
+  createEffect(on(currentView, (view) => {
+    if (view === 'main') {
+      requestAnimationFrame(() => {
+        const y = app.savedScrollY();
+        window.scrollTo(0, y);
+      });
+    }
+  }));
+
+  const togglePane = () => setIsPaneOpen(!isPaneOpen());
+
+  return (
+    <Show
+      when={!app.loading()}
+      fallback={
+        <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
+          <Spinner class="w-8 h-8" />
+        </div>
+      }
+    >
+      <Show
+        when={!app.error()}
+        fallback={<ConnectionError error={app.error()} />}
+      >
+        <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
+          <DomainCssLoader />
+          <FaviconLoader />
+          <GoogleAnalyticsLoader />
+          <WsConnector />
+          <AlertManager />
+          
+          <Show when={domainRevision()} keyed>
+            <>
+              <Header onTogglePane={togglePane} />
+              
+              <Switch>
+                <Match when={currentView() === 'main'}>
+                  <MainView />
+                </Match>
+                <Match when={currentView() === 'post'}>
+                  <PostPage />
+                </Match>
+                <Match when={currentView() === 'profile'}>
+                  <ProfilePage />
+                </Match>
+                <Match when={currentView() === 'settings'}>
+                  <Settings />
+                </Match>
+                <Match when={currentView() === 'docs'}>
+                  <Docs />
+                </Match>
+                <Match when={currentView() === 'editor'}>
+                  <EditorPage />
+                </Match>
+                <Match when={currentView() === 'profile-edit'}>
+                  <ProfileEditPage />
+                </Match>
+              </Switch>
+            </>
+          </Show>
+          
+          <RightPane isOpen={isPaneOpen} onClose={togglePane} />
+          <Toaster />
+          <AssetDebugTap />
+          
+          <SwitchAccountModal
+            isOpen={app.isSwitchAccountModalOpen()}
+            requiredAddress={app.requiredAccount()}
+            onSuccess={app.resolveSwitchAccountPrompt}
+            onCancel={app.rejectSwitchAccountPrompt}
+          />
+        </div>
+      </Show>
+    </Show>
+  );
+}
+</file>
+
 <file path="src/i18n/useI18n.js">
 // src/i18n/useI18n.js
 import { createSignal } from "solid-js";
@@ -32106,203 +32377,305 @@ export default function CommentCard(props) {
 }
 </file>
 
-<file path="src/components/settings/LocalIpfsSection.jsx">
-// src/components/settings/LocalIpfsSection.jsx
-import { createSignal, Show, For } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { fetchWithTimeout } from "../../utils/net.js";
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal, onMount, createMemo, Switch, Match } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
+import { authorize } from "../blockchain/auth.js";
+import { pushErrorToast } from "../ui/toast.js";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+import AuthorizedUser from "./auth/AuthorizedUser.jsx";
+import NewPostButton from "./main/NewPostButton.jsx";
+import TokenPrice from "./main/TokenPrice.jsx";
 
-export default function LocalIpfsSection() {
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
   const app = useApp();
   const { t } = app;
+  const [eagerDone, setEagerDone] = createSignal(false);
+  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
 
-  const [testing, setTesting] = createSignal(false);
-  const [apiUrl, setApiUrl] = createSignal(app.localIpfsApiUrl() || "http://127.0.0.1:5001");
+  const desiredId = () => app.desiredChainId();
+  const mismatchedChain = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
 
-  const [diagRunning, setDiagRunning] = createSignal(false);
-  const [diagResults, setDiagResults] = createSignal(null);
+  const isAddressMismatched = createMemo(() => {
+    const walletAcc = walletAccount();
+    const authorizedAcc = app.authorizedUser()?.address;
+    if (!authorizedAcc || !walletAcc) return false;
+    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
+  });
 
-  async function runDiagnostics() {
-    setDiagRunning(true);
-    setDiagResults([]);
-    const results = [];
-    
-    const localApi = apiUrl().trim().replace(/\/+$/, "");
-    const localGateway = localApi.replace(/:\d+$/, ":8080");
-    const currentOrigin = window.location.origin;
+  onMount(async () => {
+    if (isWalletAvailable()) await eagerConnect();
+    setEagerDone(true);
+  });
 
-    // Step 1: Check basic API liveness and fetch config
-    let config = null;
+  const handleLoginClick = async () => {
+    setIsLoggingIn(true);
     try {
-      const res = await fetchWithTimeout(`${localApi}/api/v0/config/show`, { method: "POST" });
-      if (!res.ok) throw new Error(`API responded with status ${res.status}`);
-      config = await res.json();
-      results.push({ name: t("ipfs.diag.liveness.name"), status: "ok", details: t("ipfs.diag.liveness.ok") });
-    } catch (err) {
-      const originsJson = JSON.stringify([currentOrigin]);
-      const fixCommand = 
-`# 1. ${t("ipfs.diag.fix.daemon")}
-ipfs daemon
-
-# 2. ${t("ipfs.diag.fix.browser")}
-
-# 3. ${t("ipfs.diag.fix.cors")}
-ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '${originsJson}'`;
-
-      results.push({ name: t("ipfs.diag.liveness.name"), status: "error", details: t("ipfs.diag.liveness.error"), fixCommand: fixCommand });
-      setDiagResults(results);
-      setDiagRunning(false);
-      return;
-    }
-    setDiagResults([...results]);
-
-    // Step 2: Analyze Gateway CORS Configuration
-    const gatewayOrigins = config?.Gateway?.HTTPHeaders?.["Access-Control-Allow-Origin"] || [];
-    if (gatewayOrigins.includes(currentOrigin) || gatewayOrigins.includes("*")) {
-      results.push({ name: t("ipfs.diag.cors.name"), status: "ok", details: t("ipfs.diag.cors.ok") });
-    } else {
-      const newOriginsList = [...new Set([currentOrigin, ...gatewayOrigins])];
-      const fixCommand = `ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${JSON.stringify(newOriginsList)}'`;
-      results.push({
-        name: t("ipfs.diag.cors.name"),
-        status: "error",
-        details: t("ipfs.diag.cors.error"),
-        fixCommand: fixCommand
-      });
-    }
-    
-    // Step 3: Final Live Gateway Fetch Test
-    const testCID = app.info()?.savva_contracts?.Config?.abi_cid;
-    if (testCID) {
-      try {
-        const testUrl = `${localGateway}/ipfs/${testCID}`;
-        await fetchWithTimeout(testUrl);
-        results.push({ name: t("ipfs.diag.fetch.name"), status: "ok", details: t("ipfs.diag.fetch.ok") });
-      } catch (err) {
-        // MODIFICATION START
-        const singleOriginJson = JSON.stringify([currentOrigin]);
-        const wildcardOriginJson = JSON.stringify(['*']);
-
-        const fixCommand = 
-`# ${t("ipfs.diag.fix.gatewayTitle")}
-
-# ${t("ipfs.diag.fix.gatewaySingleOrigin")}
-ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${singleOriginJson}'
-
-# --- OR ---
-
-# ${t("ipfs.diag.fix.gatewayWildcard")}
-ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOriginJson}'
-`;
-
-        results.push({
-          name: t("ipfs.diag.fetch.name"),
-          status: "error",
-          details: t("ipfs.diag.fetch.errorFirewall"),
-          fixCommand: fixCommand
-        });
-        // MODIFICATION END
-      }
-    } else {
-      results.push({ name: t("ipfs.diag.fetch.name"), status: "warn", details: t("ipfs.diag.fetch.warnSkipped") });
-    }
-
-    setDiagResults(results);
-    setDiagRunning(false);
-  }
-
-  async function onEnableLocal() {
-    setTesting(true);
-    try {
-      await app.enableLocalIpfs(apiUrl().trim());
+      await authorize(app);
+    } catch (e) {
+      console.error("Authorization failed:", e);
+      pushErrorToast(e, { context: "Login failed" });
     } finally {
-      setTesting(false);
+      setIsLoggingIn(false);
     }
-  }
-
-  const statusColorClass = (status) => {
-    if (status === 'ok') return 'text-emerald-600';
-    if (status === 'error') return 'text-red-600';
-    return 'text-amber-500'; // for 'warn'
   };
 
-  return (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-        <h3 class="text-lg font-medium">{t("settings.localIpfs.title")}</h3>
-        <label class="flex items-center gap-2">
-            <input type="checkbox" checked={app.localIpfsEnabled()} onInput={(e) => {
-                const checked = e.currentTarget.checked;
-                if (checked) { onEnableLocal(); } else { app.disableLocalIpfs(); }
-            }}/>
-            <span>{t("settings.localIpfs.enableCheckbox")}</span>
-        </label>
-        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 md:items-end">
-            <label class="block">
-                <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.localIpfs.apiUrl.label")}</span>
-                <input class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                    value={apiUrl()}
-                    onInput={(e) => {
-                        const val = e.currentTarget.value;
-                        setApiUrl(val);
-                        app.setLocalIpfsApiUrl?.(val);
-                    }}
-                    placeholder="http://127.0.0.1:5001" spellcheck={false}/>
-            </label>
-            <div class="flex md:self-end">
-                <Show when={!app.localIpfsEnabled()}
-                    fallback={<button class="h-10 px-3 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={()=> app.disableLocalIpfs()}>{t("settings.localIpfs.disable")}</button>}>
-                    <button class="h-10 px-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60" onClick={onEnableLocal} disabled={testing()} title={t("settings.localIpfs.testEnable")}>
-                        {testing() ? t("common.checking") : t("settings.localIpfs.testEnable")}
-                    </button>
-                </Show>
-            </div>
-        </div>
-        <div class="text-sm text-[hsl(var(--muted-foreground))]">
-            {t("settings.localIpfs.status.label")}:{" "}
-            <span class={app.localIpfsStatus()==='ok' ? "text-[hsl(var(--primary))]" : app.localIpfsStatus()==='down' ? "text-[hsl(var(--destructive))]" : "opacity-70"}>
-                {app.localIpfsStatus()}
-            </span>
-            <Show when={app.localIpfsEnabled() && app.localIpfsGateway()}>
-                <span class="ml-2 opacity-70">• {t("settings.localIpfs.gateway.label")}: {app.localIpfsGateway()}</span>
-            </Show>
-        </div>
+  async function onConnect() {
+    try {
+      await connectWallet();
+      if (desiredId()) await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to connect wallet" });
+    }
+  }
 
-        <Show when={app.localIpfsEnabled()}>
-            <div class="pt-2 border-t border-[hsl(var(--border))]">
-                <div class="flex items-center justify-between">
-                    <h4 class="font-medium">{t("ipfs.diag.title")}</h4>
-                    <button class="h-9 px-3 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
-                        onClick={runDiagnostics}
-                        disabled={diagRunning()}>
-                        {diagRunning() ? t("common.loading") : t("ipfs.diag.run")}
-                    </button>
-                </div>
-                <Show when={diagResults() && diagResults().length > 0}>
-                    <div class="mt-2 space-y-2 text-xs">
-                        <For each={diagResults()}>
-                            {(result) => (
-                                <div class="p-2 rounded bg-[hsl(var(--muted))]">
-                                    <div class="flex items-center">
-                                        <span class={`font-bold ${statusColorClass(result.status)}`}>
-                                            {result.status.toUpperCase()}:
-                                        </span>
-                                        <span class="font-semibold ml-2">{result.name}</span>
-                                    </div>
-                                    <p class="mt-1 text-[hsl(var(--muted-foreground))]">{result.details}</p>
-                                    <Show when={result.fixCommand}>
-                                        <p class="mt-2 font-medium">{t("ipfs.diag.fix.title")}</p>
-                                        <pre class="mt-1 p-2 rounded bg-[hsl(var(--background))] text-[hsl(var(--foreground))] font-mono text-[11px] whitespace-pre-wrap break-all">
-                                            {result.fixCommand}
-                                        </pre>
-                                    </Show>
-                                </div>
-                            )}
-                        </For>
-                    </div>
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+    } catch (e) {
+      console.error("Failed to copy address:", e);
+    }
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to switch chain" });
+    }
+  }
+
+  const chainLogoSrc = () => getChainLogo(desiredId());
+
+  return (
+    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+            <TokenPrice />
+          </div>
+
+          <div class="flex items-center gap-3">
+            {/* Show New Post button ONLY when authorized AND wallet is connected */}
+            <Show when={app.authorizedUser() && walletAccount()}>
+              <NewPostButton />
+            </Show>
+
+            {/* Show user avatar menu if a session exists, regardless of wallet connection */}
+            <Show when={app.authorizedUser()}>
+              <AuthorizedUser />
+            </Show>
+
+            {/* Logic for Connect/Login buttons */}
+            <Switch>
+              {/* Wallet not connected -> Show "Connect" button */}
+              <Match when={!walletAccount() && eagerDone()}>
+                <Show when={isWalletAvailable()}>
+                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
+                    {t("wallet.connect")}
+                  </button>
                 </Show>
-            </div>
-        </Show>
-    </section>
+              </Match>
+
+              {/* Wallet connected BUT no session -> Show "Login" button */}
+              <Match when={walletAccount() && !app.authorizedUser()}>
+                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
+                  {isLoggingIn() ? t("common.checking") : "Login"}
+                </button>
+              </Match>
+            </Switch>
+
+            {/* Wallet address and chain info */}
+            <Show when={walletAccount()}>
+                <div class="flex items-center gap-2">
+                    <button
+                        classList={{
+                            "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                            "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                        }}
+                        onClick={copyAddress}
+                        title={t("wallet.copyAddress")}
+                    >
+                        {shortAddr(walletAccount())}
+                    </button>
+                    <Show when={!mismatchedChain()} fallback={
+                        <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
+                            {t("wallet.changeChain")}
+                        </button>
+                    }>
+                        <Show when={chainLogoSrc()}>
+                            <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
+                        </Show>
+                    </Show>
+                </div>
+            </Show>
+
+            {/* Hamburger menu */}
+            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
+  );
+}
+</file>
+
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createSignal, Show, createMemo, createEffect } from "solid-js";
+import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import ThemeToggle from "./ui/ThemeToggle.jsx";
+import LangSelector from "./ui/LangSelector.jsx";
+import RightPaneFooter from "./RightPaneFooter.jsx";
+import { dbg } from "../utils/debug.js";
+
+export default function RightPane({ isOpen, onClose }) {
+  const app = useApp();
+  const { t } = app;
+  const [showSwitch, setShowSwitch] = createSignal(false);
+
+  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  const domainLangCodes = createMemo(() => {
+    const config = app.domainAssetsConfig?.();
+    if (!config || !Array.isArray(config.locales)) {
+      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
+      return [];
+    }
+    const codes = config.locales.map((l) => l.code).filter(Boolean);
+    dbg.log("RightPane", "domainLangCodes calculated:", codes);
+    return codes;
+  });
+
+  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
+
+  createEffect(() => {
+    const availableCodes = domainLangCodes();
+    const currentLang = app.lang?.();
+    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
+
+    if (availableCodes.length === 0) {
+      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
+      return;
+    }
+
+    if (!availableCodes.includes(currentLang)) {
+      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
+      app.setLang?.(availableCodes[0]);
+    } else {
+      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
+    }
+  });
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col p-4 space-y-3">
+          <nav class="pt-2">
+            <ul class="space-y-3">
+              <li><ThemeToggle /></li>
+
+              <Show when={showLangSelector()}>
+                <li><LangSelector codes={domainLangCodes()} /></li>
+              </Show>
+
+              {/* Gear settings link */}
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
+
+              {/* Documentation link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/docs"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+              {/* Settings link */}
+              <li>
+                <div
+                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/settings"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+            </ul>
+          </nav>
+          <RightPaneFooter />
+        </div>
+      </div>
+
+      {isOpen() && (
+        <div
+          class="fixed inset-0 z-20"
+          style={{ "background-color": "rgba(0,0,0,0.2)" }}
+          data-testid="overlay"
+          onClick={onClose}
+        />
+      )}
+
+      <Show when={showSwitch()} keyed>
+        <SwitchConnectDialog
+          open={true}
+          domain={app.config()?.domain}
+          backendLink={app.config()?.backendLink}
+          loading={app.loading()}
+          error={app.error()}
+          onApply={() => { }}
+          onReset={app.clearConnectOverride}
+          onClose={() => setShowSwitch(false)}
+        />
+      </Show>
+    </>
   );
 }
 </file>
@@ -33293,309 +33666,6 @@ export function handleReact(app, payload) {
   } else {
     dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
   }
-}
-</file>
-
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-import { Show, createSignal, onMount, createMemo, Switch, Match } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
-import { authorize } from "../blockchain/auth.js";
-import { pushErrorToast } from "../ui/toast.js";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-import Container from "./layout/Container";
-import AuthorizedUser from "./auth/AuthorizedUser.jsx";
-import NewPostButton from "./main/NewPostButton.jsx";
-import TokenPrice from "./main/TokenPrice.jsx";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const { t } = app;
-  const [eagerDone, setEagerDone] = createSignal(false);
-  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatchedChain = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  const isAddressMismatched = createMemo(() => {
-    const walletAcc = walletAccount();
-    const authorizedAcc = app.authorizedUser()?.address;
-    if (!authorizedAcc || !walletAcc) return false;
-    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
-  });
-
-  onMount(async () => {
-    if (isWalletAvailable()) await eagerConnect();
-    setEagerDone(true);
-  });
-
-  const handleLoginClick = async () => {
-    setIsLoggingIn(true);
-    try {
-      await authorize(app);
-    } catch (e) {
-      console.error("Authorization failed:", e);
-      pushErrorToast(e, { context: "Login failed" });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to connect wallet" });
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(walletAccount());
-    } catch (e) {
-      console.error("Failed to copy address:", e);
-    }
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to switch chain" });
-    }
-  }
-
-  const chainLogoSrc = () => getChainLogo(desiredId());
-
-  return (
-    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
-      <Container>
-        <div class="h-12 px-2 flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-            <TokenPrice />
-          </div>
-
-          <div class="flex items-center gap-3">
-            {/* Show New Post button ONLY when authorized AND wallet is connected */}
-            <Show when={app.authorizedUser() && walletAccount()}>
-              <NewPostButton />
-            </Show>
-
-            {/* Show user avatar menu if a session exists, regardless of wallet connection */}
-            <Show when={app.authorizedUser()}>
-              <AuthorizedUser />
-            </Show>
-
-            {/* Logic for Connect/Login buttons */}
-            <Switch>
-              {/* Wallet not connected -> Show "Connect" button */}
-              <Match when={!walletAccount() && eagerDone()}>
-                <Show when={isWalletAvailable()}>
-                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
-                    {t("wallet.connect")}
-                  </button>
-                </Show>
-              </Match>
-
-              {/* Wallet connected BUT no session -> Show "Login" button */}
-              <Match when={walletAccount() && !app.authorizedUser()}>
-                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
-                  {isLoggingIn() ? t("common.checking") : "Login"}
-                </button>
-              </Match>
-            </Switch>
-
-            {/* Wallet address and chain info */}
-            <Show when={walletAccount()}>
-                <div class="flex items-center gap-2">
-                    <button
-                        classList={{
-                            "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
-                            "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
-                        }}
-                        onClick={copyAddress}
-                        title={t("wallet.copyAddress")}
-                    >
-                        {shortAddr(walletAccount())}
-                    </button>
-                    <Show when={!mismatchedChain()} fallback={
-                        <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
-                            {t("wallet.changeChain")}
-                        </button>
-                    }>
-                        <Show when={chainLogoSrc()}>
-                            <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
-                        </Show>
-                    </Show>
-                </div>
-            </Show>
-
-            {/* Hamburger menu */}
-            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
-          </div>
-        </div>
-      </Container>
-    </header>
-  );
-}
-</file>
-
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createSignal, Show, createMemo, createEffect } from "solid-js";
-import { navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
-import ThemeToggle from "./ui/ThemeToggle.jsx";
-import LangSelector from "./ui/LangSelector.jsx";
-import RightPaneFooter from "./RightPaneFooter.jsx";
-import { dbg } from "../utils/debug.js";
-
-export default function RightPane({ isOpen, onClose }) {
-  const app = useApp();
-  const { t } = app;
-  const [showSwitch, setShowSwitch] = createSignal(false);
-
-  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
-
-  const domainLangCodes = createMemo(() => {
-    const config = app.domainAssetsConfig?.();
-    if (!config || !Array.isArray(config.locales)) {
-      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
-      return [];
-    }
-    const codes = config.locales.map((l) => l.code).filter(Boolean);
-    dbg.log("RightPane", "domainLangCodes calculated:", codes);
-    return codes;
-  });
-
-  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
-
-  createEffect(() => {
-    const availableCodes = domainLangCodes();
-    const currentLang = app.lang?.();
-    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
-
-    if (availableCodes.length === 0) {
-      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
-      return;
-    }
-
-    if (!availableCodes.includes(currentLang)) {
-      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
-      app.setLang?.(availableCodes[0]);
-    } else {
-      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
-    }
-  });
-
-  return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col p-4 space-y-3">
-          <nav class="pt-2">
-            <ul class="space-y-3">
-              <li><ThemeToggle /></li>
-
-              <Show when={showLangSelector()}>
-                <li><LangSelector codes={domainLangCodes()} /></li>
-              </Show>
-
-              {/* Gear settings link */}
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
-              </Show>
-
-              {/* Documentation link */}
-              <li>
-                <div
-                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/docs"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
-                  aria-label={t("docs.nav")}
-                  title={t("docs.nav")}
-                >
-                  {t("docs.nav")}
-                </div>
-              </li>
-
-              {/* Settings link */}
-              <li>
-                <div
-                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/settings"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
-                >
-                  {t("rightPane.settings")}
-                </div>
-              </li>
-            </ul>
-          </nav>
-          <RightPaneFooter />
-        </div>
-      </div>
-
-      {isOpen() && (
-        <div
-          class="fixed inset-0 z-20"
-          style={{ "background-color": "rgba(0,0,0,0.2)" }}
-          data-testid="overlay"
-          onClick={onClose}
-        />
-      )}
-
-      <Show when={showSwitch()} keyed>
-        <SwitchConnectDialog
-          open={true}
-          domain={app.config()?.domain}
-          backendLink={app.config()?.backendLink}
-          loading={app.loading()}
-          error={app.error()}
-          onApply={() => { }}
-          onReset={app.clearConnectOverride}
-          onClose={() => setShowSwitch(false)}
-        />
-      </Show>
-    </>
-  );
 }
 </file>
 
