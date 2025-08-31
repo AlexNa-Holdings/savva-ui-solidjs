@@ -1,8 +1,8 @@
 // src/pages/profile/PostsTab.jsx
 import { createSignal, createResource, createMemo, For, Show, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import ContentFeed from "../../components/feed/ContentFeed.jsx";
-import ViewModeToggle, { viewMode } from "../../components/ui/ViewModeToggle.jsx";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import TagList from "./TagList.jsx";
 import { useDomainCategories } from "../../hooks/useDomainCategories.js";

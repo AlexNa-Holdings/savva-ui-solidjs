@@ -14,7 +14,9 @@ import Address from "../components/ui/Address.jsx";
 import { formatUnits } from "viem";
 import { ipfs } from "../ipfs/index.js";
 import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
-import PostsTab from "./profile/PostsTab.jsx";
+import PostsTab from "../components/profile/PostsTab.jsx";
+import SubscribersTab from "../components/profile/SubscribersTab.jsx";
+import TokenValue from "../components/ui/TokenValue.jsx";
 
 // Data fetcher for the user profile
 async function fetchUserProfile(params) {
@@ -75,17 +77,6 @@ export default function ProfilePage() {
     { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> }
   ]);
   
-  const formattedStaked = createMemo(() => {
-    const user = userResource();
-    if (!user || !user.staked) return "0";
-    try {
-      const staked = parseFloat(formatUnits(BigInt(user.staked), 18));
-      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(staked);
-    } catch {
-      return "0";
-    }
-  });
-
   const aboutText = createMemo(() => {
     const details = profileDetails();
     if (!details || !details.about) return "";
@@ -149,8 +140,16 @@ export default function ProfilePage() {
                     </div>
                     <div class="flex items-center gap-2 mt-2 text-sm">
                       <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
-                      <span class="font-semibold">{formattedStaked()}</span>
+                      <TokenValue amount={user().staked} />
                       <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
+                    </div>
+                    <div class="flex items-center gap-2 mt-1 text-sm">
+                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                      <TokenValue amount={user().total_sponsoring} />
+                    </div>
+                    <div class="flex items-center gap-2 mt-1 text-sm">
+                      <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                      <TokenValue amount={user().total_sponsored} />
                     </div>
                   </div>
 
@@ -162,7 +161,6 @@ export default function ProfilePage() {
                     <Stat value={user().n_followers} label={t("profile.stats.subscribers")} />
                     <Stat value={user().n_following} label={t("profile.stats.subscriptions")} />
                     <Stat value={user().n_sponsoring} label={t("profile.stats.sponsoring")} />
-                    <Stat value={formatRewardAmount(user().total_sponsoring)} label={t("profile.stats.totalSponsoring")} />
                     <Stat value={user().n_nfts} label={t("profile.stats.nfts")} />
                     <div class="ml-auto">
                       <button class="px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
@@ -182,7 +180,7 @@ export default function ProfilePage() {
                       <PostsTab user={user()} />
                     </Match>
                     <Match when={activeTab() === 'subscribers'}>
-                      <p class="text-center text-sm text-[hsl(var(--muted-foreground))]">Subscribers list will be implemented here.</p>
+                      <SubscribersTab user={user()} />
                     </Match>
                     <Match when={activeTab() === 'subscriptions'}>
                       <p class="text-center text-sm text-[hsl(var(--muted-foreground))]">Subscriptions list will be implemented here.</p>
@@ -200,3 +198,4 @@ export default function ProfilePage() {
     </main>
   );
 }
+

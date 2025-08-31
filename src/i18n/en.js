@@ -296,5 +296,12 @@ export default {
     "profile.tabs.posts": "Posts",
     "profile.tabs.subscribers": "Subscribers",
     "profile.tabs.subscriptions": "Subscriptions",
-    "profile.tabs.tags": "Tags"
+    "profile.tabs.tags": "Tags",
+      "profile.subscribers.showActiveOnly": "Show only active",
+  "profile.subscribers.table.user": "User",
+  "profile.subscribers.table.domain": "Domain",
+  "profile.subscribers.table.weeks": "Weeks Left",
+  "profile.subscribers.table.amount": "Weekly Amount",
+  "profile.subscribers.table.expired": "Expired",
+  "profile.subscribers.noResults": "No subscribers found."
 };

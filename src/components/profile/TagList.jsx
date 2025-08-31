@@ -1,6 +1,6 @@
 // src/pages/profile/TagList.jsx
 import { For, Show } from "solid-js";
-import Spinner from "../../components/ui/Spinner.jsx";
+import Spinner from "../ui/Spinner.jsx";
 
 export default function TagList(props) {
   const tags = () => props.tags || [];
