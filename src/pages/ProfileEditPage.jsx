@@ -15,6 +15,8 @@ import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
 import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
 import { httpBase } from "../net/endpoints.js";
 import { pushErrorToast, pushToast } from "../ui/toast.js";
+import ConfirmModal from "../components/ui/ConfirmModal.jsx";
+import { createPublicClient, http } from "viem";
 
 async function fetchProfileForEdit(params) {
     const { app, identifier } = params;
@@ -74,13 +76,15 @@ export default function ProfileEditPage() {
     const [nameInput, setNameInput] = createSignal("");
     const [nameError, setNameError] = createSignal("");
     const [isCheckingName, setIsCheckingName] = createSignal(false);
+    const [isRegistering, setIsRegistering] = createSignal(false);
+    const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
 
     const identifier = createMemo(() => {
         const path = route();
         return path.split('/')[2] || "";
     });
 
-    const [profileData] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
+    const [profileData, { refetch }] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
 
     const [avatar, setAvatar] = createSignal("");
     const [about, setAbout] = createSignal({});
@@ -158,8 +162,44 @@ export default function ProfileEditPage() {
     };
 
     const isRegisterDisabled = createMemo(() => {
-        return isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
+        return isRegistering() || isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
     });
+
+    const executeSetName = async () => {
+      if (isRegisterDisabled()) return;
+      setIsRegistering(true);
+      setShowConfirmNameChange(false);
+    
+      try {
+        const contract = await getSavvaContract(app, "UserProfile", { write: true });
+        const hash = await contract.write.setName([nameInput()]);
+        
+        const desiredChain = app.desiredChain();
+        const transport = http(desiredChain.rpcUrls[0]);
+        const publicClient = createPublicClient({ chain: desiredChain, transport });
+        
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== 'success') {
+          throw new Error(`Transaction failed with status: ${receipt.status}`);
+        }
+    
+        pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
+        setInitialName(nameInput()); // Update the "original" name to the new one
+        refetch(); // Refetch profile data to get latest state
+      } catch (err) {
+        pushErrorToast(err, { context: t('profile.edit.name.registerError') });
+      } finally {
+        setIsRegistering(false);
+      }
+    };
+
+    const handleRegisterName = () => {
+        if (initialName()) {
+            setShowConfirmNameChange(true);
+        } else {
+            executeSetName();
+        }
+    };
 
     const handleAvatarSave = async (blob) => {
         try {
@@ -254,8 +294,11 @@ export default function ProfileEditPage() {
                                                 <button 
                                                     class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
                                                     disabled={isRegisterDisabled()}
+                                                    onClick={handleRegisterName}
                                                 >
-                                                    {isCheckingName() ? <Spinner class="w-5 h-5" /> : t("profile.edit.registerName")}
+                                                    <Show when={isCheckingName() || isRegistering()} fallback={t("profile.edit.registerName")}>
+                                                        <Spinner class="w-5 h-5" />
+                                                    </Show>
                                                 </button>
                                             </div>
                                         </div>
@@ -293,6 +336,13 @@ export default function ProfileEditPage() {
                 isOpen={showAvatarEditor()}
                 onClose={() => setShowAvatarEditor(false)}
                 onSave={handleAvatarSave}
+            />
+            <ConfirmModal
+                isOpen={showConfirmNameChange()}
+                onClose={() => setShowConfirmNameChange(false)}
+                onConfirm={executeSetName}
+                title={t("profile.edit.name.confirmChangeTitle")}
+                message={t("profile.edit.name.confirmChangeMessage", { name: initialName() })}
             />
         </>
     );

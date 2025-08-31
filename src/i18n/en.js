@@ -410,4 +410,10 @@ export default {
   "profile.edit.registerName": "Register Name",
   "profile.edit.registeredName": "Registered Name",
   "profile.edit.registeredNameHelp": "Name registration is coming soon.",
+    "profile.edit.connectWallet": "Please connect your wallet to edit the profile.",
+  "profile.edit.name.confirmChangeMessage": "Your previous name '{name}' will no longer be yours, and anyone else will be able to take it. Are you sure?",
+  "profile.edit.name.confirmChangeTitle": "Confirm Name Change",
+  "profile.edit.name.registerError": "Failed to register name.",
+  "profile.edit.name.registerSuccess": "Name registered successfully!",
+  "profile.edit.name.registering": "Registering..."
 };
