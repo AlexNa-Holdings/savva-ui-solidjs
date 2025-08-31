@@ -3,6 +3,7 @@ import { createSignal, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import { navigate } from "../../routing/hashRouter.js";
 
 function ChevronDownIcon(props) {
   return (
@@ -14,6 +15,7 @@ function ChevronDownIcon(props) {
 
 export default function AuthorizedUser() {
   const app = useApp();
+  const { t } = app;
   const [menuOpen, setMenuOpen] = createSignal(false);
   let menuRef;
   
@@ -21,6 +23,14 @@ export default function AuthorizedUser() {
 
   const handleLogoutClick = () => {
     app.logout();
+    setMenuOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    const u = user();
+    if (!u) return;
+    const path = u.name ? `/@${u.name}` : `/${u.address}`;
+    navigate(path);
     setMenuOpen(false);
   };
   
@@ -61,9 +71,17 @@ export default function AuthorizedUser() {
               href="#"
               class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
               role="menuitem"
+              onClick={(e) => { e.preventDefault(); handleProfileClick(); }}
+            >
+              {t("header.myProfile")}
+            </a>
+            <a
+              href="#"
+              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+              role="menuitem"
               onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
             >
-              Logout
+              {t("header.logout")}
             </a>
           </div>
         </div>

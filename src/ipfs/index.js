@@ -29,7 +29,6 @@ async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = 
     try {
       const res = await fetchWithTimeout(url, { timeoutMs, ...init });
       if (res && res.ok) {
-        // This is the only successful return path. It guarantees `res` exists.
         return { res, url, gateway: gw };
       }
 
@@ -75,11 +74,11 @@ async function fetchBest(app, ipfsPath, options = {}) {
 }
 
 async function getJSONBest(app, ipfsPath, options = {}) {
-  const { response, url, gateway } = await fetchBest(app, ipfsPath, {
+  const { res, url, gateway } = await fetchBest(app, ipfsPath, {
     ...options,
     headers: { Accept: "application/json", ...(options.headers || {}) },
   });
-  return { data: await response.json(), url, gateway };
+  return { data: await res.json(), url, gateway };
 }
 
 export const ipfs = {

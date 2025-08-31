@@ -5,6 +5,7 @@ import IpfsImage from "./IpfsImage.jsx";
 import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
 import VerifiedBadge from "./icons/VerifiedBadge.jsx";
 import StakerLevelIcon from "./StakerLevelIcon.jsx";
+import { navigate } from "../../routing/hashRouter.js";
 
 function isVerified(a) {
     return Boolean(a && a.name);
@@ -23,8 +24,10 @@ export default function UserCard(props) {
 
     const handleUserClick = (e) => {
         e.stopPropagation();
-        // Placeholder for future navigation to user profile
-        console.log("UserCard clicked, navigate to profile for:", author().address);
+        const user = author();
+        if (!user) return;
+        const targetPath = user.name ? `/@${user.name}` : `/${user.address}`;
+        navigate(targetPath);
     };
 
     return (

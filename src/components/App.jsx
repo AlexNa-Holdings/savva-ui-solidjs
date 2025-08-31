@@ -19,6 +19,7 @@ import PostPage from "../pages/PostPage";
 import EditorPage from "../pages/EditorPage.jsx";
 import AlertManager from "../alerts/AlertManager.jsx";
 import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
+import ProfilePage from "../pages/ProfilePage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -31,9 +32,11 @@ export default function App() {
     if (r.startsWith("/settings")) return "settings";
     if (r.startsWith("/docs")) return "docs";
     if (r.startsWith("/editor/")) return "editor";
+    if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
   });
 
+  // ADD THIS BLOCK BACK
   const domainRevision = createMemo(() => {
     if (app.loading()) return null;
     const domainName = app.selectedDomainName?.();
@@ -101,6 +104,9 @@ export default function App() {
                 </Match>
                 <Match when={currentView() === 'post'}>
                   <PostPage />
+                </Match>
+                <Match when={currentView() === 'profile'}>
+                  <ProfilePage />
                 </Match>
                 <Match when={currentView() === 'settings'}>
                   <Settings />
