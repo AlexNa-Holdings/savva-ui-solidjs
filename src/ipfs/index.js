@@ -4,6 +4,14 @@ import { fetchWithTimeout } from "../utils/net.js";
 function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
 function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
 
+// New helper function to ensure a URL has a protocol
+function ensureProtocol(url) {
+  if (!url || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `https://${url}`;
+}
+
 function normalizeInput(input) {
   let s = String(input || "").trim();
   if (!s) throw new Error("ipfs: empty input");
@@ -14,7 +22,8 @@ function normalizeInput(input) {
 }
 
 function buildUrl(baseGateway, cidPath) {
-  const base = String(baseGateway || "").trim().replace(/\/+$/, "");
+  const normalizedGateway = ensureProtocol(String(baseGateway || "").trim());
+  const base = normalizedGateway.replace(/\/+$/, "");
   const path = String(cidPath || "").trim().replace(/^\/+/g, "");
   if (!base || !path) return "";
   const hasIpfs = /\/ipfs$/i.test(base);

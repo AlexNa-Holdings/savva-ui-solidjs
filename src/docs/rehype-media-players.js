@@ -1,16 +1,16 @@
-// src/components/docs/rehype-media-players.js
+// src/docs/rehype-media-players.js
 import { visit } from "unist-util-visit";
 
 const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
 const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
 
-function isVideoUrl(url) {
-  return VIDEO_EXTENSIONS.test(url);
+function isVideoUrl(url, altText = "") {
+  return VIDEO_EXTENSIONS.test(url) || VIDEO_EXTENSIONS.test(altText);
 }
 
-function isAudioUrl(url) {
-  return AUDIO_EXTENSIONS.test(url);
+function isAudioUrl(url, altText = "") {
+  return AUDIO_EXTENSIONS.test(url) || AUDIO_EXTENSIONS.test(altText);
 }
 
 function getYouTubeId(url) {
@@ -26,6 +26,7 @@ export function rehypeMediaPlayers() {
       }
 
       const url = node.properties.src;
+      const alt = node.properties.alt;
       const youtubeId = getYouTubeId(url);
 
       if (youtubeId) {
@@ -45,7 +46,7 @@ export function rehypeMediaPlayers() {
           },
           children: []
         }];
-      } else if (isVideoUrl(url)) {
+      } else if (isVideoUrl(url, alt)) {
         node.tagName = "video";
         node.properties = {
           src: url,
@@ -53,7 +54,7 @@ export function rehypeMediaPlayers() {
           style: "width: 100%; border-radius: 0.5rem;"
         };
         node.children = [];
-      } else if (isAudioUrl(url)) {
+      } else if (isAudioUrl(url, alt)) {
         node.tagName = "audio";
         node.properties = {
           src: url,
@@ -63,6 +64,6 @@ export function rehypeMediaPlayers() {
         node.children = [];
       }
     });
-    return tree; // Added this line
+    return tree;
   };
 }

@@ -1,8 +1,8 @@
 // src/components/ui/BrandLogo.jsx
-/* src/components/ui/BrandLogo.jsx */
 import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { dbg } from "../../utils/debug";
+import { navigate } from "../../routing/hashRouter.js";
 
 export default function BrandLogo(props) {
   const app = useApp();
@@ -84,23 +84,30 @@ export default function BrandLogo(props) {
   // reset broken flag whenever src changes
   createMemo(() => { src(); setImgBroken(false); });
 
+  const handleLogoClick = (e) => {
+    e.preventDefault();
+    navigate("/");
+  };
+
   return (
-    <div class="flex items-center">
-      <Show when={src() && !imgBroken()} fallback={
-        <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
-      }>
-        <img
-          src={src()}
-          alt={t("brand.logoAlt", { domain: domainTitle() })}
-          class={props.class || "h-8 w-auto"}
-          decoding="async"
-          loading="eager"
-          onError={() => {
-            dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
-            setImgBroken(true);
-          }}
-        />
-      </Show>
-    </div>
+    <a href="/#/" onClick={handleLogoClick} class="cursor-pointer">
+      <div class="flex items-center">
+        <Show when={src() && !imgBroken()} fallback={
+          <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
+        }>
+          <img
+            src={src()}
+            alt={t("brand.logoAlt", { domain: domainTitle() })}
+            class={props.class || "h-8 w-auto"}
+            decoding="async"
+            loading="eager"
+            onError={() => {
+              dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
+              setImgBroken(true);
+            }}
+          />
+        </Show>
+      </div>
+    </a>
   );
 }

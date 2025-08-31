@@ -6,6 +6,7 @@ import { stringify as toYaml } from "yaml";
 import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
 import { createTextPreview } from "../../../editor/preview-utils.js";
+import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
@@ -35,9 +36,18 @@ export default function StepUploadDescriptor(props) {
     if (params.fundraiser) descriptor.fundraiser = params.fundraiser;
     if (params.thumbnail) descriptor.thumbnail = params.thumbnail;
 
-    const gateways = app.info()?.ipfs_gateways;
-    if (gateways && Array.isArray(gateways) && gateways.length > 0) {
-      descriptor.gateways = gateways;
+    // Conditionally add gateways based on user settings
+    if (isPinningEnabled()) {
+      const userServices = getPinningServices();
+      const userGateways = userServices.map(s => s.gatewayUrl).filter(Boolean);
+      if (userGateways.length > 0) {
+        descriptor.gateways = userGateways;
+      }
+    } else {
+      const systemGateways = app.info()?.ipfs_gateways || [];
+      if (systemGateways.length > 0) {
+        descriptor.gateways = systemGateways;
+      }
     }
     
     const content = postData();

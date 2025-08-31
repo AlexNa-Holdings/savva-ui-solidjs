@@ -1,4 +1,4 @@
-// src/pages/profile/PostsTab.jsx
+// src/components/profile/PostsTab.jsx
 import { createSignal, createResource, createMemo, For, Show, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import ContentFeed from "../feed/ContentFeed.jsx";
@@ -11,7 +11,7 @@ async function fetchUserTags(params) {
   const { app, user_addr, lang } = params;
   if (!app.wsMethod || !user_addr || !lang) return [];
   try {
-    const getTags = app.wsMethod("get_user_tags");
+    const getTags = app.wsMethod("get-user-tags");
     const res = await getTags({
       domain: app.selectedDomainName(),
       user_addr: user_addr,

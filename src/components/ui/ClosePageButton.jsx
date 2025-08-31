@@ -3,22 +3,30 @@ import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter } from "../../routing/hashRouter";
 
 /**
- * Close (go to main tabs view) floating button.
+ * Close (go to main tabs view) or Back (go to previous history entry) floating button.
+ * @param {object} props
+ * @param {string} [props.mode='back'] - 'back' for history.back(), 'close' to navigate to the main feed.
  */
-export default function ClosePageButton({ title, offsetTop = 56 }) {
+export default function ClosePageButton(props) {
   const app = useApp();
   const { navigate } = useHashRouter();
   const { t } = app;
-  const label = title || t("settings.back");
+  const label = props.title || t("settings.back");
+  const offsetTop = props.offsetTop ?? 56;
+  const mode = props.mode || 'back';
 
-  const closeAndReturn = () => {
-    navigate(app.lastTabRoute() || "/");
+  const handleClick = () => {
+    if (mode === 'close') {
+      navigate(app.lastTabRoute() || "/");
+    } else {
+      window.history.back();
+    }
   };
 
   return (
     <button
       type="button"
-      onClick={closeAndReturn}
+      onClick={handleClick}
       aria-label={label}
       title={label}
       class="fixed right-3 z-20 p-2 rounded-full

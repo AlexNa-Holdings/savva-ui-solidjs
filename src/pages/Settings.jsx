@@ -4,6 +4,7 @@ import LocalIpfsSection from "../components/settings/LocalIpfsSection.jsx";
 import Assets from "../components/settings/Assets.jsx";
 import DeveloperSection from "../components/settings/DeveloperSection.jsx";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import PinningServicesSection from "../components/settings/PinningServicesSection.jsx";
 
 export default function Settings() {
   const app = useApp();
@@ -19,6 +20,7 @@ export default function Settings() {
       </div>
 
       <LocalIpfsSection />
+      <PinningServicesSection />
       <Assets />
       <DeveloperSection />
     </main>

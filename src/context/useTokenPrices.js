@@ -1,23 +1,14 @@
 // src/context/useTokenPrices.js
-import { createSignal, onMount, onCleanup } from "solid-js";
+import { createSignal, onMount, onCleanup, createMemo } from "solid-js";
 import { whenWsOpen, getWsApi } from "../net/wsRuntime";
 import { dbg } from "../utils/debug";
 
 export function useTokenPrices(app) {
-  const [prices, setPrices] = createSignal(null);
+  const [prices, setPrices] = createSignal({});
 
   const updatePrices = (data) => {
     if (!data || !data.tokens) return;
-    const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
-    if (!savvaTokenAddress) return;
-
-    const savvaPriceData = data.tokens[savvaTokenAddress];
-    if (savvaPriceData) {
-      setPrices({
-        price: savvaPriceData.price,
-        gain: savvaPriceData.gain
-      });
-    }
+    setPrices(prev => ({ ...prev, ...data.tokens }));
   };
 
   const fetchInitialPrices = async () => {
@@ -35,9 +26,22 @@ export function useTokenPrices(app) {
   onMount(() => {
     fetchInitialPrices();
   });
+  
+  const savvaTokenPrice = createMemo(() => {
+    const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
+    if (!savvaTokenAddress) return null;
+    return prices()[savvaTokenAddress] || null;
+  });
+  
+  const baseTokenPrice = createMemo(() => {
+    // The key for the base/native token is an empty string
+    return prices()[""] || null; 
+  });
 
   return {
-    savvaTokenPrice: prices,
+    allTokenPrices: prices,
+    savvaTokenPrice,
+    baseTokenPrice,
     updateTokenPrices: updatePrices
   };
 }

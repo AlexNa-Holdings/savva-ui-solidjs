@@ -1,7 +1,7 @@
 // src/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match } from "solid-js";
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../routing/hashRouter.js";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
 import Spinner from "../components/ui/Spinner.jsx";
 import IpfsImage from "../components/ui/IpfsImage.jsx";
@@ -9,14 +9,15 @@ import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
 import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
 import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
 import Tabs from "../components/ui/Tabs.jsx";
-import { formatRewardAmount } from "../blockchain/utils.js";
 import Address from "../components/ui/Address.jsx";
-import { formatUnits } from "viem";
 import { ipfs } from "../ipfs/index.js";
 import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
 import PostsTab from "../components/profile/PostsTab.jsx";
 import SubscribersTab from "../components/profile/SubscribersTab.jsx";
+import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
+import WalletTab from "../components/profile/WalletTab.jsx";
 import TokenValue from "../components/ui/TokenValue.jsx";
+import { walletAccount } from "../blockchain/wallet.js";
 
 // Data fetcher for the user profile
 async function fetchUserProfile({ app, identifier }) {
@@ -69,13 +70,28 @@ export default function ProfilePage() {
   
   const [activeTab, setActiveTab] = createSignal('posts');
   
-  const TABS = createMemo(() => [
-    { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-    { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-    { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-    { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> }
-  ]);
+  const TABS = createMemo(() => {
+    const tabs = [
+      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+    ];
+
+    if (walletAccount()) {
+      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
+    }
+
+    return tabs;
+  });
   
+  createEffect(() => {
+    const availableTabs = TABS();
+    const currentActive = activeTab();
+    if (!availableTabs.some(tab => tab.id === currentActive)) {
+        setActiveTab('posts');
+    }
+  });
+
   const aboutText = createMemo(() => {
     const details = profileDetails();
     if (!details || !details.about) return "";
@@ -90,13 +106,11 @@ export default function ProfilePage() {
     }
     return "";
   });
-
-  const Stat = (props) => (
-    <div class="text-center">
-      <div class="font-bold text-lg">{props.value}</div>
-      <div class="text-xs text-[hsl(var(--muted-foreground))]">{props.label}</div>
-    </div>
-  );
+  
+  const isSubscribed = createMemo(() => {
+      const u = userResource();
+      return u && u.i_sponsor_for > 0;
+  });
 
   return (
     <main class="sv-container p-4 max-w-4xl mx-auto">
@@ -117,20 +131,37 @@ export default function ProfilePage() {
             <div class="space-y-6">
               {/* Profile Header */}
               <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden shrink-0 bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                  <IpfsImage 
-                    src={user().avatar}
-                    alt={`${user().name} avatar`}
-                    class="w-full h-full object-cover"
-                    fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
-                  />
+                <div class="flex flex-col items-center gap-4 shrink-0">
+                  <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
+                    <IpfsImage 
+                      src={user().avatar}
+                      alt={`${user().name} avatar`}
+                      class="w-full h-full object-cover"
+                      fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
+                    />
+                  </div>
+                  <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
+                    <Show 
+                      when={!isSubscribed()}
+                      fallback={
+                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                          {t("profile.unsubscribe")}
+                        </button>
+                      }
+                    >
+                      <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
+                        {t("profile.subscribe")}
+                      </button>
+                    </Show>
+                  </Show>
                 </div>
+                
                 <div class="flex-1 w-full text-center sm:text-left space-y-3">
                   <div class="flex flex-col items-center sm:items-start">
                     <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
                     <Show when={user().name}>
                       <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                        <span>{user().name}</span>
+                        <span>{user().name.toUpperCase()}</span>
                         <VerifiedBadge class="w-4 h-4" />
                       </div>
                     </Show>
@@ -145,28 +176,18 @@ export default function ProfilePage() {
                     <div class="flex items-center gap-2 mt-1 text-sm">
                       <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
                       <TokenValue amount={user().total_sponsoring} />
+                      <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
                     </div>
                     <div class="flex items-center gap-2 mt-1 text-sm">
                       <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
                       <TokenValue amount={user().total_sponsored} />
+                      <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
                     </div>
                   </div>
 
                   <Show when={aboutText()}>
                     <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
                   </Show>
-                  
-                  <div class="flex justify-center sm:justify-start items-center gap-4 flex-wrap pt-2">
-                    <Stat value={user().n_followers} label={t("profile.stats.subscribers")} />
-                    <Stat value={user().n_following} label={t("profile.stats.subscriptions")} />
-                    <Stat value={user().n_sponsoring} label={t("profile.stats.sponsoring")} />
-                    <Stat value={user().n_nfts} label={t("profile.stats.nfts")} />
-                    <div class="ml-auto">
-                      <button class="px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
-                        {t("profile.subscribe")}
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -182,10 +203,10 @@ export default function ProfilePage() {
                       <SubscribersTab user={user()} />
                     </Match>
                     <Match when={activeTab() === 'subscriptions'}>
-                      <p class="text-center text-sm text-[hsl(var(--muted-foreground))]">Subscriptions list will be implemented here.</p>
+                      <SubscriptionsTab user={user()} />
                     </Match>
                     <Match when={activeTab() === 'wallet'}>
-                      <p class="text-center text-sm text-[hsl(var(--muted-foreground))]">Wallet/Assets view will be implemented here.</p>
+                      <WalletTab user={user()} />
                     </Match>
                   </Switch>
                 </div>
@@ -197,6 +218,3 @@ export default function ProfilePage() {
     </main>
   );
 }
-
-
-

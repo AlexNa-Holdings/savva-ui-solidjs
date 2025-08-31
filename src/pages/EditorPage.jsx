@@ -384,7 +384,7 @@ export default function EditorPage() {
   const handleInsertFile = (fileName, fileType) => {
     const url = `uploads/${fileName}`;
     let markdown;
-    if (fileType === 'image') {
+    if (fileType === 'image' || fileType === 'video') {
       markdown = `![${fileName}](${url})`;
     } else {
       markdown = `[${fileName}](${url})`;
@@ -464,7 +464,7 @@ export default function EditorPage() {
       >
         <>
           <Show when={!isFullScreen()}>
-            <ClosePageButton />
+             <ClosePageButton mode="close" />
             <header class="flex justify-between items-start gap-4">
               <h2 class="text-2xl font-semibold flex-1 min-w-0">{title()}</h2>
               <Show when={editorMode() === 'new_post' || editorMode() === 'edit_post'}>
