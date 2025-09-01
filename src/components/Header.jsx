@@ -89,7 +89,7 @@ export default function Header({ onTogglePane }) {
     }
   }
 
-  const chainLogoSrc = () => getChainLogo(desiredId());
+  const ChainLogo = createMemo(() => getChainLogo(desiredId()));
 
   return (
     <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
@@ -129,7 +129,7 @@ export default function Header({ onTogglePane }) {
               <div class="flex items-center gap-2">
                 <button
                     classList={{
-                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] whitespace-nowrap": true,
                         "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
                     }}
                     onClick={copyAddress}
@@ -142,8 +142,12 @@ export default function Header({ onTogglePane }) {
                         {t("wallet.changeChain")}
                     </button>
                 }>
-                    <Show when={chainLogoSrc()}>
-                        <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
+                    <Show when={ChainLogo()}>
+                        {(Logo) => (
+                            <div class="flex items-center justify-center w-6 h-6 flex-shrink-0" title={t("wallet.onRequiredNetwork")}>
+                                <Logo class="w-full h-full" />
+                            </div>
+                        )}
                     </Show>
                 </Show>
               </div>

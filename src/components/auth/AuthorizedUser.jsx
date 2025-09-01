@@ -33,6 +33,14 @@ export default function AuthorizedUser() {
     navigate(path);
     setMenuOpen(false);
   };
+
+  const handleWalletClick = () => {
+    const u = user();
+    if (!u) return;
+    const basePath = u.name ? `/@${u.name}` : `/${u.address}`;
+    navigate(`${basePath}?tab=wallet`);
+    setMenuOpen(false);
+  };
   
   const handleClickOutside = (event) => {
     if (menuRef && !menuRef.contains(event.target)) {
@@ -74,6 +82,14 @@ export default function AuthorizedUser() {
               onClick={(e) => { e.preventDefault(); handleProfileClick(); }}
             >
               {t("header.myProfile")}
+            </a>
+            <a
+              href="#"
+              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+              role="menuitem"
+              onClick={(e) => { e.preventDefault(); handleWalletClick(); }}
+            >
+              {t("header.myWallet")}
             </a>
             <a
               href="#"

@@ -428,5 +428,6 @@ export default {
   "profile.edit.saving": "Saving...",
   "profile.edit.saveSuccess": "Profile updated successfully!",
   "profile.edit.saveError": "Failed to save profile.",
-  "profile.edit.buttonLabel": "Edit Profile"
+  "profile.edit.buttonLabel": "Edit Profile",
+  "header.myWallet": "My Wallet"
 };

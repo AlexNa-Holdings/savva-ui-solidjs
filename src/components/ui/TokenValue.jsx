@@ -62,9 +62,9 @@ export default function TokenValue(props) {
       return <SavvaTokenIcon class="w-4 h-4" />;
     }
     if (isBaseToken()) {
-        const logoSrc = getChainLogo(desiredChain()?.id);
-        if (logoSrc) {
-            return <img src={logoSrc} alt={desiredChain()?.nativeCurrency.symbol} class="w-5 h-5" />;
+        const LogoComponent = getChainLogo(desiredChain()?.id);
+        if (LogoComponent) {
+            return <LogoComponent class="w-5 h-5" />;
         }
     }
     return null;

@@ -62,7 +62,7 @@ export default function ProfilePage() {
 
   const identifier = createMemo(() => {
     const path = route();
-    return path.startsWith('/') ? path.substring(1) : path;
+    return (path.split('?')[0].split('/')[1] || "");
   });
 
   const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
@@ -99,6 +99,17 @@ export default function ProfilePage() {
     return tabs;
   });
 
+  onMount(() => {
+    const hash = window.location.hash;
+    const urlParams = new URLSearchParams(hash.split('?')[1]);
+    const tabParam = urlParams.get('tab');
+    const validTabs = TABS().map(t => t.id);
+
+    if (tabParam && validTabs.includes(tabParam)) {
+        setActiveTab(tabParam);
+    }
+  });
+
   createEffect(() => {
     const availableTabs = TABS();
     const currentActive = activeTab();
@@ -112,11 +123,9 @@ export default function ProfilePage() {
   const displayName = createMemo(() => {
     const u = userResource();
     if (!u) return "";
-
     const addr = String(u.address || "").toLowerCase();
     const overlay = app.userDisplayNames?.()?.[addr]?.[uiLang()];
     if (overlay) return overlay;
-
     const serverNames = u.display_names;
     if (serverNames && typeof serverNames === "object") {
       const n = serverNames[uiLang()];
