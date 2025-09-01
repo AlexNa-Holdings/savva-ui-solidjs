@@ -143,12 +143,18 @@ export function AppProvider(props) {
     return walletClient;
   }
 
-  // ── overlay for locale-aware display names (address -> { langCode: name }) ──
   const [userDisplayNames, _setUserDisplayNames] = Solid.createSignal({});
   function setUserDisplayNames(address, namesMap) {
     if (!address || !namesMap || typeof namesMap !== "object") return;
     const key = String(address).toLowerCase();
     _setUserDisplayNames((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...namesMap } }));
+  }
+
+  const [userAvatars, _setUserAvatars] = Solid.createSignal({});
+  function setUserAvatar(address, avatarCid) {
+    if (!address || typeof avatarCid !== 'string') return;
+    const key = String(address).toLowerCase();
+    _setUserAvatars((prev) => ({ ...prev, [key]: avatarCid }));
   }
 
   const value = {
@@ -173,10 +179,10 @@ export function AppProvider(props) {
     requiredAccount,
     resolveSwitchAccountPrompt,
     rejectSwitchAccountPrompt,
-
-    // expose overlay + setter for alerts/pages
     userDisplayNames,
     setUserDisplayNames,
+    userAvatars,
+    setUserAvatar,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;

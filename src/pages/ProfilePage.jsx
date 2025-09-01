@@ -107,36 +107,16 @@ export default function ProfilePage() {
     }
   });
 
-  // ---- locale-aware display name with live alert updates (no global changes needed) ----
   const uiLang = () => (app.lang?.() || "en").toLowerCase();
-  const [overlayNames, setOverlayNames] = createSignal(null);
-
-  // Subscribe to any user profile/update alert and apply display_names if it matches this page's user.
-  onMount(() => {
-    const off = app.alertBus?.on?.("*", ({ type, payload }) => {
-      try {
-        const d = payload?.data || {};
-        const addr = String(d.user?.address || d.address || "").toLowerCase();
-        const pageAddr = String(userResource()?.address || "").toLowerCase();
-        const names = d.display_names || d.user?.display_names;
-        if (addr && names && addr === pageAddr) {
-          setOverlayNames(names);
-        }
-      } catch {
-        /* ignore */
-      }
-    });
-    onCleanup(() => { try { off && off(); } catch {} });
-  });
 
   const displayName = createMemo(() => {
     const u = userResource();
     if (!u) return "";
-    const namesFromAlert = overlayNames();
-    if (namesFromAlert && typeof namesFromAlert === "object") {
-      const n = namesFromAlert[uiLang()];
-      if (n) return n;
-    }
+
+    const addr = String(u.address || "").toLowerCase();
+    const overlay = app.userDisplayNames?.()?.[addr]?.[uiLang()];
+    if (overlay) return overlay;
+
     const serverNames = u.display_names;
     if (serverNames && typeof serverNames === "object") {
       const n = serverNames[uiLang()];

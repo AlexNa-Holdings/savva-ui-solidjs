@@ -44,6 +44,18 @@ export function useAppAuth() {
     }
   }
 
+  function updateAuthorizedUser(partialData) {
+    const currentUser = authorizedUser();
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, ...partialData, address: currentUser.address };
+    setAuthorizedUser(updatedUser);
+    try {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
+    } catch (e) {
+      console.error("Failed to save updated authorized user:", e);
+    }
+  }
+
   async function logout() {
     try {
       await fetch(`${httpBase()}logout`, { credentials: 'include' });
@@ -64,5 +76,5 @@ export function useAppAuth() {
     logout();
   }
 
-  return { authorizedUser, login, logout, handleAuthError };
+  return { authorizedUser, login, logout, handleAuthError, updateAuthorizedUser };
 }

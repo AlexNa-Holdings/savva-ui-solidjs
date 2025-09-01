@@ -88,6 +88,17 @@ export function handleUserInfoChanged(app, payload) {
       app.setUserDisplayNames?.(addr, names);
       dbg.log("Alerts:user_info_changed", "display_names updated", { addr, names });
     }
+
+    if (typeof u.avatar === 'string') {
+        app.setUserAvatar?.(addr, u.avatar);
+        dbg.log("Alerts:user_info_changed", "avatar updated", { addr, avatar: u.avatar });
+    }
+
+    const authorized = app.authorizedUser();
+    if (authorized && String(authorized.address).toLowerCase() === addr) {
+      app.updateAuthorizedUser?.(u);
+      dbg.log("Alerts:user_info_changed", "Authorized user data was updated with partial data:", u);
+    }
   } catch (e) {
     dbg.warn?.("Alerts:user_info_changed", "failed to handle", e);
   }

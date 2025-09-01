@@ -3,7 +3,7 @@ import { createMemo, createResource, Show, createSignal, Switch, Match, createEf
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../context/AppContext.jsx";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../routing/hashRouter.js";
 import { walletAccount } from "../blockchain/wallet.js";
 import { getSavvaContract } from "../blockchain/contracts.js";
 import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
@@ -157,6 +157,17 @@ export default function ProfileEditPage() {
             }
             
             setAbout(reconcile(initialAboutState));
+        }
+    });
+
+    createEffect(() => {
+        const authorized = app.authorizedUser();
+        const profile = profileData();
+
+        if (authorized && profile && !profile.error && authorized.address?.toLowerCase() === profile.address?.toLowerCase()) {
+            if (authorized.avatar !== avatar()) {
+                setAvatar(authorized.avatar);
+            }
         }
     });
 

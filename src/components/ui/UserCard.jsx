@@ -31,6 +31,14 @@ export default function UserCard(props) {
       : (a.display_names?.[uiLang()] || a.display_name || "");
   });
 
+  const displayAvatar = createMemo(() => {
+    const a = author();
+    const addr = String(a.address || "").toLowerCase();
+    const overlay = app.userAvatars?.()?.[addr];
+    // Use overlay if it exists (even if it's an empty string), otherwise fallback to prop.
+    return overlay !== undefined ? overlay : a.avatar;
+  });
+
   const hasName = createMemo(() => author().name || displayName() || author().display_name);
 
   const handleUserClick = (e) => {
@@ -48,11 +56,11 @@ export default function UserCard(props) {
           <Show when={!props.compact}>
             <div class="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
               <Show
-                when={author().avatar}
+                when={displayAvatar()}
                 fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
               >
                 <IpfsImage
-                  src={author().avatar}
+                  src={displayAvatar()}
                   alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
                   class="w-full h-full object-cover"
                 />
