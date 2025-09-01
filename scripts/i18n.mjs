@@ -25,7 +25,8 @@ const usedKeys = new Set();
  * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
  * (If you build keys dynamically, they won’t be picked up by any static scan.)
  */
-const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+// const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)/g; //allows t(a,b..)
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
