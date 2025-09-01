@@ -90,7 +90,7 @@ export default function ProfileEditPage() {
     const [isCheckingName, setIsCheckingName] = createSignal(false);
     const [isRegistering, setIsRegistering] = createSignal(false);
     const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
-    
+
     const [displayNames, setDisplayNames] = createStore({});
     const [nsfwPreference, setNsfwPreference] = createSignal("h");
     const [sponsorValues, setSponsorValues] = createStore(["", "", "", "", ""]);
@@ -119,7 +119,7 @@ export default function ProfileEditPage() {
 
             const profile = data.profile || {};
             setNsfwPreference(profile.nsfw || "h");
-            
+
             let initialDisplayNames = {};
             if (profile.display_names && typeof profile.display_names === 'object') {
                 initialDisplayNames = profile.display_names;
@@ -127,7 +127,7 @@ export default function ProfileEditPage() {
                 initialDisplayNames = { [uiLang()]: profile.display_name };
             }
             setDisplayNames(reconcile(initialDisplayNames));
-            
+
             const s_values = profile.sponsor_values;
             if (Array.isArray(s_values) && s_values.length > 0) {
                 const filledValues = s_values.slice(0, 5).map(v => v || "");
@@ -136,15 +136,15 @@ export default function ProfileEditPage() {
             } else {
                 setSponsorValues(reconcile(["", "", "", "", ""]));
             }
-            
+
             let initialAboutState = {};
             if (profile.about_me && typeof profile.about_me === 'object') {
                 initialAboutState = profile.about_me;
-            } 
+            }
             else if (profile.about && typeof profile.about === 'string') {
                 initialAboutState = { [uiLang()]: profile.about };
             }
-            
+
             setAbout(reconcile(initialAboutState));
         }
     });
@@ -162,11 +162,11 @@ export default function ProfileEditPage() {
         const locales = domainAssetsConfig?.()?.locales || [];
         return locales.length > 0 ? locales.map(l => l.code) : ["en"];
     });
-    
+
     const handleAboutChange = (e) => {
         setAbout(activeLang(), e.currentTarget.value);
     };
-    
+
     const handleDisplayNameChange = (e) => {
         setDisplayNames(activeLang(), e.currentTarget.value);
     };
@@ -187,7 +187,7 @@ export default function ProfileEditPage() {
             setNameError(t("profile.edit.name.errorInvalidChar"));
             return;
         }
-        
+
         clearTimeout(debounceTimer);
         if (lowerValue) {
             setIsCheckingName(true);
@@ -195,10 +195,10 @@ export default function ProfileEditPage() {
                 try {
                     const contract = await getSavvaContract(app, 'UserProfile');
                     const ownerAddress = await contract.read.owners([lowerValue]);
-                    const checksummedOwner = ownerAddress !== '0x0000000000000000000000000000000000000000' 
-                        ? toChecksumAddress(ownerAddress) 
+                    const checksummedOwner = ownerAddress !== '0x0000000000000000000000000000000000000000'
+                        ? toChecksumAddress(ownerAddress)
                         : null;
-                    
+
                     if (checksummedOwner && checksummedOwner.toLowerCase() !== profileData().address.toLowerCase()) {
                         setNameError(t("profile.edit.name.errorTaken"));
                     }
@@ -212,9 +212,9 @@ export default function ProfileEditPage() {
             setIsCheckingName(false);
         }
     };
-    
+
     const handleSponsorValueChange = (index, value) => {
-        setSponsorValues(index, value.replace(/[^0-9]/g, ''));
+        setSponsorValues(index, String(value).replace(/\D/g, ""));
     };
 
     const isRegisterDisabled = createMemo(() => {
@@ -222,31 +222,31 @@ export default function ProfileEditPage() {
     });
 
     const executeSetName = async () => {
-      if (isRegisterDisabled()) return;
-      setIsRegistering(true);
-      setShowConfirmNameChange(false);
-    
-      try {
-        const contract = await getSavvaContract(app, "UserProfile", { write: true });
-        const hash = await contract.write.setName([nameInput()]);
-        
-        const desiredChain = app.desiredChain();
-        const transport = http(desiredChain.rpcUrls[0]);
-        const publicClient = createPublicClient({ chain: desiredChain, transport });
-        
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        if (receipt.status !== 'success') {
-          throw new Error(`Transaction failed with status: ${receipt.status}`);
+        if (isRegisterDisabled()) return;
+        setIsRegistering(true);
+        setShowConfirmNameChange(false);
+
+        try {
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            const hash = await contract.write.setName([nameInput()]);
+
+            const desiredChain = app.desiredChain();
+            const transport = http(desiredChain.rpcUrls[0]);
+            const publicClient = createPublicClient({ chain: desiredChain, transport });
+
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            if (receipt.status !== 'success') {
+                throw new Error(`Transaction failed with status: ${receipt.status}`);
+            }
+
+            pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
+            setInitialName(nameInput());
+            refetch();
+        } catch (err) {
+            pushErrorToast(err, { context: t('profile.edit.name.registerError') });
+        } finally {
+            setIsRegistering(false);
         }
-    
-        pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
-        setInitialName(nameInput());
-        refetch();
-      } catch (err) {
-        pushErrorToast(err, { context: t('profile.edit.name.registerError') });
-      } finally {
-        setIsRegistering(false);
-      }
     };
 
     const handleRegisterName = () => {
@@ -275,14 +275,14 @@ export default function ProfileEditPage() {
 
             const contract = await getSavvaContract(app, "UserProfile", { write: true });
             await contract.write.setAvatar([newCid]);
-            
+
             pushToast({ type: "success", message: t("profile.edit.avatar.success") });
         } catch (e) {
             pushErrorToast(e, { context: "Avatar update failed" });
             throw e;
         }
     };
-    
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -292,17 +292,17 @@ export default function ProfileEditPage() {
                 about_me: { ...about },
                 sponsor_values: [...sponsorValues].map(v => Number(v) || 0).filter(v => v > 0),
             };
-    
+
             const profileFile = new File([JSON.stringify(profileJson)], "profile.json", { type: 'application/json' });
             const formData = new FormData();
             formData.append('file', profileFile);
-    
+
             const response = await fetch(`${httpBase()}store`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include'
             });
-    
+
             if (!response.ok) throw new Error(`Profile upload failed: ${response.status}`);
             const result = await response.json();
             const newProfileCid = result?.cid;
@@ -310,7 +310,7 @@ export default function ProfileEditPage() {
 
             const contract = await getSavvaContract(app, "UserProfile", { write: true });
             const hash = await contract.write.setString([toHexBytes32(app.selectedDomainName()), toHexBytes32("profile_cid"), newProfileCid]);
-            
+
             const desiredChain = app.desiredChain();
             const transport = http(desiredChain.rpcUrls[0]);
             const publicClient = createPublicClient({ chain: desiredChain, transport });
@@ -333,8 +333,8 @@ export default function ProfileEditPage() {
                     <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
                 </div>
 
-                <Show 
-                    when={walletAccount()} 
+                <Show
+                    when={walletAccount()}
                     fallback={
                         <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
                             <p class="text-[hsl(var(--muted-foreground))] text-center">{t("profile.edit.connectWallet")}</p>
@@ -356,7 +356,7 @@ export default function ProfileEditPage() {
                                 <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
                                     <h3 class="text-lg font-semibold">{t("profile.edit.crossDomainSettings")}</h3>
                                     <div class="flex items-start gap-6">
-                                        <div 
+                                        <div
                                             onClick={() => setShowAvatarEditor(true)}
                                             class="relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
                                         >
@@ -387,9 +387,9 @@ export default function ProfileEditPage() {
                                                     <p>{t("profile.edit.name.help.line3")}</p>
                                                 </div>
                                                 <Show when={nameError()}>
-                                                  <p class="mt-1 text-xs text-[hsl(var(--destructive))]">{nameError()}</p>
+                                                    <p class="mt-1 text-xs text-[hsl(var(--destructive))]">{nameError()}</p>
                                                 </Show>
-                                                <button 
+                                                <button
                                                     class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
                                                     disabled={isRegisterDisabled()}
                                                     onClick={handleRegisterName}
@@ -413,7 +413,7 @@ export default function ProfileEditPage() {
                                     <p class="text-sm text-[hsl(var(--muted-foreground))]">
                                         {t("profile.edit.domainLabel")}: <strong>{app.selectedDomainName()}</strong>
                                     </p>
-                                    
+
                                     <div class="relative mt-4 pt-8 p-3 border rounded-lg border-[hsl(var(--border))]">
                                         <div class="absolute top-2 right-2">
                                             <LangSelector
@@ -444,7 +444,7 @@ export default function ProfileEditPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
                                         <label for="nsfw-preference" class="font-medium justify-self-end">{t("profile.edit.nsfw.label")}</label>
                                         <select
@@ -460,10 +460,10 @@ export default function ProfileEditPage() {
 
                                         <label class="font-medium justify-self-end self-start pt-2">{t("profile.edit.sponsorValues.label")}</label>
                                         <div class="flex items-center gap-2">
-                                            <For each={sponsorValues}>
+                                            <For each={[0, 1, 2, 3, 4]}>
                                                 {(value, index) => (
-                                                    <input 
-                                                        type="number" 
+                                                    <input
+                                                        type="number"
                                                         value={value}
                                                         onInput={(e) => handleSponsorValueChange(index(), e.currentTarget.value)}
                                                         class="w-full px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
@@ -493,7 +493,7 @@ export default function ProfileEditPage() {
                     </Switch>
                 </Show>
             </main>
-            <AvatarEditorModal 
+            <AvatarEditorModal
                 isOpen={showAvatarEditor()}
                 onClose={() => setShowAvatarEditor(false)}
                 onSave={handleAvatarSave}

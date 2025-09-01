@@ -779,129 +779,6 @@ export function getChainLogo(chainId) {
 }
 </file>
 
-<file path="src/blockchain/wallet.js">
-// src/blockchain/wallet.js
-import { createSignal } from "solid-js";
-
-const [walletAccount, setWalletAccount] = createSignal(null);
-const [walletChainId, setWalletChainId] = createSignal(null);
-
-export function isWalletAvailable() {
-  return typeof window !== "undefined" && !!window.ethereum;
-}
-
-function hexChainId(n) {
-  const id = Number(n);
-  if (!Number.isFinite(id)) throw new Error(`Invalid chain id: ${n}`);
-  return "0x" + id.toString(16);
-}
-
-let listenersReady = false;
-function setupListeners() {
-  const eth = window.ethereum;
-  if (!eth || listenersReady) return;
-  eth.on?.("accountsChanged", (accs) => {
-    setWalletAccount(accs?.[0] || null);
-  });
-  eth.on?.("chainChanged", (id) => {
-    const n = typeof id === "string" ? parseInt(id, 16) : +id;
-    setWalletChainId(Number.isFinite(n) ? n : null);
-  });
-  listenersReady = true;
-}
-
-export async function eagerConnect() {
-  const eth = window.ethereum;
-  if (!eth) return false;
-  setupListeners();
-  try {
-    const [accounts, chainIdHex] = await Promise.all([
-      eth.request({ method: "eth_accounts" }),
-      eth.request({ method: "eth_chainId" }).catch(() => null),
-    ]);
-    if (chainIdHex) {
-      const n = parseInt(chainIdHex, 16);
-      setWalletChainId(Number.isFinite(n) ? n : null);
-    }
-    if (accounts && accounts[0]) {
-      setWalletAccount(accounts[0]);
-      return true;
-    }
-    setWalletAccount(null);
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-export async function connectWallet() {
-  const eth = window.ethereum;
-  if (!eth) throw new Error("No Ethereum wallet found");
-  setupListeners();
-  const accounts = await eth.request({ method: "eth_requestAccounts" });
-  const chainIdHex = await eth.request({ method: "eth_chainId" }).catch(() => null);
-  if (chainIdHex) {
-    const n = parseInt(chainIdHex, 16);
-    setWalletChainId(Number.isFinite(n) ? n : null);
-  }
-  setWalletAccount(accounts?.[0] || null);
-}
-
-/**
- * Switch to a chain; if the wallet doesn't know it, try to add it.
- * meta = {
- *   chainId: number,
- *   name: string,
- *   nativeCurrency: { name, symbol, decimals },
- *   rpcUrls: string[],
- *   blockExplorers?: string[]
- * }
- */
-export async function switchOrAddChain(meta) {
-  const eth = window.ethereum;
-  if (!eth) throw new Error("No Ethereum wallet found");
-  if (!meta || !meta.chainId) throw new Error("Missing chain metadata");
-
-  const chainIdHexVal = hexChainId(meta.chainId);
-  try {
-    await eth.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: chainIdHexVal }],
-    });
-  } catch (e) {
-    // 4902 = Unrecognized chain
-    const code = e?.code ?? e?.data?.originalError?.code;
-    if (code === 4902) {
-      await eth.request({
-        method: "wallet_addEthereumChain",
-        params: [
-          {
-            chainId: chainIdHexVal,
-            chainName: meta.name || `Chain ${meta.chainId}`,
-            nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
-            rpcUrls: meta.rpcUrls || [],
-            blockExplorerUrls: meta.blockExplorers || [],
-          },
-        ],
-      });
-    } else {
-      throw e;
-    }
-  }
-
-  // update signal with the (new) chain id
-  try {
-    const cid = await eth.request({ method: "eth_chainId" });
-    if (cid) {
-      const n = parseInt(cid, 16);
-      setWalletChainId(Number.isFinite(n) ? n : null);
-    }
-  } catch { /* ignore */ }
-}
-
-export { walletAccount, walletChainId };
-</file>
-
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -1058,6 +935,56 @@ export default function Assets() {
 }
 </file>
 
+<file path="src/components/tabs/NILTab.jsx">
+// src/components/tabs/NILTab.jsx
+import ContentFeed from "../feed/ContentFeed.jsx";
+
+const HEADER_H = 48; // header height for min page height
+
+export default function NILTab(props) {
+  // mock async page loader; replace with backend fetcher later
+  async function fetchPage(page, pageSize) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (page > 6) return [];
+    return Array.from({ length: pageSize }, (_, i) => ({
+      id: `nil_${page}_${i}`,
+      text: `NIL content item ${page}-${i}: long text to demonstrate scrolling.`,
+    }));
+  }
+
+  return (
+    <section class="w-full" style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}>
+      <ContentFeed
+        mode={props.tab?._raw?.mode === "grid" ? "grid" : "list"}
+        fetchPage={fetchPage}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/TabPanelScaffold.jsx">
+// src/components/tabs/TabPanelScaffold.jsx
+import { useApp } from "../../context/AppContext";
+
+/**
+ * Minimal shared scaffold for tab content: title + body container.
+ */
+export default function TabPanelScaffold(props) {
+  const { t } = useApp();
+  return (
+    <section class="space-y-2">
+      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">
+        {props.title || t("main.tabs.untitled")}
+      </h3>
+      <div class="text-sm text-[hsl(var(--muted-foreground))]">
+        {props.children ?? t("main.tabs.empty")}
+      </div>
+    </section>
+  );
+}
+</file>
+
 <file path="src/components/ui/icons/TabIcons.jsx">
 // src/components/ui/icons/TabIcons.jsx
 /* src/components/ui/icons/TabIcons.jsx */
@@ -1178,6 +1105,98 @@ export default function ThemeIconToggle(props) {
 }
 </file>
 
+<file path="src/dev/AssetDebugTap.jsx">
+// src/dev/AssetDebugTap.jsx
+/* src/dev/AssetDebugTap.jsx */
+import { createEffect } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { dbg } from "../utils/debug";
+
+const dn = (d) => (typeof d === "string" ? d : d?.name || "");
+
+export default function AssetDebugTap() {
+    const app = useApp();
+
+    // Track & log env
+    let prevEnv;
+    createEffect(() => {
+        const next = app.assetsEnv?.();
+        if (prevEnv !== next) {
+            dbg.log("assets", "assetsEnv changed:", { prev: prevEnv, next });
+            prevEnv = next;
+        }
+    });
+
+    // Track & log base URL from /info
+    let prevBase;
+    createEffect(() => {
+        const next = app.assetsBaseUrl?.();
+        if (prevBase !== next) {
+            dbg.log("assets", "assetsBaseUrl changed:", { prev: prevBase, next });
+            prevBase = next;
+        }
+    });
+
+    // Track & log selected domain
+    let prevDomain;
+    createEffect(() => {
+        const next = dn(app.selectedDomain?.());
+        if (prevDomain !== next) {
+            dbg.log("assets", "selectedDomain changed:", { prev: prevDomain, next });
+            prevDomain = next;
+        }
+    });
+
+    // Track & log ACTIVE prefix the app uses for all assets
+    let prevPrefix;
+    createEffect(() => {
+        const next = app.domainAssetsPrefix?.();
+        if (prevPrefix !== next) {
+            dbg.log("assets", "domainAssetsPrefix (ACTIVE) changed:", { prev: prevPrefix, next });
+            prevPrefix = next;
+        }
+    });
+
+    // Track & log where the config came from: remote (domain) vs default pack
+    let prevSource;
+    createEffect(() => {
+        const next = app.domainAssetsSource?.();
+        if (prevSource !== next) {
+            dbg.log("assets", "domainAssetsSource changed:", { prev: prevSource, next });
+            prevSource = next;
+        }
+    });
+
+    // Track & log parsed config.yaml presence and key fields (logos/tabs)
+    let prevStamp;
+    createEffect(() => {
+        const cfg = app.domainAssetsConfig?.();
+        const stamp = cfg
+            ? JSON.stringify({
+                cid: cfg.assets_cid || cfg.cid || null,
+                gotLogos: !!(cfg.logos || cfg.logo),
+                tabs: !!cfg.modules?.tabs,
+            })
+            : "null";
+
+        if (prevStamp !== stamp) {
+            dbg.group("assets: domainAssetsConfig loaded/changed");
+            dbg.log("assets", "summary:", {
+                hasConfig: !!cfg,
+                hasLogos: !!(cfg?.logos || cfg?.logo),
+                tabsPath: cfg?.modules?.tabs || null,
+                assets_cid: cfg?.assets_cid || cfg?.cid || null,
+            });
+            dbg.groupEnd();
+            prevStamp = stamp;
+        }
+    });
+
+    // Nothing to render
+    return null;
+}
+</file>
+
 <file path="src/hooks/useTheme.js">
 // src/hooks/useTheme.js
 import { createSignal, onMount } from "solid-js";
@@ -1202,6 +1221,30 @@ export function useTheme() {
   useTheme.theme = theme;
 
   return [theme, toggleTheme];
+}
+</file>
+
+<file path="src/routing/tabRoutes.js">
+// src/routing/tabRoutes.js
+// Tiny helpers for tab <-> URL
+export const TAB_PREFIX = "/t";
+
+function slug(s) {
+  return String(s || "").trim().toLowerCase();
+}
+
+/** e.g., "leaders" -> "/t/leaders" */
+export function tabPath(idOrType) {
+  const key = slug(idOrType);
+  return `${TAB_PREFIX}/${encodeURIComponent(key)}`;
+}
+
+/** If route is "/t/<key>" returns "<key>", else "" */
+export function tabKeyFromRoute(route) {
+  const r = String(route || "");
+  if (!r.startsWith(TAB_PREFIX + "/")) return "";
+  const key = r.slice((TAB_PREFIX + "/").length);
+  return decodeURIComponent(key || "");
 }
 </file>
 
@@ -18418,6 +18461,149 @@ export function clearConfigCache() {
 }
 </file>
 
+<file path="src/blockchain/wallet.js">
+// src/blockchain/wallet.js
+import { createSignal } from "solid-js";
+
+const [walletAccount, setWalletAccount] = createSignal(null);
+const [walletChainId, setWalletChainId] = createSignal(null);
+
+export function isWalletAvailable() {
+  return typeof window !== "undefined" && !!window.ethereum;
+}
+
+function hexChainId(n) {
+  const id = Number(n);
+  if (!Number.isFinite(id)) throw new Error(`Invalid chain id: ${n}`);
+  return "0x" + id.toString(16);
+}
+
+// Helper to add a timeout to a promise
+function withTimeout(promise, ms, errorMessage = 'Request timed out') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, ms);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timer));
+  });
+}
+
+let listenersReady = false;
+function setupListeners() {
+  const eth = window.ethereum;
+  if (!eth || listenersReady) return;
+  eth.on?.("accountsChanged", (accs) => {
+    setWalletAccount(accs?.[0] || null);
+  });
+  eth.on?.("chainChanged", (id) => {
+    const n = typeof id === "string" ? parseInt(id, 16) : +id;
+    setWalletChainId(Number.isFinite(n) ? n : null);
+  });
+  listenersReady = true;
+}
+
+export async function eagerConnect() {
+  const eth = window.ethereum;
+  if (!eth) return false;
+  setupListeners();
+  try {
+    const [accounts, chainIdHex] = await Promise.all([
+      eth.request({ method: "eth_accounts" }),
+      eth.request({ method: "eth_chainId" }).catch(() => null),
+    ]);
+    if (chainIdHex) {
+      const n = parseInt(chainIdHex, 16);
+      setWalletChainId(Number.isFinite(n) ? n : null);
+    }
+    if (accounts && accounts[0]) {
+      setWalletAccount(accounts[0]);
+      return true;
+    }
+    setWalletAccount(null);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function connectWallet() {
+  const eth = window.ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found");
+  setupListeners();
+
+  const accounts = await withTimeout(
+    eth.request({ method: "eth_requestAccounts" }),
+    15000, // 15 second timeout
+    "Wallet connection request timed out. Please try again."
+  );
+
+  const chainIdHex = await eth.request({ method: "eth_chainId" }).catch(() => null);
+  if (chainIdHex) {
+    const n = parseInt(chainIdHex, 16);
+    setWalletChainId(Number.isFinite(n) ? n : null);
+  }
+  setWalletAccount(accounts?.[0] || null);
+}
+
+/**
+ * Switch to a chain; if the wallet doesn't know it, try to add it.
+ * meta = {
+ * chainId: number,
+ * name: string,
+ * nativeCurrency: { name, symbol, decimals },
+ * rpcUrls: string[],
+ * blockExplorers?: string[]
+ * }
+ */
+export async function switchOrAddChain(meta) {
+  const eth = window.ethereum;
+  if (!eth) throw new Error("No Ethereum wallet found");
+  if (!meta || !meta.chainId) throw new Error("Missing chain metadata");
+
+  const chainIdHexVal = hexChainId(meta.chainId);
+  try {
+    await eth.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: chainIdHexVal }],
+    });
+  } catch (e) {
+    // 4902 = Unrecognized chain
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4902) {
+      await eth.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: chainIdHexVal,
+            chainName: meta.name || `Chain ${meta.chainId}`,
+            nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
+            rpcUrls: meta.rpcUrls || [],
+            blockExplorerUrls: meta.blockExplorers || [],
+          },
+        ],
+      });
+    } else {
+      throw e;
+    }
+  }
+
+  // update signal with the (new) chain id
+  try {
+    const cid = await eth.request({ method: "eth_chainId" });
+    if (cid) {
+      const n = parseInt(cid, 16);
+      setWalletChainId(Number.isFinite(n) ? n : null);
+    }
+  } catch { /* ignore */ }
+}
+
+export { walletAccount, walletChainId };
+</file>
+
 <file path="src/components/auth/SwitchAccountModal.jsx">
 // src/components/auth/SwitchAccountModal.jsx
 import { Show, createEffect } from "solid-js";
@@ -20514,6 +20700,130 @@ export default function PinningServicesSection() {
 }
 </file>
 
+<file path="src/components/tabs/CommentsTab.jsx">
+// src/components/tabs/CommentsTab.jsx
+import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug.js";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import CommentThread from "../comments/CommentThread.jsx";
+
+export default function CommentsTab(props) {
+  const { t } = useApp();
+  const app = useApp();
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
+
+  const commentListFetcher = app.wsMethod ? app.wsMethod("latest-comments-new") : null;
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+
+    try {
+      const nextPage = page() + 1;
+      const pageSize = 10;
+
+      const params = {
+        domain: app.selectedDomainName(),
+        limit: pageSize,
+        offset: (nextPage - 1) * pageSize,
+      };
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      if (!commentListFetcher) throw new Error("API method not available.");
+
+      const res = await commentListFetcher(params);
+      const chunk = res?.list || [];
+
+      if (chunk.length < pageSize) setHasMore(false);
+
+      const newItems = chunk.map(it => ({ id: it.savva_cid, _raw: it }));
+      setItems(prev => [...prev, ...newItems]);
+      setPage(nextPage);
+
+    } catch (e) {
+      dbg.error("CommentsTab", "Failed to fetch comments", e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  createEffect(() => {
+    if (props.isActivated && !hasLoadedOnce()) {
+      setHasLoadedOnce(true);
+      loadMore();
+    }
+  });
+
+  onMount(() => {
+    const handleScroll = () => {
+      if (!props.isActivated) return;
+      const scrollThreshold = 400;
+      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
+      if (scrolledToBottom) loadMore();
+    };
+
+    let timeoutId = null;
+    const throttledHandleScroll = () => {
+      if (timeoutId === null) {
+        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
+      }
+    };
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+
+    onCleanup(() => {
+      window.removeEventListener('scroll', throttledHandleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  });
+
+  return (
+    <section class="w-full space-y-4">
+      <For each={items()}>
+        {(item) => <CommentThread thread={item} />}
+      </For>
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
+      </Show>
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/index.js">
+// src/components/tabs/index.js
+import ActualTab from "./ActualTab.jsx";
+import CommentsTab from "./CommentsTab.jsx";
+import ForYouTab from "./ForYouTab.jsx";
+import LeadersTab from "./LeadersTab.jsx";
+import NewTab from "./NewTab.jsx";
+
+/**
+ * Registry of tab type -> component.
+ * Add more mappings as you implement new tab types.
+ */
+const REGISTRY = {
+  actual: ActualTab,
+  comments: CommentsTab,
+  "for-you": ForYouTab,
+  leaders: LeadersTab,
+  new: NewTab,
+};
+
+export function getTabComponent(type) {
+  const key = String(type || "").toLowerCase();
+  return REGISTRY[key] || null;
+}
+</file>
+
 <file path="src/components/tabs/NILRightPanel.jsx">
 // src/components/tabs/NILRightPanel.jsx
 import { useApp } from "../../context/AppContext.jsx";
@@ -20586,56 +20896,6 @@ export default function NILRightPanel() {
         </div>
       </div>
     </aside>
-  );
-}
-</file>
-
-<file path="src/components/tabs/NILTab.jsx">
-// src/components/tabs/NILTab.jsx
-import ContentFeed from "../feed/ContentFeed.jsx";
-
-const HEADER_H = 48; // header height for min page height
-
-export default function NILTab(props) {
-  // mock async page loader; replace with backend fetcher later
-  async function fetchPage(page, pageSize) {
-    await new Promise((r) => setTimeout(r, 250));
-    if (page > 6) return [];
-    return Array.from({ length: pageSize }, (_, i) => ({
-      id: `nil_${page}_${i}`,
-      text: `NIL content item ${page}-${i}: long text to demonstrate scrolling.`,
-    }));
-  }
-
-  return (
-    <section class="w-full" style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}>
-      <ContentFeed
-        mode={props.tab?._raw?.mode === "grid" ? "grid" : "list"}
-        fetchPage={fetchPage}
-      />
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/tabs/TabPanelScaffold.jsx">
-// src/components/tabs/TabPanelScaffold.jsx
-import { useApp } from "../../context/AppContext";
-
-/**
- * Minimal shared scaffold for tab content: title + body container.
- */
-export default function TabPanelScaffold(props) {
-  const { t } = useApp();
-  return (
-    <section class="space-y-2">
-      <h3 class="text-base font-semibold text-[hsl(var(--foreground))]">
-        {props.title || t("main.tabs.untitled")}
-      </h3>
-      <div class="text-sm text-[hsl(var(--muted-foreground))]">
-        {props.children ?? t("main.tabs.empty")}
-      </div>
-    </section>
   );
 }
 </file>
@@ -21199,98 +21459,6 @@ export default function Toaster() {
 }
 </file>
 
-<file path="src/dev/AssetDebugTap.jsx">
-// src/dev/AssetDebugTap.jsx
-/* src/dev/AssetDebugTap.jsx */
-import { createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { dbg } from "../utils/debug";
-
-const dn = (d) => (typeof d === "string" ? d : d?.name || "");
-
-export default function AssetDebugTap() {
-    const app = useApp();
-
-    // Track & log env
-    let prevEnv;
-    createEffect(() => {
-        const next = app.assetsEnv?.();
-        if (prevEnv !== next) {
-            dbg.log("assets", "assetsEnv changed:", { prev: prevEnv, next });
-            prevEnv = next;
-        }
-    });
-
-    // Track & log base URL from /info
-    let prevBase;
-    createEffect(() => {
-        const next = app.assetsBaseUrl?.();
-        if (prevBase !== next) {
-            dbg.log("assets", "assetsBaseUrl changed:", { prev: prevBase, next });
-            prevBase = next;
-        }
-    });
-
-    // Track & log selected domain
-    let prevDomain;
-    createEffect(() => {
-        const next = dn(app.selectedDomain?.());
-        if (prevDomain !== next) {
-            dbg.log("assets", "selectedDomain changed:", { prev: prevDomain, next });
-            prevDomain = next;
-        }
-    });
-
-    // Track & log ACTIVE prefix the app uses for all assets
-    let prevPrefix;
-    createEffect(() => {
-        const next = app.domainAssetsPrefix?.();
-        if (prevPrefix !== next) {
-            dbg.log("assets", "domainAssetsPrefix (ACTIVE) changed:", { prev: prevPrefix, next });
-            prevPrefix = next;
-        }
-    });
-
-    // Track & log where the config came from: remote (domain) vs default pack
-    let prevSource;
-    createEffect(() => {
-        const next = app.domainAssetsSource?.();
-        if (prevSource !== next) {
-            dbg.log("assets", "domainAssetsSource changed:", { prev: prevSource, next });
-            prevSource = next;
-        }
-    });
-
-    // Track & log parsed config.yaml presence and key fields (logos/tabs)
-    let prevStamp;
-    createEffect(() => {
-        const cfg = app.domainAssetsConfig?.();
-        const stamp = cfg
-            ? JSON.stringify({
-                cid: cfg.assets_cid || cfg.cid || null,
-                gotLogos: !!(cfg.logos || cfg.logo),
-                tabs: !!cfg.modules?.tabs,
-            })
-            : "null";
-
-        if (prevStamp !== stamp) {
-            dbg.group("assets: domainAssetsConfig loaded/changed");
-            dbg.log("assets", "summary:", {
-                hasConfig: !!cfg,
-                hasLogos: !!(cfg?.logos || cfg?.logo),
-                tabsPath: cfg?.modules?.tabs || null,
-                assets_cid: cfg?.assets_cid || cfg?.cid || null,
-            });
-            dbg.groupEnd();
-            prevStamp = stamp;
-        }
-    });
-
-    // Nothing to render
-    return null;
-}
-</file>
-
 <file path="src/docs/rehype-rewrite-links.js">
 // src/components/docs/rehype-rewrite-links.js
 import { visit } from "unist-util-visit";
@@ -21807,209 +21975,6 @@ export function toWsUrl(backendHttpUrl, { path = "/ws", query = {} } = {}) {
 }
 </file>
 
-<file path="src/pages/ProfileEditPage.jsx">
-// src/pages/ProfileEditPage.jsx
-import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
-import { walletAccount } from "../blockchain/wallet.js";
-import { getSavvaContract } from "../blockchain/contracts.js";
-import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
-import { ipfs } from "../ipfs/index.js";
-import Spinner from "../components/ui/Spinner.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
-import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
-import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast, pushToast } from "../ui/toast.js";
-
-async function fetchProfileForEdit(params) {
-    const { app, identifier } = params;
-    if (!identifier) return { error: "No identifier provided." };
-
-    try {
-        const userProfileContract = await getSavvaContract(app, 'UserProfile');
-        let userAddress;
-
-        if (identifier.startsWith('@')) {
-            const userName = identifier.substring(1).toLowerCase();
-            const address = await userProfileContract.read.owners([userName]);
-            if (!address || address === '0x0000000000000000000000000000000000000000') {
-                return { error: "User does not exist." };
-            }
-            userAddress = toChecksumAddress(address);
-        } else {
-            userAddress = toChecksumAddress(identifier);
-        }
-
-        const avatarCid = await userProfileContract.read.avatars([userAddress]);
-        const profileCid = await userProfileContract.read.getString([
-            userAddress,
-            toHexBytes32(app.selectedDomainName()),
-            toHexBytes32("profile_cid")
-        ]);
-
-        let ipfsData = {};
-        if (profileCid) {
-            const { data } = await ipfs.getJSONBest(app, profileCid);
-            ipfsData = data || {};
-        }
-
-        return {
-            address: userAddress,
-            avatar: avatarCid,
-            profile: ipfsData
-        };
-    } catch (e) {
-        console.error("Failed to fetch profile for editing:", e);
-        return { error: e.message };
-    }
-}
-
-export default function ProfileEditPage() {
-    const app = useApp();
-    const { t, lang: uiLang, domainAssetsConfig } = app;
-    const { route } = useHashRouter();
-
-    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
-
-    const identifier = createMemo(() => {
-        const path = route();
-        return path.split('/')[2] || "";
-    });
-
-    const [profileData] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
-
-    const [avatar, setAvatar] = createSignal("");
-    const [about, setAbout] = createSignal({});
-    const [activeLang, setActiveLang] = createSignal(uiLang());
-
-    createEffect(() => {
-        const data = profileData();
-        if (data && !data.error) {
-            setAvatar(data.avatar || "");
-
-            const profileAbout = data.profile?.about;
-            if (typeof profileAbout === 'string') {
-                setAbout({ [activeLang()]: profileAbout });
-            } else if (typeof profileAbout === 'object' && profileAbout !== null) {
-                setAbout(profileAbout);
-            } else {
-                setAbout({});
-            }
-        }
-    });
-
-    const domainLangCodes = createMemo(() => {
-        const locales = domainAssetsConfig?.()?.locales || [];
-        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
-    });
-    
-    const handleAboutChange = (e) => {
-        const newText = e.currentTarget.value;
-        setAbout(prev => ({ ...prev, [activeLang()]: newText }));
-    };
-
-    const handleAvatarSave = async (blob) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', blob, 'avatar.png');
-
-            const response = await fetch(`${httpBase()}store`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
-            const result = await response.json();
-            const newCid = result?.cid;
-            if (!newCid) throw new Error("API did not return a CID for the avatar.");
-
-            const contract = await getSavvaContract(app, "UserProfile", { write: true });
-            await contract.write.setAvatar([newCid]);
-            
-            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
-        } catch (e) {
-            pushErrorToast(e, { context: "Avatar update failed" });
-            throw e; // re-throw to keep modal's processing state correct
-        }
-    };
-
-    return (
-        <>
-            <main class="p-4 max-w-3xl mx-auto space-y-6">
-                <ClosePageButton />
-                <div class="flex items-center justify-between">
-                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
-                </div>
-
-                <Show when={walletAccount()} fallback={
-                    <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-                        <p class="text-[hsl(var(--muted-foreground))] text-center">Please connect your wallet to edit the profile.</p>
-                    </div>
-                }>
-                    <Switch>
-                        <Match when={profileData.loading}>
-                            <div class="flex justify-center items-center h-48"><Spinner /></div>
-                        </Match>
-                        <Match when={profileData()?.error}>
-                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-                                <p class="text-red-500 text-center">{profileData().error}</p>
-                            </div>
-                        </Match>
-                        <Match when={profileData()}>
-                            <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                                <h3 class="text-lg font-semibold">{t("profile.edit.generalInfo")}</h3>
-                                <div class="flex items-center gap-6">
-                                    <div 
-                                        onClick={() => setShowAvatarEditor(true)}
-                                        class="relative group w-48 h-48 rounded-full overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
-                                    >
-                                        <IpfsImage
-                                            src={avatar()}
-                                            alt="User Avatar"
-                                            class="w-full h-full object-cover"
-                                            fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
-                                        />
-                                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <EditIcon class="w-10 h-10 text-white" />
-                                        </div>
-                                    </div>
-                                    <div class="flex-1 space-y-2">
-                                        <div class="flex justify-end">
-                                            <LangSelector
-                                                codes={domainLangCodes()}
-                                                value={activeLang()}
-                                                onChange={setActiveLang}
-                                            />
-                                        </div>
-                                        <textarea
-                                            value={about()[activeLang()] || ""}
-                                            onInput={handleAboutChange}
-                                            class="w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                                            placeholder="Tell us about yourself..."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </Match>
-                    </Switch>
-                </Show>
-            </main>
-            <AvatarEditorModal 
-                isOpen={showAvatarEditor()}
-                onClose={() => setShowAvatarEditor(false)}
-                onSave={handleAvatarSave}
-            />
-        </>
-    );
-}
-</file>
-
 <file path="src/routing/hashRouter.js">
 // src/routing/hashRouter.js
 import { createSignal } from "solid-js";
@@ -22038,30 +22003,6 @@ export function navigate(path, { replace = false } = {}) {
 
 export function useHashRouter() {
   return { route, navigate };
-}
-</file>
-
-<file path="src/routing/tabRoutes.js">
-// src/routing/tabRoutes.js
-// Tiny helpers for tab <-> URL
-export const TAB_PREFIX = "/t";
-
-function slug(s) {
-  return String(s || "").trim().toLowerCase();
-}
-
-/** e.g., "leaders" -> "/t/leaders" */
-export function tabPath(idOrType) {
-  const key = slug(idOrType);
-  return `${TAB_PREFIX}/${encodeURIComponent(key)}`;
-}
-
-/** If route is "/t/<key>" returns "<key>", else "" */
-export function tabKeyFromRoute(route) {
-  const r = String(route || "");
-  if (!r.startsWith(TAB_PREFIX + "/")) return "";
-  const key = r.slice((TAB_PREFIX + "/").length);
-  return decodeURIComponent(key || "");
 }
 </file>
 
@@ -24117,98 +24058,271 @@ export default function PostsTab(props) {
 }
 </file>
 
-<file path="src/components/tabs/CommentsTab.jsx">
-// src/components/tabs/CommentsTab.jsx
-import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+<file path="src/components/tabs/ActualTab.jsx">
+// src/components/tabs/ActualTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
 import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug.js";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
-import CommentThread from "../comments/CommentThread.jsx";
 
-export default function CommentsTab(props) {
-  const { t } = useApp();
-  const app = useApp();
-  const [items, setItems] = createSignal([]);
-  const [page, setPage] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
-
-  const commentListFetcher = app.wsMethod ? app.wsMethod("latest-comments-new") : null;
-
-  async function loadMore() {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
     try {
-      const nextPage = page() + 1;
-      const pageSize = 10;
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
 
+export default function ActualTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      if (!contentList) return [];
       const params = {
-        domain: app.selectedDomainName(),
-        limit: pageSize,
-        offset: (nextPage - 1) * pageSize,
+        domain: domainName(),
+        content_type: "post",
+        limit,
+        offset,
+        lang: lang(),
+        // MODIFICATION: Added new sort order for this tab.
+        order_by: 'fund_amount'
       };
-
+      
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+      
       const user = app.authorizedUser();
       if (user?.address) {
         params.my_addr = toChecksumAddress(user.address);
       }
 
-      if (!commentListFetcher) throw new Error("API method not available.");
-
-      const res = await commentListFetcher(params);
-      const chunk = res?.list || [];
-
-      if (chunk.length < pageSize) setHasMore(false);
-
-      const newItems = chunk.map(it => ({ id: it.savva_cid, _raw: it }));
-      setItems(prev => [...prev, ...newItems]);
-      setPage(nextPage);
-
-    } catch (e) {
-      dbg.error("CommentsTab", "Failed to fetch comments", e);
-    } finally {
-      setLoading(false);
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      console.error("fetchPage error:", err);
+      return [];
     }
   }
 
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={category()}
+            onInput={(e) => setCategory(e.currentTarget.value)}
+            aria-label={app.t("newTab.category")}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+            </For>
+          </select>
+          <Show when={categoriesRes.loading}>
+            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+          </Show>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+        isActivated={props.isActivated}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/ForYouTab.jsx">
+// src/components/tabs/ForYouTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+export default function ForYouTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
   createEffect(() => {
-    if (props.isActivated && !hasLoadedOnce()) {
-      setHasLoadedOnce(true);
-      loadMore();
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
     }
   });
 
-  onMount(() => {
-    const handleScroll = () => {
-      if (!props.isActivated) return;
-      const scrollThreshold = 400;
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (scrolledToBottom) loadMore();
-    };
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
 
-    let timeoutId = null;
-    const throttledHandleScroll = () => {
-      if (timeoutId === null) {
-        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      if (!contentList) return [];
+      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
       }
-    };
-    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+      
+      const user = app.authorizedUser();
+      if (user?.address) {
+        // MODIFICATION: Pass the authorized address as `user_addr` for this feed.
+        params.user_addr = toChecksumAddress(user.address);
+      }
 
-    onCleanup(() => {
-      window.removeEventListener('scroll', throttledHandleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    });
-  });
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      console.error("fetchPage error:", err);
+      return [];
+    }
+  }
 
   return (
-    <section class="w-full space-y-4">
-      <For each={items()}>
-        {(item) => <CommentThread thread={item} />}
-      </For>
-      <Show when={loading()}>
-        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
+          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+          <select
+            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={category()}
+            onInput={(e) => setCategory(e.currentTarget.value)}
+            aria-label={app.t("newTab.category")}
+          >
+            <For each={categoriesWithAll()}>
+              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+            </For>
+          </select>
+          <Show when={categoriesRes.loading}>
+            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+          </Show>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+        isActivated={props.isActivated}
+      />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/RightRailLayout.jsx">
+// src/components/tabs/RightRailLayout.jsx
+import { Show } from "solid-js";
+import RightRail from "../layout/RightRail.jsx";
+
+const HEADER_H = 48;
+
+export default function RightRailLayout(props) {
+  return (
+    <section
+      class="w-full"
+      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
+    >
+      <Show
+        when={props.rightPanelConfig?.available}
+        fallback={
+          // When the right panel is unavailable, render content in a single column.
+          <div>{props.children}</div>
+        }
+      >
+        {/* When the right panel is available, render the two-column grid. */}
+        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
+          <div>{props.children}</div>
+          <aside class="hidden md:block sticky top-16">
+            <div class="space-y-4">
+              <RightRail config={props.rightPanelConfig} />
+            </div>
+          </aside>
+        </div>
       </Show>
     </section>
   );
@@ -25975,6 +26089,360 @@ tabs:
           count: 7
 </file>
 
+<file path="scripts/i18n.mjs">
+// scripts/i18n.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import dotenv from "dotenv";
+import OpenAI from "openai";
+
+// ---------- Config ----------
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const SRC_DIR = path.join(ROOT, "src");
+const I18N_DIR = path.join(SRC_DIR, "i18n");
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const BATCH_SIZE = 60; // how many keys to ask the model about per request
+const targetLang = process.argv[2] || null;
+const onlyEnglish = targetLang === "en";
+
+// ---------- Collect used keys (scan t("key") calls) ----------
+const exts = [".js", ".jsx", ".ts", ".tsx"];
+const usedKeys = new Set();
+
+/**
+ * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
+ * (If you build keys dynamically, they won’t be picked up by any static scan.)
+ */
+const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
+      walk(p);
+    } else if (exts.includes(path.extname(entry.name))) {
+      const text = fs.readFileSync(p, "utf8");
+      let m;
+      while ((m = T_CALL.exec(text))) {
+        usedKeys.add(m[2]);
+      }
+    }
+  }
+}
+
+walk(SRC_DIR);
+
+// ---------- Helpers to load & write lang files ----------
+function isLangFile(name) {
+  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
+}
+function toModuleURL(filePath) {
+  return pathToFileURL(filePath).href;
+}
+async function loadLang(filePath) {
+  const mod = await import(toModuleURL(filePath));
+  const dict = mod?.default || {};
+  const normalized = {};
+  for (const [k, v] of Object.entries(dict)) {
+    normalized[k] = typeof v === "string" ? v : String(v);
+  }
+  return normalized;
+}
+function writeLang(filePath, obj) {
+  const sorted = Object.keys(obj)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = obj[k];
+      return acc;
+    }, {});
+  const body =
+    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
+    "export default " +
+    JSON.stringify(sorted, null, 2) +
+    ";\n";
+  fs.writeFileSync(filePath, body, "utf8");
+}
+
+// ---------- OpenAI helpers ----------
+let openai = null;
+if (OPENAI_KEY) {
+  openai = new OpenAI({ apiKey: OPENAI_KEY });
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
+  if (!openai) return {};
+  const res = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          `You are a localization copywriter for a web app. ` +
+          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
+          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
+          `Do not add extra keys.`,
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+  const text = res.choices?.[0]?.message?.content || "{}";
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+async function fillEnglish(keys) {
+  const out = {};
+  for (const group of chunk(keys, BATCH_SIZE)) {
+    const prompt =
+      `For each key, produce an English UI string (microcopy). ` +
+      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
+      JSON.stringify({ keys: group }, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+async function translateTo(langCode, englishPairs) {
+  const out = {};
+  const keys = Object.keys(englishPairs);
+  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
+    const batchToTranslate = {};
+    for (const k of keyGroup) {
+      batchToTranslate[k] = englishPairs[k];
+    }
+    const prompt =
+      `Translate the values in the following JSON object to ${langCode}. ` +
+      `Return a JSON object with the same keys, but with translated string values. ` +
+      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
+      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
+      JSON.stringify(batchToTranslate, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+// ---------- Main ----------
+(async function main() {
+  // Sanity
+  if (!fs.existsSync(I18N_DIR)) {
+    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
+    process.exit(1);
+  }
+
+  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
+  if (langFiles.length === 0) {
+    console.error("[i18n] No language files found in src/i18n");
+    process.exit(1);
+  }
+
+  const enPath = path.join(I18N_DIR, "en.js");
+  if (!fs.existsSync(enPath)) {
+    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
+    process.exit(1);
+  }
+
+  // Load all dicts
+  const dicts = {};
+  for (const f of langFiles) {
+    dicts[f] = await loadLang(path.join(I18N_DIR, f));
+  }
+
+  const desiredKeys = new Set(usedKeys);
+
+  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
+  const enOrig = dicts["en.js"] || {};
+  const enNew = {};
+  const missingEn = [];
+
+  for (const k of desiredKeys) {
+    const v = enOrig[k];
+    const isMissingValue =
+      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+    if (isMissingValue) {
+      enNew[k] = "???";
+      missingEn.push(k);
+    } else {
+      enNew[k] = v;
+    }
+  }
+
+  writeLang(enPath, enNew);
+
+  // ---------- 2) Fill English "???" via OpenAI ----------
+  if (missingEn.length > 0) {
+    if (!openai) {
+      console.warn(
+        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
+      );
+    } else {
+      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
+      const filled = await fillEnglish(missingEn);
+      let filledCount = 0;
+      for (const k of missingEn) {
+        const candidate = filled[k];
+        if (typeof candidate === "string" && candidate.trim()) {
+          enNew[k] = candidate.trim();
+          filledCount++;
+        }
+      }
+      if (filledCount > 0) {
+        writeLang(enPath, enNew);
+        console.log(`[i18n] Filled ${filledCount} English strings.`);
+      }
+    }
+  } else {
+    console.log("[i18n] No missing English strings to fill.");
+  }
+
+  // ---------- 2.5) Detect 'force retranslate' flags on English ('!…') ----------
+  // Only applicable when NOT in en-only mode.
+  const flaggedKeys = new Set();
+  const cleanFlagText = {};
+  if (!onlyEnglish) {
+    for (const k of Object.keys(enNew)) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        flaggedKeys.add(k);
+        cleanFlagText[k] = v.slice(1).trim(); // the source text to re-translate from English
+      }
+    }
+  }
+
+  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
+  if (onlyEnglish) {
+    console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
+    return;
+  }
+
+  // We'll track which flagged keys succeeded in ALL languages,
+  // so we can safely strip '!' from English afterwards.
+  const maybeStripBang = new Set(flaggedKeys); // remove any key that fails in a language
+
+  for (const f of langFiles) {
+    if (f === "en.js") continue;
+
+    const langPath = path.join(I18N_DIR, f);
+    const langCode = path.basename(f, ".js");
+    const langDict = dicts[f] || {};
+
+    // Prune/prepare
+    const out = {};
+    const toTranslate = {};
+
+    for (const k of desiredKeys) {
+      const v = langDict[k];
+      const enVal = enNew[k];
+
+      // Should we force re-translate this key (English starts with '!')?
+      const forceRetranslate = flaggedKeys.has(k);
+
+      // Missing?
+      const isMissing =
+        v == null ||
+        (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+
+      if (forceRetranslate) {
+        // Mark as missing to ensure we overwrite; queue clean English for translation
+        out[k] = "???";
+        if (cleanFlagText[k]) toTranslate[k] = cleanFlagText[k];
+      } else if (isMissing) {
+        out[k] = "???";
+        if (typeof enVal === "string" && enVal.trim() && enVal !== "???") {
+          toTranslate[k] = enVal;
+        }
+      } else {
+        out[k] = v;
+      }
+    }
+
+    writeLang(langPath, out);
+    const toTranslateCount = Object.keys(toTranslate).length;
+
+    if (toTranslateCount === 0) {
+      console.log(`[i18n] ${langCode}: nothing to translate.`);
+      // If there are flagged keys but nothing to translate for this lang,
+      // we consider it a failure for those keys because they remained as-is.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
+      continue;
+    }
+
+    if (!openai) {
+      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
+      // Mark all flagged keys as failed for this language.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
+      continue;
+    }
+
+    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
+    const translated = await translateTo(langCode, toTranslate);
+    let translatedCount = 0;
+
+    for (const key of Object.keys(toTranslate)) {
+      const t = translated[key];
+      if (typeof t === "string" && t.trim()) {
+        out[key] = t.trim();
+        translatedCount++;
+      } else {
+        // translation for this key failed → don't strip '!' later
+        if (flaggedKeys.has(key)) maybeStripBang.delete(key);
+      }
+    }
+
+    // Any flagged key that still left as "???" is a failure for this language
+    for (const k of flaggedKeys) {
+      if (out[k] === "???") maybeStripBang.delete(k);
+    }
+
+    if (translatedCount > 0) {
+      writeLang(langPath, out);
+    }
+    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
+  }
+
+  // ---------- 4) If all non-English languages were updated for a flagged key, strip '!' in English ----------
+  if (maybeStripBang.size > 0) {
+    let changed = 0;
+    for (const k of maybeStripBang) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        const cleaned = v.slice(1).trim();
+        enNew[k] = cleaned || v; // don't produce empty
+        changed++;
+      }
+    }
+    if (changed > 0) {
+      writeLang(enPath, enNew);
+      console.log(`[i18n] Removed leading '!' from ${changed} English key(s) after successful re-translation.`);
+    }
+  }
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+</file>
+
 <file path="src/blockchain/auth.js">
 // src/blockchain/auth.js
 import { hexToString } from "viem";
@@ -26134,268 +26602,6 @@ export default function PostListView(props) {
       </For>
     </div>
   );
-}
-</file>
-
-<file path="src/components/tabs/ActualTab.jsx">
-// src/components/tabs/ActualTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-export default function ActualTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      if (!contentList) return [];
-      const params = {
-        domain: domainName(),
-        content_type: "post",
-        limit,
-        offset,
-        lang: lang(),
-        // MODIFICATION: Added new sort order for this tab.
-        order_by: 'fund_amount'
-      };
-      
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-      
-      const user = app.authorizedUser();
-      if (user?.address) {
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      console.error("fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
-          </Show>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-        isActivated={props.isActivated}
-      />
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/tabs/ForYouTab.jsx">
-// src/components/tabs/ForYouTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-export default function ForYouTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      if (!contentList) return [];
-      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-      
-      const user = app.authorizedUser();
-      if (user?.address) {
-        // MODIFICATION: Pass the authorized address as `user_addr` for this feed.
-        params.user_addr = toChecksumAddress(user.address);
-      }
-
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      console.error("fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
-          </Show>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-        isActivated={props.isActivated}
-      />
-    </section>
-  );
-}
-</file>
-
-<file path="src/components/tabs/index.js">
-// src/components/tabs/index.js
-import ActualTab from "./ActualTab.jsx";
-import CommentsTab from "./CommentsTab.jsx";
-import ForYouTab from "./ForYouTab.jsx";
-import LeadersTab from "./LeadersTab.jsx";
-import NewTab from "./NewTab.jsx";
-
-/**
- * Registry of tab type -> component.
- * Add more mappings as you implement new tab types.
- */
-const REGISTRY = {
-  actual: ActualTab,
-  comments: CommentsTab,
-  "for-you": ForYouTab,
-  leaders: LeadersTab,
-  new: NewTab,
-};
-
-export function getTabComponent(type) {
-  const key = String(type || "").toLowerCase();
-  return REGISTRY[key] || null;
 }
 </file>
 
@@ -27731,454 +27937,6 @@ sections:
         file: core-concepts/config-contract.md
 </file>
 
-<file path="scripts/i18n.mjs">
-// scripts/i18n.mjs
-import fs from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
-import dotenv from "dotenv";
-import OpenAI from "openai";
-
-// ---------- Config ----------
-const ROOT = process.cwd();
-dotenv.config({ path: path.join(ROOT, ".env") });
-
-const SRC_DIR = path.join(ROOT, "src");
-const I18N_DIR = path.join(SRC_DIR, "i18n");
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const BATCH_SIZE = 60; // how many keys to ask the model about per request
-const targetLang = process.argv[2] || null;
-const onlyEnglish = targetLang === "en";
-
-// ---------- Collect used keys (scan t("key") calls) ----------
-const exts = [".js", ".jsx", ".ts", ".tsx"];
-const usedKeys = new Set();
-
-/**
- * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
- * (If you build keys dynamically, they won’t be picked up by any static scan.)
- */
-const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
-
-function walk(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === "dist") continue;
-      walk(p);
-    } else if (exts.includes(path.extname(entry.name))) {
-      const text = fs.readFileSync(p, "utf8");
-      let m;
-      while ((m = T_CALL.exec(text))) {
-        usedKeys.add(m[2]);
-      }
-    }
-  }
-}
-
-walk(SRC_DIR);
-
-// ---------- Helpers to load & write lang files ----------
-function isLangFile(name) {
-  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
-}
-function toModuleURL(filePath) {
-  return pathToFileURL(filePath).href;
-}
-async function loadLang(filePath) {
-  const mod = await import(toModuleURL(filePath));
-  const dict = mod?.default || {};
-  const normalized = {};
-  for (const [k, v] of Object.entries(dict)) {
-    normalized[k] = typeof v === "string" ? v : String(v);
-  }
-  return normalized;
-}
-function writeLang(filePath, obj) {
-  const sorted = Object.keys(obj)
-    .sort()
-    .reduce((acc, k) => {
-      acc[k] = obj[k];
-      return acc;
-    }, {});
-  const body =
-    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
-    "export default " +
-    JSON.stringify(sorted, null, 2) +
-    ";\n";
-  fs.writeFileSync(filePath, body, "utf8");
-}
-
-// ---------- OpenAI helpers ----------
-let openai = null;
-if (OPENAI_KEY) {
-  openai = new OpenAI({ apiKey: OPENAI_KEY });
-}
-
-function chunk(arr, size) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
-async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
-  if (!openai) return {};
-  const res = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          `You are a localization copywriter for a web app. ` +
-          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
-          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
-          `Do not add extra keys.`,
-      },
-      { role: "user", content: prompt },
-    ],
-  });
-  const text = res.choices?.[0]?.message?.content || "{}";
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
-
-async function fillEnglish(keys) {
-  const out = {};
-  for (const group of chunk(keys, BATCH_SIZE)) {
-    const prompt =
-      `For each key, produce an English UI string (microcopy). ` +
-      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
-      JSON.stringify({ keys: group }, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-async function translateTo(langCode, englishPairs) {
-  const out = {};
-  const keys = Object.keys(englishPairs);
-  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
-    const batchToTranslate = {};
-    for (const k of keyGroup) {
-      batchToTranslate[k] = englishPairs[k];
-    }
-    const prompt =
-      `Translate the values in the following JSON object to ${langCode}. ` +
-      `Return a JSON object with the same keys, but with translated string values. ` +
-      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
-      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
-      JSON.stringify(batchToTranslate, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-// ---------- Main ----------
-(async function main() {
-  // Sanity
-  if (!fs.existsSync(I18N_DIR)) {
-    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
-    process.exit(1);
-  }
-
-  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
-  if (langFiles.length === 0) {
-    console.error("[i18n] No language files found in src/i18n");
-    process.exit(1);
-  }
-
-  const enPath = path.join(I18N_DIR, "en.js");
-  if (!fs.existsSync(enPath)) {
-    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
-    process.exit(1);
-  }
-
-  // Load all dicts
-  const dicts = {};
-  for (const f of langFiles) {
-    dicts[f] = await loadLang(path.join(I18N_DIR, f));
-  }
-
-  const desiredKeys = new Set(usedKeys);
-
-  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
-  const enOrig = dicts["en.js"] || {};
-  const enNew = {};
-  const missingEn = [];
-
-  for (const k of desiredKeys) {
-    const v = enOrig[k];
-    const isMissingValue =
-      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-    if (isMissingValue) {
-      enNew[k] = "???";
-      missingEn.push(k);
-    } else {
-      enNew[k] = v;
-    }
-  }
-
-  writeLang(enPath, enNew);
-
-  // ---------- 2) Fill English "???" via OpenAI ----------
-  if (missingEn.length > 0) {
-    if (!openai) {
-      console.warn(
-        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
-      );
-    } else {
-      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
-      const filled = await fillEnglish(missingEn);
-      let filledCount = 0;
-      for (const k of missingEn) {
-        const candidate = filled[k];
-        if (typeof candidate === "string" && candidate.trim()) {
-          enNew[k] = candidate.trim();
-          filledCount++;
-        }
-      }
-      if (filledCount > 0) {
-        writeLang(enPath, enNew);
-        console.log(`[i18n] Filled ${filledCount} English strings.`);
-      }
-    }
-  } else {
-    console.log("[i18n] No missing English strings to fill.");
-  }
-
-  // ---------- 2.5) Detect 'force retranslate' flags on English ('!…') ----------
-  // Only applicable when NOT in en-only mode.
-  const flaggedKeys = new Set();
-  const cleanFlagText = {};
-  if (!onlyEnglish) {
-    for (const k of Object.keys(enNew)) {
-      const v = enNew[k];
-      if (typeof v === "string" && v.startsWith("!")) {
-        flaggedKeys.add(k);
-        cleanFlagText[k] = v.slice(1).trim(); // the source text to re-translate from English
-      }
-    }
-  }
-
-  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
-  if (onlyEnglish) {
-    console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
-    return;
-  }
-
-  // We'll track which flagged keys succeeded in ALL languages,
-  // so we can safely strip '!' from English afterwards.
-  const maybeStripBang = new Set(flaggedKeys); // remove any key that fails in a language
-
-  for (const f of langFiles) {
-    if (f === "en.js") continue;
-
-    const langPath = path.join(I18N_DIR, f);
-    const langCode = path.basename(f, ".js");
-    const langDict = dicts[f] || {};
-
-    // Prune/prepare
-    const out = {};
-    const toTranslate = {};
-
-    for (const k of desiredKeys) {
-      const v = langDict[k];
-      const enVal = enNew[k];
-
-      // Should we force re-translate this key (English starts with '!')?
-      const forceRetranslate = flaggedKeys.has(k);
-
-      // Missing?
-      const isMissing =
-        v == null ||
-        (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-
-      if (forceRetranslate) {
-        // Mark as missing to ensure we overwrite; queue clean English for translation
-        out[k] = "???";
-        if (cleanFlagText[k]) toTranslate[k] = cleanFlagText[k];
-      } else if (isMissing) {
-        out[k] = "???";
-        if (typeof enVal === "string" && enVal.trim() && enVal !== "???") {
-          toTranslate[k] = enVal;
-        }
-      } else {
-        out[k] = v;
-      }
-    }
-
-    writeLang(langPath, out);
-    const toTranslateCount = Object.keys(toTranslate).length;
-
-    if (toTranslateCount === 0) {
-      console.log(`[i18n] ${langCode}: nothing to translate.`);
-      // If there are flagged keys but nothing to translate for this lang,
-      // we consider it a failure for those keys because they remained as-is.
-      for (const k of flaggedKeys) {
-        if (out[k] === "???") maybeStripBang.delete(k);
-      }
-      continue;
-    }
-
-    if (!openai) {
-      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
-      // Mark all flagged keys as failed for this language.
-      for (const k of flaggedKeys) {
-        if (out[k] === "???") maybeStripBang.delete(k);
-      }
-      continue;
-    }
-
-    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
-    const translated = await translateTo(langCode, toTranslate);
-    let translatedCount = 0;
-
-    for (const key of Object.keys(toTranslate)) {
-      const t = translated[key];
-      if (typeof t === "string" && t.trim()) {
-        out[key] = t.trim();
-        translatedCount++;
-      } else {
-        // translation for this key failed → don't strip '!' later
-        if (flaggedKeys.has(key)) maybeStripBang.delete(key);
-      }
-    }
-
-    // Any flagged key that still left as "???" is a failure for this language
-    for (const k of flaggedKeys) {
-      if (out[k] === "???") maybeStripBang.delete(k);
-    }
-
-    if (translatedCount > 0) {
-      writeLang(langPath, out);
-    }
-    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
-  }
-
-  // ---------- 4) If all non-English languages were updated for a flagged key, strip '!' in English ----------
-  if (maybeStripBang.size > 0) {
-    let changed = 0;
-    for (const k of maybeStripBang) {
-      const v = enNew[k];
-      if (typeof v === "string" && v.startsWith("!")) {
-        const cleaned = v.slice(1).trim();
-        enNew[k] = cleaned || v; // don't produce empty
-        changed++;
-      }
-    }
-    if (changed > 0) {
-      writeLang(enPath, enNew);
-      console.log(`[i18n] Removed leading '!' from ${changed} English key(s) after successful re-translation.`);
-    }
-  }
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
-</file>
-
-<file path="src/components/auth/AuthorizedUser.jsx">
-// src/components/auth/AuthorizedUser.jsx
-import { createSignal, Show, onMount, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import { navigate } from "../../routing/hashRouter.js";
-
-function ChevronDownIcon(props) {
-  return (
-    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
-      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
-    </svg>
-  );
-}
-
-export default function AuthorizedUser() {
-  const app = useApp();
-  const { t } = app;
-  const [menuOpen, setMenuOpen] = createSignal(false);
-  let menuRef;
-  
-  const user = () => app.authorizedUser();
-
-  const handleLogoutClick = () => {
-    app.logout();
-    setMenuOpen(false);
-  };
-
-  const handleProfileClick = () => {
-    const u = user();
-    if (!u) return;
-    const path = u.name ? `/@${u.name}` : `/${u.address}`;
-    navigate(path);
-    setMenuOpen(false);
-  };
-  
-  const handleClickOutside = (event) => {
-    if (menuRef && !menuRef.contains(event.target)) {
-      setMenuOpen(false);
-    }
-  };
-
-  onMount(() => document.addEventListener("mousedown", handleClickOutside));
-  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
-
-  return (
-    <div class="relative" ref={menuRef}>
-      <Show when={user()}>
-        <button
-          class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
-          onClick={() => setMenuOpen(!menuOpen())}
-          aria-haspopup="true"
-          aria-expanded={menuOpen()}
-        >
-          <div class="w-7 h-7 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-            <IpfsImage
-              src={user().avatar}
-              alt="User Avatar"
-              class="w-full h-full object-cover"
-              fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-            />
-          </div>
-          <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-        </button>
-      </Show>
-
-      <Show when={menuOpen()}>
-        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
-          <div class="py-1" role="menu" aria-orientation="vertical">
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleProfileClick(); }}
-            >
-              {t("header.myProfile")}
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
-            >
-              {t("header.logout")}
-            </a>
-          </div>
-        </div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/docs/DocsContent.jsx">
 // src/components/docs/DocsContent.jsx
 import { createMemo, createResource, Show } from "solid-js";
@@ -28613,41 +28371,6 @@ export default function PostControls(props) {
 }
 </file>
 
-<file path="src/components/tabs/RightRailLayout.jsx">
-// src/components/tabs/RightRailLayout.jsx
-import { Show } from "solid-js";
-import RightRail from "../layout/RightRail.jsx";
-
-const HEADER_H = 48;
-
-export default function RightRailLayout(props) {
-  return (
-    <section
-      class="w-full"
-      style={{ "min-height": `calc(100vh - ${HEADER_H}px)` }}
-    >
-      <Show
-        when={props.rightPanelConfig?.available}
-        fallback={
-          // When the right panel is unavailable, render content in a single column.
-          <div>{props.children}</div>
-        }
-      >
-        {/* When the right panel is available, render the two-column grid. */}
-        <div class="grid gap-4 grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px] items-start">
-          <div>{props.children}</div>
-          <aside class="hidden md:block sticky top-16">
-            <div class="space-y-4">
-              <RightRail config={props.rightPanelConfig} />
-            </div>
-          </aside>
-        </div>
-      </Show>
-    </section>
-  );
-}
-</file>
-
 <file path="src/i18n/static_keys.jsx">
 //--------------------------------------------------------
 // i18n techical comments.'
@@ -28705,6 +28428,519 @@ t("tabs.title.for-you")
 
 
 */
+</file>
+
+<file path="src/pages/ProfileEditPage.jsx">
+// src/pages/ProfileEditPage.jsx
+import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect, For } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import { useHashRouter } from "../routing/hashRouter.js";
+import { walletAccount } from "../blockchain/wallet.js";
+import { getSavvaContract } from "../blockchain/contracts.js";
+import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
+import { ipfs } from "../ipfs/index.js";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
+import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast, pushToast } from "../ui/toast.js";
+import ConfirmModal from "../components/ui/ConfirmModal.jsx";
+import { createPublicClient, http } from "viem";
+import ContextMenu from "../components/ui/ContextMenu.jsx";
+
+async function fetchProfileForEdit(params) {
+    const { app, identifier } = params;
+    if (!identifier) return { error: "No identifier provided." };
+
+    try {
+        const userProfileContract = await getSavvaContract(app, 'UserProfile');
+        let userAddress;
+
+        if (identifier.startsWith('@')) {
+            const userName = identifier.substring(1).toLowerCase();
+            const address = await userProfileContract.read.owners([userName]);
+            if (!address || address === '0x0000000000000000000000000000000000000000') {
+                return { error: "User does not exist." };
+            }
+            userAddress = toChecksumAddress(address);
+        } else {
+            userAddress = toChecksumAddress(identifier);
+        }
+
+        const [avatarCid, profileCid, name] = await Promise.all([
+            userProfileContract.read.avatars([userAddress]),
+            userProfileContract.read.getString([
+                userAddress,
+                toHexBytes32(app.selectedDomainName()),
+                toHexBytes32("profile_cid")
+            ]),
+            userProfileContract.read.names([userAddress])
+        ]);
+
+        let ipfsData = {};
+        if (profileCid) {
+            const { data } = await ipfs.getJSONBest(app, profileCid);
+            ipfsData = data || {};
+        }
+
+        return {
+            address: userAddress,
+            avatar: avatarCid,
+            profile: ipfsData,
+            name: name,
+            profile_cid: profileCid
+        };
+    } catch (e) {
+        console.error("Failed to fetch profile for editing:", e);
+        return { error: e.message };
+    }
+}
+
+function copyToClipboard(text, label, t) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        pushToast({ type: "success", message: t("clipboard.copied", { label }) });
+    }).catch(err => {
+        console.error(`Failed to copy ${label}:`, err);
+    });
+}
+
+export default function ProfileEditPage() {
+    const app = useApp();
+    const { t, lang: uiLang, domainAssetsConfig } = app;
+    const { route } = useHashRouter();
+    let debounceTimer;
+
+    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
+    const [initialName, setInitialName] = createSignal("");
+    const [nameInput, setNameInput] = createSignal("");
+    const [nameError, setNameError] = createSignal("");
+    const [isCheckingName, setIsCheckingName] = createSignal(false);
+    const [isRegistering, setIsRegistering] = createSignal(false);
+    const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
+    
+    const [displayNames, setDisplayNames] = createStore({});
+    const [nsfwPreference, setNsfwPreference] = createSignal("h");
+    const [sponsorValues, setSponsorValues] = createStore(["", "", "", "", ""]);
+    const [isSaving, setIsSaving] = createSignal(false);
+    const [about, setAbout] = createStore({});
+
+    const identifier = createMemo(() => {
+        const path = route();
+        return path.split('/')[2] || "";
+    });
+
+    const [profileData, { refetch }] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
+
+    const [avatar, setAvatar] = createSignal("");
+    const [activeLang, setActiveLang] = createSignal(uiLang());
+
+    const profileCid = createMemo(() => profileData()?.profile_cid);
+
+    createEffect(() => {
+        const data = profileData();
+        if (data && !data.error) {
+            setAvatar(data.avatar || "");
+            const currentName = data.name || "";
+            setInitialName(currentName);
+            setNameInput(currentName);
+
+            const profile = data.profile || {};
+            setNsfwPreference(profile.nsfw || "h");
+            
+            let initialDisplayNames = {};
+            if (profile.display_names && typeof profile.display_names === 'object') {
+                initialDisplayNames = profile.display_names;
+            } else if (profile.display_name && typeof profile.display_name === 'string') {
+                initialDisplayNames = { [uiLang()]: profile.display_name };
+            }
+            setDisplayNames(reconcile(initialDisplayNames));
+            
+            const s_values = profile.sponsor_values;
+            if (Array.isArray(s_values) && s_values.length > 0) {
+                const filledValues = s_values.slice(0, 5).map(v => v || "");
+                while (filledValues.length < 5) filledValues.push("");
+                setSponsorValues(reconcile(filledValues));
+            } else {
+                setSponsorValues(reconcile(["", "", "", "", ""]));
+            }
+            
+            let initialAboutState = {};
+            if (profile.about_me && typeof profile.about_me === 'object') {
+                initialAboutState = profile.about_me;
+            } 
+            else if (profile.about && typeof profile.about === 'string') {
+                initialAboutState = { [uiLang()]: profile.about };
+            }
+            
+            setAbout(reconcile(initialAboutState));
+        }
+    });
+
+    const contextMenuItems = createMemo(() => {
+        const cid = profileCid();
+        if (!cid) return [];
+        return [{
+            label: t("profile.edit.copyProfileCid"),
+            onClick: () => copyToClipboard(cid, "User Profile CID", t)
+        }];
+    });
+
+    const domainLangCodes = createMemo(() => {
+        const locales = domainAssetsConfig?.()?.locales || [];
+        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
+    });
+    
+    const handleAboutChange = (e) => {
+        setAbout(activeLang(), e.currentTarget.value);
+    };
+    
+    const handleDisplayNameChange = (e) => {
+        setDisplayNames(activeLang(), e.currentTarget.value);
+    };
+
+    const handleNameInput = (e) => {
+        const lowerValue = e.currentTarget.value.toLowerCase();
+        setNameInput(lowerValue);
+        setNameError("");
+
+        if (lowerValue === initialName()) {
+            setIsCheckingName(false);
+            clearTimeout(debounceTimer);
+            return;
+        }
+
+        const validCharRegex = /^[a-z0-9.-]*$/;
+        if (!validCharRegex.test(lowerValue)) {
+            setNameError(t("profile.edit.name.errorInvalidChar"));
+            return;
+        }
+        
+        clearTimeout(debounceTimer);
+        if (lowerValue) {
+            setIsCheckingName(true);
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const contract = await getSavvaContract(app, 'UserProfile');
+                    const ownerAddress = await contract.read.owners([lowerValue]);
+                    const checksummedOwner = ownerAddress !== '0x0000000000000000000000000000000000000000' 
+                        ? toChecksumAddress(ownerAddress) 
+                        : null;
+                    
+                    if (checksummedOwner && checksummedOwner.toLowerCase() !== profileData().address.toLowerCase()) {
+                        setNameError(t("profile.edit.name.errorTaken"));
+                    }
+                } catch (err) {
+                    console.error("Error checking name uniqueness:", err);
+                } finally {
+                    setIsCheckingName(false);
+                }
+            }, 500);
+        } else {
+            setIsCheckingName(false);
+        }
+    };
+    
+    const handleSponsorValueChange = (index, value) => {
+        setSponsorValues(index, value.replace(/[^0-9]/g, ''));
+    };
+
+    const isRegisterDisabled = createMemo(() => {
+        return isRegistering() || isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
+    });
+
+    const executeSetName = async () => {
+      if (isRegisterDisabled()) return;
+      setIsRegistering(true);
+      setShowConfirmNameChange(false);
+    
+      try {
+        const contract = await getSavvaContract(app, "UserProfile", { write: true });
+        const hash = await contract.write.setName([nameInput()]);
+        
+        const desiredChain = app.desiredChain();
+        const transport = http(desiredChain.rpcUrls[0]);
+        const publicClient = createPublicClient({ chain: desiredChain, transport });
+        
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== 'success') {
+          throw new Error(`Transaction failed with status: ${receipt.status}`);
+        }
+    
+        pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
+        setInitialName(nameInput());
+        refetch();
+      } catch (err) {
+        pushErrorToast(err, { context: t('profile.edit.name.registerError') });
+      } finally {
+        setIsRegistering(false);
+      }
+    };
+
+    const handleRegisterName = () => {
+        if (initialName()) {
+            setShowConfirmNameChange(true);
+        } else {
+            executeSetName();
+        }
+    };
+
+    const handleAvatarSave = async (blob) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', blob, 'avatar.png');
+
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
+            const result = await response.json();
+            const newCid = result?.cid;
+            if (!newCid) throw new Error("API did not return a CID for the avatar.");
+
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            await contract.write.setAvatar([newCid]);
+            
+            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
+        } catch (e) {
+            pushErrorToast(e, { context: "Avatar update failed" });
+            throw e;
+        }
+    };
+    
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const profileJson = {
+                display_names: { ...displayNames },
+                nsfw: nsfwPreference(),
+                about_me: { ...about },
+                sponsor_values: [...sponsorValues].map(v => Number(v) || 0).filter(v => v > 0),
+            };
+    
+            const profileFile = new File([JSON.stringify(profileJson)], "profile.json", { type: 'application/json' });
+            const formData = new FormData();
+            formData.append('file', profileFile);
+    
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+    
+            if (!response.ok) throw new Error(`Profile upload failed: ${response.status}`);
+            const result = await response.json();
+            const newProfileCid = result?.cid;
+            if (!newProfileCid) throw new Error("API did not return a CID for the profile.");
+
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            const hash = await contract.write.setString([toHexBytes32(app.selectedDomainName()), toHexBytes32("profile_cid"), newProfileCid]);
+            
+            const desiredChain = app.desiredChain();
+            const transport = http(desiredChain.rpcUrls[0]);
+            const publicClient = createPublicClient({ chain: desiredChain, transport });
+            await publicClient.waitForTransactionReceipt({ hash });
+
+            pushToast({ type: 'success', message: t('profile.edit.saveSuccess') });
+            refetch();
+        } catch (err) {
+            pushErrorToast(err, { context: t('profile.edit.saveError') });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <>
+            <main class="p-4 max-w-3xl mx-auto space-y-6">
+                <ClosePageButton />
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
+                </div>
+
+                <Show 
+                    when={walletAccount()} 
+                    fallback={
+                        <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                            <p class="text-[hsl(var(--muted-foreground))] text-center">{t("profile.edit.connectWallet")}</p>
+                        </div>
+                    }
+                >
+                    <Switch>
+                        <Match when={profileData.loading}>
+                            <div class="flex justify-center items-center h-48"><Spinner /></div>
+                        </Match>
+                        <Match when={profileData()?.error}>
+                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+                                <p class="text-red-500 text-center">{profileData().error}</p>
+                            </div>
+                        </Match>
+                        <Match when={profileData()}>
+                            <div class="space-y-6">
+                                {/* Section 1: Cross Domain Settings */}
+                                <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <h3 class="text-lg font-semibold">{t("profile.edit.crossDomainSettings")}</h3>
+                                    <div class="flex items-start gap-6">
+                                        <div 
+                                            onClick={() => setShowAvatarEditor(true)}
+                                            class="relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
+                                        >
+                                            <IpfsImage
+                                                src={avatar()}
+                                                alt="User Avatar"
+                                                class="w-full h-full object-cover"
+                                                fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
+                                            />
+                                            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <EditIcon class="w-10 h-10 text-white" />
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 space-y-4">
+                                            <div>
+                                                <label for="registered-name" class="font-medium">{t("profile.edit.registeredName")}</label>
+                                                <input
+                                                    id="registered-name"
+                                                    type="text"
+                                                    value={nameInput()}
+                                                    onInput={handleNameInput}
+                                                    classList={{ "border-[hsl(var(--destructive))]": !!nameError() }}
+                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
+                                                />
+                                                <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+                                                    <p>{t("profile.edit.name.help.line1")}</p>
+                                                    <p>{t("profile.edit.name.help.line2")}</p>
+                                                    <p>{t("profile.edit.name.help.line3")}</p>
+                                                </div>
+                                                <Show when={nameError()}>
+                                                  <p class="mt-1 text-xs text-[hsl(var(--destructive))]">{nameError()}</p>
+                                                </Show>
+                                                <button 
+                                                    class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                                                    disabled={isRegisterDisabled()}
+                                                    onClick={handleRegisterName}
+                                                >
+                                                    <Show when={isCheckingName() || isRegistering()} fallback={t("profile.edit.registerName")}>
+                                                        <Spinner class="w-5 h-5" />
+                                                    </Show>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Section 2: Domain Specific Parameters */}
+                                <div class="relative p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+                                        <ContextMenu items={contextMenuItems()} positionClass="absolute top-2 right-2 z-20" />
+                                    </Show>
+
+                                    <h3 class="text-lg font-semibold">{t("profile.edit.domainSpecificParams")}</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                        {t("profile.edit.domainLabel")}: <strong>{app.selectedDomainName()}</strong>
+                                    </p>
+                                    
+                                    <div class="relative mt-4 pt-8 p-3 border rounded-lg border-[hsl(var(--border))]">
+                                        <div class="absolute top-2 right-2">
+                                            <LangSelector
+                                                codes={domainLangCodes()}
+                                                value={activeLang()}
+                                                onChange={setActiveLang}
+                                            />
+                                        </div>
+                                        <div class="space-y-4">
+                                            <div>
+                                                <label for="display-name-lang" class="font-medium text-sm">{t("profile.edit.displayName")}</label>
+                                                <input
+                                                    id="display-name-lang"
+                                                    type="text"
+                                                    value={displayNames[activeLang()] || ""}
+                                                    onInput={handleDisplayNameChange}
+                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="font-medium text-sm">{t("profile.edit.aboutMe")}</label>
+                                                <textarea
+                                                    value={about[activeLang()] || ""}
+                                                    onInput={handleAboutChange}
+                                                    class="mt-1 w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                                    placeholder="Tell us about yourself..."
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
+                                        <label for="nsfw-preference" class="font-medium justify-self-end">{t("profile.edit.nsfw.label")}</label>
+                                        <select
+                                            id="nsfw-preference"
+                                            value={nsfwPreference()}
+                                            onChange={(e) => setNsfwPreference(e.currentTarget.value)}
+                                            class="w-full max-w-sm px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                        >
+                                            <option value="s">{t("profile.edit.nsfw.show")}</option>
+                                            <option value="w">{t("profile.edit.nsfw.warn")}</option>
+                                            <option value="h">{t("profile.edit.nsfw.hide")}</option>
+                                        </select>
+
+                                        <label class="font-medium justify-self-end self-start pt-2">{t("profile.edit.sponsorValues.label")}</label>
+                                        <div class="flex items-center gap-2">
+                                            <For each={sponsorValues}>
+                                                {(value, index) => (
+                                                    <input 
+                                                        type="number" 
+                                                        value={value}
+                                                        onInput={(e) => handleSponsorValueChange(index(), e.currentTarget.value)}
+                                                        class="w-full px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                                    />
+                                                )}
+                                            </For>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <button
+                                        class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 disabled:opacity-60"
+                                        onClick={handleSave}
+                                        disabled={isSaving()}
+                                    >
+                                        <Show when={isSaving()} fallback={t("profile.edit.saveButton")}>
+                                            <div class="flex items-center gap-2">
+                                                <Spinner class="w-5 h-5" />
+                                                <span>{t("profile.edit.saving")}</span>
+                                            </div>
+                                        </Show>
+                                    </button>
+                                </div>
+                            </div>
+                        </Match>
+                    </Switch>
+                </Show>
+            </main>
+            <AvatarEditorModal 
+                isOpen={showAvatarEditor()}
+                onClose={() => setShowAvatarEditor(false)}
+                onSave={handleAvatarSave}
+            />
+            <ConfirmModal
+                isOpen={showConfirmNameChange()}
+                onClose={() => setShowConfirmNameChange(false)}
+                onConfirm={executeSetName}
+                title={t("profile.edit.name.confirmChangeTitle")}
+                message={t("profile.edit.name.confirmChangeMessage", { name: initialName() })}
+            />
+        </>
+    );
+}
 </file>
 
 <file path="src/styles/themed-controls.css">
@@ -29095,6 +29331,100 @@ export const alertRegistry = {
 };
 </file>
 
+<file path="src/components/auth/AuthorizedUser.jsx">
+// src/components/auth/AuthorizedUser.jsx
+import { createSignal, Show, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "../ui/IpfsImage.jsx";
+import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
+import { navigate } from "../../routing/hashRouter.js";
+
+function ChevronDownIcon(props) {
+  return (
+    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
+      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z"></path>
+    </svg>
+  );
+}
+
+export default function AuthorizedUser() {
+  const app = useApp();
+  const { t } = app;
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  let menuRef;
+  
+  const user = () => app.authorizedUser();
+
+  const handleLogoutClick = () => {
+    app.logout();
+    setMenuOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    const u = user();
+    if (!u) return;
+    const path = u.name ? `/@${u.name}` : `/${u.address}`;
+    navigate(path);
+    setMenuOpen(false);
+  };
+  
+  const handleClickOutside = (event) => {
+    if (menuRef && !menuRef.contains(event.target)) {
+      setMenuOpen(false);
+    }
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  return (
+    <div class="relative" ref={menuRef}>
+      <Show when={user()}>
+        <button
+          class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
+          onClick={() => setMenuOpen(!menuOpen())}
+          aria-haspopup="true"
+          aria-expanded={menuOpen()}
+        >
+          <div class="w-7 h-7 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+            <IpfsImage
+              src={user().avatar}
+              alt="User Avatar"
+              class="w-full h-full object-cover"
+              fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+            />
+          </div>
+          <ChevronDownIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+        </button>
+      </Show>
+
+      <Show when={menuOpen()}>
+        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
+          <div class="py-1" role="menu" aria-orientation="vertical">
+            <a
+              href="#"
+              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+              role="menuitem"
+              onClick={(e) => { e.preventDefault(); handleProfileClick(); }}
+            >
+              {t("header.myProfile")}
+            </a>
+            <a
+              href="#"
+              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
+              role="menuitem"
+              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
+            >
+              {t("header.logout")}
+            </a>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/editor/wizard_steps/StepUploadIPFS.jsx">
 // src/components/editor/wizard_steps/StepUploadIPFS.jsx
 import { createSignal, onMount, Show } from "solid-js";
@@ -29305,6 +29635,156 @@ export default function MainView() {
         <TabsBar />
       </div>
     </Container>
+  );
+}
+</file>
+
+<file path="src/components/tabs/LeadersTab.jsx">
+// src/components/tabs/LeadersTab.jsx
+import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import ContentFeed from "../feed/ContentFeed.jsx";
+import { useApp } from "../../context/AppContext.jsx";
+import { loadAssetResource } from "../../utils/assetLoader";
+import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
+
+function useDomainCategories(app) {
+  const cfg = () => app.domainAssetsConfig?.();
+  const relPath = createMemo(() => cfg()?.modules?.categories || null);
+  const lang = () => (app.lang?.() || "en").toLowerCase();
+  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
+  const [cats] = createResource(params, async ({ rel, lang }) => {
+    if (!rel) return [];
+    try {
+      const data = await loadAssetResource(app, rel, { type: "yaml" });
+      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
+      return (Array.isArray(listByLang) ? listByLang : []).map(String);
+    } catch (err) {
+      console.error(`Failed to load categories from ${rel}:`, err);
+      return [];
+    }
+  });
+  return cats;
+}
+
+const TIME_FRAMES = ["month", "week", "year", "all"];
+
+export default function LeadersTab(props) {
+  const app = useApp();
+  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const [category, setCategory] = createSignal("ALL");
+  const [timeFrame, setTimeFrame] = createSignal("month");
+  const categoriesRes = useDomainCategories(app);
+  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    const newList = categoriesRes();
+    const currentSelection = category();
+    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
+      setCategory("ALL");
+    }
+  });
+
+  const domainName = () => {
+    const d = app.selectedDomain?.();
+    return typeof d === "string" ? d : d?.name || "";
+  };
+  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
+
+  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
+
+  async function fetchPage(page, pageSize) {
+    const limit = pageSize;
+    const offset = (page - 1) * pageSize;
+    try {
+      await whenWsOpen();
+      if (!contentList) return [];
+      const params = {
+        domain: domainName(),
+        content_type: "post",
+        limit,
+        offset,
+        lang: lang(),
+        order_by: 'total_author_share'
+      };
+      
+      const cat = category();
+      if (cat && cat !== "ALL") {
+        params.category = `${lang()}:${cat}`;
+      }
+
+      const user = app.authorizedUser();
+      if (user?.address) {
+        params.my_addr = toChecksumAddress(user.address);
+      }
+
+      const selectedTime = timeFrame();
+      if (selectedTime !== "all") {
+        const now = new Date();
+        let pastDate = new Date();
+        if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
+        if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
+        if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
+
+
+        // MODIFICATION: Changed to standard ISO string format.
+        params.min_time = pastDate.toISOString();
+      }
+
+      const res = await contentList(params);
+      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      return arr.map((it) => ({
+        id: it?.savva_cid || it?.savvaCID || it?.id,
+        _raw: it,
+      }));
+    } catch (err) {
+      console.error("fetchPage error:", err);
+      return [];
+    }
+  }
+
+  return (
+    <section class="w-full">
+      <div class="mb-3 flex items-center gap-3">
+        <ViewModeToggle size="md" />
+        <div class="ml-auto flex items-center gap-4">
+          <div class="flex items-center gap-2 min-w-[220px]">
+            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={category()}
+              onInput={(e) => setCategory(e.currentTarget.value)}
+              aria-label={app.t("newTab.category")}
+            >
+              <For each={categoriesWithAll()}>
+                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+              </For>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={timeFrame()}
+              onInput={(e) => setTimeFrame(e.currentTarget.value)}
+              aria-label="Time frame"
+            >
+              <For each={TIME_FRAMES}>
+                {(frame) => <option value={frame}>{app.t(`timeFrame.${frame}`)}</option>}
+              </For>
+            </select>
+          </div>
+        </div>
+      </div>
+      <ContentFeed
+        mode={viewMode()}
+        fetchPage={fetchPage}
+        pageSize={12}
+        resetOn={feedResetKey()}
+        isRailVisible={props.isRailVisible}
+        isActivated={props.isActivated}
+      />
+    </section>
   );
 }
 </file>
@@ -30051,6 +30531,106 @@ export default function EditorFilesDrawer(props) {
 }
 </file>
 
+<file path="src/components/feed/ContentFeed.jsx">
+// src/components/feed/ContentFeed.jsx
+import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import PostListView from "./PostListView.jsx";
+import { dbg } from "../../utils/debug.js";
+
+export default function ContentFeed(props) {
+  const { t } = useApp();
+  const [items, setItems] = createSignal([]);
+  const [page, setPage] = createSignal(0);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
+
+  async function loadMore() {
+    if (loading() || !hasMore()) return;
+    setLoading(true);
+    try {
+      const nextPage = page() + 1;
+      dbg.log("ContentFeed", "loadMore → page", nextPage);
+      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
+      dbg.log("ContentFeed", "page result length", chunk.length);
+      if (!chunk.length) setHasMore(false);
+      
+      setItems((prev) => {
+        const next = prev.concat(chunk);
+        props.onItemsChange?.(next);
+        return next;
+      });
+
+      setPage(nextPage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  createEffect(() => {
+    // This effect triggers the very first load once the component is activated.
+    if (props.isActivated && !hasLoadedOnce()) {
+      dbg.log('ContentFeed', 'Component activated. Firing initial loadMore().');
+      setHasLoadedOnce(true);
+      loadMore();
+    }
+  });
+
+  onMount(() => {
+    const handleScroll = () => {
+      // Only load more content if the feed has been activated.
+      if (!props.isActivated) return;
+      const scrollThreshold = 600;
+      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
+      if (scrolledToBottom) loadMore();
+    };
+    let timeoutId = null;
+    const throttledHandleScroll = () => {
+      if (timeoutId === null) {
+        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
+      }
+    };
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+    onCleanup(() => {
+      window.removeEventListener('scroll', throttledHandleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  });
+
+  createEffect(on(() => props.resetOn, () => {
+    setItems([]);
+    props.onItemsChange?.([]);
+    setPage(0);
+    setHasMore(true);
+    setLoading(false);
+    setHasLoadedOnce(false); // Reset the load trigger
+
+    // If the component is already active when a reset occurs, load immediately.
+    // Otherwise, the activation effect will handle the load.
+    if (props.isActivated) {
+      queueMicrotask(() => {
+          setHasLoadedOnce(true);
+          loadMore();
+      });
+    }
+  }, { defer: true }));
+
+  return (
+    <div class="w-full">
+      <PostListView
+        items={items()}
+        mode={props.mode}
+        isRailVisible={props.isRailVisible}
+      />
+      <Show when={loading()}>
+        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/post/ReactionInput.jsx">
 // src/components/post/ReactionInput.jsx
 import { createMemo, Show, createSignal, createEffect, For, onCleanup } from "solid-js";
@@ -30234,156 +30814,6 @@ export default function ReactionInput(props) {
 }
 </file>
 
-<file path="src/components/tabs/LeadersTab.jsx">
-// src/components/tabs/LeadersTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
-import ContentFeed from "../feed/ContentFeed.jsx";
-import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader";
-import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
-import { toChecksumAddress } from "../../blockchain/utils.js";
-import { whenWsOpen } from "../../net/wsRuntime.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
-
-const TIME_FRAMES = ["month", "week", "year", "all"];
-
-export default function LeadersTab(props) {
-  const app = useApp();
-  const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const [category, setCategory] = createSignal("ALL");
-  const [timeFrame, setTimeFrame] = createSignal("month");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
-
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
-  const domainName = () => {
-    const d = app.selectedDomain?.();
-    return typeof d === "string" ? d : d?.name || "";
-  };
-  const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
-
-  const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
-
-  async function fetchPage(page, pageSize) {
-    const limit = pageSize;
-    const offset = (page - 1) * pageSize;
-    try {
-      await whenWsOpen();
-      if (!contentList) return [];
-      const params = {
-        domain: domainName(),
-        content_type: "post",
-        limit,
-        offset,
-        lang: lang(),
-        order_by: 'total_author_share'
-      };
-      
-      const cat = category();
-      if (cat && cat !== "ALL") {
-        params.category = `${lang()}:${cat}`;
-      }
-
-      const user = app.authorizedUser();
-      if (user?.address) {
-        params.my_addr = toChecksumAddress(user.address);
-      }
-
-      const selectedTime = timeFrame();
-      if (selectedTime !== "all") {
-        const now = new Date();
-        let pastDate = new Date();
-        if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
-        if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
-        if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
-
-
-        // MODIFICATION: Changed to standard ISO string format.
-        params.min_time = pastDate.toISOString();
-      }
-
-      const res = await contentList(params);
-      const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      return arr.map((it) => ({
-        id: it?.savva_cid || it?.savvaCID || it?.id,
-        _raw: it,
-      }));
-    } catch (err) {
-      console.error("fetchPage error:", err);
-      return [];
-    }
-  }
-
-  return (
-    <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-4">
-          <div class="flex items-center gap-2 min-w-[220px]">
-            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={category()}
-              onInput={(e) => setCategory(e.currentTarget.value)}
-              aria-label={app.t("newTab.category")}
-            >
-              <For each={categoriesWithAll()}>
-                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-              </For>
-            </select>
-          </div>
-          <div class="flex items-center gap-2">
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={timeFrame()}
-              onInput={(e) => setTimeFrame(e.currentTarget.value)}
-              aria-label="Time frame"
-            >
-              <For each={TIME_FRAMES}>
-                {(frame) => <option value={frame}>{app.t(`timeFrame.${frame}`)}</option>}
-              </For>
-            </select>
-          </div>
-        </div>
-      </div>
-      <ContentFeed
-        mode={viewMode()}
-        fetchPage={fetchPage}
-        pageSize={12}
-        resetOn={feedResetKey()}
-        isRailVisible={props.isRailVisible}
-        isActivated={props.isActivated}
-      />
-    </section>
-  );
-}
-</file>
-
 <file path="src/components/ui/IpfsImage.jsx">
 // src/components/ui/IpfsImage.jsx
 import { createSignal, createEffect, Show, Switch, Match } from "solid-js";
@@ -30439,92 +30869,6 @@ export default function IpfsImage(props) {
       </Switch>
     </div>
   );
-}
-</file>
-
-<file path="src/components/ui/UserCard.jsx">
-// src/components/ui/UserCard.jsx
-import { Show, createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "./IpfsImage.jsx";
-import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
-import VerifiedBadge from "./icons/VerifiedBadge.jsx";
-import StakerLevelIcon from "./StakerLevelIcon.jsx";
-import { navigate } from "../../routing/hashRouter.js";
-
-function isVerified(a) {
-    return Boolean(a && a.name);
-}
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function UserCard(props) {
-    const { t } = useApp();
-    const author = () => props.author || {};
-
-    const hasName = createMemo(() => author().name || author().display_name);
-
-    const handleUserClick = (e) => {
-        e.stopPropagation();
-        const user = author();
-        if (!user) return;
-        const targetPath = user.name ? `/@${user.name}` : `/${user.address}`;
-        navigate(targetPath);
-    };
-
-    return (
-        <Show when={author()}>
-            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-10'}`}>
-                <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
-                    <Show when={!props.compact}>
-                        <div class="w-8 h-8 rounded-full overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-                            <Show
-                                when={author().avatar}
-                                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-                            >
-                                <IpfsImage
-                                    src={author().avatar}
-                                    alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
-                                    class="w-full h-full object-cover"
-                                />
-                            </Show>
-                        </div>
-                    </Show>
-
-                    <div class="min-w-0">
-                        <Show when={author().display_name && !props.compact}>
-                            <div class="text-xs truncate text-[hsl(var(--foreground))] w-full">
-                                {author().display_name}
-                            </div>
-                        </Show>
-
-                        <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
-                            <Show when={author().name}>
-                                <div class="min-w-0 flex items-center">
-                                    <span class="truncate uppercase font-semibold">{author().name}</span>
-                                    <Show when={isVerified(author())}>
-                                        <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
-                                    </Show>
-                                </div>
-                            </Show>
-                            
-                            <Show when={!hasName() && author().address}>
-                                <span class="font-mono">{shortAddr(author().address)}</span>
-                            </Show>
-
-                            <StakerLevelIcon
-                                staked={author().staked}
-                                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Show>
-    );
 }
 </file>
 
@@ -31286,106 +31630,6 @@ export default function PostSubmissionWizard(props) {
 }
 </file>
 
-<file path="src/components/feed/ContentFeed.jsx">
-// src/components/feed/ContentFeed.jsx
-import { createSignal, onCleanup, onMount, For, Show, createEffect, on } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import PostListView from "./PostListView.jsx";
-import { dbg } from "../../utils/debug.js";
-
-export default function ContentFeed(props) {
-  const { t } = useApp();
-  const [items, setItems] = createSignal([]);
-  const [page, setPage] = createSignal(0);
-  const [hasMore, setHasMore] = createSignal(true);
-  const [loading, setLoading] = createSignal(false);
-  const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
-
-  async function loadMore() {
-    if (loading() || !hasMore()) return;
-    setLoading(true);
-    try {
-      const nextPage = page() + 1;
-      dbg.log("ContentFeed", "loadMore → page", nextPage);
-      const chunk = (await props.fetchPage?.(nextPage, props.pageSize || 12)) ?? [];
-      dbg.log("ContentFeed", "page result length", chunk.length);
-      if (!chunk.length) setHasMore(false);
-      
-      setItems((prev) => {
-        const next = prev.concat(chunk);
-        props.onItemsChange?.(next);
-        return next;
-      });
-
-      setPage(nextPage);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  createEffect(() => {
-    // This effect triggers the very first load once the component is activated.
-    if (props.isActivated && !hasLoadedOnce()) {
-      dbg.log('ContentFeed', 'Component activated. Firing initial loadMore().');
-      setHasLoadedOnce(true);
-      loadMore();
-    }
-  });
-
-  onMount(() => {
-    const handleScroll = () => {
-      // Only load more content if the feed has been activated.
-      if (!props.isActivated) return;
-      const scrollThreshold = 600;
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (scrolledToBottom) loadMore();
-    };
-    let timeoutId = null;
-    const throttledHandleScroll = () => {
-      if (timeoutId === null) {
-        timeoutId = setTimeout(() => { handleScroll(); timeoutId = null; }, 200);
-      }
-    };
-    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
-    onCleanup(() => {
-      window.removeEventListener('scroll', throttledHandleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    });
-  });
-
-  createEffect(on(() => props.resetOn, () => {
-    setItems([]);
-    props.onItemsChange?.([]);
-    setPage(0);
-    setHasMore(true);
-    setLoading(false);
-    setHasLoadedOnce(false); // Reset the load trigger
-
-    // If the component is already active when a reset occurs, load immediately.
-    // Otherwise, the activation effect will handle the load.
-    if (props.isActivated) {
-      queueMicrotask(() => {
-          setHasLoadedOnce(true);
-          loadMore();
-      });
-    }
-  }, { defer: true }));
-
-  return (
-    <div class="w-full">
-      <PostListView
-        items={items()}
-        mode={props.mode}
-        isRailVisible={props.isRailVisible}
-      />
-      <Show when={loading()}>
-        <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">{t("common.loading")}</div>
-      </Show>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/settings/LocalIpfsSection.jsx">
 // src/components/settings/LocalIpfsSection.jsx
 import { createSignal, Show, For } from "solid-js";
@@ -31584,6 +31828,92 @@ ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOr
         </Show>
     </section>
   );
+}
+</file>
+
+<file path="src/components/ui/UserCard.jsx">
+// src/components/ui/UserCard.jsx
+import { Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "./IpfsImage.jsx";
+import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
+import VerifiedBadge from "./icons/VerifiedBadge.jsx";
+import StakerLevelIcon from "./StakerLevelIcon.jsx";
+import { navigate } from "../../routing/hashRouter.js";
+
+function isVerified(a) {
+    return Boolean(a && a.name);
+}
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function UserCard(props) {
+    const { t } = useApp();
+    const author = () => props.author || {};
+
+    const hasName = createMemo(() => author().name || author().display_name);
+
+    const handleUserClick = (e) => {
+        e.stopPropagation();
+        const user = author();
+        if (!user) return;
+        const targetPath = user.name ? `/@${user.name}` : `/${user.address}`;
+        navigate(targetPath);
+    };
+
+    return (
+        <Show when={author()}>
+            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-10'}`}>
+                <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
+                    <Show when={!props.compact}>
+                        <div class="w-8 h-8 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+                            <Show
+                                when={author().avatar}
+                                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+                            >
+                                <IpfsImage
+                                    src={author().avatar}
+                                    alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
+                                    class="w-full h-full object-cover"
+                                />
+                            </Show>
+                        </div>
+                    </Show>
+
+                    <div class="min-w-0">
+                        <Show when={author().display_name && !props.compact}>
+                            <div class="text-xs truncate text-[hsl(var(--foreground))] w-full">
+                                {author().display_name}
+                            </div>
+                        </Show>
+
+                        <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
+                            <Show when={author().name}>
+                                <div class="min-w-0 flex items-center">
+                                    <span class="truncate uppercase font-semibold">{author().name}</span>
+                                    <Show when={isVerified(author())}>
+                                        <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
+                                    </Show>
+                                </div>
+                            </Show>
+                            
+                            <Show when={!hasName() && author().address}>
+                                <span class="font-mono">{shortAddr(author().address)}</span>
+                            </Show>
+
+                            <StakerLevelIcon
+                                staked={author().staked}
+                                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Show>
+    );
 }
 </file>
 
@@ -32373,164 +32703,6 @@ export default function CommentCard(props) {
         {...modalProps()}
       />
     </div>
-  );
-}
-</file>
-
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-import { Show, createSignal, onMount, createMemo, Switch, Match } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
-import { authorize } from "../blockchain/auth.js";
-import { pushErrorToast } from "../ui/toast.js";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-import Container from "./layout/Container";
-import AuthorizedUser from "./auth/AuthorizedUser.jsx";
-import NewPostButton from "./main/NewPostButton.jsx";
-import TokenPrice from "./main/TokenPrice.jsx";
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const { t } = app;
-  const [eagerDone, setEagerDone] = createSignal(false);
-  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatchedChain = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  const isAddressMismatched = createMemo(() => {
-    const walletAcc = walletAccount();
-    const authorizedAcc = app.authorizedUser()?.address;
-    if (!authorizedAcc || !walletAcc) return false;
-    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
-  });
-
-  onMount(async () => {
-    if (isWalletAvailable()) await eagerConnect();
-    setEagerDone(true);
-  });
-
-  const handleLoginClick = async () => {
-    setIsLoggingIn(true);
-    try {
-      await authorize(app);
-    } catch (e) {
-      console.error("Authorization failed:", e);
-      pushErrorToast(e, { context: "Login failed" });
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  async function onConnect() {
-    try {
-      await connectWallet();
-      if (desiredId()) await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to connect wallet" });
-    }
-  }
-
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(walletAccount());
-    } catch (e) {
-      console.error("Failed to copy address:", e);
-    }
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to switch chain" });
-    }
-  }
-
-  const chainLogoSrc = () => getChainLogo(desiredId());
-
-  return (
-    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
-      <Container>
-        <div class="h-12 px-2 flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-            <TokenPrice />
-          </div>
-
-          <div class="flex items-center gap-3">
-            {/* Show New Post button ONLY when authorized AND wallet is connected */}
-            <Show when={app.authorizedUser() && walletAccount()}>
-              <NewPostButton />
-            </Show>
-
-            {/* Show user avatar menu if a session exists, regardless of wallet connection */}
-            <Show when={app.authorizedUser()}>
-              <AuthorizedUser />
-            </Show>
-
-            {/* Logic for Connect/Login buttons */}
-            <Switch>
-              {/* Wallet not connected -> Show "Connect" button */}
-              <Match when={!walletAccount() && eagerDone()}>
-                <Show when={isWalletAvailable()}>
-                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
-                    {t("wallet.connect")}
-                  </button>
-                </Show>
-              </Match>
-
-              {/* Wallet connected BUT no session -> Show "Login" button */}
-              <Match when={walletAccount() && !app.authorizedUser()}>
-                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
-                  {isLoggingIn() ? t("common.checking") : "Login"}
-                </button>
-              </Match>
-            </Switch>
-
-            {/* Wallet address and chain info */}
-            <Show when={walletAccount()}>
-                <div class="flex items-center gap-2">
-                    <button
-                        classList={{
-                            "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
-                            "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
-                        }}
-                        onClick={copyAddress}
-                        title={t("wallet.copyAddress")}
-                    >
-                        {shortAddr(walletAccount())}
-                    </button>
-                    <Show when={!mismatchedChain()} fallback={
-                        <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
-                            {t("wallet.changeChain")}
-                        </button>
-                    }>
-                        <Show when={chainLogoSrc()}>
-                            <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
-                        </Show>
-                    </Show>
-                </div>
-            </Show>
-
-            {/* Hamburger menu */}
-            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
-          </div>
-        </div>
-      </Container>
-    </header>
   );
 }
 </file>
@@ -33669,6 +33841,169 @@ export function handleReact(app, payload) {
 }
 </file>
 
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal, onMount, createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
+import { authorize } from "../blockchain/auth.js";
+import { pushErrorToast } from "../ui/toast.js";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+import AuthorizedUser from "./auth/AuthorizedUser.jsx";
+import NewPostButton from "./main/NewPostButton.jsx";
+import TokenPrice from "./main/TokenPrice.jsx";
+import { dbg } from "../utils/debug.js";
+
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const { t } = app;
+  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
+
+  const desiredId = () => app.desiredChainId();
+  const mismatchedChain = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  const isAddressMismatched = createMemo(() => {
+    const walletAcc = walletAccount();
+    const authorizedAcc = app.authorizedUser()?.address;
+    if (!authorizedAcc || !walletAcc) return false;
+    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
+  });
+
+  onMount(() => {
+    if (isWalletAvailable()) eagerConnect();
+  });
+
+  const handleLoginClick = async () => {
+    setIsLoggingIn(true);
+    try {
+      await authorize(app);
+    } catch (e) {
+      console.error("Authorization failed:", e);
+      pushErrorToast(e, { context: "Login failed" });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  async function onConnect() {
+    dbg.log("Header:onConnect", "Connect process started.");
+    try {
+      dbg.log("Header:onConnect", "Attempting to call connectWallet()...");
+      await connectWallet();
+      dbg.log("Header:onConnect", "connectWallet() succeeded. Account:", walletAccount());
+
+      if (desiredId()) {
+        dbg.log("Header:onConnect", "Ensuring wallet is on desired chain:", desiredId());
+        await app.ensureWalletOnDesiredChain();
+        dbg.log("Header:onConnect", "Chain check successful.");
+      }
+    } catch (e) {
+      dbg.error("Header:onConnect", "Error during connection process:", e);
+      const errorContext = { context: "Failed to connect wallet" };
+      if (e?.message?.toLowerCase().includes("timed out")) {
+          errorContext.help = t("wallet.error.timeoutHelp");
+      }
+      pushErrorToast(e, errorContext);
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+    } catch (e) {
+      console.error("Failed to copy address:", e);
+    }
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to switch chain" });
+    }
+  }
+
+  const chainLogoSrc = () => getChainLogo(desiredId());
+
+  return (
+    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+            <TokenPrice />
+          </div>
+
+          <div class="flex items-center gap-3">
+            <Show when={app.authorizedUser() && walletAccount()}>
+              <NewPostButton />
+            </Show>
+
+            <Show when={app.authorizedUser()}>
+              <AuthorizedUser />
+            </Show>
+
+            <Show
+              when={walletAccount()}
+              fallback={
+                <Show when={isWalletAvailable()}>
+                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
+                    {t("wallet.connect")}
+                  </button>
+                </Show>
+              }
+            >
+              {/* This content renders when wallet IS connected */}
+              <Show when={!app.authorizedUser()}>
+                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
+                  {isLoggingIn() ? t("common.checking") : "Login"}
+                </button>
+              </Show>
+
+              <div class="flex items-center gap-2">
+                <button
+                    classList={{
+                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                        "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                    }}
+                    onClick={copyAddress}
+                    title={t("wallet.copyAddress")}
+                >
+                    {shortAddr(walletAccount())}
+                </button>
+                <Show when={!mismatchedChain()} fallback={
+                    <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
+                        {t("wallet.changeChain")}
+                    </button>
+                }>
+                    <Show when={chainLogoSrc()}>
+                        <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
+                    </Show>
+                </Show>
+              </div>
+            </Show>
+
+            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
+  );
+}
+</file>
+
 <file path="src/components/docs/MarkdownView.jsx">
 // src/components/docs/MarkdownView.jsx
 import { createEffect, onCleanup, createSignal, onMount } from "solid-js";
@@ -33943,6 +34278,177 @@ export default function NewTab(props) {
         onItemsChange={app.setNewFeedItems}
         isActivated={props.isActivated}
       />
+    </section>
+  );
+}
+</file>
+
+<file path="src/components/main/TabsBar.jsx">
+// src/components/main/TabsBar.jsx
+import { createResource, Show, createMemo, createSignal, createEffect, batch, For } from "solid-js";
+import { useApp } from "../../context/AppContext";
+import { useI18n } from "../../i18n/useI18n";
+import { loadAssetResource } from "../../utils/assetLoader";
+import { useHashRouter, navigate } from "../../routing/hashRouter";
+import Tabs from "../ui/Tabs.jsx";
+import { getTabComponent } from "../tabs";
+import RightRailLayout from "../tabs/RightRailLayout.jsx";
+import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
+
+const slug = (s) => String(s || "").trim().toLowerCase();
+const firstSeg = (path) => {
+  const p = String(path || "/");
+  const s = p.startsWith("/") ? p.slice(1) : p;
+  return s.split(/[?#/]/, 1)[0] || "";
+};
+const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
+
+function SvgIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {props.children}
+    </svg>
+  );
+}
+const TrophyIcon = () => <SvgIcon><path d="M8 21h8M12 17v4M7 4h10M7 8a5 5 0 0010 0M7 4a4 4 0 01-4 4M17 4a4 4 0 004 4"/></SvgIcon>;
+const BoltIcon = () => <SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>;
+const CommentIcon = () => <SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>;
+const SparklesIcon = () => <SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>;
+const HeartIcon = () => <SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>;
+const FallbackIcon = () => <SvgIcon><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></SvgIcon>;
+
+function iconForType(type) {
+  const k = slug(type);
+  if (k === "leaders") return <TrophyIcon />;
+  if (k === "actual") return <BoltIcon />;
+  if (k === "comments") return <CommentIcon />;
+  if (k === "new") return <SparklesIcon />;
+  if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  return <FallbackIcon />;
+}
+
+function iconFromSpec(spec) {
+  if (!spec) return null;
+  if (typeof spec === "string" && spec.startsWith("emoji:")) {
+    const ch = spec.slice("emoji:".length);
+    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
+  }
+  return null;
+}
+
+export default function TabsBar() {
+  const app = useApp();
+  const { t, domainAssetsConfig, setLastTabRoute } = app;
+  const { lang } = useI18n();
+  const { route } = useHashRouter();
+
+  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
+
+  const [tabsRaw] = createResource(
+    () => tabsPath(),
+    async (relPath) => {
+      if (!relPath) return [];
+      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
+      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
+      return list.map((x, i) => ({
+        id: x?.id ?? x?.type ?? `tab_${i}`,
+        type: x?.type ?? x?.id ?? `tab_${i}`,
+        _raw: x,
+      }));
+    }
+  );
+
+  const [selectedId, setSelectedId] = createSignal("");
+  const [activatedTabs, setActivatedTabs] = createSignal(new Set());
+  const [isInitialized, setIsInitialized] = createSignal(false);
+
+  const items = createMemo(() =>
+    (tabsRaw() || []).map((tab) => {
+      const label = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
+      const explicit = iconFromSpec(tab._raw.icon);
+      const auto = iconForType(tab.type);
+      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
+    })
+  );
+
+  createEffect(() => {
+    const list = tabsRaw();
+    if (tabsRaw.loading) return;
+    if (!list || list.length === 0) return setSelectedId("");
+
+    const key = firstSeg(route());
+    const match = list.find(t => slug(t.id) === key || slug(t.type) === key);
+
+    if (match) {
+      if (selectedId() !== match.id) {
+        batch(() => {
+          setSelectedId(match.id);
+          setLastTabRoute(route());
+          setActivatedTabs(prev => new Set(prev).add(match.id));
+        });
+      }
+    } else {
+      const r = route();
+      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs") || r.startsWith("/editor/");
+      
+      if (isPageRoute) {
+        setSelectedId("");
+      } else if (r === "/" && !isInitialized()) {
+        const first = list[0];
+        const defaultPath = pathFor(first.type || first.id);
+        batch(() => {
+          setSelectedId(first.id);
+          navigate(defaultPath, { replace: true });
+          setLastTabRoute(defaultPath);
+          setActivatedTabs(prev => new Set(prev).add(first.id));
+          setIsInitialized(true);
+        });
+      }
+    }
+  });
+
+  function handleTabChange(nextId) {
+    const entry = (tabsRaw() || []).find((t) => t.id === nextId);
+    if (!entry) return;
+    const newPath = pathFor(entry.type || entry.id);
+    if (route() !== newPath) {
+      navigate(newPath);
+    }
+  }
+  
+  return (
+    <section class="w-full">
+      <div class="sv-container sv-container--no-gutter">
+        <Show when={!tabsRaw.loading} fallback={<div class="p-4 text-sm text-center">{t("main.tabs.loading")}</div>}>
+          <Tabs items={items()} value={selectedId()} onChange={handleTabChange} compactWidth={768} />
+        </Show>
+
+        <div class="tabs_panel">
+          <For each={tabsRaw()}>
+            {(tab) => {
+              const Comp = getTabComponent(tab.type);
+              const title = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
+              const rightPanelConfig = tab._raw?.right_panel;
+              const isRailVisible = rightPanelConfig?.available;
+
+              return (
+                <div style={{ display: tab.id === selectedId() ? 'block' : 'none' }}>
+                  <RightRailLayout rightPanelConfig={rightPanelConfig}>
+                    <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
+                      <Comp 
+                        title={title} 
+                        tab={tab} 
+                        isRailVisible={isRailVisible}
+                        isActivated={activatedTabs().has(tab.id)}
+                      />
+                    </Show>
+                  </RightRailLayout>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </div>
     </section>
   );
 }
@@ -34536,177 +35042,6 @@ export default {
   "wallet.error.userCanceled": "Транзакция отменена.",
   "wallet.onRequiredNetwork": "В требуемой сети"
 };
-</file>
-
-<file path="src/components/main/TabsBar.jsx">
-// src/components/main/TabsBar.jsx
-import { createResource, Show, createMemo, createSignal, createEffect, batch, For } from "solid-js";
-import { useApp } from "../../context/AppContext";
-import { useI18n } from "../../i18n/useI18n";
-import { loadAssetResource } from "../../utils/assetLoader";
-import { useHashRouter, navigate } from "../../routing/hashRouter";
-import Tabs from "../ui/Tabs.jsx";
-import { getTabComponent } from "../tabs";
-import RightRailLayout from "../tabs/RightRailLayout.jsx";
-import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
-
-const slug = (s) => String(s || "").trim().toLowerCase();
-const firstSeg = (path) => {
-  const p = String(path || "/");
-  const s = p.startsWith("/") ? p.slice(1) : p;
-  return s.split(/[?#/]/, 1)[0] || "";
-};
-const pathFor = (idOrType) => `/${encodeURIComponent(slug(idOrType)) || ""}`;
-
-function SvgIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-4 h-4"} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      {props.children}
-    </svg>
-  );
-}
-const TrophyIcon = () => <SvgIcon><path d="M8 21h8M12 17v4M7 4h10M7 8a5 5 0 0010 0M7 4a4 4 0 01-4 4M17 4a4 4 0 004 4"/></SvgIcon>;
-const BoltIcon = () => <SvgIcon><path d="M13 2L3 14h6l-2 8 10-12h-6l2-8z"/></SvgIcon>;
-const CommentIcon = () => <SvgIcon><path d="M4 6h16v8a4 4 0 01-4 4h-3l-4 3v-3H8a4 4 0 01-4-4z"/></SvgIcon>;
-const SparklesIcon = () => <SvgIcon><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM6 16l.8 2.2L9 19l-2.2.8L6 22l-.8-2.2L3 19l2.2-.8z"/></SvgIcon>;
-const HeartIcon = () => <SvgIcon><path d="M12 21s-8-7-8-13a5 5 0 019-3 5 5 0 019 3c0 6-8 13-8 13z"/></SvgIcon>;
-const FallbackIcon = () => <SvgIcon><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></SvgIcon>;
-
-function iconForType(type) {
-  const k = slug(type);
-  if (k === "leaders") return <TrophyIcon />;
-  if (k === "actual") return <BoltIcon />;
-  if (k === "comments") return <CommentIcon />;
-  if (k === "new") return <SparklesIcon />;
-  if (k === "for-you" || k === "foryou") return <HeartIcon />;
-  return <FallbackIcon />;
-}
-
-function iconFromSpec(spec) {
-  if (!spec) return null;
-  if (typeof spec === "string" && spec.startsWith("emoji:")) {
-    const ch = spec.slice("emoji:".length);
-    return <span aria-hidden="true" class="inline-block leading-none">{ch}</span>;
-  }
-  return null;
-}
-
-export default function TabsBar() {
-  const app = useApp();
-  const { t, domainAssetsConfig, setLastTabRoute } = app;
-  const { lang } = useI18n();
-  const { route } = useHashRouter();
-
-  const tabsPath = createMemo(() => domainAssetsConfig?.()?.modules?.tabs || "modules/tabs.yaml");
-
-  const [tabsRaw] = createResource(
-    () => tabsPath(),
-    async (relPath) => {
-      if (!relPath) return [];
-      const data = (await loadAssetResource(app, relPath, { type: "yaml" })) || {};
-      const list = Array.isArray(data) ? data : Array.isArray(data.tabs) ? data.tabs : [];
-      return list.map((x, i) => ({
-        id: x?.id ?? x?.type ?? `tab_${i}`,
-        type: x?.type ?? x?.id ?? `tab_${i}`,
-        _raw: x,
-      }));
-    }
-  );
-
-  const [selectedId, setSelectedId] = createSignal("");
-  const [activatedTabs, setActivatedTabs] = createSignal(new Set());
-  const [isInitialized, setIsInitialized] = createSignal(false);
-
-  const items = createMemo(() =>
-    (tabsRaw() || []).map((tab) => {
-      const label = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
-      const explicit = iconFromSpec(tab._raw.icon);
-      const auto = iconForType(tab.type);
-      return { id: tab.id, label, icon: explicit || auto, type: tab.type };
-    })
-  );
-
-  createEffect(() => {
-    const list = tabsRaw();
-    if (tabsRaw.loading) return;
-    if (!list || list.length === 0) return setSelectedId("");
-
-    const key = firstSeg(route());
-    const match = list.find(t => slug(t.id) === key || slug(t.type) === key);
-
-    if (match) {
-      if (selectedId() !== match.id) {
-        batch(() => {
-          setSelectedId(match.id);
-          setLastTabRoute(route());
-          setActivatedTabs(prev => new Set(prev).add(match.id));
-        });
-      }
-    } else {
-      const r = route();
-      const isPageRoute = r.startsWith("/post/") || r.startsWith("/settings") || r.startsWith("/docs") || r.startsWith("/editor/");
-      
-      if (isPageRoute) {
-        setSelectedId("");
-      } else if (r === "/" && !isInitialized()) {
-        const first = list[0];
-        const defaultPath = pathFor(first.type || first.id);
-        batch(() => {
-          setSelectedId(first.id);
-          navigate(defaultPath, { replace: true });
-          setLastTabRoute(defaultPath);
-          setActivatedTabs(prev => new Set(prev).add(first.id));
-          setIsInitialized(true);
-        });
-      }
-    }
-  });
-
-  function handleTabChange(nextId) {
-    const entry = (tabsRaw() || []).find((t) => t.id === nextId);
-    if (!entry) return;
-    const newPath = pathFor(entry.type || entry.id);
-    if (route() !== newPath) {
-      navigate(newPath);
-    }
-  }
-  
-  return (
-    <section class="w-full">
-      <div class="sv-container sv-container--no-gutter">
-        <Show when={!tabsRaw.loading} fallback={<div class="p-4 text-sm text-center">{t("main.tabs.loading")}</div>}>
-          <Tabs items={items()} value={selectedId()} onChange={handleTabChange} compactWidth={768} />
-        </Show>
-
-        <div class="tabs_panel">
-          <For each={tabsRaw()}>
-            {(tab) => {
-              const Comp = getTabComponent(tab.type);
-              const title = t(`tabs.title.${slug(tab.type)}`) || t("main.tabs.untitled");
-              const rightPanelConfig = tab._raw?.right_panel;
-              const isRailVisible = rightPanelConfig?.available;
-
-              return (
-                <div style={{ display: tab.id === selectedId() ? 'block' : 'none' }}>
-                  <RightRailLayout rightPanelConfig={rightPanelConfig}>
-                    <Show when={Comp} fallback={<TabPanelScaffold title={title} />}>
-                      <Comp 
-                        title={title} 
-                        tab={tab} 
-                        isRailVisible={isRailVisible}
-                        isActivated={activatedTabs().has(tab.id)}
-                      />
-                    </Show>
-                  </RightRailLayout>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    </section>
-  );
-}
 </file>
 
 <file path="src/pages/PostPage.jsx">
@@ -36546,6 +36881,40 @@ export default {
 "profile.edit.avatar.save": "Save",
 "profile.edit.avatar.success": "Avatar update transaction sent.",
 "profile.edit.avatar.select": "Select an image file...",
+  "profile.edit.crossDomainSettings": "Cross Domain Settings",
+  "profile.edit.registeredName": "Registered Name",
+  "profile.edit.registeredNameHelp": "Name registration is coming soon.",
+  "profile.edit.domainSpecificParams": "Domain Specific Parameters",
+  "profile.edit.domainLabel": "Domain",
+    "profile.edit.crossDomainSettings": "Cross Domain Settings",
+  "profile.edit.domainLabel": "Domain",
+  "profile.edit.domainSpecificParams": "Domain Specific Parameters",
+  "profile.edit.name.errorInvalidChar": "Unaccepted character.",
+  "profile.edit.name.errorTaken": "This name is already taken.",
+  "profile.edit.name.help.line1": "This is your unique short name. Once you have one you can have a short url to your profile in form of @name.",
+  "profile.edit.name.help.line2": "Names are case insensitive, so upper and lower case characters are the same.",
+  "profile.edit.name.help.line3": "Only English letters, digits, and the symbols '.' (dot) and '-' (dash) are allowed.",
+  "profile.edit.registerName": "Register Name",
+  "profile.edit.registeredName": "Registered Name",
+  "profile.edit.registeredNameHelp": "Name registration is coming soon.",
+    "profile.edit.connectWallet": "Please connect your wallet to edit the profile.",
+  "profile.edit.name.confirmChangeMessage": "Your previous name '{name}' will no longer be yours, and anyone else will be able to take it. Are you sure?",
+  "profile.edit.name.confirmChangeTitle": "Confirm Name Change",
+  "profile.edit.name.registerError": "Failed to register name.",
+  "profile.edit.name.registerSuccess": "Name registered successfully!",
+  "profile.edit.name.registering": "Registering...",
+   "profile.edit.aboutMe": "Information about me",
+   "profile.edit.copyProfileCid": "Copy User Profile CID",
+     "profile.edit.displayName": "Display Name",
+  "profile.edit.nsfw.label": "NSFW Content",
+  "profile.edit.nsfw.show": "Show",
+  "profile.edit.nsfw.warn": "Warn",
+  "profile.edit.nsfw.hide": "Hide",
+   "profile.edit.sponsorValues.label": "Predefined Amounts to Contribute to Post Fund",
+  "profile.edit.saveButton": "Save Changes",
+  "profile.edit.saving": "Saving...",
+  "profile.edit.saveSuccess": "Profile updated successfully!",
+  "profile.edit.saveError": "Failed to save profile."
 };
 </file>
 
