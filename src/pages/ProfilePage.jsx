@@ -1,5 +1,5 @@
 // src/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, onCleanup, onMount } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../routing/hashRouter.js";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
@@ -67,9 +67,9 @@ export default function ProfilePage() {
 
   const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
   const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
-  
+
   const [activeTab, setActiveTab] = createSignal('posts');
-  
+
   const isMyProfile = createMemo(() => {
     const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
     const profileAddr = userResource()?.address?.toLowerCase();
@@ -98,13 +98,51 @@ export default function ProfilePage() {
 
     return tabs;
   });
-  
+
   createEffect(() => {
     const availableTabs = TABS();
     const currentActive = activeTab();
     if (!availableTabs.some(tab => tab.id === currentActive)) {
-        setActiveTab('posts');
+      setActiveTab('posts');
     }
+  });
+
+  // ---- locale-aware display name with live alert updates (no global changes needed) ----
+  const uiLang = () => (app.lang?.() || "en").toLowerCase();
+  const [overlayNames, setOverlayNames] = createSignal(null);
+
+  // Subscribe to any user profile/update alert and apply display_names if it matches this page's user.
+  onMount(() => {
+    const off = app.alertBus?.on?.("*", ({ type, payload }) => {
+      try {
+        const d = payload?.data || {};
+        const addr = String(d.user?.address || d.address || "").toLowerCase();
+        const pageAddr = String(userResource()?.address || "").toLowerCase();
+        const names = d.display_names || d.user?.display_names;
+        if (addr && names && addr === pageAddr) {
+          setOverlayNames(names);
+        }
+      } catch {
+        /* ignore */
+      }
+    });
+    onCleanup(() => { try { off && off(); } catch {} });
+  });
+
+  const displayName = createMemo(() => {
+    const u = userResource();
+    if (!u) return "";
+    const namesFromAlert = overlayNames();
+    if (namesFromAlert && typeof namesFromAlert === "object") {
+      const n = namesFromAlert[uiLang()];
+      if (n) return n;
+    }
+    const serverNames = u.display_names;
+    if (serverNames && typeof serverNames === "object") {
+      const n = serverNames[uiLang()];
+      if (n) return n;
+    }
+    return u.display_name || u.name || "";
   });
 
   const aboutText = createMemo(() => {
@@ -113,25 +151,25 @@ export default function ProfilePage() {
     const lang = app.lang();
 
     if (details.about_me && typeof details.about_me === 'object') {
-        return details.about_me[lang] || details.about_me.en || Object.values(details.about_me)[0] || "";
+      return details.about_me[lang] || details.about_me.en || Object.values(details.about_me)[0] || "";
     }
-    
+
     if (details.about && typeof details.about === 'string') {
-        return details.about;
+      return details.about;
     }
 
     return "";
   });
-  
+
   const isSubscribed = createMemo(() => {
-      const u = userResource();
-      return u && u.i_sponsor_for > 0;
+    const u = userResource();
+    return u && u.i_sponsor_for > 0;
   });
 
   return (
     <main class="sv-container p-4 max-w-4xl mx-auto">
       <ClosePageButton />
-      
+
       <Switch>
         <Match when={userResource.loading}>
           <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
@@ -150,7 +188,7 @@ export default function ProfilePage() {
                 <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                   <div class="flex flex-col items-center gap-4 shrink-0">
                     <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                      <IpfsImage 
+                      <IpfsImage
                         src={user().avatar}
                         alt={`${user().name} avatar`}
                         class="w-full h-full object-cover"
@@ -158,7 +196,7 @@ export default function ProfilePage() {
                       />
                     </div>
                     <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
-                      <Show 
+                      <Show
                         when={!isSubscribed()}
                         fallback={
                           <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
@@ -172,10 +210,10 @@ export default function ProfilePage() {
                       </Show>
                     </Show>
                   </div>
-                  
+
                   <div class="flex-1 w-full text-center sm:text-left space-y-3">
                     <div class="flex flex-col items-center sm:items-start">
-                      <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
+                      <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
                       <Show when={user().name}>
                         <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
                           <span>{user().name.toUpperCase()}</span>
@@ -220,7 +258,6 @@ export default function ProfilePage() {
                   </Show>
                 </div>
               </div>
-
 
               {/* Profile Tabs */}
               <div>

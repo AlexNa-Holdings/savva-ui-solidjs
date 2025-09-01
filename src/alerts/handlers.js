@@ -76,3 +76,19 @@ export function handleReact(app, payload) {
     dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
   }
 }
+
+export function handleUserInfoChanged(app, payload) {
+  try {
+    const u = payload?.user || payload?.data?.user;
+    const addr = String(u?.address || "").toLowerCase();
+    if (!addr) return;
+
+    const names = u.display_names || {};
+    if (names && typeof names === "object") {
+      app.setUserDisplayNames?.(addr, names);
+      dbg.log("Alerts:user_info_changed", "display_names updated", { addr, names });
+    }
+  } catch (e) {
+    dbg.warn?.("Alerts:user_info_changed", "failed to handle", e);
+  }
+}

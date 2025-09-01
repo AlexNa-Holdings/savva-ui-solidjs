@@ -128,13 +128,12 @@ export function AppProvider(props) {
     const authorizedAcc = auth.authorizedUser()?.address;
     if (!authorizedAcc) throw new Error("User is not authorized.");
     
-    const walletClient = getRawWalletClient(); // Uses the raw client internally
+    const walletClient = getRawWalletClient();
     const walletAcc = walletClient.account.address;
 
     if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
       try {
         await promptSwitchAccount(authorizedAcc);
-        // After success, the walletAccount() signal is updated, so we need a fresh client.
         return getRawWalletClient();
       } catch (e) {
         throw new Error(i18n.t("wallet.error.userCanceled"));
@@ -142,6 +141,14 @@ export function AppProvider(props) {
     }
     
     return walletClient;
+  }
+
+  // ── overlay for locale-aware display names (address -> { langCode: name }) ──
+  const [userDisplayNames, _setUserDisplayNames] = Solid.createSignal({});
+  function setUserDisplayNames(address, namesMap) {
+    if (!address || !namesMap || typeof namesMap !== "object") return;
+    const key = String(address).toLowerCase();
+    _setUserDisplayNames((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...namesMap } }));
   }
 
   const value = {
@@ -166,6 +173,10 @@ export function AppProvider(props) {
     requiredAccount,
     resolveSwitchAccountPrompt,
     rejectSwitchAccountPrompt,
+
+    // expose overlay + setter for alerts/pages
+    userDisplayNames,
+    setUserDisplayNames,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
