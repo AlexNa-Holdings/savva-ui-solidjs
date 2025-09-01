@@ -1,5 +1,5 @@
 // src/components/App.jsx
-import { createSignal, onMount, Show, createMemo, createEffect, on, Switch, Match } from "solid-js";
+import { createSignal, onMount, Show, createMemo, createEffect, on } from "solid-js";
 import Header from "./Header";
 import RightPane from "./RightPane";
 import Settings from "../pages/Settings";
@@ -38,7 +38,6 @@ export default function App() {
     return "main";
   });
 
-  // ADD THIS BLOCK BACK
   const domainRevision = createMemo(() => {
     if (app.loading()) return null;
     const domainName = app.selectedDomainName?.();
@@ -100,29 +99,16 @@ export default function App() {
             <>
               <Header onTogglePane={togglePane} />
               
-              <Switch>
-                <Match when={currentView() === 'main'}>
-                  <MainView />
-                </Match>
-                <Match when={currentView() === 'post'}>
-                  <PostPage />
-                </Match>
-                <Match when={currentView() === 'profile'}>
-                  <ProfilePage />
-                </Match>
-                <Match when={currentView() === 'settings'}>
-                  <Settings />
-                </Match>
-                <Match when={currentView() === 'docs'}>
-                  <Docs />
-                </Match>
-                <Match when={currentView() === 'editor'}>
-                  <EditorPage />
-                </Match>
-                <Match when={currentView() === 'profile-edit'}>
-                  <ProfileEditPage />
-                </Match>
-              </Switch>
+              <div hidden={currentView() !== 'main'}>
+                <MainView />
+              </div>
+
+              <Show when={currentView() === 'post'}><PostPage /></Show>
+              <Show when={currentView() === 'profile'}><ProfilePage /></Show>
+              <Show when={currentView() === 'settings'}><Settings /></Show>
+              <Show when={currentView() === 'docs'}><Docs /></Show>
+              <Show when={currentView() === 'editor'}><EditorPage /></Show>
+              <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
             </>
           </Show>
           

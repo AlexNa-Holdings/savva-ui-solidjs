@@ -1,5 +1,6 @@
 // src/components/post/CommentCard.jsx
-import { For, Show, createMemo, createSignal, createResource, Switch, Match } from "solid-js";
+import { For, Show, createMemo, createSignal, createResource, Switch, Match, createEffect } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext";
 import PostInfo from "../feed/PostInfo";
 import UserCard from "../ui/UserCard";
@@ -61,37 +62,30 @@ export default function CommentCard(props) {
   const [isHovered, setIsHovered] = createSignal(false);
   const [isPreparing, setIsPreparing] = createSignal(false);
   
-  // This makes the comment data reactive to global updates
-  const comment = createMemo(() => {
-    const baseComment = props.comment;
-    const update = app.postUpdate();
+  const [comment, setComment] = createStore(props.comment);
 
-    if (update && update.cid === baseComment.savva_cid) {
-        let updatedRaw = { ...baseComment };
-        
-        if (update.type === 'reactionsChanged') {
-            updatedRaw.reactions = update.data.reactions;
-            if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
-                updatedRaw.my_reaction = update.data.reaction;
-            }
-        }
-        
-        return updatedRaw;
+  createEffect(() => {
+    const update = app.postUpdate();
+    if (!update || update.cid !== comment.savva_cid) return;
+
+    if (update.type === 'reactionsChanged') {
+      setComment("reactions", reconcile(update.data.reactions));
+      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+        setComment("my_reaction", update.data.reaction);
+      }
     }
-    
-    return baseComment;
   });
 
-  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(comment);
+  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(() => comment);
 
   const isAuthor = createMemo(() => {
     const userAddr = app.authorizedUser()?.address?.toLowerCase();
-    const authorAddr = comment()?.author?.address?.toLowerCase();
+    const authorAddr = comment?.author?.address?.toLowerCase();
     return !!userAddr && userAddr === authorAddr;
   });
 
   const localizedPreview = createMemo(() => {
-    const locales = comment().savva_content?.locales;
+    const locales = comment.savva_content?.locales;
     if (!locales) return "";
     const lang = app.lang();
     if (locales[lang]?.text_preview) return locales[lang].text_preview;
@@ -104,7 +98,7 @@ export default function CommentCard(props) {
     () => ({
       shouldFetch: isExpanded(),
       app: app,
-      comment: comment(),
+      comment: comment,
       lang: app.lang()
     }),
     async (params) => {
@@ -114,8 +108,8 @@ export default function CommentCard(props) {
   );
 
   const contextMenuItems = createMemo(() => {
-    if (!comment()) return [];
-    return getPostAdminItems(comment(), t);
+    if (!comment) return [];
+    return getPostAdminItems(comment, t);
   });
 
   const needsTruncation = createMemo(() => {
@@ -124,16 +118,15 @@ export default function CommentCard(props) {
   });
 
   const ipfsBaseUrl = createMemo(() => {
-    const c = comment();
-    if (!c) return "";
-    const dataCid = getPostContentBaseCid(c);
+    if (!comment) return "";
+    const dataCid = getPostContentBaseCid(comment);
     if (!dataCid) return "";
     
     let bestGateway;
     if (app.localIpfsEnabled() && app.localIpfsGateway()) {
       bestGateway = app.localIpfsGateway();
-    } else if (Array.isArray(c.gateways) && c.gateways.length > 0) {
-      bestGateway = c.gateways[0];
+    } else if (Array.isArray(comment.gateways) && comment.gateways.length > 0) {
+      bestGateway = comment.gateways[0];
     } else {
       bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
     }
@@ -148,7 +141,7 @@ export default function CommentCard(props) {
 
   const handleReply = (e) => {
     e.stopPropagation();
-    const commentCid = comment()?.savva_cid;
+    const commentCid = comment?.savva_cid;
     if (commentCid) {
       navigate(`/editor/new-comment/${commentCid}`);
     }
@@ -158,8 +151,8 @@ export default function CommentCard(props) {
     e.stopPropagation();
     setIsPreparing(true);
     try {
-      await preparePostForEditing(comment(), app);
-      navigate(`/editor/comment/${comment().savva_cid}`);
+      await preparePostForEditing(comment, app);
+      navigate(`/editor/comment/${comment.savva_cid}`);
     } catch (err) {
       pushErrorToast(err, { context: "Failed to prepare comment for editing." });
     } finally {
@@ -176,7 +169,7 @@ export default function CommentCard(props) {
     >
       <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
         <div class="mb-2">
-          <UserCard author={comment().author} compact={false} />
+          <UserCard author={comment.author} compact={false} />
         </div>
         
         <div class="text-sm prose prose-sm max-w-none">
@@ -196,10 +189,10 @@ export default function CommentCard(props) {
         </div>
 
         <div class="mt-2 flex items-center justify-between">
-          <PostInfo item={{ _raw: comment() }} hideTopBorder={true} timeFormat="long" hideActions={true} />
+          <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
           <div class="flex items-center gap-2 text-xs font-semibold">
             <Show when={app.authorizedUser()}>
-              <ReactionInput post={{_raw: comment()}} />
+              <ReactionInput post={comment} />
             </Show>
             <Show when={isAuthor()}>
               <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title="Edit Comment">
@@ -232,9 +225,9 @@ export default function CommentCard(props) {
         </div>
       </Show>
       
-      <Show when={comment().children?.length > 0}>
+      <Show when={comment.children?.length > 0}>
         <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
-          <For each={comment().children}>
+          <For each={comment.children}>
             {(reply) => <CommentCard comment={reply} level={level() + 1} />}
           </For>
         </div>

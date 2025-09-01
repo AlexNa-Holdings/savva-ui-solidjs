@@ -1,5 +1,6 @@
 // src/components/feed/PostCard.jsx
 import { Show, createMemo, createSignal, createEffect } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -40,37 +41,31 @@ export default function PostCard(props) {
   const { t } = app;
   const [isHovered, setIsHovered] = createSignal(false);
   
-  const item = createMemo(() => {
-    const baseItem = props.item;
+  const [item, setItem] = createStore(props.item);
+
+  createEffect(() => {
     const update = app.postUpdate();
-
-    if (update && update.cid === baseItem.id) {
-        let updatedRaw = { ...baseItem._raw };
-        
-        if (update.type === 'reactionsChanged') {
-            updatedRaw.reactions = update.data.reactions;
-            if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
-                updatedRaw.my_reaction = update.data.reaction;
-            }
-        } else if (update.type === 'commentCountChanged') {
-            updatedRaw.total_childs = update.data.newTotal;
-        }
-
-        return { ...baseItem, _raw: updatedRaw };
+    if (!update || update.cid !== item.id) return;
+  
+    if (update.type === 'reactionsChanged') {
+      setItem("_raw", "reactions", reconcile(update.data.reactions));
+      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+        setItem("_raw", "my_reaction", update.data.reaction);
+      }
+    } else if (update.type === 'commentCountChanged') {
+      setItem("_raw", "total_childs", update.data.newTotal);
     }
-    
-    return baseItem;
   });
 
-  const author = () => item()._raw?.author;
-  const content = () => item()._raw?.savva_content;
-  const fund = () => item()._raw?.fund;
+  const author = () => item._raw?.author;
+  const content = () => item._raw?.savva_content;
+  const fund = () => item._raw?.fund;
   const isListMode = () => props.mode === 'list';
 
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
     if (thumbnailPath) {
-      return resolvePostCidPath(item()._raw, thumbnailPath);
+      return resolvePostCidPath(item._raw, thumbnailPath);
     }
     return author()?.avatar;
   });
@@ -84,18 +79,17 @@ export default function PostCard(props) {
   });
 
   const handleCardClick = (e) => {
-    const postId = props.item.id;
-    if (postId) {
+    if (item.id) {
       app.setSavedScrollY(window.scrollY);
-      navigate(`/post/${postId}`);
+      navigate(`/post/${item.id}`);
     } else {
-      console.warn("PostCard: Could not find post ID to navigate.", { item: props.item });
+      console.warn("PostCard: Could not find post ID to navigate.", { item: item });
     }
   };
 
   const finalContextMenuItems = createMemo(() => {
     const propItems = props.contextMenuItems || [];
-    const adminItems = getPostAdminItems(item()._raw, t);
+    const adminItems = getPostAdminItems(item._raw, t);
     return [...propItems, ...adminItems];
   });
 
@@ -119,7 +113,7 @@ export default function PostCard(props) {
         <IpfsImage
           src={displayImageSrc()}
           class={roundingClass}
-          postGateways={item()?._raw?.gateways || []}
+          postGateways={item._raw?.gateways || []}
           fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
         />
         <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
@@ -166,7 +160,7 @@ export default function PostCard(props) {
       </div>
       
       <Show when={!props.compact}>
-        <PostInfo item={item()} mode={props.mode} timeFormat="long" />
+        <PostInfo item={item} mode={props.mode} timeFormat="long" />
       </Show>
     </div>
   );
@@ -179,13 +173,13 @@ export default function PostCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Show when={item()?._raw?.pinned}>
+      <Show when={item._raw?.pinned}>
         <div class="absolute -top-2 -left-2 z-10">
           <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
         </div>
       </Show>
 
-      <Show when={item()?._raw?.nft?.owner}>
+      <Show when={item._raw?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
           <NftBadge />
         </div>
