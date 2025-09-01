@@ -3,7 +3,7 @@ import { createSignal, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate, useHashRouter } from "../../routing/hashRouter.js";
 
 function ChevronDownIcon(props) {
   return (
@@ -16,36 +16,41 @@ function ChevronDownIcon(props) {
 export default function AuthorizedUser() {
   const app = useApp();
   const { t } = app;
+  const { route } = useHashRouter();
   const [menuOpen, setMenuOpen] = createSignal(false);
   let menuRef;
-  
+
   const user = () => app.authorizedUser();
 
-  const handleLogoutClick = () => {
-    app.logout();
+  function go(target) {
+    const current = route();
+    const currentBase = current.split("?")[0];
+    const targetBase = target.split("?")[0];
+    navigate(target, { replace: currentBase === targetBase });
     setMenuOpen(false);
-  };
+  }
 
   const handleProfileClick = () => {
     const u = user();
     if (!u) return;
     const path = u.name ? `/@${u.name}` : `/${u.address}`;
-    navigate(path);
-    setMenuOpen(false);
+    go(path);
   };
 
   const handleWalletClick = () => {
     const u = user();
     if (!u) return;
     const basePath = u.name ? `/@${u.name}` : `/${u.address}`;
-    navigate(`${basePath}?tab=wallet`);
+    go(`${basePath}?tab=wallet`);
+  };
+
+  const handleLogoutClick = () => {
+    app.logout();
     setMenuOpen(false);
   };
-  
+
   const handleClickOutside = (event) => {
-    if (menuRef && !menuRef.contains(event.target)) {
-      setMenuOpen(false);
-    }
+    if (menuRef && !menuRef.contains(event.target)) setMenuOpen(false);
   };
 
   onMount(() => document.addEventListener("mousedown", handleClickOutside));
@@ -55,7 +60,8 @@ export default function AuthorizedUser() {
     <div class="relative" ref={menuRef}>
       <Show when={user()}>
         <button
-          class="flex items-center gap-1 p-0.5 rounded-full border-2 border-transparent hover:border-[hsl(var(--primary))]"
+          /* removed hover/focus border + hide outline/ring */
+          class="flex items-center gap-1 p-0.5 rounded-full outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0"
           onClick={() => setMenuOpen(!menuOpen())}
           aria-haspopup="true"
           aria-expanded={menuOpen()}
@@ -63,7 +69,7 @@ export default function AuthorizedUser() {
           <div class="w-7 h-7 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
             <IpfsImage
               src={user().avatar}
-              alt="User Avatar"
+              alt={t("profile.avatarAlt")}
               class="w-full h-full object-cover"
               fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
             />
@@ -73,33 +79,16 @@ export default function AuthorizedUser() {
       </Show>
 
       <Show when={menuOpen()}>
-        <div class="absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black ring-opacity-5 z-50">
-          <div class="py-1" role="menu" aria-orientation="vertical">
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleProfileClick(); }}
-            >
-              {t("header.myProfile")}
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleWalletClick(); }}
-            >
-              {t("header.myWallet")}
-            </a>
-            <a
-              href="#"
-              class="block px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]"
-              role="menuitem"
-              onClick={(e) => { e.preventDefault(); handleLogoutClick(); }}
-            >
-              {t("header.logout")}
-            </a>
-          </div>
+        <div class="absolute right-0 mt-2 w-40 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow">
+          <button class="w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleProfileClick}>
+            {t("profile.menu.myProfile")}
+          </button>
+          <button class="w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleWalletClick}>
+            {t("profile.menu.myWallet")}
+          </button>
+          <button class="w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleLogoutClick}>
+            {t("profile.menu.logout")}
+          </button>
         </div>
       </Show>
     </div>

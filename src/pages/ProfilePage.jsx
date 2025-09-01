@@ -1,5 +1,5 @@
 // src/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, onCleanup, onMount } from "solid-js";
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../routing/hashRouter.js";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
@@ -22,20 +22,12 @@ import { walletAccount } from "../blockchain/wallet.js";
 // Data fetcher for the user profile
 async function fetchUserProfile({ app, identifier }) {
   if (!identifier || !app.wsCall) return null;
-
   try {
     const wsParams = { domain: app.selectedDomainName() };
     const currentUser = app.authorizedUser();
-    if (currentUser) {
-      wsParams.caller = currentUser.address;
-    }
-
-    if (identifier.startsWith('@')) {
-      wsParams.user_name = identifier.substring(1);
-    } else {
-      wsParams.user_addr = identifier;
-    }
-
+    if (currentUser) wsParams.caller = currentUser.address;
+    if (identifier.startsWith('@')) wsParams.user_name = identifier.substring(1);
+    else wsParams.user_addr = identifier;
     return await app.wsCall('get-user', wsParams);
   } catch (error) {
     console.error("Failed to fetch user profile:", error);
@@ -91,32 +83,41 @@ export default function ProfilePage() {
       { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
       { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
     ];
-
-    if (isMyProfile()) {
-      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
-    }
-
+    if (isMyProfile()) tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
     return tabs;
   });
 
-  onMount(() => {
-    const hash = window.location.hash;
-    const urlParams = new URLSearchParams(hash.split('?')[1]);
-    const tabParam = urlParams.get('tab');
-    const validTabs = TABS().map(t => t.id);
-
-    if (tabParam && validTabs.includes(tabParam)) {
-        setActiveTab(tabParam);
-    }
+  // Read ?tab= from current hash route (reactive to route() changes)
+  const desiredTab = createMemo(() => {
+    const path = route() || "";
+    const qs = path.split("?")[1] || "";
+    return new URLSearchParams(qs).get("tab") || "";
   });
 
+  // Apply ?tab= when available and valid; also covers late-appearance of 'wallet'
   createEffect(() => {
-    const availableTabs = TABS();
-    const currentActive = activeTab();
-    if (!availableTabs.some(tab => tab.id === currentActive)) {
-      setActiveTab('posts');
-    }
+    const tab = desiredTab();
+    if (!tab) return;
+    const valid = TABS().map(t => t.id);
+    if (valid.includes(tab)) setActiveTab(tab);
   });
+
+  // Guard: if active tab becomes invalid (e.g., wallet disappears), fallback to posts
+  createEffect(() => {
+    const available = TABS();
+    if (!available.some(t => t.id === activeTab())) setActiveTab('posts');
+  });
+
+  // Keep URL in sync when switching tabs (replace state to avoid history spam)
+  function onTabChange(nextId) {
+    const hash = window.location.hash || "";
+    const [path, qsRaw] = hash.split("?");
+    const params = new URLSearchParams(qsRaw || "");
+    params.set("tab", nextId);
+    const nextHash = `${path}?${params.toString()}`;
+    if (nextHash !== hash) history.replaceState(null, "", nextHash);
+    setActiveTab(nextId);
+  }
 
   const uiLang = () => (app.lang?.() || "en").toLowerCase();
 
@@ -138,15 +139,12 @@ export default function ProfilePage() {
     const details = profileDetails();
     if (!details) return "";
     const lang = app.lang();
-
     if (details.about_me && typeof details.about_me === 'object') {
       return details.about_me[lang] || details.about_me.en || Object.values(details.about_me)[0] || "";
     }
-
     if (details.about && typeof details.about === 'string') {
       return details.about;
     }
-
     return "";
   });
 
@@ -172,7 +170,7 @@ export default function ProfilePage() {
         <Match when={userResource()}>
           {(user) =>
             <div class="space-y-6">
-              {/* Profile Header */}
+              {/* Header */}
               <div class="flex justify-between items-end gap-4">
                 <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                   <div class="flex flex-col items-center gap-4 shrink-0">
@@ -205,7 +203,7 @@ export default function ProfilePage() {
                       <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
                       <Show when={user().name}>
                         <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                          <span>{user().name.toUpperCase()}</span>
+                          <span>{String(user().name || "").toUpperCase()}</span>
                           <VerifiedBadge class="w-4 h-4" />
                         </div>
                       </Show>
@@ -248,9 +246,9 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Profile Tabs */}
+              {/* Tabs */}
               <div>
-                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
+                <Tabs items={TABS()} value={activeTab()} onChange={onTabChange} compactWidth={640} />
                 <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
                   <Switch>
                     <Match when={activeTab() === 'posts'}>
@@ -262,7 +260,7 @@ export default function ProfilePage() {
                     <Match when={activeTab() === 'subscriptions'}>
                       <SubscriptionsTab user={user()} />
                     </Match>
-                    <Match when={activeTab() === 'wallet'}>
+                    <Match when={activeTab() === 'wallet' && isMyProfile()}>
                       <WalletTab user={user()} />
                     </Match>
                   </Switch>
