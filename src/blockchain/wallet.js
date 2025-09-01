@@ -14,6 +14,20 @@ function hexChainId(n) {
   return "0x" + id.toString(16);
 }
 
+// Helper to add a timeout to a promise
+function withTimeout(promise, ms, errorMessage = 'Request timed out') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, ms);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timer));
+  });
+}
+
 let listenersReady = false;
 function setupListeners() {
   const eth = window.ethereum;
@@ -56,7 +70,13 @@ export async function connectWallet() {
   const eth = window.ethereum;
   if (!eth) throw new Error("No Ethereum wallet found");
   setupListeners();
-  const accounts = await eth.request({ method: "eth_requestAccounts" });
+
+  const accounts = await withTimeout(
+    eth.request({ method: "eth_requestAccounts" }),
+    15000, // 15 second timeout
+    "Wallet connection request timed out. Please try again."
+  );
+
   const chainIdHex = await eth.request({ method: "eth_chainId" }).catch(() => null);
   if (chainIdHex) {
     const n = parseInt(chainIdHex, 16);
@@ -68,11 +88,11 @@ export async function connectWallet() {
 /**
  * Switch to a chain; if the wallet doesn't know it, try to add it.
  * meta = {
- *   chainId: number,
- *   name: string,
- *   nativeCurrency: { name, symbol, decimals },
- *   rpcUrls: string[],
- *   blockExplorers?: string[]
+ * chainId: number,
+ * name: string,
+ * nativeCurrency: { name, symbol, decimals },
+ * rpcUrls: string[],
+ * blockExplorers?: string[]
  * }
  */
 export async function switchOrAddChain(meta) {

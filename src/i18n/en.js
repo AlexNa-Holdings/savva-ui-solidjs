@@ -415,5 +415,17 @@ export default {
   "profile.edit.name.confirmChangeTitle": "Confirm Name Change",
   "profile.edit.name.registerError": "Failed to register name.",
   "profile.edit.name.registerSuccess": "Name registered successfully!",
-  "profile.edit.name.registering": "Registering..."
+  "profile.edit.name.registering": "Registering...",
+   "profile.edit.aboutMe": "Information about me",
+   "profile.edit.copyProfileCid": "Copy User Profile CID",
+     "profile.edit.displayName": "Display Name",
+  "profile.edit.nsfw.label": "NSFW Content",
+  "profile.edit.nsfw.show": "Show",
+  "profile.edit.nsfw.warn": "Warn",
+  "profile.edit.nsfw.hide": "Hide",
+   "profile.edit.sponsorValues.label": "Predefined Amounts to Contribute to Post Fund",
+  "profile.edit.saveButton": "Save Changes",
+  "profile.edit.saving": "Saving...",
+  "profile.edit.saveSuccess": "Profile updated successfully!",
+  "profile.edit.saveError": "Failed to save profile."
 };

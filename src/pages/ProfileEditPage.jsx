@@ -1,5 +1,6 @@
 // src/pages/ProfileEditPage.jsx
-import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect } from "solid-js";
+import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect, For } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../context/AppContext.jsx";
 import ClosePageButton from "../components/ui/ClosePageButton.jsx";
 import { useHashRouter } from "../routing/hashRouter.js";
@@ -17,6 +18,7 @@ import { httpBase } from "../net/endpoints.js";
 import { pushErrorToast, pushToast } from "../ui/toast.js";
 import ConfirmModal from "../components/ui/ConfirmModal.jsx";
 import { createPublicClient, http } from "viem";
+import ContextMenu from "../components/ui/ContextMenu.jsx";
 
 async function fetchProfileForEdit(params) {
     const { app, identifier } = params;
@@ -57,12 +59,22 @@ async function fetchProfileForEdit(params) {
             address: userAddress,
             avatar: avatarCid,
             profile: ipfsData,
-            name: name
+            name: name,
+            profile_cid: profileCid
         };
     } catch (e) {
         console.error("Failed to fetch profile for editing:", e);
         return { error: e.message };
     }
+}
+
+function copyToClipboard(text, label, t) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        pushToast({ type: "success", message: t("clipboard.copied", { label }) });
+    }).catch(err => {
+        console.error(`Failed to copy ${label}:`, err);
+    });
 }
 
 export default function ProfileEditPage() {
@@ -78,6 +90,12 @@ export default function ProfileEditPage() {
     const [isCheckingName, setIsCheckingName] = createSignal(false);
     const [isRegistering, setIsRegistering] = createSignal(false);
     const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
+    
+    const [displayNames, setDisplayNames] = createStore({});
+    const [nsfwPreference, setNsfwPreference] = createSignal("h");
+    const [sponsorValues, setSponsorValues] = createStore(["", "", "", "", ""]);
+    const [isSaving, setIsSaving] = createSignal(false);
+    const [about, setAbout] = createStore({});
 
     const identifier = createMemo(() => {
         const path = route();
@@ -87,8 +105,9 @@ export default function ProfileEditPage() {
     const [profileData, { refetch }] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
 
     const [avatar, setAvatar] = createSignal("");
-    const [about, setAbout] = createSignal({});
     const [activeLang, setActiveLang] = createSignal(uiLang());
+
+    const profileCid = createMemo(() => profileData()?.profile_cid);
 
     createEffect(() => {
         const data = profileData();
@@ -98,15 +117,45 @@ export default function ProfileEditPage() {
             setInitialName(currentName);
             setNameInput(currentName);
 
-            const profileAbout = data.profile?.about;
-            if (typeof profileAbout === 'string') {
-                setAbout({ [activeLang()]: profileAbout });
-            } else if (typeof profileAbout === 'object' && profileAbout !== null) {
-                setAbout(profileAbout);
-            } else {
-                setAbout({});
+            const profile = data.profile || {};
+            setNsfwPreference(profile.nsfw || "h");
+            
+            let initialDisplayNames = {};
+            if (profile.display_names && typeof profile.display_names === 'object') {
+                initialDisplayNames = profile.display_names;
+            } else if (profile.display_name && typeof profile.display_name === 'string') {
+                initialDisplayNames = { [uiLang()]: profile.display_name };
             }
+            setDisplayNames(reconcile(initialDisplayNames));
+            
+            const s_values = profile.sponsor_values;
+            if (Array.isArray(s_values) && s_values.length > 0) {
+                const filledValues = s_values.slice(0, 5).map(v => v || "");
+                while (filledValues.length < 5) filledValues.push("");
+                setSponsorValues(reconcile(filledValues));
+            } else {
+                setSponsorValues(reconcile(["", "", "", "", ""]));
+            }
+            
+            let initialAboutState = {};
+            if (profile.about_me && typeof profile.about_me === 'object') {
+                initialAboutState = profile.about_me;
+            } 
+            else if (profile.about && typeof profile.about === 'string') {
+                initialAboutState = { [uiLang()]: profile.about };
+            }
+            
+            setAbout(reconcile(initialAboutState));
         }
+    });
+
+    const contextMenuItems = createMemo(() => {
+        const cid = profileCid();
+        if (!cid) return [];
+        return [{
+            label: t("profile.edit.copyProfileCid"),
+            onClick: () => copyToClipboard(cid, "User Profile CID", t)
+        }];
     });
 
     const domainLangCodes = createMemo(() => {
@@ -115,8 +164,11 @@ export default function ProfileEditPage() {
     });
     
     const handleAboutChange = (e) => {
-        const newText = e.currentTarget.value;
-        setAbout(prev => ({ ...prev, [activeLang()]: newText }));
+        setAbout(activeLang(), e.currentTarget.value);
+    };
+    
+    const handleDisplayNameChange = (e) => {
+        setDisplayNames(activeLang(), e.currentTarget.value);
     };
 
     const handleNameInput = (e) => {
@@ -160,6 +212,10 @@ export default function ProfileEditPage() {
             setIsCheckingName(false);
         }
     };
+    
+    const handleSponsorValueChange = (index, value) => {
+        setSponsorValues(index, value.replace(/[^0-9]/g, ''));
+    };
 
     const isRegisterDisabled = createMemo(() => {
         return isRegistering() || isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
@@ -184,8 +240,8 @@ export default function ProfileEditPage() {
         }
     
         pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
-        setInitialName(nameInput()); // Update the "original" name to the new one
-        refetch(); // Refetch profile data to get latest state
+        setInitialName(nameInput());
+        refetch();
       } catch (err) {
         pushErrorToast(err, { context: t('profile.edit.name.registerError') });
       } finally {
@@ -223,7 +279,49 @@ export default function ProfileEditPage() {
             pushToast({ type: "success", message: t("profile.edit.avatar.success") });
         } catch (e) {
             pushErrorToast(e, { context: "Avatar update failed" });
-            throw e; // re-throw to keep modal's processing state correct
+            throw e;
+        }
+    };
+    
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const profileJson = {
+                display_names: { ...displayNames },
+                nsfw: nsfwPreference(),
+                about_me: { ...about },
+                sponsor_values: [...sponsorValues].map(v => Number(v) || 0).filter(v => v > 0),
+            };
+    
+            const profileFile = new File([JSON.stringify(profileJson)], "profile.json", { type: 'application/json' });
+            const formData = new FormData();
+            formData.append('file', profileFile);
+    
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+    
+            if (!response.ok) throw new Error(`Profile upload failed: ${response.status}`);
+            const result = await response.json();
+            const newProfileCid = result?.cid;
+            if (!newProfileCid) throw new Error("API did not return a CID for the profile.");
+
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            const hash = await contract.write.setString([toHexBytes32(app.selectedDomainName()), toHexBytes32("profile_cid"), newProfileCid]);
+            
+            const desiredChain = app.desiredChain();
+            const transport = http(desiredChain.rpcUrls[0]);
+            const publicClient = createPublicClient({ chain: desiredChain, transport });
+            await publicClient.waitForTransactionReceipt({ hash });
+
+            pushToast({ type: 'success', message: t('profile.edit.saveSuccess') });
+            refetch();
+        } catch (err) {
+            pushErrorToast(err, { context: t('profile.edit.saveError') });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -306,26 +404,89 @@ export default function ProfileEditPage() {
                                 </div>
 
                                 {/* Section 2: Domain Specific Parameters */}
-                                <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                <div class="relative p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+                                        <ContextMenu items={contextMenuItems()} positionClass="absolute top-2 right-2 z-20" />
+                                    </Show>
+
                                     <h3 class="text-lg font-semibold">{t("profile.edit.domainSpecificParams")}</h3>
                                     <p class="text-sm text-[hsl(var(--muted-foreground))]">
                                         {t("profile.edit.domainLabel")}: <strong>{app.selectedDomainName()}</strong>
                                     </p>
-                                    <div class="mt-2 space-y-2">
-                                        <div class="flex justify-end">
+                                    
+                                    <div class="relative mt-4 pt-8 p-3 border rounded-lg border-[hsl(var(--border))]">
+                                        <div class="absolute top-2 right-2">
                                             <LangSelector
                                                 codes={domainLangCodes()}
                                                 value={activeLang()}
                                                 onChange={setActiveLang}
                                             />
                                         </div>
-                                        <textarea
-                                            value={about()[activeLang()] || ""}
-                                            onInput={handleAboutChange}
-                                            class="w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                                            placeholder="Tell us about yourself..."
-                                        />
+                                        <div class="space-y-4">
+                                            <div>
+                                                <label for="display-name-lang" class="font-medium text-sm">{t("profile.edit.displayName")}</label>
+                                                <input
+                                                    id="display-name-lang"
+                                                    type="text"
+                                                    value={displayNames[activeLang()] || ""}
+                                                    onInput={handleDisplayNameChange}
+                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="font-medium text-sm">{t("profile.edit.aboutMe")}</label>
+                                                <textarea
+                                                    value={about[activeLang()] || ""}
+                                                    onInput={handleAboutChange}
+                                                    class="mt-1 w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                                    placeholder="Tell us about yourself..."
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
+                                    
+                                    <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
+                                        <label for="nsfw-preference" class="font-medium justify-self-end">{t("profile.edit.nsfw.label")}</label>
+                                        <select
+                                            id="nsfw-preference"
+                                            value={nsfwPreference()}
+                                            onChange={(e) => setNsfwPreference(e.currentTarget.value)}
+                                            class="w-full max-w-sm px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                        >
+                                            <option value="s">{t("profile.edit.nsfw.show")}</option>
+                                            <option value="w">{t("profile.edit.nsfw.warn")}</option>
+                                            <option value="h">{t("profile.edit.nsfw.hide")}</option>
+                                        </select>
+
+                                        <label class="font-medium justify-self-end self-start pt-2">{t("profile.edit.sponsorValues.label")}</label>
+                                        <div class="flex items-center gap-2">
+                                            <For each={sponsorValues}>
+                                                {(value, index) => (
+                                                    <input 
+                                                        type="number" 
+                                                        value={value}
+                                                        onInput={(e) => handleSponsorValueChange(index(), e.currentTarget.value)}
+                                                        class="w-full px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                                    />
+                                                )}
+                                            </For>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <button
+                                        class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 disabled:opacity-60"
+                                        onClick={handleSave}
+                                        disabled={isSaving()}
+                                    >
+                                        <Show when={isSaving()} fallback={t("profile.edit.saveButton")}>
+                                            <div class="flex items-center gap-2">
+                                                <Spinner class="w-5 h-5" />
+                                                <span>{t("profile.edit.saving")}</span>
+                                            </div>
+                                        </Show>
+                                    </button>
                                 </div>
                             </div>
                         </Match>

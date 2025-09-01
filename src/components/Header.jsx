@@ -1,5 +1,5 @@
 // src/components/Header.jsx
-import { Show, createSignal, onMount, createMemo, Switch, Match } from "solid-js";
+import { Show, createSignal, onMount, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
 import { authorize } from "../blockchain/auth.js";
@@ -10,6 +10,7 @@ import Container from "./layout/Container";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
 import NewPostButton from "./main/NewPostButton.jsx";
 import TokenPrice from "./main/TokenPrice.jsx";
+import { dbg } from "../utils/debug.js";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -19,7 +20,6 @@ function shortAddr(addr) {
 export default function Header({ onTogglePane }) {
   const app = useApp();
   const { t } = app;
-  const [eagerDone, setEagerDone] = createSignal(false);
   const [isLoggingIn, setIsLoggingIn] = createSignal(false);
 
   const desiredId = () => app.desiredChainId();
@@ -35,9 +35,8 @@ export default function Header({ onTogglePane }) {
     return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
   });
 
-  onMount(async () => {
-    if (isWalletAvailable()) await eagerConnect();
-    setEagerDone(true);
+  onMount(() => {
+    if (isWalletAvailable()) eagerConnect();
   });
 
   const handleLoginClick = async () => {
@@ -53,11 +52,24 @@ export default function Header({ onTogglePane }) {
   };
 
   async function onConnect() {
+    dbg.log("Header:onConnect", "Connect process started.");
     try {
+      dbg.log("Header:onConnect", "Attempting to call connectWallet()...");
       await connectWallet();
-      if (desiredId()) await app.ensureWalletOnDesiredChain();
+      dbg.log("Header:onConnect", "connectWallet() succeeded. Account:", walletAccount());
+
+      if (desiredId()) {
+        dbg.log("Header:onConnect", "Ensuring wallet is on desired chain:", desiredId());
+        await app.ensureWalletOnDesiredChain();
+        dbg.log("Header:onConnect", "Chain check successful.");
+      }
     } catch (e) {
-      pushErrorToast(e, { context: "Failed to connect wallet" });
+      dbg.error("Header:onConnect", "Error during connection process:", e);
+      const errorContext = { context: "Failed to connect wallet" };
+      if (e?.message?.toLowerCase().includes("timed out")) {
+          errorContext.help = t("wallet.error.timeoutHelp");
+      }
+      pushErrorToast(e, errorContext);
     }
   }
 
@@ -89,61 +101,54 @@ export default function Header({ onTogglePane }) {
           </div>
 
           <div class="flex items-center gap-3">
-            {/* Show New Post button ONLY when authorized AND wallet is connected */}
             <Show when={app.authorizedUser() && walletAccount()}>
               <NewPostButton />
             </Show>
 
-            {/* Show user avatar menu if a session exists, regardless of wallet connection */}
             <Show when={app.authorizedUser()}>
               <AuthorizedUser />
             </Show>
 
-            {/* Logic for Connect/Login buttons */}
-            <Switch>
-              {/* Wallet not connected -> Show "Connect" button */}
-              <Match when={!walletAccount() && eagerDone()}>
+            <Show
+              when={walletAccount()}
+              fallback={
                 <Show when={isWalletAvailable()}>
                   <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
                     {t("wallet.connect")}
                   </button>
                 </Show>
-              </Match>
-
-              {/* Wallet connected BUT no session -> Show "Login" button */}
-              <Match when={walletAccount() && !app.authorizedUser()}>
+              }
+            >
+              {/* This content renders when wallet IS connected */}
+              <Show when={!app.authorizedUser()}>
                 <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
                   {isLoggingIn() ? t("common.checking") : "Login"}
                 </button>
-              </Match>
-            </Switch>
+              </Show>
 
-            {/* Wallet address and chain info */}
-            <Show when={walletAccount()}>
-                <div class="flex items-center gap-2">
-                    <button
-                        classList={{
-                            "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
-                            "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
-                        }}
-                        onClick={copyAddress}
-                        title={t("wallet.copyAddress")}
-                    >
-                        {shortAddr(walletAccount())}
+              <div class="flex items-center gap-2">
+                <button
+                    classList={{
+                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                        "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                    }}
+                    onClick={copyAddress}
+                    title={t("wallet.copyAddress")}
+                >
+                    {shortAddr(walletAccount())}
+                </button>
+                <Show when={!mismatchedChain()} fallback={
+                    <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
+                        {t("wallet.changeChain")}
                     </button>
-                    <Show when={!mismatchedChain()} fallback={
-                        <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
-                            {t("wallet.changeChain")}
-                        </button>
-                    }>
-                        <Show when={chainLogoSrc()}>
-                            <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
-                        </Show>
+                }>
+                    <Show when={chainLogoSrc()}>
+                        <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
                     </Show>
-                </div>
+                </Show>
+              </div>
             </Show>
 
-            {/* Hamburger menu */}
             <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
