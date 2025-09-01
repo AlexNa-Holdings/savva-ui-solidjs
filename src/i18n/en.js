@@ -427,5 +427,6 @@ export default {
   "profile.edit.saveButton": "Save Changes",
   "profile.edit.saving": "Saving...",
   "profile.edit.saveSuccess": "Profile updated successfully!",
-  "profile.edit.saveError": "Failed to save profile."
+  "profile.edit.saveError": "Failed to save profile.",
+  "profile.edit.buttonLabel": "Edit Profile"
 };

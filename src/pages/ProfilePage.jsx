@@ -18,7 +18,6 @@ import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
 import WalletTab from "../components/profile/WalletTab.jsx";
 import TokenValue from "../components/ui/TokenValue.jsx";
 import { walletAccount } from "../blockchain/wallet.js";
-import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
 
 // Data fetcher for the user profile
 async function fetchUserProfile({ app, identifier }) {
@@ -110,16 +109,17 @@ export default function ProfilePage() {
 
   const aboutText = createMemo(() => {
     const details = profileDetails();
-    if (!details || !details.about) return "";
+    if (!details) return "";
+    const lang = app.lang();
 
-    const aboutData = details.about;
-    if (typeof aboutData === 'string') {
-      return aboutData;
+    if (details.about_me && typeof details.about_me === 'object') {
+        return details.about_me[lang] || details.about_me.en || Object.values(details.about_me)[0] || "";
     }
-    if (typeof aboutData === 'object') {
-      const lang = app.lang();
-      return aboutData[lang] || aboutData.en || Object.values(aboutData)[0] || "";
+    
+    if (details.about && typeof details.about === 'string') {
+        return details.about;
     }
+
     return "";
   });
   
@@ -208,15 +208,14 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Edit Profile Button */}
                 <div class="flex-shrink-0">
                   <Show when={canEdit()}>
                     <button
                       onClick={handleEditProfile}
-                      class="p-2 rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                      class="px-4 py-2 text-sm rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--accent))]"
                       title={t("profile.edit.title")}
                     >
-                      <EditIcon class="w-5 h-5" />
+                      {t("profile.edit.buttonLabel")}
                     </button>
                   </Show>
                 </div>
