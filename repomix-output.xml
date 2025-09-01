@@ -779,6 +779,26 @@ export function getChainLogo(chainId) {
 }
 </file>
 
+<file path="src/components/layout/Container.jsx">
+// src/components/layout/Container.jsx
+export default function Container(props) {
+  return <div class={`sv-container ${props.class || ""}`}>{props.children}</div>;
+}
+</file>
+
+<file path="src/components/layout/TwoColumn.jsx">
+// src/components/layout/TwoColumn.jsx
+export default function TwoColumn(props) {
+  // props.aside is the node for the right column
+  return (
+    <div class="sv-content-grid">
+      <section class="sv-main">{props.children}</section>
+      {props.aside && <aside class="sv-aside">{props.aside}</aside>}
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -931,6 +951,82 @@ export default function Assets() {
         </div>
       </Show>
     </section>
+  );
+}
+</file>
+
+<file path="src/components/tabs/NILRightPanel.jsx">
+// src/components/tabs/NILRightPanel.jsx
+import { useApp } from "../../context/AppContext.jsx";
+
+const HEADER_H = 48; // keep synced with header height
+
+export default function NILRightPanel() {
+  const { t } = useApp();
+
+  return (
+    <aside
+      class="hidden lg:block"
+      style={{ position: "sticky", top: `${HEADER_H}px` }}
+    >
+      <div
+        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]"
+        style={{
+          "max-height": `calc(100vh - ${HEADER_H}px)`,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          class="p-3 space-y-3 overflow-auto"
+          style={{ "max-height": `calc(100vh - ${HEADER_H}px - 1px - 1px)` }}
+        >
+          <h4 class="font-semibold">Right Panel</h4>
+          <p class="text-sm">
+            {t("main.tabs.empty")} — this content is intentionally long to
+            demonstrate internal scrolling:
+          </p>
+
+          {/* demo long content */}
+          <ul class="list-disc ml-5 text-sm space-y-1">
+            <li>Example item A</li>
+            <li>Example item B</li>
+            <li>Example item C</li>
+          </ul>
+          <div class="text-sm leading-snug space-y-2">
+            <p>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis
+              congue, magna non gravida finibus, felis nisl finibus nunc,
+              laoreet imperdiet arcu erat in felis.
+            </p>
+            <p>
+              Sed vitae lectus nec nisl elementum bibendum. Phasellus vel orci
+              vitae lectus dapibus rhoncus. Suspendisse vehicula arcu a sem
+              pharetra, at pulvinar ex gravida.
+            </p>
+            <p>
+              Maecenas at urna sed turpis pretium volutpat. Aliquam vulputate
+              porttitor metus, ut interdum ante semper quis.
+            </p>
+            <p>
+              Praesent fermentum, justo eu volutpat ultricies, eros ante
+              facilisis risus, eget dictum quam nibh a neque. Integer
+              ullamcorper, ipsum non consequat sollicitudin, arcu massa
+              elementum est, vitae gravida nibh nibh vel eros.
+            </p>
+            <p>
+              Ut at vestibulum nibh. Vivamus euismod, justo vitae dictum
+              posuere, mi quam viverra quam, et dictum ex tellus non augue.
+            </p>
+            <p>
+              Integer dignissim lacus sed nibh posuere, vitae luctus lectus
+              rhoncus. Vestibulum ante ipsum primis in faucibus orci luctus et
+              ultrices posuere cubilia curae; Quisque ut odio non velit maximus
+              mollis.
+            </p>
+          </div>
+        </div>
+      </div>
+    </aside>
   );
 }
 </file>
@@ -6036,6 +6132,96 @@ async function main() {
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
+</file>
+
+<file path="scripts/release.mjs">
+// scripts/release.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import dotenv from "dotenv";
+
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const VERSION_FILE = path.join(ROOT, "src", "version.js");
+const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
+const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
+
+const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
+const DEPLOY_USER = process.env.DEPLOY_USER || "";
+const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
+const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
+const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
+
+function sh(cmd, opts = {}) {
+  console.log(`$ ${cmd}`);
+  return execSync(cmd, { stdio: "inherit", ...opts });
+}
+
+function readVersion() {
+  const text = fs.readFileSync(VERSION_FILE, "utf8");
+  const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
+  if (!m) throw new Error("Could not parse APP_VERSION in src/version.js");
+  return { major: Number(m[1]), minor: Number(m[2]), text };
+}
+
+function writeVersion(major, minor, prevText) {
+  const next = `${major}.${minor}`;
+  const out = prevText.replace(/APP_VERSION\s*=\s*["'`](\d+\.\d+)["'`]/, `APP_VERSION = "${next}"`);
+  fs.writeFileSync(VERSION_FILE, out, "utf8");
+  return next;
+}
+
+function runI18nScripts() {
+  console.log("Running i18n scripts...");
+  sh("node scripts/i18n.mjs");
+  sh("node scripts/i18n-docs.mjs");
+}
+
+function build() {
+  sh("npm run build");
+}
+
+function gitCommitAndPush(version) {
+  try { sh("git add -A"); } catch {}
+  try { sh(`git commit -m "release: v${version}"`); }
+  catch { console.warn("No changes to commit."); }
+  // Push current branch
+  try { sh("git rev-parse --abbrev-ref HEAD"); } catch {}
+  try { sh("git push"); } catch {}
+  // Also push HEAD to Prod branch (without switching)
+  try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
+}
+
+function deploy() {
+  if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
+    console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
+    return;
+  }
+  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
+  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
+
+  // Ensure path exists, then scp
+  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
+  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
+}
+
+(async function main() {
+  const { major, minor, text } = readVersion();
+  const nextVersion = writeVersion(major, minor + 1, text);
+  console.log(`Bumped version to ${nextVersion}`);
+
+  runI18nScripts();
+  build();
+  gitCommitAndPush(nextVersion);
+  deploy();
+
+  console.log(`Done. Released v${nextVersion}.`);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 </file>
 
 <file path="src/alerts/AlertManager.jsx">
@@ -19349,26 +19535,6 @@ export default function UploadFromUrlModal(props) {
 }
 </file>
 
-<file path="src/components/layout/Container.jsx">
-// src/components/layout/Container.jsx
-export default function Container(props) {
-  return <div class={`sv-container ${props.class || ""}`}>{props.children}</div>;
-}
-</file>
-
-<file path="src/components/layout/TwoColumn.jsx">
-// src/components/layout/TwoColumn.jsx
-export default function TwoColumn(props) {
-  // props.aside is the node for the right column
-  return (
-    <div class="sv-content-grid">
-      <section class="sv-main">{props.children}</section>
-      {props.aside && <aside class="sv-aside">{props.aside}</aside>}
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/main/ConnectionError.jsx">
 // src/components/main/ConnectionError.jsx
 import { Show } from "solid-js";
@@ -20824,82 +20990,6 @@ export function getTabComponent(type) {
 }
 </file>
 
-<file path="src/components/tabs/NILRightPanel.jsx">
-// src/components/tabs/NILRightPanel.jsx
-import { useApp } from "../../context/AppContext.jsx";
-
-const HEADER_H = 48; // keep synced with header height
-
-export default function NILRightPanel() {
-  const { t } = useApp();
-
-  return (
-    <aside
-      class="hidden lg:block"
-      style={{ position: "sticky", top: `${HEADER_H}px` }}
-    >
-      <div
-        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]"
-        style={{
-          "max-height": `calc(100vh - ${HEADER_H}px)`,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          class="p-3 space-y-3 overflow-auto"
-          style={{ "max-height": `calc(100vh - ${HEADER_H}px - 1px - 1px)` }}
-        >
-          <h4 class="font-semibold">Right Panel</h4>
-          <p class="text-sm">
-            {t("main.tabs.empty")} — this content is intentionally long to
-            demonstrate internal scrolling:
-          </p>
-
-          {/* demo long content */}
-          <ul class="list-disc ml-5 text-sm space-y-1">
-            <li>Example item A</li>
-            <li>Example item B</li>
-            <li>Example item C</li>
-          </ul>
-          <div class="text-sm leading-snug space-y-2">
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis
-              congue, magna non gravida finibus, felis nisl finibus nunc,
-              laoreet imperdiet arcu erat in felis.
-            </p>
-            <p>
-              Sed vitae lectus nec nisl elementum bibendum. Phasellus vel orci
-              vitae lectus dapibus rhoncus. Suspendisse vehicula arcu a sem
-              pharetra, at pulvinar ex gravida.
-            </p>
-            <p>
-              Maecenas at urna sed turpis pretium volutpat. Aliquam vulputate
-              porttitor metus, ut interdum ante semper quis.
-            </p>
-            <p>
-              Praesent fermentum, justo eu volutpat ultricies, eros ante
-              facilisis risus, eget dictum quam nibh a neque. Integer
-              ullamcorper, ipsum non consequat sollicitudin, arcu massa
-              elementum est, vitae gravida nibh nibh vel eros.
-            </p>
-            <p>
-              Ut at vestibulum nibh. Vivamus euismod, justo vitae dictum
-              posuere, mi quam viverra quam, et dictum ex tellus non augue.
-            </p>
-            <p>
-              Integer dignissim lacus sed nibh posuere, vitae luctus lectus
-              rhoncus. Vestibulum ante ipsum primis in faucibus orci luctus et
-              ultrices posuere cubilia curae; Quisque ut odio non velit maximus
-              mollis.
-            </p>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
-</file>
-
 <file path="src/components/ui/icons/ActionIcons.jsx">
 // src/components/ui/icons/ActionIcons.jsx
 export function EditIcon(props) {
@@ -22003,6 +22093,59 @@ export function navigate(path, { replace = false } = {}) {
 
 export function useHashRouter() {
   return { route, navigate };
+}
+</file>
+
+<file path="src/styles/layout.css">
+/* src/styles/layout.css */
+:root {
+  --sv-container-max: 1600px;           /* main max width for content container */
+  --sv-container-gutter: clamp(16px, 2vw, 32px); /* responsive padding */
+  --sv-aside-w: clamp(300px, 24vw, 380px);       /* sidebar width on desktop */
+  --sv-content-max-ch: 68ch;            /* comfortable text line length */
+}
+
+/* Centered container */
+.sv-container {
+  max-width: var(--sv-container-max);
+  margin-inline: auto;
+  /* padding-inline: var(--sv-container-gutter); */
+}
+
+/* Content grid: main column + sidebar */
+.sv-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(16px, 2vw, 24px);
+}
+@media (min-width: 1024px) {
+  .sv-content-grid {
+    grid-template-columns: minmax(0, 1fr) var(--sv-aside-w);
+    align-items: start;
+  }
+}
+
+.sv-main { min-width: 0; }
+.sv-aside { min-width: 0; }
+
+/* Text limiter for typography-heavy content */
+.sv-typography {
+  max-width: var(--sv-content-max-ch);
+}
+
+/* Full-bleed section for backgrounds/hero areas */
+.full-bleed {
+  width: 100vw;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+
+@media (min-width: 1800px) {
+  :root { --sv-container-max: 1600px; }
+}
+
+.sv-container--no-gutter {
+  padding-inline: 0; /* keep max-width centering, remove side padding */
 }
 </file>
 
@@ -23242,96 +23385,6 @@ locales:
 domain: savva.app
 backendLink: https://ui.savva.app/api/
 gear: true
-</file>
-
-<file path="scripts/release.mjs">
-// scripts/release.mjs
-import fs from "node:fs";
-import path from "node:path";
-import { execSync } from "node:child_process";
-import dotenv from "dotenv";
-
-const ROOT = process.cwd();
-dotenv.config({ path: path.join(ROOT, ".env") });
-
-const VERSION_FILE = path.join(ROOT, "src", "version.js");
-const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
-const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
-
-const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
-const DEPLOY_USER = process.env.DEPLOY_USER || "";
-const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
-const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
-const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
-
-function sh(cmd, opts = {}) {
-  console.log(`$ ${cmd}`);
-  return execSync(cmd, { stdio: "inherit", ...opts });
-}
-
-function readVersion() {
-  const text = fs.readFileSync(VERSION_FILE, "utf8");
-  const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
-  if (!m) throw new Error("Could not parse APP_VERSION in src/version.js");
-  return { major: Number(m[1]), minor: Number(m[2]), text };
-}
-
-function writeVersion(major, minor, prevText) {
-  const next = `${major}.${minor}`;
-  const out = prevText.replace(/APP_VERSION\s*=\s*["'`](\d+\.\d+)["'`]/, `APP_VERSION = "${next}"`);
-  fs.writeFileSync(VERSION_FILE, out, "utf8");
-  return next;
-}
-
-function runI18nScripts() {
-  console.log("Running i18n scripts...");
-  sh("node scripts/i18n.mjs");
-  sh("node scripts/i18n-docs.mjs");
-}
-
-function build() {
-  sh("npm run build");
-}
-
-function gitCommitAndPush(version) {
-  try { sh("git add -A"); } catch {}
-  try { sh(`git commit -m "release: v${version}"`); }
-  catch { console.warn("No changes to commit."); }
-  // Push current branch
-  try { sh("git rev-parse --abbrev-ref HEAD"); } catch {}
-  try { sh("git push"); } catch {}
-  // Also push HEAD to Prod branch (without switching)
-  try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
-}
-
-function deploy() {
-  if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
-    console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
-    return;
-  }
-  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
-  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
-
-  // Ensure path exists, then scp
-  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
-  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
-}
-
-(async function main() {
-  const { major, minor, text } = readVersion();
-  const nextVersion = writeVersion(major, minor + 1, text);
-  console.log(`Bumped version to ${nextVersion}`);
-
-  runI18nScripts();
-  build();
-  gitCommitAndPush(nextVersion);
-  deploy();
-
-  console.log(`Done. Released v${nextVersion}.`);
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
 </file>
 
 <file path="src/blockchain/contracts.js">
@@ -25807,59 +25860,6 @@ export function whenWsOpen({ timeoutMs = 12000 } = {}) {
 }
 </file>
 
-<file path="src/styles/layout.css">
-/* src/styles/layout.css */
-:root {
-  --sv-container-max: 1600px;           /* main max width for content container */
-  --sv-container-gutter: clamp(16px, 2vw, 32px); /* responsive padding */
-  --sv-aside-w: clamp(300px, 24vw, 380px);       /* sidebar width on desktop */
-  --sv-content-max-ch: 68ch;            /* comfortable text line length */
-}
-
-/* Centered container */
-.sv-container {
-  max-width: var(--sv-container-max);
-  margin-inline: auto;
-  /* padding-inline: var(--sv-container-gutter); */
-}
-
-/* Content grid: main column + sidebar */
-.sv-content-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: clamp(16px, 2vw, 24px);
-}
-@media (min-width: 1024px) {
-  .sv-content-grid {
-    grid-template-columns: minmax(0, 1fr) var(--sv-aside-w);
-    align-items: start;
-  }
-}
-
-.sv-main { min-width: 0; }
-.sv-aside { min-width: 0; }
-
-/* Text limiter for typography-heavy content */
-.sv-typography {
-  max-width: var(--sv-content-max-ch);
-}
-
-/* Full-bleed section for backgrounds/hero areas */
-.full-bleed {
-  width: 100vw;
-  margin-left: 50%;
-  transform: translateX(-50%);
-}
-
-@media (min-width: 1800px) {
-  :root { --sv-container-max: 1600px; }
-}
-
-.sv-container--no-gutter {
-  padding-inline: 0; /* keep max-width centering, remove side padding */
-}
-</file>
-
 <file path="src/ui/contextMenuBuilder.js">
 // src/ui/contextMenuBuilder.js
 import { pushToast } from "../ui/toast.js";
@@ -28092,6 +28092,29 @@ export default function EditorToolbar(props) {
 }
 </file>
 
+<file path="src/components/main/MainView.jsx">
+// src/components/main/MainView.jsx
+import { useApp } from "../../context/AppContext";
+import TabsBar from "./TabsBar";
+import Container from "../layout/Container";
+import ToTopButton from "../ui/ToTopButton";
+import NewContentBanner from "./NewContentBanner.jsx";
+
+export default function MainView() {
+  const { t } = useApp();
+
+  return (
+    <Container>
+      <ToTopButton />
+      <NewContentBanner />
+      <div class="w-full">
+        <TabsBar />
+      </div>
+    </Container>
+  );
+}
+</file>
+
 <file path="src/components/main/NewContentBanner.jsx">
 // src/components/main/NewContentBanner.jsx
 import { Show } from "solid-js";
@@ -28430,519 +28453,6 @@ t("tabs.title.for-you")
 */
 </file>
 
-<file path="src/pages/ProfileEditPage.jsx">
-// src/pages/ProfileEditPage.jsx
-import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect, For } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
-import { useApp } from "../context/AppContext.jsx";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import { useHashRouter } from "../routing/hashRouter.js";
-import { walletAccount } from "../blockchain/wallet.js";
-import { getSavvaContract } from "../blockchain/contracts.js";
-import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
-import { ipfs } from "../ipfs/index.js";
-import Spinner from "../components/ui/Spinner.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import LangSelector from "../components/ui/LangSelector.jsx";
-import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
-import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
-import { httpBase } from "../net/endpoints.js";
-import { pushErrorToast, pushToast } from "../ui/toast.js";
-import ConfirmModal from "../components/ui/ConfirmModal.jsx";
-import { createPublicClient, http } from "viem";
-import ContextMenu from "../components/ui/ContextMenu.jsx";
-
-async function fetchProfileForEdit(params) {
-    const { app, identifier } = params;
-    if (!identifier) return { error: "No identifier provided." };
-
-    try {
-        const userProfileContract = await getSavvaContract(app, 'UserProfile');
-        let userAddress;
-
-        if (identifier.startsWith('@')) {
-            const userName = identifier.substring(1).toLowerCase();
-            const address = await userProfileContract.read.owners([userName]);
-            if (!address || address === '0x0000000000000000000000000000000000000000') {
-                return { error: "User does not exist." };
-            }
-            userAddress = toChecksumAddress(address);
-        } else {
-            userAddress = toChecksumAddress(identifier);
-        }
-
-        const [avatarCid, profileCid, name] = await Promise.all([
-            userProfileContract.read.avatars([userAddress]),
-            userProfileContract.read.getString([
-                userAddress,
-                toHexBytes32(app.selectedDomainName()),
-                toHexBytes32("profile_cid")
-            ]),
-            userProfileContract.read.names([userAddress])
-        ]);
-
-        let ipfsData = {};
-        if (profileCid) {
-            const { data } = await ipfs.getJSONBest(app, profileCid);
-            ipfsData = data || {};
-        }
-
-        return {
-            address: userAddress,
-            avatar: avatarCid,
-            profile: ipfsData,
-            name: name,
-            profile_cid: profileCid
-        };
-    } catch (e) {
-        console.error("Failed to fetch profile for editing:", e);
-        return { error: e.message };
-    }
-}
-
-function copyToClipboard(text, label, t) {
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-        pushToast({ type: "success", message: t("clipboard.copied", { label }) });
-    }).catch(err => {
-        console.error(`Failed to copy ${label}:`, err);
-    });
-}
-
-export default function ProfileEditPage() {
-    const app = useApp();
-    const { t, lang: uiLang, domainAssetsConfig } = app;
-    const { route } = useHashRouter();
-    let debounceTimer;
-
-    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
-    const [initialName, setInitialName] = createSignal("");
-    const [nameInput, setNameInput] = createSignal("");
-    const [nameError, setNameError] = createSignal("");
-    const [isCheckingName, setIsCheckingName] = createSignal(false);
-    const [isRegistering, setIsRegistering] = createSignal(false);
-    const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
-    
-    const [displayNames, setDisplayNames] = createStore({});
-    const [nsfwPreference, setNsfwPreference] = createSignal("h");
-    const [sponsorValues, setSponsorValues] = createStore(["", "", "", "", ""]);
-    const [isSaving, setIsSaving] = createSignal(false);
-    const [about, setAbout] = createStore({});
-
-    const identifier = createMemo(() => {
-        const path = route();
-        return path.split('/')[2] || "";
-    });
-
-    const [profileData, { refetch }] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
-
-    const [avatar, setAvatar] = createSignal("");
-    const [activeLang, setActiveLang] = createSignal(uiLang());
-
-    const profileCid = createMemo(() => profileData()?.profile_cid);
-
-    createEffect(() => {
-        const data = profileData();
-        if (data && !data.error) {
-            setAvatar(data.avatar || "");
-            const currentName = data.name || "";
-            setInitialName(currentName);
-            setNameInput(currentName);
-
-            const profile = data.profile || {};
-            setNsfwPreference(profile.nsfw || "h");
-            
-            let initialDisplayNames = {};
-            if (profile.display_names && typeof profile.display_names === 'object') {
-                initialDisplayNames = profile.display_names;
-            } else if (profile.display_name && typeof profile.display_name === 'string') {
-                initialDisplayNames = { [uiLang()]: profile.display_name };
-            }
-            setDisplayNames(reconcile(initialDisplayNames));
-            
-            const s_values = profile.sponsor_values;
-            if (Array.isArray(s_values) && s_values.length > 0) {
-                const filledValues = s_values.slice(0, 5).map(v => v || "");
-                while (filledValues.length < 5) filledValues.push("");
-                setSponsorValues(reconcile(filledValues));
-            } else {
-                setSponsorValues(reconcile(["", "", "", "", ""]));
-            }
-            
-            let initialAboutState = {};
-            if (profile.about_me && typeof profile.about_me === 'object') {
-                initialAboutState = profile.about_me;
-            } 
-            else if (profile.about && typeof profile.about === 'string') {
-                initialAboutState = { [uiLang()]: profile.about };
-            }
-            
-            setAbout(reconcile(initialAboutState));
-        }
-    });
-
-    const contextMenuItems = createMemo(() => {
-        const cid = profileCid();
-        if (!cid) return [];
-        return [{
-            label: t("profile.edit.copyProfileCid"),
-            onClick: () => copyToClipboard(cid, "User Profile CID", t)
-        }];
-    });
-
-    const domainLangCodes = createMemo(() => {
-        const locales = domainAssetsConfig?.()?.locales || [];
-        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
-    });
-    
-    const handleAboutChange = (e) => {
-        setAbout(activeLang(), e.currentTarget.value);
-    };
-    
-    const handleDisplayNameChange = (e) => {
-        setDisplayNames(activeLang(), e.currentTarget.value);
-    };
-
-    const handleNameInput = (e) => {
-        const lowerValue = e.currentTarget.value.toLowerCase();
-        setNameInput(lowerValue);
-        setNameError("");
-
-        if (lowerValue === initialName()) {
-            setIsCheckingName(false);
-            clearTimeout(debounceTimer);
-            return;
-        }
-
-        const validCharRegex = /^[a-z0-9.-]*$/;
-        if (!validCharRegex.test(lowerValue)) {
-            setNameError(t("profile.edit.name.errorInvalidChar"));
-            return;
-        }
-        
-        clearTimeout(debounceTimer);
-        if (lowerValue) {
-            setIsCheckingName(true);
-            debounceTimer = setTimeout(async () => {
-                try {
-                    const contract = await getSavvaContract(app, 'UserProfile');
-                    const ownerAddress = await contract.read.owners([lowerValue]);
-                    const checksummedOwner = ownerAddress !== '0x0000000000000000000000000000000000000000' 
-                        ? toChecksumAddress(ownerAddress) 
-                        : null;
-                    
-                    if (checksummedOwner && checksummedOwner.toLowerCase() !== profileData().address.toLowerCase()) {
-                        setNameError(t("profile.edit.name.errorTaken"));
-                    }
-                } catch (err) {
-                    console.error("Error checking name uniqueness:", err);
-                } finally {
-                    setIsCheckingName(false);
-                }
-            }, 500);
-        } else {
-            setIsCheckingName(false);
-        }
-    };
-    
-    const handleSponsorValueChange = (index, value) => {
-        setSponsorValues(index, value.replace(/[^0-9]/g, ''));
-    };
-
-    const isRegisterDisabled = createMemo(() => {
-        return isRegistering() || isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
-    });
-
-    const executeSetName = async () => {
-      if (isRegisterDisabled()) return;
-      setIsRegistering(true);
-      setShowConfirmNameChange(false);
-    
-      try {
-        const contract = await getSavvaContract(app, "UserProfile", { write: true });
-        const hash = await contract.write.setName([nameInput()]);
-        
-        const desiredChain = app.desiredChain();
-        const transport = http(desiredChain.rpcUrls[0]);
-        const publicClient = createPublicClient({ chain: desiredChain, transport });
-        
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        if (receipt.status !== 'success') {
-          throw new Error(`Transaction failed with status: ${receipt.status}`);
-        }
-    
-        pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
-        setInitialName(nameInput());
-        refetch();
-      } catch (err) {
-        pushErrorToast(err, { context: t('profile.edit.name.registerError') });
-      } finally {
-        setIsRegistering(false);
-      }
-    };
-
-    const handleRegisterName = () => {
-        if (initialName()) {
-            setShowConfirmNameChange(true);
-        } else {
-            executeSetName();
-        }
-    };
-
-    const handleAvatarSave = async (blob) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', blob, 'avatar.png');
-
-            const response = await fetch(`${httpBase()}store`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
-            const result = await response.json();
-            const newCid = result?.cid;
-            if (!newCid) throw new Error("API did not return a CID for the avatar.");
-
-            const contract = await getSavvaContract(app, "UserProfile", { write: true });
-            await contract.write.setAvatar([newCid]);
-            
-            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
-        } catch (e) {
-            pushErrorToast(e, { context: "Avatar update failed" });
-            throw e;
-        }
-    };
-    
-    const handleSave = async () => {
-        setIsSaving(true);
-        try {
-            const profileJson = {
-                display_names: { ...displayNames },
-                nsfw: nsfwPreference(),
-                about_me: { ...about },
-                sponsor_values: [...sponsorValues].map(v => Number(v) || 0).filter(v => v > 0),
-            };
-    
-            const profileFile = new File([JSON.stringify(profileJson)], "profile.json", { type: 'application/json' });
-            const formData = new FormData();
-            formData.append('file', profileFile);
-    
-            const response = await fetch(`${httpBase()}store`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-    
-            if (!response.ok) throw new Error(`Profile upload failed: ${response.status}`);
-            const result = await response.json();
-            const newProfileCid = result?.cid;
-            if (!newProfileCid) throw new Error("API did not return a CID for the profile.");
-
-            const contract = await getSavvaContract(app, "UserProfile", { write: true });
-            const hash = await contract.write.setString([toHexBytes32(app.selectedDomainName()), toHexBytes32("profile_cid"), newProfileCid]);
-            
-            const desiredChain = app.desiredChain();
-            const transport = http(desiredChain.rpcUrls[0]);
-            const publicClient = createPublicClient({ chain: desiredChain, transport });
-            await publicClient.waitForTransactionReceipt({ hash });
-
-            pushToast({ type: 'success', message: t('profile.edit.saveSuccess') });
-            refetch();
-        } catch (err) {
-            pushErrorToast(err, { context: t('profile.edit.saveError') });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    return (
-        <>
-            <main class="p-4 max-w-3xl mx-auto space-y-6">
-                <ClosePageButton />
-                <div class="flex items-center justify-between">
-                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
-                </div>
-
-                <Show 
-                    when={walletAccount()} 
-                    fallback={
-                        <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-                            <p class="text-[hsl(var(--muted-foreground))] text-center">{t("profile.edit.connectWallet")}</p>
-                        </div>
-                    }
-                >
-                    <Switch>
-                        <Match when={profileData.loading}>
-                            <div class="flex justify-center items-center h-48"><Spinner /></div>
-                        </Match>
-                        <Match when={profileData()?.error}>
-                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-                                <p class="text-red-500 text-center">{profileData().error}</p>
-                            </div>
-                        </Match>
-                        <Match when={profileData()}>
-                            <div class="space-y-6">
-                                {/* Section 1: Cross Domain Settings */}
-                                <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                                    <h3 class="text-lg font-semibold">{t("profile.edit.crossDomainSettings")}</h3>
-                                    <div class="flex items-start gap-6">
-                                        <div 
-                                            onClick={() => setShowAvatarEditor(true)}
-                                            class="relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
-                                        >
-                                            <IpfsImage
-                                                src={avatar()}
-                                                alt="User Avatar"
-                                                class="w-full h-full object-cover"
-                                                fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
-                                            />
-                                            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <EditIcon class="w-10 h-10 text-white" />
-                                            </div>
-                                        </div>
-                                        <div class="flex-1 space-y-4">
-                                            <div>
-                                                <label for="registered-name" class="font-medium">{t("profile.edit.registeredName")}</label>
-                                                <input
-                                                    id="registered-name"
-                                                    type="text"
-                                                    value={nameInput()}
-                                                    onInput={handleNameInput}
-                                                    classList={{ "border-[hsl(var(--destructive))]": !!nameError() }}
-                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
-                                                />
-                                                <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-                                                    <p>{t("profile.edit.name.help.line1")}</p>
-                                                    <p>{t("profile.edit.name.help.line2")}</p>
-                                                    <p>{t("profile.edit.name.help.line3")}</p>
-                                                </div>
-                                                <Show when={nameError()}>
-                                                  <p class="mt-1 text-xs text-[hsl(var(--destructive))]">{nameError()}</p>
-                                                </Show>
-                                                <button 
-                                                    class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-                                                    disabled={isRegisterDisabled()}
-                                                    onClick={handleRegisterName}
-                                                >
-                                                    <Show when={isCheckingName() || isRegistering()} fallback={t("profile.edit.registerName")}>
-                                                        <Spinner class="w-5 h-5" />
-                                                    </Show>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 2: Domain Specific Parameters */}
-                                <div class="relative p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                                    <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
-                                        <ContextMenu items={contextMenuItems()} positionClass="absolute top-2 right-2 z-20" />
-                                    </Show>
-
-                                    <h3 class="text-lg font-semibold">{t("profile.edit.domainSpecificParams")}</h3>
-                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                                        {t("profile.edit.domainLabel")}: <strong>{app.selectedDomainName()}</strong>
-                                    </p>
-                                    
-                                    <div class="relative mt-4 pt-8 p-3 border rounded-lg border-[hsl(var(--border))]">
-                                        <div class="absolute top-2 right-2">
-                                            <LangSelector
-                                                codes={domainLangCodes()}
-                                                value={activeLang()}
-                                                onChange={setActiveLang}
-                                            />
-                                        </div>
-                                        <div class="space-y-4">
-                                            <div>
-                                                <label for="display-name-lang" class="font-medium text-sm">{t("profile.edit.displayName")}</label>
-                                                <input
-                                                    id="display-name-lang"
-                                                    type="text"
-                                                    value={displayNames[activeLang()] || ""}
-                                                    onInput={handleDisplayNameChange}
-                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label class="font-medium text-sm">{t("profile.edit.aboutMe")}</label>
-                                                <textarea
-                                                    value={about[activeLang()] || ""}
-                                                    onInput={handleAboutChange}
-                                                    class="mt-1 w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                                                    placeholder="Tell us about yourself..."
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
-                                        <label for="nsfw-preference" class="font-medium justify-self-end">{t("profile.edit.nsfw.label")}</label>
-                                        <select
-                                            id="nsfw-preference"
-                                            value={nsfwPreference()}
-                                            onChange={(e) => setNsfwPreference(e.currentTarget.value)}
-                                            class="w-full max-w-sm px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                                        >
-                                            <option value="s">{t("profile.edit.nsfw.show")}</option>
-                                            <option value="w">{t("profile.edit.nsfw.warn")}</option>
-                                            <option value="h">{t("profile.edit.nsfw.hide")}</option>
-                                        </select>
-
-                                        <label class="font-medium justify-self-end self-start pt-2">{t("profile.edit.sponsorValues.label")}</label>
-                                        <div class="flex items-center gap-2">
-                                            <For each={sponsorValues}>
-                                                {(value, index) => (
-                                                    <input 
-                                                        type="number" 
-                                                        value={value}
-                                                        onInput={(e) => handleSponsorValueChange(index(), e.currentTarget.value)}
-                                                        class="w-full px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                                                    />
-                                                )}
-                                            </For>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end">
-                                    <button
-                                        class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 disabled:opacity-60"
-                                        onClick={handleSave}
-                                        disabled={isSaving()}
-                                    >
-                                        <Show when={isSaving()} fallback={t("profile.edit.saveButton")}>
-                                            <div class="flex items-center gap-2">
-                                                <Spinner class="w-5 h-5" />
-                                                <span>{t("profile.edit.saving")}</span>
-                                            </div>
-                                        </Show>
-                                    </button>
-                                </div>
-                            </div>
-                        </Match>
-                    </Switch>
-                </Show>
-            </main>
-            <AvatarEditorModal 
-                isOpen={showAvatarEditor()}
-                onClose={() => setShowAvatarEditor(false)}
-                onSave={handleAvatarSave}
-            />
-            <ConfirmModal
-                isOpen={showConfirmNameChange()}
-                onClose={() => setShowConfirmNameChange(false)}
-                onConfirm={executeSetName}
-                title={t("profile.edit.name.confirmChangeTitle")}
-                message={t("profile.edit.name.confirmChangeMessage", { name: initialName() })}
-            />
-        </>
-    );
-}
-</file>
-
 <file path="src/styles/themed-controls.css">
 /* src/styles/themed-controls.css
 ──────────────────────────────────────────────────────────────
@@ -29225,6 +28735,53 @@ render(() => (
 ), root);
 </file>
 
+<file path="package.json">
+{
+  "name": "savva-ui-solidjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "release": "node scripts/release.mjs",
+    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
+  },
+  "dependencies": {
+    "@shikijs/themes": "^3.11.0",
+    "@solidjs/router": "^0.15.3",
+    "dompurify": "^3.2.6",
+    "dotenv": "^17.2.1",
+    "js-yaml": "^4.1.0",
+    "marked": "^16.2.0",
+    "openai": "^5.12.2",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-pretty-code": "^0.14.1",
+    "rehype-slug": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-breaks": "^4.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "shiki": "^3.11.0",
+    "solid-js": "^1.9.8",
+    "unified": "^11.0.5",
+    "viem": "^2.33.3",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.2",
+    "vite-plugin-solid": "^2.11.8"
+  }
+}
+</file>
+
 <file path="public/dev_docs/en/sidebar.yaml">
 # public/dev_docs/en/sidebar.yaml
 sections:
@@ -29311,24 +28868,6 @@ sections:
   "core-concepts/config-contract.md": "d0390a3d46e6bd6cc6a50b6caa979b608876d04fb9cb174bd67cc2652275e960",
   "core-concepts/publishing-posts.md": "61774803e87614ea4bc5f6f132ca0fbf74f1b4b84ed41a1a29675f7940ce2e65"
 }
-</file>
-
-<file path="src/alerts/registry.js">
-// src/alerts/registry.js
-import * as h from "./handlers.js";
-
-/**
- * A map of WebSocket alert types to their handler functions.
- * The AlertManager uses this to delegate incoming messages.
- */
-export const alertRegistry = {
-  token_price_changed: h.handleTokenPriceChanged,
-  content_processed: h.handleContentProcessed,
-  ping: h.handlePing,
-  pong: h.handlePong,
-  react: h.handleReact,
-  comment_counter: h.handleCommentCounterUpdate,
-};
 </file>
 
 <file path="src/components/auth/AuthorizedUser.jsx">
@@ -29612,29 +29151,6 @@ export default function MarkdownInput(props) {
         </div>
       </Show>
     </div>
-  );
-}
-</file>
-
-<file path="src/components/main/MainView.jsx">
-// src/components/main/MainView.jsx
-import { useApp } from "../../context/AppContext";
-import TabsBar from "./TabsBar";
-import Container from "../layout/Container";
-import ToTopButton from "../ui/ToTopButton";
-import NewContentBanner from "./NewContentBanner.jsx";
-
-export default function MainView() {
-  const { t } = useApp();
-
-  return (
-    <Container>
-      <ToTopButton />
-      <NewContentBanner />
-      <div class="w-full">
-        <TabsBar />
-      </div>
-    </Container>
   );
 }
 </file>
@@ -30008,261 +29524,6 @@ export default function Docs() {
 }
 </file>
 
-<file path="src/pages/ProfilePage.jsx">
-// src/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../routing/hashRouter.js";
-import ClosePageButton from "../components/ui/ClosePageButton.jsx";
-import Spinner from "../components/ui/Spinner.jsx";
-import IpfsImage from "../components/ui/IpfsImage.jsx";
-import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
-import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
-import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
-import Tabs from "../components/ui/Tabs.jsx";
-import Address from "../components/ui/Address.jsx";
-import { ipfs } from "../ipfs/index.js";
-import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
-import PostsTab from "../components/profile/PostsTab.jsx";
-import SubscribersTab from "../components/profile/SubscribersTab.jsx";
-import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
-import WalletTab from "../components/profile/WalletTab.jsx";
-import TokenValue from "../components/ui/TokenValue.jsx";
-import { walletAccount } from "../blockchain/wallet.js";
-import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
-
-// Data fetcher for the user profile
-async function fetchUserProfile({ app, identifier }) {
-  if (!identifier || !app.wsCall) return null;
-
-  try {
-    const wsParams = { domain: app.selectedDomainName() };
-    const currentUser = app.authorizedUser();
-    if (currentUser) {
-      wsParams.caller = currentUser.address;
-    }
-
-    if (identifier.startsWith('@')) {
-      wsParams.user_name = identifier.substring(1);
-    } else {
-      wsParams.user_addr = identifier;
-    }
-
-    return await app.wsCall('get-user', wsParams);
-  } catch (error) {
-    console.error("Failed to fetch user profile:", error);
-    return { error: error.message };
-  }
-}
-
-// Data fetcher for the profile details from IPFS
-async function fetchProfileDetails(cid, app) {
-  if (!cid) return null;
-  try {
-    const { data } = await ipfs.getJSONBest(app, cid);
-    return data;
-  } catch (e) {
-    console.error(`Failed to fetch profile details from IPFS CID: ${cid}`, e);
-    return { error: e.message };
-  }
-}
-
-export default function ProfilePage() {
-  const app = useApp();
-  const { t } = app;
-  const { route } = useHashRouter();
-
-  const identifier = createMemo(() => {
-    const path = route();
-    return path.startsWith('/') ? path.substring(1) : path;
-  });
-
-  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
-  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
-  
-  const [activeTab, setActiveTab] = createSignal('posts');
-  
-  const isMyProfile = createMemo(() => {
-    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
-    const profileAddr = userResource()?.address?.toLowerCase();
-    return !!authorizedAddr && authorizedAddr === profileAddr;
-  });
-
-  const canEdit = createMemo(() => {
-    const connectedWallet = walletAccount()?.toLowerCase();
-    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
-  });
-
-  const handleEditProfile = () => {
-    navigate(`/profile-edit/${identifier()}`);
-  };
-
-  const TABS = createMemo(() => {
-    const tabs = [
-      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-    ];
-
-    if (isMyProfile()) {
-      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
-    }
-
-    return tabs;
-  });
-  
-  createEffect(() => {
-    const availableTabs = TABS();
-    const currentActive = activeTab();
-    if (!availableTabs.some(tab => tab.id === currentActive)) {
-        setActiveTab('posts');
-    }
-  });
-
-  const aboutText = createMemo(() => {
-    const details = profileDetails();
-    if (!details || !details.about) return "";
-
-    const aboutData = details.about;
-    if (typeof aboutData === 'string') {
-      return aboutData;
-    }
-    if (typeof aboutData === 'object') {
-      const lang = app.lang();
-      return aboutData[lang] || aboutData.en || Object.values(aboutData)[0] || "";
-    }
-    return "";
-  });
-  
-  const isSubscribed = createMemo(() => {
-      const u = userResource();
-      return u && u.i_sponsor_for > 0;
-  });
-
-  return (
-    <main class="sv-container p-4 max-w-4xl mx-auto">
-      <ClosePageButton />
-      
-      <Switch>
-        <Match when={userResource.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
-        </Match>
-        <Match when={userResource.error || userResource()?.error}>
-          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
-            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("profile.error.title")}</h3>
-            <p class="text-sm mt-1">{userResource.error?.message || userResource()?.error}</p>
-          </div>
-        </Match>
-        <Match when={userResource()}>
-          {(user) =>
-            <div class="space-y-6">
-              {/* Profile Header */}
-              <div class="flex justify-between items-end gap-4">
-                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                  <div class="flex flex-col items-center gap-4 shrink-0">
-                    <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                      <IpfsImage 
-                        src={user().avatar}
-                        alt={`${user().name} avatar`}
-                        class="w-full h-full object-cover"
-                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
-                      />
-                    </div>
-                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
-                      <Show 
-                        when={!isSubscribed()}
-                        fallback={
-                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
-                            {t("profile.unsubscribe")}
-                          </button>
-                        }
-                      >
-                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
-                          {t("profile.subscribe")}
-                        </button>
-                      </Show>
-                    </Show>
-                  </div>
-                  
-                  <div class="flex-1 w-full text-center sm:text-left space-y-3">
-                    <div class="flex flex-col items-center sm:items-start">
-                      <h2 class="text-2xl font-bold">{user().display_name || user().name}</h2>
-                      <Show when={user().name}>
-                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                          <span>{user().name.toUpperCase()}</span>
-                          <VerifiedBadge class="w-4 h-4" />
-                        </div>
-                      </Show>
-                      <div class="mt-1">
-                        <Address address={user().address} format="full" />
-                      </div>
-                      <div class="flex items-center gap-2 mt-2 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
-                        <TokenValue amount={user().staked} />
-                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
-                      </div>
-                      <div class="flex items-center gap-2 mt-1 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
-                        <TokenValue amount={user().total_sponsoring} />
-                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                      </div>
-                      <div class="flex items-center gap-2 mt-1 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
-                        <TokenValue amount={user().total_sponsored} />
-                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                      </div>
-                    </div>
-
-                    <Show when={aboutText()}>
-                      <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
-                    </Show>
-                  </div>
-                </div>
-
-                {/* Edit Profile Button */}
-                <div class="flex-shrink-0">
-                  <Show when={canEdit()}>
-                    <button
-                      onClick={handleEditProfile}
-                      class="p-2 rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                      title={t("profile.edit.title")}
-                    >
-                      <EditIcon class="w-5 h-5" />
-                    </button>
-                  </Show>
-                </div>
-              </div>
-
-
-              {/* Profile Tabs */}
-              <div>
-                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
-                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
-                  <Switch>
-                    <Match when={activeTab() === 'posts'}>
-                      <PostsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'subscribers'}>
-                      <SubscribersTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'subscriptions'}>
-                      <SubscriptionsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === 'wallet'}>
-                      <WalletTab user={user()} />
-                    </Match>
-                  </Switch>
-                </div>
-              </div>
-            </div>
-          }
-        </Match>
-      </Switch>
-    </main>
-  );
-}
-</file>
-
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -30294,51 +29555,23 @@ export default function Settings() {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "savva-ui-solidjs",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "release": "node scripts/release.mjs",
-    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
-  },
-  "dependencies": {
-    "@shikijs/themes": "^3.11.0",
-    "@solidjs/router": "^0.15.3",
-    "dompurify": "^3.2.6",
-    "dotenv": "^17.2.1",
-    "js-yaml": "^4.1.0",
-    "marked": "^16.2.0",
-    "openai": "^5.12.2",
-    "rehype-autolink-headings": "^7.1.0",
-    "rehype-pretty-code": "^0.14.1",
-    "rehype-slug": "^6.0.0",
-    "rehype-stringify": "^10.0.1",
-    "remark-breaks": "^4.0.0",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2",
-    "shiki": "^3.11.0",
-    "solid-js": "^1.9.8",
-    "unified": "^11.0.5",
-    "viem": "^2.33.3",
-    "yaml": "^2.8.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.12",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.12",
-    "vite": "^7.1.2",
-    "vite-plugin-solid": "^2.11.8"
-  }
-}
+<file path="src/alerts/registry.js">
+// src/alerts/registry.js
+import * as h from "./handlers.js";
+
+/**
+ * A map of WebSocket alert types to their handler functions.
+ * The AlertManager uses this to delegate incoming messages.
+ */
+export const alertRegistry = {
+  token_price_changed: h.handleTokenPriceChanged,
+  content_processed: h.handleContentProcessed,
+  ping: h.handlePing,
+  pong: h.handlePong,
+  react: h.handleReact,
+  comment_counter: h.handleCommentCounterUpdate,
+  user_info_changed: h.handleUserInfoChanged,
+};
 </file>
 
 <file path="src/components/editor/EditorFilesDrawer.jsx">
@@ -31206,6 +30439,530 @@ export default class WsClient {
 }
 </file>
 
+<file path="src/pages/ProfileEditPage.jsx">
+// src/pages/ProfileEditPage.jsx
+import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect, For } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
+import { useApp } from "../context/AppContext.jsx";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import { useHashRouter } from "../routing/hashRouter.js";
+import { walletAccount } from "../blockchain/wallet.js";
+import { getSavvaContract } from "../blockchain/contracts.js";
+import { toChecksumAddress, toHexBytes32 } from "../blockchain/utils.js";
+import { ipfs } from "../ipfs/index.js";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import LangSelector from "../components/ui/LangSelector.jsx";
+import { EditIcon } from "../components/ui/icons/ActionIcons.jsx";
+import AvatarEditorModal from "../components/profile/AvatarEditorModal.jsx";
+import { httpBase } from "../net/endpoints.js";
+import { pushErrorToast, pushToast } from "../ui/toast.js";
+import ConfirmModal from "../components/ui/ConfirmModal.jsx";
+import { createPublicClient, http } from "viem";
+import ContextMenu from "../components/ui/ContextMenu.jsx";
+
+async function fetchProfileForEdit(params) {
+    const { app, identifier } = params;
+    if (!identifier) return { error: "No identifier provided." };
+
+    try {
+        const userProfileContract = await getSavvaContract(app, 'UserProfile');
+        let userAddress;
+
+        if (identifier.startsWith('@')) {
+            const userName = identifier.substring(1).toLowerCase();
+            const address = await userProfileContract.read.owners([userName]);
+            if (!address || address === '0x0000000000000000000000000000000000000000') {
+                return { error: "User does not exist." };
+            }
+            userAddress = toChecksumAddress(address);
+        } else {
+            userAddress = toChecksumAddress(identifier);
+        }
+
+        const [avatarCid, profileCid, name] = await Promise.all([
+            userProfileContract.read.avatars([userAddress]),
+            userProfileContract.read.getString([
+                userAddress,
+                toHexBytes32(app.selectedDomainName()),
+                toHexBytes32("profile_cid")
+            ]),
+            userProfileContract.read.names([userAddress])
+        ]);
+
+        let ipfsData = {};
+        if (profileCid) {
+            const { data } = await ipfs.getJSONBest(app, profileCid);
+            ipfsData = data || {};
+        }
+
+        return {
+            address: userAddress,
+            avatar: avatarCid,
+            profile: ipfsData,
+            name: name,
+            profile_cid: profileCid
+        };
+    } catch (e) {
+        console.error("Failed to fetch profile for editing:", e);
+        return { error: e.message };
+    }
+}
+
+function copyToClipboard(text, label, t) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        pushToast({ type: "success", message: t("clipboard.copied", { label }) });
+    }).catch(err => {
+        console.error(`Failed to copy ${label}:`, err);
+    });
+}
+
+// Helper to filter out empty string values from an object
+function filterEmptyValues(obj) {
+    const newObj = {};
+    for (const key in obj) {
+        if (typeof obj[key] === 'string' && obj[key].trim() !== "") {
+            newObj[key] = obj[key];
+        }
+    }
+    return newObj;
+}
+
+export default function ProfileEditPage() {
+    const app = useApp();
+    const { t, lang: uiLang, domainAssetsConfig } = app;
+    const { route } = useHashRouter();
+    let debounceTimer;
+
+    const [showAvatarEditor, setShowAvatarEditor] = createSignal(false);
+    const [initialName, setInitialName] = createSignal("");
+    const [nameInput, setNameInput] = createSignal("");
+    const [nameError, setNameError] = createSignal("");
+    const [isCheckingName, setIsCheckingName] = createSignal(false);
+    const [isRegistering, setIsRegistering] = createSignal(false);
+    const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
+    
+    const [displayNames, setDisplayNames] = createStore({});
+    const [nsfwPreference, setNsfwPreference] = createSignal("h");
+    const [sponsorValues, setSponsorValues] = createStore(["", "", "", "", ""]);
+    const [isSaving, setIsSaving] = createSignal(false);
+    const [about, setAbout] = createStore({});
+
+    const identifier = createMemo(() => {
+        const path = route();
+        return path.split('/')[2] || "";
+    });
+
+    const [profileData, { refetch }] = createResource(() => ({ app, identifier: identifier() }), fetchProfileForEdit);
+
+    const [avatar, setAvatar] = createSignal("");
+    const [activeLang, setActiveLang] = createSignal(uiLang());
+
+    const profileCid = createMemo(() => profileData()?.profile_cid);
+
+    createEffect(() => {
+        const data = profileData();
+        if (data && !data.error) {
+            setAvatar(data.avatar || "");
+            const currentName = data.name || "";
+            setInitialName(currentName);
+            setNameInput(currentName);
+
+            const profile = data.profile || {};
+            setNsfwPreference(profile.nsfw || "h");
+            
+            let initialDisplayNames = {};
+            if (profile.display_names && typeof profile.display_names === 'object') {
+                initialDisplayNames = profile.display_names;
+            } else if (profile.display_name && typeof profile.display_name === 'string') {
+                initialDisplayNames = { [uiLang()]: profile.display_name };
+            }
+            setDisplayNames(reconcile(initialDisplayNames));
+            
+            const s_values = profile.sponsor_values;
+            if (Array.isArray(s_values) && s_values.length > 0) {
+                const filledValues = s_values.slice(0, 5).map(v => v || "");
+                while (filledValues.length < 5) filledValues.push("");
+                setSponsorValues(reconcile(filledValues));
+            } else {
+                setSponsorValues(reconcile(["", "", "", "", ""]));
+            }
+            
+            let initialAboutState = {};
+            if (profile.about_me && typeof profile.about_me === 'object') {
+                initialAboutState = profile.about_me;
+            } 
+            else if (profile.about && typeof profile.about === 'string') {
+                initialAboutState = { [uiLang()]: profile.about };
+            }
+            
+            setAbout(reconcile(initialAboutState));
+        }
+    });
+
+    const contextMenuItems = createMemo(() => {
+        const cid = profileCid();
+        if (!cid) return [];
+        return [{
+            label: t("profile.edit.copyProfileCid"),
+            onClick: () => copyToClipboard(cid, "User Profile CID", t)
+        }];
+    });
+
+    const domainLangCodes = createMemo(() => {
+        const locales = domainAssetsConfig?.()?.locales || [];
+        return locales.length > 0 ? locales.map(l => l.code) : ["en"];
+    });
+    
+    const handleAboutChange = (e) => {
+        setAbout(activeLang(), e.currentTarget.value);
+    };
+    
+    const handleDisplayNameChange = (e) => {
+        setDisplayNames(activeLang(), e.currentTarget.value);
+    };
+
+    const handleNameInput = (e) => {
+        const lowerValue = e.currentTarget.value.toLowerCase();
+        setNameInput(lowerValue);
+        setNameError("");
+
+        if (lowerValue === initialName()) {
+            setIsCheckingName(false);
+            clearTimeout(debounceTimer);
+            return;
+        }
+
+        const validCharRegex = /^[a-z0-9.-]*$/;
+        if (!validCharRegex.test(lowerValue)) {
+            setNameError(t("profile.edit.name.errorInvalidChar"));
+            return;
+        }
+        
+        clearTimeout(debounceTimer);
+        if (lowerValue) {
+            setIsCheckingName(true);
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const contract = await getSavvaContract(app, 'UserProfile');
+                    const ownerAddress = await contract.read.owners([lowerValue]);
+                    const checksummedOwner = ownerAddress !== '0x0000000000000000000000000000000000000000' 
+                        ? toChecksumAddress(ownerAddress) 
+                        : null;
+                    
+                    if (checksummedOwner && checksummedOwner.toLowerCase() !== profileData().address.toLowerCase()) {
+                        setNameError(t("profile.edit.name.errorTaken"));
+                    }
+                } catch (err) {
+                    console.error("Error checking name uniqueness:", err);
+                } finally {
+                    setIsCheckingName(false);
+                }
+            }, 500);
+        } else {
+            setIsCheckingName(false);
+        }
+    };
+    
+    const handleSponsorValueChange = (index, value) => {
+        setSponsorValues(index, value.replace(/[^0-9]/g, ''));
+    };
+
+    const isRegisterDisabled = createMemo(() => {
+        return isRegistering() || isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
+    });
+
+    const executeSetName = async () => {
+      if (isRegisterDisabled()) return;
+      setIsRegistering(true);
+      setShowConfirmNameChange(false);
+    
+      try {
+        const contract = await getSavvaContract(app, "UserProfile", { write: true });
+        const hash = await contract.write.setName([nameInput()]);
+        
+        const desiredChain = app.desiredChain();
+        const transport = http(desiredChain.rpcUrls[0]);
+        const publicClient = createPublicClient({ chain: desiredChain, transport });
+        
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== 'success') {
+          throw new Error(`Transaction failed with status: ${receipt.status}`);
+        }
+    
+        pushToast({ type: 'success', message: t('profile.edit.name.registerSuccess') });
+        setInitialName(nameInput());
+        refetch();
+      } catch (err) {
+        pushErrorToast(err, { context: t('profile.edit.name.registerError') });
+      } finally {
+        setIsRegistering(false);
+      }
+    };
+
+    const handleRegisterName = () => {
+        if (initialName()) {
+            setShowConfirmNameChange(true);
+        } else {
+            executeSetName();
+        }
+    };
+
+    const handleAvatarSave = async (blob) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', blob, 'avatar.png');
+
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (!response.ok) throw new Error(`Avatar upload failed: ${response.status}`);
+            const result = await response.json();
+            const newCid = result?.cid;
+            if (!newCid) throw new Error("API did not return a CID for the avatar.");
+
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            await contract.write.setAvatar([newCid]);
+            
+            pushToast({ type: "success", message: t("profile.edit.avatar.success") });
+        } catch (e) {
+            pushErrorToast(e, { context: "Avatar update failed" });
+            throw e;
+        }
+    };
+    
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const profileJson = {
+                display_names: filterEmptyValues({ ...displayNames }),
+                nsfw: nsfwPreference(),
+                about_me: filterEmptyValues({ ...about }),
+                sponsor_values: [...sponsorValues].map(v => Number(v) || 0).filter(v => v > 0),
+            };
+    
+            const profileFile = new File([JSON.stringify(profileJson)], "profile.json", { type: 'application/json' });
+            const formData = new FormData();
+            formData.append('file', profileFile);
+    
+            const response = await fetch(`${httpBase()}store`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+    
+            if (!response.ok) throw new Error(`Profile upload failed: ${response.status}`);
+            const result = await response.json();
+            const newProfileCid = result?.cid;
+            if (!newProfileCid) throw new Error("API did not return a CID for the profile.");
+
+            const contract = await getSavvaContract(app, "UserProfile", { write: true });
+            const hash = await contract.write.setString([toHexBytes32(app.selectedDomainName()), toHexBytes32("profile_cid"), newProfileCid]);
+            
+            const desiredChain = app.desiredChain();
+            const transport = http(desiredChain.rpcUrls[0]);
+            const publicClient = createPublicClient({ chain: desiredChain, transport });
+            await publicClient.waitForTransactionReceipt({ hash });
+
+            pushToast({ type: 'success', message: t('profile.edit.saveSuccess') });
+            refetch();
+        } catch (err) {
+            pushErrorToast(err, { context: t('profile.edit.saveError') });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <>
+            <main class="p-4 max-w-3xl mx-auto space-y-6">
+                <ClosePageButton />
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-semibold">{t("profile.edit.title")}</h2>
+                </div>
+
+                <Show 
+                    when={walletAccount()} 
+                    fallback={
+                        <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                            <p class="text-[hsl(var(--muted-foreground))] text-center">{t("profile.edit.connectWallet")}</p>
+                        </div>
+                    }
+                >
+                    <Switch>
+                        <Match when={profileData.loading}>
+                            <div class="flex justify-center items-center h-48"><Spinner /></div>
+                        </Match>
+                        <Match when={profileData()?.error}>
+                            <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+                                <p class="text-red-500 text-center">{profileData().error}</p>
+                            </div>
+                        </Match>
+                        <Match when={profileData()}>
+                            <div class="space-y-6">
+                                {/* Section 1: Cross Domain Settings */}
+                                <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <h3 class="text-lg font-semibold">{t("profile.edit.crossDomainSettings")}</h3>
+                                    <div class="flex items-start gap-6">
+                                        <div 
+                                            onClick={() => setShowAvatarEditor(true)}
+                                            class="relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
+                                        >
+                                            <IpfsImage
+                                                src={avatar()}
+                                                alt="User Avatar"
+                                                class="w-full h-full object-cover"
+                                                fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
+                                            />
+                                            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <EditIcon class="w-10 h-10 text-white" />
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 space-y-4">
+                                            <div>
+                                                <label for="registered-name" class="font-medium">{t("profile.edit.registeredName")}</label>
+                                                <input
+                                                    id="registered-name"
+                                                    type="text"
+                                                    value={nameInput()}
+                                                    onInput={handleNameInput}
+                                                    classList={{ "border-[hsl(var(--destructive))]": !!nameError() }}
+                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
+                                                />
+                                                <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+                                                    <p>{t("profile.edit.name.help.line1")}</p>
+                                                    <p>{t("profile.edit.name.help.line2")}</p>
+                                                    <p>{t("profile.edit.name.help.line3")}</p>
+                                                </div>
+                                                <Show when={nameError()}>
+                                                  <p class="mt-1 text-xs text-[hsl(var(--destructive))]">{nameError()}</p>
+                                                </Show>
+                                                <button 
+                                                    class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                                                    disabled={isRegisterDisabled()}
+                                                    onClick={handleRegisterName}
+                                                >
+                                                    <Show when={isCheckingName() || isRegistering()} fallback={t("profile.edit.registerName")}>
+                                                        <Spinner class="w-5 h-5" />
+                                                    </Show>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Section 2: Domain Specific Parameters */}
+                                <div class="relative p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
+                                    <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+                                        <ContextMenu items={contextMenuItems()} positionClass="absolute top-2 right-2 z-20" />
+                                    </Show>
+
+                                    <h3 class="text-lg font-semibold">{t("profile.edit.domainSpecificParams")}</h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                        {t("profile.edit.domainLabel")}: <strong>{app.selectedDomainName()}</strong>
+                                    </p>
+                                    
+                                    <div class="relative mt-4 pt-8 p-3 border rounded-lg border-[hsl(var(--border))]">
+                                        <div class="absolute top-2 right-2">
+                                            <LangSelector
+                                                codes={domainLangCodes()}
+                                                value={activeLang()}
+                                                onChange={setActiveLang}
+                                            />
+                                        </div>
+                                        <div class="space-y-4">
+                                            <div>
+                                                <label for="display-name-lang" class="font-medium text-sm">{t("profile.edit.displayName")}</label>
+                                                <input
+                                                    id="display-name-lang"
+                                                    type="text"
+                                                    value={displayNames[activeLang()] || ""}
+                                                    onInput={handleDisplayNameChange}
+                                                    class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] mt-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="font-medium text-sm">{t("profile.edit.aboutMe")}</label>
+                                                <textarea
+                                                    value={about[activeLang()] || ""}
+                                                    onInput={handleAboutChange}
+                                                    class="mt-1 w-full min-h-[120px] p-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                                    placeholder="Tell us about yourself..."
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
+                                        <label for="nsfw-preference" class="font-medium justify-self-end">{t("profile.edit.nsfw.label")}</label>
+                                        <select
+                                            id="nsfw-preference"
+                                            value={nsfwPreference()}
+                                            onChange={(e) => setNsfwPreference(e.currentTarget.value)}
+                                            class="w-full max-w-sm px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                        >
+                                            <option value="s">{t("profile.edit.nsfw.show")}</option>
+                                            <option value="w">{t("profile.edit.nsfw.warn")}</option>
+                                            <option value="h">{t("profile.edit.nsfw.hide")}</option>
+                                        </select>
+
+                                        <label class="font-medium justify-self-end self-start pt-2">{t("profile.edit.sponsorValues.label")}</label>
+                                        <div class="flex items-center gap-2">
+                                            <For each={sponsorValues}>
+                                                {(value, index) => (
+                                                    <input 
+                                                        type="number"
+                                                        value={value}
+                                                        onInput={(e) => handleSponsorValueChange(index(), e.currentTarget.value)}
+                                                        class="w-full px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                                                    />
+                                                )}
+                                            </For>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <button
+                                        class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 disabled:opacity-60"
+                                        onClick={handleSave}
+                                        disabled={isSaving()}
+                                    >
+                                        <Show when={isSaving()} fallback={t("profile.edit.saveButton")}>
+                                            <div class="flex items-center gap-2">
+                                                <Spinner class="w-5 h-5" />
+                                                <span>{t("profile.edit.saving")}</span>
+                                            </div>
+                                        </Show>
+                                    </button>
+                                </div>
+                            </div>
+                        </Match>
+                    </Switch>
+                </Show>
+            </main>
+            <AvatarEditorModal 
+                isOpen={showAvatarEditor()}
+                onClose={() => setShowAvatarEditor(false)}
+                onSave={handleAvatarSave}
+            />
+            <ConfirmModal
+                isOpen={showConfirmNameChange()}
+                onClose={() => setShowConfirmNameChange(false)}
+                onConfirm={executeSetName}
+                title={t("profile.edit.name.confirmChangeTitle")}
+                message={t("profile.edit.name.confirmChangeMessage", { name: initialName() })}
+            />
+        </>
+    );
+}
+</file>
+
 <file path="src/components/editor/wizard_steps/StepPublish.jsx">
 // src/components/editor/wizard_steps/StepPublish.jsx
 import { createSignal, onMount, Show, createEffect, on } from "solid-js";
@@ -31831,92 +31588,6 @@ ipfs config --json Gateway.HTTPHeaders.Access-Control-Allow-Origin '${wildcardOr
 }
 </file>
 
-<file path="src/components/ui/UserCard.jsx">
-// src/components/ui/UserCard.jsx
-import { Show, createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "./IpfsImage.jsx";
-import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
-import VerifiedBadge from "./icons/VerifiedBadge.jsx";
-import StakerLevelIcon from "./StakerLevelIcon.jsx";
-import { navigate } from "../../routing/hashRouter.js";
-
-function isVerified(a) {
-    return Boolean(a && a.name);
-}
-
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function UserCard(props) {
-    const { t } = useApp();
-    const author = () => props.author || {};
-
-    const hasName = createMemo(() => author().name || author().display_name);
-
-    const handleUserClick = (e) => {
-        e.stopPropagation();
-        const user = author();
-        if (!user) return;
-        const targetPath = user.name ? `/@${user.name}` : `/${user.address}`;
-        navigate(targetPath);
-    };
-
-    return (
-        <Show when={author()}>
-            <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-10'}`}>
-                <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
-                    <Show when={!props.compact}>
-                        <div class="w-8 h-8 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
-                            <Show
-                                when={author().avatar}
-                                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-                            >
-                                <IpfsImage
-                                    src={author().avatar}
-                                    alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
-                                    class="w-full h-full object-cover"
-                                />
-                            </Show>
-                        </div>
-                    </Show>
-
-                    <div class="min-w-0">
-                        <Show when={author().display_name && !props.compact}>
-                            <div class="text-xs truncate text-[hsl(var(--foreground))] w-full">
-                                {author().display_name}
-                            </div>
-                        </Show>
-
-                        <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
-                            <Show when={author().name}>
-                                <div class="min-w-0 flex items-center">
-                                    <span class="truncate uppercase font-semibold">{author().name}</span>
-                                    <Show when={isVerified(author())}>
-                                        <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
-                                    </Show>
-                                </div>
-                            </Show>
-                            
-                            <Show when={!hasName() && author().address}>
-                                <span class="font-mono">{shortAddr(author().address)}</span>
-                            </Show>
-
-                            <StakerLevelIcon
-                                staked={author().staked}
-                                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Show>
-    );
-}
-</file>
-
 <file path="src/components/App.jsx">
 // src/components/App.jsx
 import { createSignal, onMount, Show, createMemo, createEffect, on, Switch, Match } from "solid-js";
@@ -32063,6 +31734,151 @@ export default function App() {
 }
 </file>
 
+<file path="src/components/RightPane.jsx">
+// src/components/RightPane.jsx
+import { createSignal, Show, createMemo, createEffect } from "solid-js";
+import { navigate } from "../routing/hashRouter";
+import { useApp } from "../context/AppContext.jsx";
+import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import ThemeToggle from "./ui/ThemeToggle.jsx";
+import LangSelector from "./ui/LangSelector.jsx";
+import RightPaneFooter from "./RightPaneFooter.jsx";
+import { dbg } from "../utils/debug.js";
+
+export default function RightPane({ isOpen, onClose }) {
+  const app = useApp();
+  const { t } = app;
+  const [showSwitch, setShowSwitch] = createSignal(false);
+
+  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  const domainLangCodes = createMemo(() => {
+    const config = app.domainAssetsConfig?.();
+    if (!config || !Array.isArray(config.locales)) {
+      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
+      return [];
+    }
+    const codes = config.locales.map((l) => l.code).filter(Boolean);
+    dbg.log("RightPane", "domainLangCodes calculated:", codes);
+    return codes;
+  });
+
+  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
+
+  createEffect(() => {
+    const availableCodes = domainLangCodes();
+    const currentLang = app.lang?.();
+    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
+
+    if (availableCodes.length === 0) {
+      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
+      return;
+    }
+
+    if (!availableCodes.includes(currentLang)) {
+      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
+      app.setLang?.(availableCodes[0]);
+    } else {
+      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
+    }
+  });
+
+  return (
+    <>
+      <div
+        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
+        onClick={handlePanelClick}
+        data-testid="right-pane"
+        style="border-left: 1px solid hsl(var(--border));"
+      >
+        <div class="h-full flex flex-col p-4 space-y-3">
+          <nav class="pt-2">
+            <ul class="space-y-3">
+              <li><ThemeToggle /></li>
+
+              <Show when={showLangSelector()}>
+                <li><LangSelector codes={domainLangCodes()} /></li>
+              </Show>
+
+              {/* Gear settings link */}
+              <Show when={app.config()?.gear}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => setShowSwitch(true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
+                  >
+                    {t("rightPane.switch.open")}
+                  </div>
+                </li>
+              </Show>
+
+              {/* Documentation link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/docs"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
+                  aria-label={t("docs.nav")}
+                  title={t("docs.nav")}
+                >
+                  {t("docs.nav")}
+                </div>
+              </li>
+
+              {/* Settings link */}
+              <li>
+                <div
+                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/settings"); 
+                    onClose(); 
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
+                >
+                  {t("rightPane.settings")}
+                </div>
+              </li>
+            </ul>
+          </nav>
+          <RightPaneFooter />
+        </div>
+      </div>
+
+      {isOpen() && (
+        <div
+          class="fixed inset-0 z-20"
+          style={{ "background-color": "rgba(0,0,0,0.2)" }}
+          data-testid="overlay"
+          onClick={onClose}
+        />
+      )}
+
+      <Show when={showSwitch()} keyed>
+        <SwitchConnectDialog
+          open={true}
+          domain={app.config()?.domain}
+          backendLink={app.config()?.backendLink}
+          loading={app.loading()}
+          error={app.error()}
+          onApply={() => { }}
+          onReset={app.clearConnectOverride}
+          onClose={() => setShowSwitch(false)}
+        />
+      </Show>
+    </>
+  );
+}
+</file>
+
 <file path="src/i18n/useI18n.js">
 // src/i18n/useI18n.js
 import { createSignal } from "solid-js";
@@ -32199,6 +32015,359 @@ export function useI18n() {
     };
   }
   return i18nSingleton;
+}
+</file>
+
+<file path="src/pages/ProfilePage.jsx">
+// src/pages/ProfilePage.jsx
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, onCleanup, onMount } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { useHashRouter, navigate } from "../routing/hashRouter.js";
+import ClosePageButton from "../components/ui/ClosePageButton.jsx";
+import Spinner from "../components/ui/Spinner.jsx";
+import IpfsImage from "../components/ui/IpfsImage.jsx";
+import UnknownUserIcon from "../components/ui/icons/UnknownUserIcon.jsx";
+import StakerLevelIcon from "../components/ui/StakerLevelIcon.jsx";
+import VerifiedBadge from "../components/ui/icons/VerifiedBadge.jsx";
+import Tabs from "../components/ui/Tabs.jsx";
+import Address from "../components/ui/Address.jsx";
+import { ipfs } from "../ipfs/index.js";
+import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../components/ui/icons/ProfileIcons.jsx";
+import PostsTab from "../components/profile/PostsTab.jsx";
+import SubscribersTab from "../components/profile/SubscribersTab.jsx";
+import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
+import WalletTab from "../components/profile/WalletTab.jsx";
+import TokenValue from "../components/ui/TokenValue.jsx";
+import { walletAccount } from "../blockchain/wallet.js";
+
+// Data fetcher for the user profile
+async function fetchUserProfile({ app, identifier }) {
+  if (!identifier || !app.wsCall) return null;
+
+  try {
+    const wsParams = { domain: app.selectedDomainName() };
+    const currentUser = app.authorizedUser();
+    if (currentUser) {
+      wsParams.caller = currentUser.address;
+    }
+
+    if (identifier.startsWith('@')) {
+      wsParams.user_name = identifier.substring(1);
+    } else {
+      wsParams.user_addr = identifier;
+    }
+
+    return await app.wsCall('get-user', wsParams);
+  } catch (error) {
+    console.error("Failed to fetch user profile:", error);
+    return { error: error.message };
+  }
+}
+
+// Data fetcher for the profile details from IPFS
+async function fetchProfileDetails(cid, app) {
+  if (!cid) return null;
+  try {
+    const { data } = await ipfs.getJSONBest(app, cid);
+    return data;
+  } catch (e) {
+    console.error(`Failed to fetch profile details from IPFS CID: ${cid}`, e);
+    return { error: e.message };
+  }
+}
+
+export default function ProfilePage() {
+  const app = useApp();
+  const { t } = app;
+  const { route } = useHashRouter();
+
+  const identifier = createMemo(() => {
+    const path = route();
+    return path.startsWith('/') ? path.substring(1) : path;
+  });
+
+  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
+  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
+
+  const [activeTab, setActiveTab] = createSignal('posts');
+
+  const isMyProfile = createMemo(() => {
+    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
+    const profileAddr = userResource()?.address?.toLowerCase();
+    return !!authorizedAddr && authorizedAddr === profileAddr;
+  });
+
+  const canEdit = createMemo(() => {
+    const connectedWallet = walletAccount()?.toLowerCase();
+    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
+  });
+
+  const handleEditProfile = () => {
+    navigate(`/profile-edit/${identifier()}`);
+  };
+
+  const TABS = createMemo(() => {
+    const tabs = [
+      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+    ];
+
+    if (isMyProfile()) {
+      tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
+    }
+
+    return tabs;
+  });
+
+  createEffect(() => {
+    const availableTabs = TABS();
+    const currentActive = activeTab();
+    if (!availableTabs.some(tab => tab.id === currentActive)) {
+      setActiveTab('posts');
+    }
+  });
+
+  // ---- locale-aware display name with live alert updates (no global changes needed) ----
+  const uiLang = () => (app.lang?.() || "en").toLowerCase();
+  const [overlayNames, setOverlayNames] = createSignal(null);
+
+  // Subscribe to any user profile/update alert and apply display_names if it matches this page's user.
+  onMount(() => {
+    const off = app.alertBus?.on?.("*", ({ type, payload }) => {
+      try {
+        const d = payload?.data || {};
+        const addr = String(d.user?.address || d.address || "").toLowerCase();
+        const pageAddr = String(userResource()?.address || "").toLowerCase();
+        const names = d.display_names || d.user?.display_names;
+        if (addr && names && addr === pageAddr) {
+          setOverlayNames(names);
+        }
+      } catch {
+        /* ignore */
+      }
+    });
+    onCleanup(() => { try { off && off(); } catch {} });
+  });
+
+  const displayName = createMemo(() => {
+    const u = userResource();
+    if (!u) return "";
+    const namesFromAlert = overlayNames();
+    if (namesFromAlert && typeof namesFromAlert === "object") {
+      const n = namesFromAlert[uiLang()];
+      if (n) return n;
+    }
+    const serverNames = u.display_names;
+    if (serverNames && typeof serverNames === "object") {
+      const n = serverNames[uiLang()];
+      if (n) return n;
+    }
+    return u.display_name || u.name || "";
+  });
+
+  const aboutText = createMemo(() => {
+    const details = profileDetails();
+    if (!details) return "";
+    const lang = app.lang();
+
+    if (details.about_me && typeof details.about_me === 'object') {
+      return details.about_me[lang] || details.about_me.en || Object.values(details.about_me)[0] || "";
+    }
+
+    if (details.about && typeof details.about === 'string') {
+      return details.about;
+    }
+
+    return "";
+  });
+
+  const isSubscribed = createMemo(() => {
+    const u = userResource();
+    return u && u.i_sponsor_for > 0;
+  });
+
+  return (
+    <main class="sv-container p-4 max-w-4xl mx-auto">
+      <ClosePageButton />
+
+      <Switch>
+        <Match when={userResource.loading}>
+          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+        </Match>
+        <Match when={userResource.error || userResource()?.error}>
+          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+            <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("profile.error.title")}</h3>
+            <p class="text-sm mt-1">{userResource.error?.message || userResource()?.error}</p>
+          </div>
+        </Match>
+        <Match when={userResource()}>
+          {(user) =>
+            <div class="space-y-6">
+              {/* Profile Header */}
+              <div class="flex justify-between items-end gap-4">
+                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                  <div class="flex flex-col items-center gap-4 shrink-0">
+                    <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
+                      <IpfsImage
+                        src={user().avatar}
+                        alt={`${user().name} avatar`}
+                        class="w-full h-full object-cover"
+                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
+                      />
+                    </div>
+                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
+                      <Show
+                        when={!isSubscribed()}
+                        fallback={
+                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                            {t("profile.unsubscribe")}
+                          </button>
+                        }
+                      >
+                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
+                          {t("profile.subscribe")}
+                        </button>
+                      </Show>
+                    </Show>
+                  </div>
+
+                  <div class="flex-1 w-full text-center sm:text-left space-y-3">
+                    <div class="flex flex-col items-center sm:items-start">
+                      <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
+                      <Show when={user().name}>
+                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
+                          <span>{user().name.toUpperCase()}</span>
+                          <VerifiedBadge class="w-4 h-4" />
+                        </div>
+                      </Show>
+                      <div class="mt-1">
+                        <Address address={user().address} format="full" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-2 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
+                        <TokenValue amount={user().staked} />
+                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                        <TokenValue amount={user().total_sponsoring} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 text-sm">
+                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                        <TokenValue amount={user().total_sponsored} />
+                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                      </div>
+                    </div>
+
+                    <Show when={aboutText()}>
+                      <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
+                    </Show>
+                  </div>
+                </div>
+
+                <div class="flex-shrink-0">
+                  <Show when={canEdit()}>
+                    <button
+                      onClick={handleEditProfile}
+                      class="px-4 py-2 text-sm rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--accent))]"
+                      title={t("profile.edit.title")}
+                    >
+                      {t("profile.edit.buttonLabel")}
+                    </button>
+                  </Show>
+                </div>
+              </div>
+
+              {/* Profile Tabs */}
+              <div>
+                <Tabs items={TABS()} value={activeTab()} onChange={setActiveTab} compactWidth={640} />
+                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
+                  <Switch>
+                    <Match when={activeTab() === 'posts'}>
+                      <PostsTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'subscribers'}>
+                      <SubscribersTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'subscriptions'}>
+                      <SubscriptionsTab user={user()} />
+                    </Match>
+                    <Match when={activeTab() === 'wallet'}>
+                      <WalletTab user={user()} />
+                    </Match>
+                  </Switch>
+                </div>
+              </div>
+            </div>
+          }
+        </Match>
+      </Switch>
+    </main>
+  );
+}
+</file>
+
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+@import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
+@import "./styles/layout.css";
+@import "../public/domain_default/domain.css";
+
+/* Custom utility for multi-line truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Animation for the post fund badge */
+@keyframes bounce-short {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-bounce-short {
+  animation: bounce-short 0.3s ease-in-out;
+}
+
+/* General purpose update animation */
+@keyframes default-update-animation {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  49% {
+    transform: translateY(50%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.default-animation {
+  animation: default-update-animation 0.4s ease-in-out;
 }
 </file>
 
@@ -32707,147 +32876,262 @@ export default function CommentCard(props) {
 }
 </file>
 
-<file path="src/components/RightPane.jsx">
-// src/components/RightPane.jsx
-import { createSignal, Show, createMemo, createEffect } from "solid-js";
-import { navigate } from "../routing/hashRouter";
-import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
-import ThemeToggle from "./ui/ThemeToggle.jsx";
-import LangSelector from "./ui/LangSelector.jsx";
-import RightPaneFooter from "./RightPaneFooter.jsx";
-import { dbg } from "../utils/debug.js";
+<file path="src/components/ui/UserCard.jsx">
+// src/components/ui/UserCard.jsx
+import { Show, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "./IpfsImage.jsx";
+import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
+import VerifiedBadge from "./icons/VerifiedBadge.jsx";
+import StakerLevelIcon from "./StakerLevelIcon.jsx";
+import { navigate } from "../../routing/hashRouter.js";
 
-export default function RightPane({ isOpen, onClose }) {
+function isVerified(a) {
+  return Boolean(a && a.name);
+}
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function UserCard(props) {
   const app = useApp();
   const { t } = app;
-  const [showSwitch, setShowSwitch] = createSignal(false);
+  const author = () => props.author || {};
+  const uiLang = () => (app.lang?.() || "en").toLowerCase();
 
-  const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
-
-  const domainLangCodes = createMemo(() => {
-    const config = app.domainAssetsConfig?.();
-    if (!config || !Array.isArray(config.locales)) {
-      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
-      return [];
-    }
-    const codes = config.locales.map((l) => l.code).filter(Boolean);
-    dbg.log("RightPane", "domainLangCodes calculated:", codes);
-    return codes;
+  const displayName = createMemo(() => {
+    const a = author();
+    const addr = String(a.address || "").toLowerCase();
+    const overlay = app.userDisplayNames?.()?.[addr]?.[uiLang()];
+    // fallbacks: new map -> server map -> legacy -> nothing
+    return overlay
+      ? overlay
+      : (a.display_names?.[uiLang()] || a.display_name || "");
   });
 
-  const showLangSelector = createMemo(() => domainLangCodes().length > 1);
+  const hasName = createMemo(() => author().name || displayName() || author().display_name);
 
-  createEffect(() => {
-    const availableCodes = domainLangCodes();
-    const currentLang = app.lang?.();
-    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
-
-    if (availableCodes.length === 0) {
-      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
-      return;
-    }
-
-    if (!availableCodes.includes(currentLang)) {
-      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
-      app.setLang?.(availableCodes[0]);
-    } else {
-      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
-    }
-  });
+  const handleUserClick = (e) => {
+    e.stopPropagation();
+    const user = author();
+    if (!user) return;
+    const targetPath = user.name ? `/@${user.name}` : `/${user.address}`;
+    navigate(targetPath);
+  };
 
   return (
-    <>
-      <div
-        class={`fixed top-0 right-0 w-64 h-full bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg z-40 ${isOpen() ? "right-0" : "right-[-256px]"} transition-all duration-300`}
-        onClick={handlePanelClick}
-        data-testid="right-pane"
-        style="border-left: 1px solid hsl(var(--border));"
-      >
-        <div class="h-full flex flex-col p-4 space-y-3">
-          <nav class="pt-2">
-            <ul class="space-y-3">
-              <li><ThemeToggle /></li>
+    <Show when={author()}>
+      <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-10'}`}>
+        <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
+          <Show when={!props.compact}>
+            <div class="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+              <Show
+                when={author().avatar}
+                fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+              >
+                <IpfsImage
+                  src={author().avatar}
+                  alt={`${author().name || t("default.user")} ${t("default.avatar")}`}
+                  class="w-full h-full object-cover"
+                />
+              </Show>
+            </div>
+          </Show>
 
-              <Show when={showLangSelector()}>
-                <li><LangSelector codes={domainLangCodes()} /></li>
+          <div class="min-w-0">
+            <Show when={displayName() && !props.compact}>
+              <div class="text-xs pt-1 truncate text-[hsl(var(--foreground))] w-full">
+                {displayName()}
+              </div>
+            </Show>
+
+            <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
+              <Show when={author().name}>
+                <div class="min-w-0 flex items-center">
+                  <span class="truncate uppercase font-semibold">{author().name}</span>
+                  <Show when={isVerified(author())}>
+                    <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
+                  </Show>
+                </div>
               </Show>
 
-              {/* Gear settings link */}
-              <Show when={app.config()?.gear}>
-                <li>
-                  <div
-                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                    role="button" tabIndex={0}
-                    onClick={() => setShowSwitch(true)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSwitch(true); } }}
-                  >
-                    {t("rightPane.switch.open")}
-                  </div>
-                </li>
+              <Show when={!hasName() && author().address}>
+                <span class="font-mono">{shortAddr(author().address)}</span>
               </Show>
 
-              {/* Documentation link */}
-              <li>
-                <div
-                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/docs"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
-                  aria-label={t("docs.nav")}
-                  title={t("docs.nav")}
-                >
-                  {t("docs.nav")}
-                </div>
-              </li>
-
-              {/* Settings link */}
-              <li>
-                <div
-                  class="px-2 rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
-                  role="button" tabIndex={0}
-                  onClick={() => {
-                    app.setSavedScrollY(window.scrollY);
-                    navigate("/settings"); 
-                    onClose(); 
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
-                >
-                  {t("rightPane.settings")}
-                </div>
-              </li>
-            </ul>
-          </nav>
-          <RightPaneFooter />
+              <StakerLevelIcon
+                staked={author().staked}
+                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
+              />
+            </div>
+          </div>
         </div>
       </div>
+    </Show>
+  );
+}
+</file>
 
-      {isOpen() && (
-        <div
-          class="fixed inset-0 z-20"
-          style={{ "background-color": "rgba(0,0,0,0.2)" }}
-          data-testid="overlay"
-          onClick={onClose}
-        />
-      )}
+<file path="src/components/Header.jsx">
+// src/components/Header.jsx
+import { Show, createSignal, onMount, createMemo } from "solid-js";
+import { useApp } from "../context/AppContext.jsx";
+import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
+import { authorize } from "../blockchain/auth.js";
+import { pushErrorToast } from "../ui/toast.js";
+import { getChainLogo } from "../blockchain/chainLogos";
+import BrandLogo from "./ui/BrandLogo.jsx";
+import Container from "./layout/Container";
+import AuthorizedUser from "./auth/AuthorizedUser.jsx";
+import NewPostButton from "./main/NewPostButton.jsx";
+import TokenPrice from "./main/TokenPrice.jsx";
+import { dbg } from "../utils/debug.js";
 
-      <Show when={showSwitch()} keyed>
-        <SwitchConnectDialog
-          open={true}
-          domain={app.config()?.domain}
-          backendLink={app.config()?.backendLink}
-          loading={app.loading()}
-          error={app.error()}
-          onApply={() => { }}
-          onReset={app.clearConnectOverride}
-          onClose={() => setShowSwitch(false)}
-        />
-      </Show>
-    </>
+function shortAddr(addr) {
+  if (!addr) return "";
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
+export default function Header({ onTogglePane }) {
+  const app = useApp();
+  const { t } = app;
+  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
+
+  const desiredId = () => app.desiredChainId();
+  const mismatchedChain = () =>
+    walletChainId() != null &&
+    desiredId() != null &&
+    walletChainId() !== desiredId();
+
+  const isAddressMismatched = createMemo(() => {
+    const walletAcc = walletAccount();
+    const authorizedAcc = app.authorizedUser()?.address;
+    if (!authorizedAcc || !walletAcc) return false;
+    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
+  });
+
+  onMount(() => {
+    if (isWalletAvailable()) eagerConnect();
+  });
+
+  const handleLoginClick = async () => {
+    setIsLoggingIn(true);
+    try {
+      await authorize(app);
+    } catch (e) {
+      console.error("Authorization failed:", e);
+      pushErrorToast(e, { context: "Login failed" });
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  async function onConnect() {
+    dbg.log("Header:onConnect", "Connect process started.");
+    try {
+      dbg.log("Header:onConnect", "Attempting to call connectWallet()...");
+      await connectWallet();
+      dbg.log("Header:onConnect", "connectWallet() succeeded. Account:", walletAccount());
+
+      if (desiredId()) {
+        dbg.log("Header:onConnect", "Ensuring wallet is on desired chain:", desiredId());
+        await app.ensureWalletOnDesiredChain();
+        dbg.log("Header:onConnect", "Chain check successful.");
+      }
+    } catch (e) {
+      dbg.error("Header:onConnect", "Error during connection process:", e);
+      const errorContext = { context: "Failed to connect wallet" };
+      if (e?.message?.toLowerCase().includes("timed out")) {
+          errorContext.help = t("wallet.error.timeoutHelp");
+      }
+      pushErrorToast(e, errorContext);
+    }
+  }
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(walletAccount());
+    } catch (e) {
+      console.error("Failed to copy address:", e);
+    }
+  }
+
+  async function onSwitchChain() {
+    try {
+      await app.ensureWalletOnDesiredChain();
+    } catch (e) {
+      pushErrorToast(e, { context: "Failed to switch chain" });
+    }
+  }
+
+  const chainLogoSrc = () => getChainLogo(desiredId());
+
+  return (
+    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
+      <Container>
+        <div class="h-12 px-2 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+            <TokenPrice />
+          </div>
+
+          <div class="flex items-center gap-3">
+            <Show when={app.authorizedUser() && walletAccount()}>
+              <NewPostButton />
+            </Show>
+
+            <Show when={app.authorizedUser()}>
+              <AuthorizedUser />
+            </Show>
+
+            <Show
+              when={walletAccount()}
+              fallback={
+                <Show when={isWalletAvailable()}>
+                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
+                    {t("wallet.connect")}
+                  </button>
+                </Show>
+              }
+            >
+              {/* This content renders when wallet IS connected */}
+              <Show when={!app.authorizedUser()}>
+                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
+                  {isLoggingIn() ? t("common.checking") : "Login"}
+                </button>
+              </Show>
+
+              <div class="flex items-center gap-2">
+                <button
+                    classList={{
+                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
+                        "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                    }}
+                    onClick={copyAddress}
+                    title={t("wallet.copyAddress")}
+                >
+                    {shortAddr(walletAccount())}
+                </button>
+                <Show when={!mismatchedChain()} fallback={
+                    <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
+                        {t("wallet.changeChain")}
+                    </button>
+                }>
+                    <Show when={chainLogoSrc()}>
+                        <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
+                    </Show>
+                </Show>
+              </div>
+            </Show>
+
+            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+          </div>
+        </div>
+      </Container>
+    </header>
   );
 }
 </file>
@@ -33698,68 +33982,6 @@ export default {
 };
 </file>
 
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-@import "./styles/tabs.css";
-@import "./styles/themed-controls.css";
-@import "./styles/layout.css";
-@import "../public/domain_default/domain.css";
-
-/* Custom utility for multi-line truncation */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-
-/* Animation for the post fund badge */
-@keyframes bounce-short {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-50%);
-  }
-}
-
-.animate-bounce-short {
-  animation: bounce-short 0.3s ease-in-out;
-}
-
-/* General purpose update animation */
-@keyframes default-update-animation {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  49% {
-    transform: translateY(50%);
-    opacity: 0;
-  }
-  50% {
-    transform: translateY(-50%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.default-animation {
-  animation: default-update-animation 0.4s ease-in-out;
-}
-</file>
-
 <file path="src/alerts/handlers.js">
 // src/alerts/handlers.js
 import { dbg } from "../utils/debug";
@@ -33839,168 +34061,21 @@ export function handleReact(app, payload) {
     dbg.log("Alerts:react", `Ignoring react alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`);
   }
 }
-</file>
 
-<file path="src/components/Header.jsx">
-// src/components/Header.jsx
-import { Show, createSignal, onMount, createMemo } from "solid-js";
-import { useApp } from "../context/AppContext.jsx";
-import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet";
-import { authorize } from "../blockchain/auth.js";
-import { pushErrorToast } from "../ui/toast.js";
-import { getChainLogo } from "../blockchain/chainLogos";
-import BrandLogo from "./ui/BrandLogo.jsx";
-import Container from "./layout/Container";
-import AuthorizedUser from "./auth/AuthorizedUser.jsx";
-import NewPostButton from "./main/NewPostButton.jsx";
-import TokenPrice from "./main/TokenPrice.jsx";
-import { dbg } from "../utils/debug.js";
+export function handleUserInfoChanged(app, payload) {
+  try {
+    const u = payload?.user || payload?.data?.user;
+    const addr = String(u?.address || "").toLowerCase();
+    if (!addr) return;
 
-function shortAddr(addr) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
-export default function Header({ onTogglePane }) {
-  const app = useApp();
-  const { t } = app;
-  const [isLoggingIn, setIsLoggingIn] = createSignal(false);
-
-  const desiredId = () => app.desiredChainId();
-  const mismatchedChain = () =>
-    walletChainId() != null &&
-    desiredId() != null &&
-    walletChainId() !== desiredId();
-
-  const isAddressMismatched = createMemo(() => {
-    const walletAcc = walletAccount();
-    const authorizedAcc = app.authorizedUser()?.address;
-    if (!authorizedAcc || !walletAcc) return false;
-    return walletAcc.toLowerCase() !== authorizedAcc.toLowerCase();
-  });
-
-  onMount(() => {
-    if (isWalletAvailable()) eagerConnect();
-  });
-
-  const handleLoginClick = async () => {
-    setIsLoggingIn(true);
-    try {
-      await authorize(app);
-    } catch (e) {
-      console.error("Authorization failed:", e);
-      pushErrorToast(e, { context: "Login failed" });
-    } finally {
-      setIsLoggingIn(false);
+    const names = u.display_names || {};
+    if (names && typeof names === "object") {
+      app.setUserDisplayNames?.(addr, names);
+      dbg.log("Alerts:user_info_changed", "display_names updated", { addr, names });
     }
-  };
-
-  async function onConnect() {
-    dbg.log("Header:onConnect", "Connect process started.");
-    try {
-      dbg.log("Header:onConnect", "Attempting to call connectWallet()...");
-      await connectWallet();
-      dbg.log("Header:onConnect", "connectWallet() succeeded. Account:", walletAccount());
-
-      if (desiredId()) {
-        dbg.log("Header:onConnect", "Ensuring wallet is on desired chain:", desiredId());
-        await app.ensureWalletOnDesiredChain();
-        dbg.log("Header:onConnect", "Chain check successful.");
-      }
-    } catch (e) {
-      dbg.error("Header:onConnect", "Error during connection process:", e);
-      const errorContext = { context: "Failed to connect wallet" };
-      if (e?.message?.toLowerCase().includes("timed out")) {
-          errorContext.help = t("wallet.error.timeoutHelp");
-      }
-      pushErrorToast(e, errorContext);
-    }
+  } catch (e) {
+    dbg.warn?.("Alerts:user_info_changed", "failed to handle", e);
   }
-
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(walletAccount());
-    } catch (e) {
-      console.error("Failed to copy address:", e);
-    }
-  }
-
-  async function onSwitchChain() {
-    try {
-      await app.ensureWalletOnDesiredChain();
-    } catch (e) {
-      pushErrorToast(e, { context: "Failed to switch chain" });
-    }
-  }
-
-  const chainLogoSrc = () => getChainLogo(desiredId());
-
-  return (
-    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
-      <Container>
-        <div class="h-12 px-2 flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
-            <TokenPrice />
-          </div>
-
-          <div class="flex items-center gap-3">
-            <Show when={app.authorizedUser() && walletAccount()}>
-              <NewPostButton />
-            </Show>
-
-            <Show when={app.authorizedUser()}>
-              <AuthorizedUser />
-            </Show>
-
-            <Show
-              when={walletAccount()}
-              fallback={
-                <Show when={isWalletAvailable()}>
-                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
-                    {t("wallet.connect")}
-                  </button>
-                </Show>
-              }
-            >
-              {/* This content renders when wallet IS connected */}
-              <Show when={!app.authorizedUser()}>
-                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
-                  {isLoggingIn() ? t("common.checking") : "Login"}
-                </button>
-              </Show>
-
-              <div class="flex items-center gap-2">
-                <button
-                    classList={{
-                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]": true,
-                        "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
-                    }}
-                    onClick={copyAddress}
-                    title={t("wallet.copyAddress")}
-                >
-                    {shortAddr(walletAccount())}
-                </button>
-                <Show when={!mismatchedChain()} fallback={
-                    <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
-                        {t("wallet.changeChain")}
-                    </button>
-                }>
-                    <Show when={chainLogoSrc()}>
-                        <img src={chainLogoSrc()} alt="chain" class="w-5 h-5" title={t("wallet.onRequiredNetwork")} />
-                    </Show>
-                </Show>
-              </div>
-            </Show>
-
-            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </button>
-          </div>
-        </div>
-      </Container>
-    </header>
-  );
 }
 </file>
 
@@ -35044,6 +35119,11 @@ export default {
 };
 </file>
 
+<file path="src/version.js">
+// src/version.js
+export const APP_VERSION = "0.106";
+</file>
+
 <file path="src/pages/PostPage.jsx">
 // src/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
@@ -35386,11 +35466,6 @@ export default function PostPage() {
     </main>
   );
 }
-</file>
-
-<file path="src/version.js">
-// src/version.js
-export const APP_VERSION = "0.106";
 </file>
 
 <file path="src/components/feed/PostCard.jsx">
@@ -35750,13 +35825,12 @@ export function AppProvider(props) {
     const authorizedAcc = auth.authorizedUser()?.address;
     if (!authorizedAcc) throw new Error("User is not authorized.");
     
-    const walletClient = getRawWalletClient(); // Uses the raw client internally
+    const walletClient = getRawWalletClient();
     const walletAcc = walletClient.account.address;
 
     if (walletAcc.toLowerCase() !== authorizedAcc.toLowerCase()) {
       try {
         await promptSwitchAccount(authorizedAcc);
-        // After success, the walletAccount() signal is updated, so we need a fresh client.
         return getRawWalletClient();
       } catch (e) {
         throw new Error(i18n.t("wallet.error.userCanceled"));
@@ -35764,6 +35838,14 @@ export function AppProvider(props) {
     }
     
     return walletClient;
+  }
+
+  // ── overlay for locale-aware display names (address -> { langCode: name }) ──
+  const [userDisplayNames, _setUserDisplayNames] = Solid.createSignal({});
+  function setUserDisplayNames(address, namesMap) {
+    if (!address || !namesMap || typeof namesMap !== "object") return;
+    const key = String(address).toLowerCase();
+    _setUserDisplayNames((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...namesMap } }));
   }
 
   const value = {
@@ -35788,6 +35870,10 @@ export function AppProvider(props) {
     requiredAccount,
     resolveSwitchAccountPrompt,
     rejectSwitchAccountPrompt,
+
+    // expose overlay + setter for alerts/pages
+    userDisplayNames,
+    setUserDisplayNames,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
@@ -36914,7 +37000,8 @@ export default {
   "profile.edit.saveButton": "Save Changes",
   "profile.edit.saving": "Saving...",
   "profile.edit.saveSuccess": "Profile updated successfully!",
-  "profile.edit.saveError": "Failed to save profile."
+  "profile.edit.saveError": "Failed to save profile.",
+  "profile.edit.buttonLabel": "Edit Profile"
 };
 </file>
 

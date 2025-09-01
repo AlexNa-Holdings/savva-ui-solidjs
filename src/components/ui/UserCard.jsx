@@ -46,7 +46,7 @@ export default function UserCard(props) {
       <div class={`flex items-center w-full ${props.compact ? 'h-auto' : 'h-10'}`}>
         <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
           <Show when={!props.compact}>
-            <div class="w-8 h-8 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
+            <div class="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
               <Show
                 when={author().avatar}
                 fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
@@ -62,12 +62,12 @@ export default function UserCard(props) {
 
           <div class="min-w-0">
             <Show when={displayName() && !props.compact}>
-              <div class="text-xs truncate text-[hsl(var(--foreground))] w-full">
+              <div class="text-xs pt-1 truncate text-[hsl(var(--foreground))] w-full">
                 {displayName()}
               </div>
             </Show>
 
-            <div class={`flex items-center gap-1 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
+            <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
               <Show when={author().name}>
                 <div class="min-w-0 flex items-center">
                   <span class="truncate uppercase font-semibold">{author().name}</span>
