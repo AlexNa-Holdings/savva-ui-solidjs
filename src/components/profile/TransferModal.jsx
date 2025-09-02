@@ -35,7 +35,7 @@ export default function TransferModal(props) {
   const [isProcessing, setIsProcessing] = createSignal(false);
 
   const close = () => {
-    if (isProcessing()) return; // Prevent closing while transaction is in flight
+    if (isProcessing()) return;
     props.onClose?.();
   };
 
@@ -70,11 +70,12 @@ export default function TransferModal(props) {
 
     try {
       await performTransfer(app, txData);
-      props.onSubmit?.(txData); // Notify parent on success
+      props.onSubmit?.(txData);
+      // ✅ clear busy state BEFORE closing so the guard doesn't block
+      setIsProcessing(false);
       close();
     } catch (e) {
-      // Error is already handled by pushErrorToast inside performTransfer
-    } finally {
+      // Error toast is shown inside performTransfer; keep dialog open
       setIsProcessing(false);
     }
   }
@@ -86,9 +87,10 @@ export default function TransferModal(props) {
         <form onSubmit={submit} class="p-4 space-y-4">
           <div class="text-lg font-semibold flex items-center gap-2">
             <TokenTitleIcon app={app} tokenAddress={props.tokenAddress || ""} />
-            <span>
-              {t("wallet.transfer.titleToken", { token: meta()?.symbol || "" })}
-            </span>
+            <span>{t("wallet.transfer.titleToken")}</span>
+            <Show when={meta()?.symbol}>
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">· {meta().symbol}</span>
+            </Show>
           </div>
 
           <AddressInput
@@ -101,7 +103,7 @@ export default function TransferModal(props) {
           <AmountInput
             label={t("wallet.transfer.amount")}
             tokenAddress={props.tokenAddress || ""}
-            balance={props.maxAmount /* optional BigInt to avoid extra read */}
+            balance={props.maxAmount}
             value={amountText()}
             onChange={({ text, amountWei: wei }) => { setAmountText(text); setAmountWei(wei); }}
           />

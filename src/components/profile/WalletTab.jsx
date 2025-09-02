@@ -12,102 +12,81 @@ import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import TransferModal from "./TransferModal.jsx";
 import IncreaseStakingModal from "./IncreaseStakingModal.jsx";
 
-/* Data */
-async function fetchWalletData({ app, user, refreshKey }) {
-  if (!user?.address || !app.desiredChain()) return null;
-  try {
-    const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-    const savvaTokenContract   = await getSavvaContract(app, "SavvaToken");
-    const contentFundContract  = await getSavvaContract(app, "ContentFund");
-    const stakingContract      = await getSavvaContract(app, "Staking");
-    const [savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward] = await Promise.all([
-      savvaTokenContract.read.balanceOf([user.address]),
-      publicClient.getBalance({ address: user.address }),
-      contentFundContract.read.claimableNftGain([user.address]),
-      stakingContract.read.balanceOf([user.address]),
-      stakingContract.read.claimable([user.address]),
-    ]);
-    const savvaTokenAddress = savvaTokenContract.address;
-    return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward, savvaTokenAddress };
-  } catch (error) {
-    console.error("Failed to fetch wallet data:", error);
-    return { error };
-  }
-}
-
-/* UI blocks */
-const WalletSection = (props) => (
-  <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-    <div class="flex justify-between items-center">
-      <h3 class="text-lg font-medium">{props.title}</h3>
-      <Show when={props.headerAction}><div>{props.headerAction}</div></Show>
-    </div>
-    {props.children}
-  </section>
-);
-
-const WalletRow = (props) => (
-  <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
-    <div class="flex justify-between items-start">
-      <div class="pr-4">
-        <h4 class="font-semibold">{props.title}</h4>
-        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
-      </div>
-      <div class="flex-shrink-0 relative inline-flex items-center">
-        {props.children}
-      </div>
-    </div>
-  </div>
-);
-
-export default function WalletTab(props) {
+export default function WalletTab() {
   const app = useApp();
   const { t } = app;
-  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user, refreshKey: app.walletDataNeedsRefresh() }), fetchWalletData);
 
-  const desiredChain = createMemo(() => app.desiredChain());
-  const baseTokenSymbol = createMemo(() => desiredChain()?.nativeCurrency?.symbol || "PLS");
-
-  const [showTransfer, setShowTransfer] = createSignal(false);
-  const [showIncreaseStaking, setShowIncreaseStaking] = createSignal(false);
-
+  const user = () => app.authorizedUser();
+  const [refreshKey, setRefreshKey] = createSignal(0);
   const RefreshButton = () => (
     <button
-      onClick={refetch}
-      disabled={walletData.loading}
-      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed"
-      aria-label={t("common.refresh")}
+      type="button"
+      class="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-[hsl(var(--border))] text-sm hover:bg-[hsl(var(--accent))]"
+      onClick={() => setRefreshKey((v) => v + 1)}
       title={t("common.refresh")}
     >
-      <RefreshIcon class="w-5 h-5" />
+      <RefreshIcon class="w-4 h-4" />
+      <span>{t("common.refresh")}</span>
     </button>
   );
 
-  const isOwnConnectedWallet = createMemo(() => {
-    const authed = app.authorizedUser()?.address?.toLowerCase();
-    const connected = walletAccount()?.toLowerCase();
-    const profile = props.user?.address?.toLowerCase();
-    return !!authed && authed === profile && connected === profile;
-  });
+  /* Data */
+  async function fetchWalletData({ app, user, refreshKey }) {
+    if (!user?.address || !app.desiredChain()) return null;
+    try {
+      const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+      const savvaTokenContract   = await getSavvaContract(app, "SavvaToken");
+      const contentFundContract  = await getSavvaContract(app, "ContentFund");
+      const stakingContract      = await getSavvaContract(app, "Staking");
+      const [savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward] = await Promise.all([
+        savvaTokenContract.read.balanceOf([user.address]),
+        publicClient.getBalance({ address: user.address }),
+        contentFundContract.read.claimableNftGain([user.address]),
+        stakingContract.read.balanceOf([user.address]),
+        stakingContract.read.claimable([user.address]),
+      ]);
+      const savvaTokenAddress = savvaTokenContract.address;
+      return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward, savvaTokenAddress };
+    } catch (error) {
+      console.error("Failed to fetch wallet data:", error);
+      return { error };
+    }
+  }
+
+  const [walletData, { refetch }] = createResource(
+    () => ({ app, user: user(), refreshKey: refreshKey() }),
+    fetchWalletData
+  );
+
+  /* Helpers */
+  const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
+
+  function isOwnConnectedWallet() {
+    const wa = walletAccount();
+    const u = user();
+    return !!wa && !!u?.address && String(wa).toLowerCase() === String(u.address).toLowerCase();
+  }
+
+  /* Menus & modals */
+  const [showTransfer, setShowTransfer] = createSignal(false);           // SAVVA transfer
+  const [showBaseTransfer, setShowBaseTransfer] = createSignal(false);   // Base token transfer
+  const [showIncreaseStaking, setShowIncreaseStaking] = createSignal(false);
 
   async function addSavvaToWallet() {
     try {
-      const address = walletData()?.savvaTokenAddress || "";
-      if (!address || !window?.ethereum?.request) return;
-      await window.ethereum.request({
+      const token = await getSavvaContract(app, "SavvaToken");
+      await window.ethereum?.request?.({
         method: "wallet_watchAsset",
         params: {
           type: "ERC20",
           options: {
-            address,
+            address: token.address,
             symbol: "SAVVA",
             decimals: 18,
           },
         },
       });
-    } catch (e) {
-      console.error("wallet_watchAsset failed:", e);
-    }
+    } catch {}
   }
 
   const savvaMenuItems = createMemo(() =>
@@ -115,11 +94,18 @@ export default function WalletTab(props) {
       ? [
           { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
           { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }),     onClick: addSavvaToWallet },
+          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
         ]
       : []
   );
-  const baseMenuItems    = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+
+  // ✅ Base coin: single “Transfer” menu item that opens TransferModal with empty token address
+  const baseMenuItems = createMemo(() =>
+    isOwnConnectedWallet()
+      ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }]
+      : []
+  );
+
   const nftMenuItems     = createMemo(() => (isOwnConnectedWallet() ? [] : []));
   const stakedMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
   const rewardMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
@@ -152,13 +138,35 @@ export default function WalletTab(props) {
     refetch();
     app.triggerWalletDataRefresh();
   }
-  
   function handleStakeSubmit() {
     refetch();
     app.triggerWalletDataRefresh();
   }
 
   const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
+
+  /* Layout blocks */
+  const WalletSection = (props) => (
+    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-medium">{props.title}</h3>
+        <Show when={props.headerAction}><div>{props.headerAction}</div></Show>
+      </div>
+      {props.children}
+    </section>
+  );
+
+  const WalletRow = (props) => (
+    <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
+      <div class="flex justify-between items-start">
+        <div class="pr-4">
+          <h4 class="font-semibold">{props.title}</h4>
+          <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
+        </div>
+        <div class="flex-shrink-0 relative inline-flex items-center">{props.children}</div>
+      </div>
+    </div>
+  );
 
   return (
     <div class="px-2 space-y-6">
@@ -223,6 +231,7 @@ export default function WalletTab(props) {
         </Show>
       </Show>
 
+      {/* SAVVA transfer modal */}
       <Show when={showTransfer()}>
         <TransferModal
           tokenAddress={savvaTokenAddress()}
@@ -232,6 +241,17 @@ export default function WalletTab(props) {
         />
       </Show>
 
+      {/* ✅ Base-token transfer modal (empty / native) */}
+      <Show when={showBaseTransfer()}>
+        <TransferModal
+          tokenAddress=""                 // empty = native coin
+          onClose={() => setShowBaseTransfer(false)}
+          onSubmit={handleTransferSubmit}
+          maxAmount={walletData()?.baseTokenBalance}
+        />
+      </Show>
+
+      {/* Increase staking (SAVVA) */}
       <Show when={showIncreaseStaking()}>
         <IncreaseStakingModal
           savvaBalance={walletData()?.savvaBalance}
