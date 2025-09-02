@@ -12,6 +12,7 @@ import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import TransferModal from "./TransferModal.jsx";
 import IncreaseStakingModal from "./IncreaseStakingModal.jsx";
 import UnstakeModal from "./UnstakeModal.jsx";
+import Countdown from "../ui/Countdown.jsx";
 
 export default function WalletTab() {
   const app = useApp();
@@ -40,9 +41,9 @@ export default function WalletTab() {
         chain: app.desiredChain(),
         transport: http(app.desiredChain().rpcUrls[0]),
       });
-      const savvaTokenContract   = await getSavvaContract(app, "SavvaToken");
-      const contentFundContract  = await getSavvaContract(app, "ContentFund");
-      const stakingContract      = await getSavvaContract(app, "Staking");
+      const savvaTokenContract = await getSavvaContract(app, "SavvaToken");
+      const contentFundContract = await getSavvaContract(app, "ContentFund");
+      const stakingContract = await getSavvaContract(app, "Staking");
 
       const [
         savvaBalance,
@@ -108,7 +109,7 @@ export default function WalletTab() {
         method: "wallet_watchAsset",
         params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
       });
-    } catch {}
+    } catch { }
   }
 
   // ── actions ──────────────────────────────────────────────────────────────────
@@ -169,10 +170,10 @@ export default function WalletTab() {
   const savvaMenuItems = createMemo(() =>
     isOwnConnectedWallet()
       ? [
-          { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
-          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
-        ]
+        { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
+        { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+        { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
+      ]
       : []
   );
 
@@ -183,10 +184,10 @@ export default function WalletTab() {
   const stakedMenuItems = createMemo(() =>
     isOwnConnectedWallet()
       ? [
-          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-          { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
-          { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
-        ]
+        { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+        { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
+        { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
+      ]
       : []
   );
 
@@ -209,9 +210,9 @@ export default function WalletTab() {
   const rewardMenuItems = createMemo(() =>
     isOwnConnectedWallet() && hasStakingReward()
       ? [
-          { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
-          { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
-        ]
+        { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
+        { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
+      ]
       : []
   );
 
@@ -252,8 +253,8 @@ export default function WalletTab() {
   };
 
   function handleTransferSubmit() { refetch(); app.triggerWalletDataRefresh?.(); }
-  function handleStakeSubmit()    { refetch(); app.triggerWalletDataRefresh?.(); }
-  function handleUnstakeSubmit()  { refetch(); app.triggerWalletDataRefresh?.(); }
+  function handleStakeSubmit() { refetch(); app.triggerWalletDataRefresh?.(); }
+  function handleUnstakeSubmit() { refetch(); app.triggerWalletDataRefresh?.(); }
 
   // ── layout helpers ───────────────────────────────────────────────────────────
   const WalletSection = (props) => (
@@ -285,7 +286,7 @@ export default function WalletTab() {
   }
 
   const availableUnstaked = () => walletData()?.availableUnstaked || 0n;
-  const unstakeRequests   = () => walletData()?.unstakeRequests || [];
+  const unstakeRequests = () => walletData()?.unstakeRequests || [];
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
@@ -379,7 +380,8 @@ export default function WalletTab() {
                             <td class="px-3 py-2">
                               <Show when={isReqAvailable(r.timestamp)} fallback={
                                 <span class="opacity-80" data-countdown-ts={Number(r.timestamp)}>
-                                  {t("profile.wallet.unstaked.countdown.placeholder")}
+                                  <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" />
+
                                 </span>
                               }>
                                 <span class="text-emerald-600">{t("wallet.unstaked.availableNow")}</span>

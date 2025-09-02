@@ -57,3 +57,26 @@
 .default-animation {
   animation: default-update-animation 0.4s ease-in-out;
 }
+
+@keyframes default-update-animation-reverse {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  49% {
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.reverse-animation {
+  animation: default-update-animation-reverse 0.4s ease-in-out;
+}

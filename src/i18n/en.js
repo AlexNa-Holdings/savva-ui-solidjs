@@ -439,5 +439,9 @@ export default {
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
   "wallet.unstake.withdrawNow": "Withdraw",
-  "wallet.unstaked.availableNow": "Available Now"
+  "wallet.unstaked.availableNow": "Available Now",
+    "time.days": "Days",
+  "time.hours": "Hours",
+  "time.minutes": "Minutes",
+  "time.seconds": "Seconds"
 };
