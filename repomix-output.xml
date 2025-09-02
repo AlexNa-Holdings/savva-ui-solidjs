@@ -180,6 +180,7 @@ src/
     config.js
     contracts.js
     tokenMeta.js
+    transactions.js
     utils.js
     wallet.js
   components/
@@ -244,6 +245,7 @@ src/
       ReactionInput.jsx
     profile/
       AvatarEditorModal.jsx
+      IncreaseStakingModal.jsx
       PostsTab.jsx
       SubscribersTab.jsx
       SubscriptionsTab.jsx
@@ -334,6 +336,7 @@ src/
     useDeleteAction.js
     useDomainCategories.js
     useLocalIpfs.js
+    useMarkdownContent.js
     useTheme.js
   i18n/
     en.js
@@ -351,7 +354,6 @@ src/
     utils.js
   net/
     endpoints.js
-    index.js
     wsApi.js
     wsBus.js
     WsClient.js
@@ -447,6 +449,115 @@ This section contains the contents of the repository's files.
   <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
   <path fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 12h14"/>
 </svg>
+</file>
+
+<file path="public/dev_docs/en/getting-started.md">
+# Getting Started
+
+Welcome to the **Getting Started** guide for the SAVVA Platform.
+
+This page walks you through the basic steps to set up the project locally and start contributing.
+
+## Prerequisites
+
+Before you begin, make sure you have the following tools installed:
+
+- **Node.js** (v18 or later recommended)  
+- **npm** or **yarn** package manager  
+- **Git** for cloning the repository  
+- A modern **browser** (Chrome, Firefox, Edge) for development and testing  
+
+## Clone the Repository
+
+The source code is hosted on GitHub. To get the latest version:
+
+```bash
+git clone https://github.com/AlexNa-Holdings/savva-ui-solidjs
+cd savva-ui-solidjs
+````
+
+## Install Dependencies
+
+Inside the project folder, install all required dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+## Start the Development Server
+
+Run the dev server with hot reloading:
+
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+The app will be available at [http://localhost:5173](http://localhost:5173).
+
+## Build for Production
+
+To create an optimized build:
+
+```bash
+npm run build
+```
+
+The output will be in the `dist/` folder.
+
+## Next Steps
+
+* Explore the **Developer Docs** for architecture and modules.
+* Try switching domains and assets in the **Right Pane**.
+* Contribute by opening issues or pull requests on GitHub.
+
+That’s it! 🎉 You’re ready to start working with the **SAVVA Platform**.
+
+```html
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAVVA · SolidJS</title>
+
+  <!-- Preload theme to avoid flash -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      } catch { }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form: /#/settings
+      if (!location.hash && location.pathname !== "/") {
+        var newHash = "#" + location.pathname + location.search + location.hash;
+        history.replaceState(null, "", "/" + newHash);
+      }
+    })();
+  </script>
+
+
+  <!-- Load app after theme class is set -->
+  <script type="module" src="/src/index.jsx"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
+```
 </file>
 
 <file path="public/domain_default/favicon/browserconfig.xml">
@@ -844,114 +955,6 @@ staker_levels:
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 166 155.3"><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" fill="#76b3e1"/><linearGradient id="a" gradientUnits="userSpaceOnUse" x1="27.5" y1="3" x2="152" y2="63.5"><stop offset=".1" stop-color="#76b3e1"/><stop offset=".3" stop-color="#dcf2fd"/><stop offset="1" stop-color="#76b3e1"/></linearGradient><path d="M163 35S110-4 69 5l-3 1c-6 2-11 5-14 9l-2 3-15 26 26 5c11 7 25 10 38 7l46 9 18-30z" opacity=".3" fill="url(#a)"/><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" fill="#518ac8"/><linearGradient id="b" gradientUnits="userSpaceOnUse" x1="95.8" y1="32.6" x2="74" y2="105.2"><stop offset="0" stop-color="#76b3e1"/><stop offset=".5" stop-color="#4377bb"/><stop offset="1" stop-color="#1f3b77"/></linearGradient><path d="M52 35l-4 1c-17 5-22 21-13 35 10 13 31 20 48 15l62-21S92 26 52 35z" opacity=".3" fill="url(#b)"/><linearGradient id="c" gradientUnits="userSpaceOnUse" x1="18.4" y1="64.2" x2="144.3" y2="149.8"><stop offset="0" stop-color="#315aa9"/><stop offset=".5" stop-color="#518ac8"/><stop offset="1" stop-color="#315aa9"/></linearGradient><path d="M134 80a45 45 0 00-48-15L24 85 4 120l112 19 20-36c4-7 3-15-2-23z" fill="url(#c)"/><linearGradient id="d" gradientUnits="userSpaceOnUse" x1="75.2" y1="74.5" x2="24.4" y2="260.8"><stop offset="0" stop-color="#4377bb"/><stop offset=".5" stop-color="#1a336b"/><stop offset="1" stop-color="#1a336b"/></linearGradient><path d="M114 115a45 45 0 00-48-15L4 120s53 40 94 30l3-1c17-5 23-21 13-34z" fill="url(#d)"/></svg>
 </file>
 
-<file path="src/blockchain/tokenMeta.js">
-// src/blockchain/tokenMeta.js
-import { createPublicClient, http } from "viem";
-
-// Minimal ERC-20 ABI (no JSX here)
-const ERC20_MIN_ABI = [
-  { name: "decimals", inputs: [], outputs: [{ type: "uint8" }], stateMutability: "view", type: "function" },
-  { name: "symbol",   inputs: [], outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
-];
-
-// In-memory cache: key = `${chainId}:${addrLowerOrEmpty}`
-const _cache = new Map();
-
-function _key(chainId, addr) {
-  return `${chainId || 0}:${(addr || "").toLowerCase()}`;
-}
-function _publicClient(app) {
-  const chain = app?.desiredChain?.();
-  const url = chain?.rpcUrls?.[0];
-  return url ? createPublicClient({ chain, transport: http(url) }) : null;
-}
-function _nativeSymbol(app) {
-  return app?.desiredChain?.().nativeCurrency?.symbol || "PLS";
-}
-
-// Resolve SAVVA/STAKE addresses once per session
-let _savvaAddrCached = null;
-let _stakingAddrCached = null;
-async function _getSavvaAddresses(app) {
-  if (_savvaAddrCached && _stakingAddrCached) return { savva: _savvaAddrCached, staking: _stakingAddrCached };
-  try {
-    const { getSavvaContract } = await import("./contracts.js");
-    const savvaC   = await getSavvaContract(app, "SavvaToken");
-    const stakingC = await getSavvaContract(app, "Staking");
-    _savvaAddrCached   = (savvaC?.address || "").toLowerCase() || null;
-    _stakingAddrCached = (stakingC?.address || "").toLowerCase() || null;
-  } catch { /* noop */ }
-  return { savva: _savvaAddrCached, staking: _stakingAddrCached };
-}
-
-/**
- * getTokenInfo(app, tokenAddress)
- * Returns { symbol, decimals } with caching and SAVVA overrides.
- *
- * Rules:
- *  - Base token (empty string): (nativeSymbol, 18)
- *  - SAVVA token address:       ("SAVVA", 18)
- *  - Staking contract address:  ("SAVVA-STAKED", 18)
- *  - Other ERC-20:               read once from chain, then cache
- */
-export async function getTokenInfo(app, tokenAddress) {
-  const chain = app?.desiredChain?.();
-  const chainId = chain?.id || 0;
-
-  // Base/native coin (empty address)
-  if (!tokenAddress) {
-    const res = { symbol: _nativeSymbol(app), decimals: 18 };
-    _cache.set(_key(chainId, ""), res);
-    return res;
-  }
-
-  const addr = String(tokenAddress).toLowerCase();
-  const k = _key(chainId, addr);
-  if (_cache.has(k)) return _cache.get(k);
-
-  // SAVVA overrides
-  const { savva, staking } = await _getSavvaAddresses(app);
-  if (savva && addr === savva) {
-    const res = { symbol: "SAVVA", decimals: 18 };
-    _cache.set(k, res);
-    return res;
-  }
-  if (staking && addr === staking) {
-    const res = { symbol: "SAVVA-STAKED", decimals: 18 };
-    _cache.set(k, res);
-    return res;
-  }
-
-  // Generic ERC-20
-  const pc = _publicClient(app);
-  if (!pc) {
-    const res = { symbol: "TOK", decimals: 18 };
-    _cache.set(k, res);
-    return res;
-  }
-
-  let decimals = 18, symbol = "TOK";
-  try {
-    const d = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "decimals" });
-    decimals = Number(d ?? 18);
-  } catch {}
-  try {
-    const s = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "symbol" });
-    symbol = String(s || "TOK").slice(0, 32);
-  } catch {}
-
-  const res = { symbol, decimals };
-  _cache.set(k, res);
-  return res;
-}
-
-export function clearTokenInfoCache() {
-  _cache.clear();
-  _savvaAddrCached = null;
-  _stakingAddrCached = null;
-}
-</file>
-
 <file path="src/components/docs/DocsIndex.jsx">
 // src/components/docs/DocsIndex.jsx
 import { createMemo, createResource, For, Show } from "solid-js";
@@ -1045,171 +1048,142 @@ export default function TwoColumn(props) {
 }
 </file>
 
-<file path="src/components/profile/TransferModal.jsx">
-// src/components/profile/TransferModal.jsx
-import { createSignal, Show, createResource } from "solid-js";
+<file path="src/components/profile/IncreaseStakingModal.jsx">
+// src/components/profile/IncreaseStakingModal.jsx
+import { createSignal, Show, createResource, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import AddressInput from "../ui/AddressInput.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
-import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
-import { getChainLogo } from "../../blockchain/chainLogos.js";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import Spinner from "../ui/Spinner.jsx";
+import TokenValue from "../ui/TokenValue.jsx";
+import { performStake } from "../../blockchain/transactions.js"; 
 
-function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
-  const chainId = app.desiredChain?.()?.id;
-  const savvaAddr = (app.info()?.savva_contracts?.SavvaToken?.address || "").toLowerCase();
-  const base = !tokenAddress;
-
-  if (base) {
-    const ChainLogo = getChainLogo(chainId);
-    return ChainLogo ? <ChainLogo class={className} /> : null;
-  }
-  if ((tokenAddress || "").toLowerCase() === savvaAddr) {
-    return <SavvaTokenIcon class={className} />;
-  }
-  return null;
-}
-
-export default function TransferModal(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [to, setTo] = createSignal(String(props.to || ""));
-  const [amountText, setAmountText] = createSignal("");
-  const [amountWei, setAmountWei] = createSignal(null);
-  const [err, setErr] = createSignal("");
-
-  const close = () => props.onClose?.();
-
-  const [meta] = createResource(
-    () => ({ app, addr: props.tokenAddress ? String(props.tokenAddress) : "" }),
-    ({ app, addr }) => getTokenInfo(app, addr)
-  );
-
-  function validate() {
-    const a = String(amountText()).trim();
-    const v = Number(a || "0");
-    const addr = String(to()).trim();
-    if (!addr || !(addr.startsWith("0x") && addr.length === 42)) {
-      return t("wallet.transfer.errors.badAddress");
+async function fetchStakingInfo({ app, userAddress }) {
+    if (!app || !userAddress) return null;
+    try {
+        const stakingContract = await getSavvaContract(app, "Staking");
+        const [totalSupply, myStake] = await Promise.all([
+            stakingContract.read.totalSupply(),
+            stakingContract.read.balanceOf([userAddress])
+        ]);
+        return { totalSupply, myStake };
+    } catch (e) {
+        console.error("Failed to fetch staking info", e);
+        return { error: e };
     }
-    if (!(v > 0) || amountWei() === null) return t("wallet.transfer.errors.badAmount");
-    return "";
-  }
-
-  function submit(e) {
-    e?.preventDefault?.();
-    const msg = validate();
-    if (msg) { setErr(msg); return; }
-    setErr("");
-    props.onSubmit?.({
-      to: to().trim(),
-      amountText: amountText().trim(),
-      amountWei: amountWei(),
-      tokenAddress: props.tokenAddress || "",
-    });
-    close();
-  }
-
-  return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" onClick={close} />
-      <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
-        <form onSubmit={submit} class="p-4 space-y-4">
-          <div class="text-lg font-semibold flex items-center gap-2">
-            <TokenTitleIcon app={app} tokenAddress={props.tokenAddress || ""} />
-            <span>
-              {t("wallet.transfer.titleToken", { token: meta()?.symbol || "" })}
-            </span>
-          </div>
-
-          <AddressInput
-            label={t("wallet.transfer.to")}
-            value={to()}
-            onChange={setTo}
-            onUserSelect={(u) => setTo(u?.address || "")}
-          />
-
-          <AmountInput
-            label={t("wallet.transfer.amount")}
-            tokenAddress={props.tokenAddress || ""}
-            balance={props.maxAmount /* optional BigInt to avoid extra read */}
-            value={amountText()}
-            onChange={({ text, amountWei: wei }) => { setAmountText(text); setAmountWei(wei); }}
-          />
-
-          <Show when={err()}>
-            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
-          </Show>
-
-          <div class="pt-1 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={close}
-              class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              type="submit"
-              class="px-3 py-1.5 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
-            >
-              {t("wallet.transfer.transferButton")}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 }
-</file>
 
-<file path="src/components/profile/WalletValueMenu.jsx">
-// src/components/profile/WalletValueMenu.jsx
-import { createMemo } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
-import ContextMenu from "../ui/ContextMenu.jsx";
+export default function IncreaseStakingModal(props) {
+    const app = useApp();
+    const { t } = app;
+    const user = () => app.authorizedUser();
 
-/**
- * Lightweight “...” menu shown next to a wallet value.
- * Renders nothing unless:
- *  - viewer is authorized
- *  - viewer's address matches user.address
- *  - wallet is currently connected with the same address
- */
-export default function WalletValueMenu(props) {
-  const app = useApp();
-  const { t } = app;
+    const [amountText, setAmountText] = createSignal("");
+    const [amountWei, setAmountWei] = createSignal(null);
+    const [err, setErr] = createSignal("");
+    const [isProcessing, setIsProcessing] = createSignal(false);
 
-  const isOwnWallet = createMemo(() => {
-    const u = props.user;
-    const authed = app.authorizedUser()?.address?.toLowerCase();
-    const connected = walletAccount()?.toLowerCase();
-    const profileAddr = u?.address?.toLowerCase();
-    return !!authed && !!connected && authed === profileAddr && connected === profileAddr;
-  });
+    const [stakingInfo] = createResource(() => ({ app, userAddress: user()?.address }), fetchStakingInfo);
 
-  // First menu we need for SAVVA token balance
-  const savvaBalanceItems = createMemo(() => ([
-    { label: t("wallet.menu.transfer"), onClick: () => props.onTransfer?.() },
-    { label: t("wallet.menu.increaseStaking"), onClick: () => props.onIncreaseStaking?.() },
-  ]));
+    const myShare = createMemo(() => {
+        const info = stakingInfo();
+        if (!info || info.error || !info.totalSupply || info.totalSupply === 0n) return "0.00";
+        const myStake = info.myStake || 0n;
+        const total = info.totalSupply;
+        const percentage = (Number(myStake) / Number(total)) * 100;
+        return percentage.toFixed(2);
+    });
 
-  // Allow custom items via props; default to SAVVA balance menu
-  const items = () => props.items || savvaBalanceItems();
+    const close = () => {
+        if (isProcessing()) return;
+        props.onClose?.();
+    };
 
-  // Position: small circular button hugging the value on its right
-  const positionClass = props.positionClass || "absolute -top-2 -right-2 z-10";
+    function validate() {
+        if (!amountWei() || amountWei() <= 0n) return t("wallet.transfer.errors.badAmount");
+        if (amountWei() > props.savvaBalance) return t("wallet.stake.errors.insufficientBalance");
+        return "";
+    }
+    
+    async function submit(e) {
+        e.preventDefault();
+        const msg = validate();
+        if (msg) { setErr(msg); return; }
+        setErr("");
+        setIsProcessing(true);
+        
+        try {
+            await performStake(app, { amountWei: amountWei() });
+            props.onSubmit?.();
+            close();
+        } catch (e) {
+            // Error is handled by a toast within performStake.
+            // Keep modal open for user to see the issue.
+            setIsProcessing(false);
+        }
+    }
 
-  if (!isOwnWallet()) return null;
+    return (
+      <div class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" onClick={close} />
+        <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
+          <form onSubmit={submit} class="p-4 space-y-4">
+            <h3 class="text-lg font-semibold">{t("wallet.stake.title")}</h3>
+            
+            <Show when={!stakingInfo.loading && stakingInfo() && !stakingInfo().error} fallback={<div class="flex justify-center"><Spinner /></div>}>
+              <div class="text-sm space-y-1 text-[hsl(var(--muted-foreground))]">
+                <div class="flex justify-between">
+                  <span>{t("wallet.stake.totalStaked")}:</span>
+                  <TokenValue amount={stakingInfo().totalSupply} tokenAddress={props.savvaTokenAddress} />
+                </div>
+                <div class="flex justify-between">
+                  <span>{t("wallet.stake.myStake")}:</span>
+                  <div class="flex items-center gap-2">
+                    <TokenValue amount={stakingInfo().myStake} tokenAddress={props.savvaTokenAddress} />
+                    <span>({myShare()}%)</span>
+                  </div>
+                </div>
+              </div>
+            </Show>
 
-  return (
-    <div class="relative inline-block">
-      {/* anchor is the parent value container */}
-      <ContextMenu items={items()} positionClass={positionClass} />
-    </div>
-  );
+            <AmountInput
+              label={t("wallet.stake.amount")}
+              tokenAddress={props.savvaTokenAddress}
+              balance={props.savvaBalance}
+              value={amountText()}
+              onChange={({ text, amountWei: wei }) => { setAmountText(text); setAmountWei(wei); }}
+            />
+
+            <Show when={err()}>
+              <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+            </Show>
+
+            <div class="pt-1 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={close}
+                disabled={isProcessing()}
+                class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={isProcessing() || !amountWei() || amountWei() <= 0n}
+                class="px-3 py-1.5 min-w-[120px] rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60 flex items-center justify-center"
+              >
+                <Show when={isProcessing()} fallback={t("wallet.stake.stakeButton")}>
+                  <div class="flex items-center gap-2">
+                    <Spinner class="w-4 h-4" />
+                    <span>{t("wallet.stake.staking")}</span>
+                  </div>
+                </Show>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
 }
 </file>
 
@@ -1495,26 +1469,6 @@ export default function TabPanelScaffold(props) {
 }
 </file>
 
-<file path="src/components/ui/icons/LockIcon.jsx">
-// src/components/ui/icons/LockIcon.jsx
-export default function LockIcon(props) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      <path
-        fill-rule="evenodd"
-        clip-rule="evenodd"
-        d="M4 6V4C4 1.79086 5.79086 0 8 0C10.2091 0 12 1.79086 12 4V6H14V16H2V6H4ZM6 4C6 2.89543 6.89543 2 8 2C9.10457 2 10 2.89543 10 4V6H6V4ZM7 13V9H9V13H7Z"
-      ></path>
-    </svg>
-  );
-}
-</file>
-
 <file path="src/components/ui/icons/TabIcons.jsx">
 // src/components/ui/icons/TabIcons.jsx
 /* src/components/ui/icons/TabIcons.jsx */
@@ -1578,370 +1532,6 @@ export function tabIconFor(type) {
     case "for-you":   return <HeartIcon />;
     default:          return null;
   }
-}
-</file>
-
-<file path="src/components/ui/AddressInput.jsx">
-// src/components/ui/AddressInput.jsx
-import { createSignal, createMemo, createResource, Show, For, onCleanup } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import IpfsImage from "./IpfsImage.jsx";
-import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
-import UserCard from "./UserCard.jsx";
-import { navigate } from "../../routing/hashRouter.js";
-
-function isHexAddress(s) {
-  const v = String(s || "").trim();
-  return /^0x[0-9a-fA-F]{40}$/.test(v);
-}
-
-export default function AddressInput(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [text, setText] = createSignal(String(props.value || "").trim());
-  const [open, setOpen] = createSignal(false);
-  const [hoverIdx, setHoverIdx] = createSignal(-1);
-  const [pickedUser, setPickedUser] = createSignal(null);
-
-  let inputRef;
-  let debounceTimer;
-
-  const domain = createMemo(() => app.selectedDomainName?.() || "");
-
-  // Debounced query
-  const [q, setQ] = createSignal("");
-  function scheduleSearch(next) {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => setQ(next), 160);
-  }
-  onCleanup(() => clearTimeout(debounceTimer));
-
-  const [results] = createResource(
-    () => ({ domain: domain(), query: q() }),
-    async ({ domain, query }) => {
-      if (!query) return [];
-      try {
-        const list = await app.wsCall?.("search-user", { domain, query });
-        return Array.isArray(list) ? list : [];
-      } catch {
-        return [];
-      }
-    }
-  );
-
-  function emitChange(addr) {
-    props.onChange?.(addr);
-  }
-
-  function chooseUser(u) {
-    if (!u) return;
-    const addr = String(u.address || "").trim();
-    setText(addr);
-    setOpen(false);
-    setPickedUser(u);
-    emitChange(addr);
-    props.onUserSelect?.(u);
-  }
-
-  function clearPicked() {
-    setPickedUser(null);
-    setTimeout(() => inputRef?.focus(), 0);
-  }
-
-  function onInput(e) {
-    const v = e.currentTarget.value;
-    setText(v);
-    setPickedUser(null);
-    const trimmed = String(v || "").trim();
-
-    if (trimmed.length === 0) {
-      setOpen(false);
-      scheduleSearch("");
-      emitChange("");
-      return;
-    }
-
-    // Always allow backend search by partial text or partial address
-    scheduleSearch(trimmed);
-    setOpen(true);
-    emitChange(trimmed);
-  }
-
-  function onKeyDown(e) {
-    if (!open()) return;
-    const items = results() || [];
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHoverIdx((i) => Math.min(items.length - 1, i + 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHoverIdx((i) => Math.max(0, i - 1));
-    } else if (e.key === "Enter") {
-      if (hoverIdx() >= 0 && items[hoverIdx()]) {
-        e.preventDefault();
-        chooseUser(items[hoverIdx()]);
-      } else if (isHexAddress(text())) {
-        e.preventDefault();
-        setOpen(false);
-        setPickedUser(null);
-        emitChange(text());
-      }
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      setOpen(false);
-    }
-  }
-
-  function goProfile(u) {
-    if (!u) return;
-    const path = u.name ? `/@${u.name}` : `/${u.address}`;
-    navigate(path);
-  }
-
-  return (
-    <div class={`relative ${props.class || ""}`}>
-      <label class="block text-sm">
-        <div class="mb-1">{props.label || t("wallet.transfer.to")}</div>
-
-        {/* When a user is selected — show the FULL UserCard */}
-        <Show
-          when={pickedUser()}
-          fallback={
-            <div class="relative">
-              <input
-                ref={inputRef}
-                value={text()}
-                onInput={onInput}
-                onKeyDown={onKeyDown}
-                onFocus={() => { if (text().trim()) setOpen(true); }}
-                placeholder={props.placeholder || t("addressInput.placeholder")}
-                class="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 pr-9 outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-                autocomplete="off"
-                inputmode="text"
-              />
-              <Show when={isHexAddress(text())}>
-                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-xs">{t("common.ok")}</span>
-              </Show>
-            </div>
-          }
-        >
-          <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-2">
-            {/* IMPORTANT: UserCard expects `author`, not `user` */}
-            <UserCard
-              author={pickedUser()}
-              clickable
-              onClick={() => goProfile(pickedUser())}
-            />
-            <div class="mt-2 flex items-center justify-end">
-              <button
-                type="button"
-                class="px-2 py-1 text-xs rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
-                onClick={clearPicked}
-                aria-label={t("common.change")}
-                title={t("common.change")}
-              >
-                {t("common.change")}
-              </button>
-            </div>
-          </div>
-        </Show>
-      </label>
-
-      {/* Suggestions */}
-      <Show when={open() && (results()?.length || 0) > 0}>
-        <div class="absolute z-50 mt-1 w-full max-h-72 overflow-auto rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow">
-          <ul class="py-1">
-            <For each={results()}>
-              {(u, idx) => (
-                <li>
-                  <button
-                    type="button"
-                    class={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[hsl(var(--accent))] ${hoverIdx() === idx() ? "bg-[hsl(var(--accent))]" : ""}`}
-                    onMouseEnter={() => setHoverIdx(idx())}
-                    onMouseLeave={() => setHoverIdx(-1)}
-                    onClick={() => chooseUser(u)}
-                  >
-                    <span class="w-6 h-6 rounded overflow-hidden bg-[hsl(var(--muted))] flex-shrink-0">
-                      <IpfsImage
-                        src={u.avatar}
-                        alt=""
-                        class="w-full h-full object-cover"
-                        fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
-                      />
-                    </span>
-                    <div class="min-w-0">
-                      <div class="text-sm leading-tight truncate">{u.name ? `@${u.name}` : (u.display_name || t("profile.user"))}</div>
-                      <div class="text-xs text-[hsl(var(--muted-foreground))] truncate">{u.address}</div>
-                    </div>
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-      </Show> 
-    </div>
-  );
-}
-</file>
-
-<file path="src/components/ui/AmountInput.jsx">
-// src/components/ui/AmountInput.jsx
-import { createMemo, createResource, createSignal, Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { createPublicClient, http, formatUnits, parseUnits } from "viem";
-import { walletAccount } from "../../blockchain/wallet.js";
-import TokenValue from "./TokenValue.jsx";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
-
-// Minimal ABI for ERC-20 balanceOf()
-const ERC20_MIN_ABI = [
-  { name: "balanceOf", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
-];
-
-function isNonEmpty(addr) { return !!addr && /^0x[0-9a-fA-F]{40}$/.test(String(addr)); }
-
-export default function AmountInput(props) {
-  const app = useApp();
-  const { t } = app;
-
-  // ── chain / client ───────────────────────────────────────────────────────────
-  const isBaseToken = createMemo(() => !isNonEmpty(props.tokenAddress));
-  const chain = createMemo(() => app.desiredChain?.());
-  const rpcUrl = createMemo(() => chain()?.rpcUrls?.[0]);
-  const publicClient = createMemo(() => {
-    const url = rpcUrl();
-    return url ? createPublicClient({ chain: chain(), transport: http(url) }) : null;
-  });
-
-  // ── token meta (cached, SAVVA-aware; no JSX here) ────────────────────────────
-  const tokenAddrForMeta = createMemo(() => (isBaseToken() ? "" : props.tokenAddress));
-  const [tokenMeta] = createResource(
-    () => ({ app, addr: tokenAddrForMeta() }),
-    ({ app, addr }) => getTokenInfo(app, addr)
-  );
-  const decimals = createMemo(() => Number(tokenMeta()?.decimals ?? 18));
-  const symbol = createMemo(() => String(tokenMeta()?.symbol || (isBaseToken() ? (chain()?.nativeCurrency?.symbol || "PLS") : "TOK")));
-
-  // Owner address we use for balance lookups
-  const ownerAddr = createMemo(() => {
-    const connected = walletAccount();
-    const authed = app.authorizedUser?.()?.address;
-    return connected || authed || "0x0000000000000000000000000000000000000000";
-  });
-
-  // balance (ERC-20 or base). We show balance for both; MAX only for ERC-20.
-  const [balanceRes, { refetch: refetchBal }] = createResource(
-    () => ({ addr: props.tokenAddress, pc: publicClient(), provided: props.balance, base: isBaseToken(), owner: ownerAddr() }),
-    async ({ addr, pc, provided, base, owner }) => {
-      if (typeof provided === "bigint") return provided;
-      if (!pc || !owner) return 0n;
-      try {
-        if (base) {
-          // native coin balance
-          return await pc.getBalance({ address: owner });
-        } else {
-          return await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "balanceOf", args: [owner] });
-        }
-      } catch { return 0n; }
-    }
-  );
-
-  // ── input state ───────────────────────────────────────────────────────────────
-  const [text, setText] = createSignal(String(props.value || ""));
-  const [error, setError] = createSignal("");
-
-  function toWeiSafe(s, dec) {
-    try { return parseUnits(String(s).trim() || "0", dec); }
-    catch { return null; }
-  }
-  function fromWeiSafe(v, dec) {
-    try { return formatUnits(v || 0n, dec); }
-    catch { return "0"; }
-  }
-
-  function emitChange(nextStr) {
-    const dec = decimals() || 18;
-    const wei = toWeiSafe(nextStr, dec);
-    if (wei === null) {
-      setError(t("common.invalidNumber"));
-      props.onChange?.({ text: nextStr, amountWei: null, decimals: dec, symbol: symbol() });
-    } else {
-      setError("");
-      props.onChange?.({ text: nextStr, amountWei: wei, decimals: dec, symbol: symbol() });
-    }
-  }
-
-  function onInput(e) {
-    const v = e.currentTarget.value;
-    setText(v);
-    emitChange(v);
-  }
-
-  async function useMax() {
-    // Only for non-base tokens
-    if (isBaseToken()) return;
-    let bal = balanceRes();
-    if (typeof bal !== "bigint") {
-      try { bal = await refetchBal(); } catch { bal = 0n; }
-    }
-    const s = fromWeiSafe(bal || 0n, decimals() || 18);
-    setText(s);
-    emitChange(s);
-  }
-
-  // ── UI ────────────────────────────────────────────────────────────────────────
-  return (
-    <div class={props.class || ""}>
-      <label class="block text-sm">
-        <div class="mb-1 flex items-center justify-between">
-          <span>{props.label || t("wallet.transfer.amount")}</span>
-          <Show when={!isBaseToken() && (props.showMax ?? true)}>
-            <button
-              type="button"
-              onClick={useMax}
-              class="text-xs underline hover:opacity-80 disabled:opacity-50"
-              disabled={balanceRes.loading}
-            >
-              {t("wallet.transfer.max")}
-            </button>
-          </Show>
-        </div>
-
-        <div class="flex items-stretch gap-2">
-          <input
-            value={text()}
-            onInput={onInput}
-            inputmode="decimal"
-            placeholder={props.placeholder || "0.0"}
-            class="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-            autocomplete="off"
-          />
-          <div class="min-w-[64px] px-2 py-2 text-sm text-[hsl(var(--muted-foreground))] flex items-center justify-end">
-            {symbol()}
-          </div>
-        </div>
-
-        {/* Balance line (shown for BOTH base & ERC-20 if we can fetch/know it) */}
-        <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))] flex items-center gap-1">
-          <span>{t("wallet.transfer.balance")}:</span>
-          <Show when={typeof balanceRes() === "bigint"} fallback={<span>—</span>}>
-            <TokenValue amount={balanceRes() || 0n} tokenAddress={isBaseToken() ? "0" : props.tokenAddress} />
-          </Show>
-        </div>
-
-        <Show when={error()}>
-          <div class="mt-1 text-sm text-[hsl(var(--destructive))]">{error()}</div>
-        </Show>
-
-        {/* Optional helper under the balance line, if caller provided one */}
-        <Show when={props.helper}>
-          <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{props.helper}</div>
-        </Show>
-      </label>
-    </div>
-  );
 }
 </file>
 
@@ -2289,10 +1879,6 @@ export function configureEndpoints({ backendLink, domain }) {
 export function httpBase() { return _backendHttpBase; }
 export function wsUrl()    { return _wsUrl; }
 export function currentDomain() { return _domain; }
-</file>
-
-<file path="src/net/index.js">
-// src/ws/index.js
 </file>
 
 <file path="src/net/wsApi.js">
@@ -19734,6 +19320,303 @@ export function clearConfigCache() {
 }
 </file>
 
+<file path="src/blockchain/tokenMeta.js">
+// src/blockchain/tokenMeta.js
+import { createPublicClient, http } from "viem";
+
+// Minimal ERC-20 ABI (no JSX here)
+const ERC20_MIN_ABI = [
+  { name: "decimals", inputs: [], outputs: [{ type: "uint8" }], stateMutability: "view", type: "function" },
+  { name: "symbol",   inputs: [], outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
+];
+
+// In-memory cache: key = `${chainId}:${addrLowerOrEmpty}`
+const _cache = new Map();
+
+function _key(chainId, addr) {
+  return `${chainId || 0}:${(addr || "").toLowerCase()}`;
+}
+function _publicClient(app) {
+  const chain = app?.desiredChain?.();
+  const url = chain?.rpcUrls?.[0];
+  return url ? createPublicClient({ chain, transport: http(url) }) : null;
+}
+function _nativeSymbol(app) {
+  return app?.desiredChain?.().nativeCurrency?.symbol || "PLS";
+}
+
+// Resolve SAVVA/STAKE addresses once per session
+let _savvaAddrCached = null;
+let _stakingAddrCached = null;
+async function _getSavvaAddresses(app) {
+  if (_savvaAddrCached && _stakingAddrCached) return { savva: _savvaAddrCached, staking: _stakingAddrCached };
+  try {
+    const { getSavvaContract } = await import("./contracts.js");
+    const savvaC   = await getSavvaContract(app, "SavvaToken");
+    const stakingC = await getSavvaContract(app, "Staking");
+    _savvaAddrCached   = (savvaC?.address || "").toLowerCase() || null;
+    _stakingAddrCached = (stakingC?.address || "").toLowerCase() || null;
+  } catch { /* noop */ }
+  return { savva: _savvaAddrCached, staking: _stakingAddrCached };
+}
+
+/**
+ * getTokenInfo(app, tokenAddress)
+ * Returns { symbol, decimals } with caching and SAVVA overrides.
+ *
+ * Rules:
+ *  - Base token (empty string): (nativeSymbol, 18)
+ *  - SAVVA token address:       ("SAVVA", 18)
+ *  - Staking contract address:  ("SAVVA-STAKED", 18)
+ *  - Other ERC-20:               read once from chain, then cache
+ */
+export async function getTokenInfo(app, tokenAddress) {
+  const chain = app?.desiredChain?.();
+  const chainId = chain?.id || 0;
+
+  // Base/native coin (empty address)
+  if (!tokenAddress) {
+    const res = { symbol: _nativeSymbol(app), decimals: 18 };
+    _cache.set(_key(chainId, ""), res);
+    return res;
+  }
+
+  const addr = String(tokenAddress).toLowerCase();
+  const k = _key(chainId, addr);
+  if (_cache.has(k)) return _cache.get(k);
+
+  // SAVVA overrides
+  const { savva, staking } = await _getSavvaAddresses(app);
+  if (savva && addr === savva) {
+    const res = { symbol: "SAVVA", decimals: 18 };
+    _cache.set(k, res);
+    return res;
+  }
+  if (staking && addr === staking) {
+    const res = { symbol: "SAVVA-STAKED", decimals: 18 };
+    _cache.set(k, res);
+    return res;
+  }
+
+  // Generic ERC-20
+  const pc = _publicClient(app);
+  if (!pc) {
+    const res = { symbol: "TOK", decimals: 18 };
+    _cache.set(k, res);
+    return res;
+  }
+
+  let decimals = 18, symbol = "TOK";
+  try {
+    const d = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "decimals" });
+    decimals = Number(d ?? 18);
+  } catch {}
+  try {
+    const s = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "symbol" });
+    symbol = String(s || "TOK").slice(0, 32);
+  } catch {}
+
+  const res = { symbol, decimals };
+  _cache.set(k, res);
+  return res;
+}
+
+export function clearTokenInfoCache() {
+  _cache.clear();
+  _savvaAddrCached = null;
+  _stakingAddrCached = null;
+}
+</file>
+
+<file path="src/blockchain/transactions.js">
+// src/blockchain/transactions.js
+import { pushToast, pushErrorToast } from "../ui/toast.js";
+import { dbg } from "../utils/debug.js";
+import { createPublicClient, http, getContract } from "viem";
+import { getSavvaContract } from "./contracts.js";
+
+// Minimal ABI for ERC20 transfer
+const ERC20_TRANSFER_ABI = [
+  {
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ type: "address", name: "to" }, { type: "uint256", name: "amount" }],
+    outputs: [{ type: "bool" }],
+  },
+];
+
+/**
+ * Manually splits a 65-byte signature into its r, s, and v components.
+ * This avoids import issues with bundlers.
+ * @param {`0x${string}`} signature The hex signature string.
+ * @returns {{r: `0x${string}`, s: `0x${string}`, v: bigint}}
+ */
+function manualSplitSignature(signature) {
+  const signatureBytes = signature.substring(2);
+  const r = `0x${signatureBytes.substring(0, 64)}`;
+  const s = `0x${signatureBytes.substring(64, 128)}`;
+  const v = BigInt(`0x${signatureBytes.substring(128, 130)}`);
+  return { r, s, v };
+}
+
+/**
+ * Sends a transaction, handling both native and ERC20 token transfers.
+ * @param {object} app - The app context from useApp().
+ * @param {object} txData - The transaction data.
+ * @param {string} txData.to - The recipient's address.
+ * @param {bigint} txData.amountWei - The amount to send in wei.
+ * @param {string} [txData.tokenAddress] - The ERC20 token address. If empty, it's a native transfer.
+ */
+export async function performTransfer(app, txData) {
+  const { to, amountWei, tokenAddress } = txData;
+  const { t } = app;
+
+  const isNative = !tokenAddress || tokenAddress === "0";
+  const tokenSymbol = isNative ? (app.desiredChain()?.nativeCurrency?.symbol || "coin") : "tokens";
+
+  const toastId = pushToast({
+    type: "info",
+    message: t("wallet.transfer.toast.pending", { token: tokenSymbol }),
+    autohideMs: 0,
+  });
+
+  try {
+    const walletClient = await app.getGuardedWalletClient();
+    const publicClient = createPublicClient({
+      chain: app.desiredChain(),
+      transport: http(app.desiredChain().rpcUrls[0]),
+    });
+
+    let hash;
+
+    if (isNative) {
+      hash = await walletClient.sendTransaction({ to: to, value: amountWei });
+    } else {
+      const tokenContract = getContract({ address: tokenAddress, abi: ERC20_TRANSFER_ABI, client: walletClient });
+      hash = await tokenContract.write.transfer([to, amountWei]);
+    }
+    
+    dbg.log("Transfer", `Transaction sent with hash: ${hash}`);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status !== 'success') {
+      throw new Error(`Transaction failed with status: ${receipt.status}`);
+    }
+
+    pushToast({ type: "success", message: t("wallet.transfer.toast.success") });
+    app.dismissToast?.(toastId);
+    return receipt;
+
+  } catch (error) {
+    pushErrorToast(error, { context: t("wallet.transfer.toast.error") });
+    app.dismissToast?.(toastId);
+    throw error;
+  }
+}
+
+/**
+ * Stakes SAVVA tokens using the stakeWithPermit method.
+ * @param {object} app - The app context from useApp().
+ * @param {object} txData - The transaction data.
+ * @param {bigint} txData.amountWei - The amount to stake in wei.
+ */
+export async function performStake(app, txData) {
+  const { amountWei } = txData;
+  const { t } = app;
+
+  const toastId = pushToast({ type: "info", message: t("wallet.stake.toast.pending"), autohideMs: 0 });
+
+  try {
+    const walletClient = await app.getGuardedWalletClient();
+    const publicClient = createPublicClient({
+      chain: app.desiredChain(),
+      transport: http(app.desiredChain().rpcUrls[0]),
+    });
+    const userAddress = walletClient.account.address;
+
+    const savvaTokenContract = await getSavvaContract(app, "SavvaToken");
+    const stakingContract = await getSavvaContract(app, "Staking", { write: true });
+
+    // 1. Prepare Permit Signature
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20); // 20-minute deadline
+    const nonce = await savvaTokenContract.read.nonces([userAddress]);
+    const domainData = await savvaTokenContract.read.eip712Domain();
+
+    const domain = {
+      name: domainData.name,
+      version: domainData.version,
+      chainId: domainData.chainId,
+      verifyingContract: savvaTokenContract.address,
+    };
+
+    const types = {
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' },
+      ],
+      Permit: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' },
+      ],
+    };
+
+    const message = {
+      owner: userAddress,
+      spender: stakingContract.address,
+      value: amountWei,
+      nonce: nonce,
+      deadline: deadline,
+    };
+
+    const signature = await walletClient.signTypedData({
+      domain,
+      types,
+      primaryType: 'Permit',
+      message,
+    });
+
+    const { v, r, s } = manualSplitSignature(signature);
+
+    // 2. Call stakeWithPermit
+    const stakeToastId = "stake_toast";
+    pushToast({ type: "info", message: t("wallet.stake.toast.staking"), autohideMs: 0, id: stakeToastId });
+    
+    const hash = await stakingContract.write.stakeWithPermit([amountWei, deadline, v, r, s]);
+    
+    const result = { hash };
+
+    (async () => {
+        try {
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            if (receipt.status !== 'success') {
+                throw new Error(`Transaction failed with status: ${receipt.status}`);
+            }
+            pushToast({ type: "success", message: t("wallet.stake.toast.success") });
+        } catch (error) {
+            pushErrorToast(error, { context: t("wallet.stake.toast.error") });
+        } finally {
+            app.dismissToast?.(toastId);
+            app.dismissToast?.(stakeToastId);
+        }
+    })();
+
+    return result;
+
+  } catch (error) {
+    pushErrorToast(error, { context: t("wallet.stake.toast.error") });
+    app.dismissToast?.(toastId);
+    app.dismissToast?.("stake_toast");
+    throw error;
+  }
+}
+</file>
+
 <file path="src/blockchain/wallet.js">
 // src/blockchain/wallet.js
 import { createSignal } from "solid-js";
@@ -21413,239 +21296,192 @@ export default function TagList(props) {
 }
 </file>
 
-<file path="src/components/profile/WalletTab.jsx">
-// src/components/profile/WalletTab.jsx
+<file path="src/components/profile/TransferModal.jsx">
+// src/components/profile/TransferModal.jsx
+import { createSignal, Show, createResource } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import TokenValue from "../ui/TokenValue.jsx";
-import { createMemo, createResource, Show, createSignal } from "solid-js";
-import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
+import AddressInput from "../ui/AddressInput.jsx";
+import AmountInput from "../ui/AmountInput.jsx";
+import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
+import { getChainLogo } from "../../blockchain/chainLogos.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { performTransfer } from "../../blockchain/transactions.js";
 import Spinner from "../ui/Spinner.jsx";
-import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
-import ContextMenu from "../ui/ContextMenu.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
-import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
-import TransferModal from "./TransferModal.jsx";
 
-/* Data */
-async function fetchWalletData({ app, user }) {
-  if (!user?.address || !app.desiredChain()) return null;
-  try {
-    const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-    const savvaTokenContract   = await getSavvaContract(app, "SavvaToken");
-    const contentFundContract  = await getSavvaContract(app, "ContentFund");
-    const stakingContract      = await getSavvaContract(app, "Staking");
-    const [savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward] = await Promise.all([
-      savvaTokenContract.read.balanceOf([user.address]),
-      publicClient.getBalance({ address: user.address }),
-      contentFundContract.read.claimableNftGain([user.address]),
-      stakingContract.read.balanceOf([user.address]),
-      stakingContract.read.claimable([user.address]),
-    ]);
-    const savvaTokenAddress = savvaTokenContract.address;
-    return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward, savvaTokenAddress };
-  } catch (error) {
-    console.error("Failed to fetch wallet data:", error);
-    return { error };
+function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
+  const chainId = app.desiredChain?.()?.id;
+  const savvaAddr = (app.info()?.savva_contracts?.SavvaToken?.address || "").toLowerCase();
+  const base = !tokenAddress;
+
+  if (base) {
+    const ChainLogo = getChainLogo(chainId);
+    return ChainLogo ? <ChainLogo class={className} /> : null;
   }
+  if ((tokenAddress || "").toLowerCase() === savvaAddr) {
+    return <SavvaTokenIcon class={className} />;
+  }
+  return null;
 }
 
-/* UI blocks */
-const WalletSection = (props) => (
-  <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-    <div class="flex justify-between items-center">
-      <h3 class="text-lg font-medium">{props.title}</h3>
-      <Show when={props.headerAction}><div>{props.headerAction}</div></Show>
-    </div>
-    {props.children}
-  </section>
-);
-
-const WalletRow = (props) => (
-  <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
-    <div class="flex justify-between items-start">
-      <div class="pr-4">
-        <h4 class="font-semibold">{props.title}</h4>
-        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
-      </div>
-      <div class="flex-shrink-0 relative inline-flex items-center">
-        {props.children}
-      </div>
-    </div>
-  </div>
-);
-
-export default function WalletTab(props) {
+export default function TransferModal(props) {
   const app = useApp();
   const { t } = app;
-  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user }), fetchWalletData);
 
-  const desiredChain = createMemo(() => app.desiredChain());
-  const baseTokenSymbol = createMemo(() => desiredChain()?.nativeCurrency?.symbol || "PLS");
+  const [to, setTo] = createSignal(String(props.to || ""));
+  const [amountText, setAmountText] = createSignal("");
+  const [amountWei, setAmountWei] = createSignal(null);
+  const [err, setErr] = createSignal("");
+  const [isProcessing, setIsProcessing] = createSignal(false);
 
-  const [showTransfer, setShowTransfer] = createSignal(false);
+  const close = () => {
+    if (isProcessing()) return; // Prevent closing while transaction is in flight
+    props.onClose?.();
+  };
 
-  const RefreshButton = () => (
-    <button
-      onClick={refetch}
-      disabled={walletData.loading}
-      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed"
-      aria-label={t("common.refresh")}
-      title={t("common.refresh")}
-    >
-      <RefreshIcon class="w-5 h-5" />
-    </button>
+  const [meta] = createResource(
+    () => ({ app, addr: props.tokenAddress ? String(props.tokenAddress) : "" }),
+    ({ app, addr }) => getTokenInfo(app, addr)
   );
 
-  const isOwnConnectedWallet = createMemo(() => {
-    const authed = app.authorizedUser()?.address?.toLowerCase();
-    const connected = walletAccount()?.toLowerCase();
-    const profile = props.user?.address?.toLowerCase();
-    return !!authed && authed === profile && connected === profile;
-  });
+  function validate() {
+    const a = String(amountText()).trim();
+    const v = Number(a || "0");
+    const addr = String(to()).trim();
+    if (!addr || !(addr.startsWith("0x") && addr.length === 42)) {
+      return t("wallet.transfer.errors.badAddress");
+    }
+    if (!(v > 0) || amountWei() === null) return t("wallet.transfer.errors.badAmount");
+    return "";
+  }
 
-  // ——— Action: add SAVVA token to wallet (EIP-747)
-  async function addSavvaToWallet() {
+  async function submit(e) {
+    e?.preventDefault?.();
+    const msg = validate();
+    if (msg) { setErr(msg); return; }
+    setErr("");
+    setIsProcessing(true);
+
+    const txData = {
+      to: to().trim(),
+      amountWei: amountWei(),
+      tokenAddress: props.tokenAddress || "",
+    };
+
     try {
-      const address = walletData()?.savvaTokenAddress || "";
-      if (!address || !window?.ethereum?.request) return;
-      await window.ethereum.request({
-        method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: {
-            address,
-            symbol: "SAVVA",
-            decimals: 18,
-            // image is optional; omit to avoid cross-origin issues
-          },
-        },
-      });
+      await performTransfer(app, txData);
+      props.onSubmit?.(txData); // Notify parent on success
+      close();
     } catch (e) {
-      console.error("wallet_watchAsset failed:", e);
+      // Error is already handled by pushErrorToast inside performTransfer
+    } finally {
+      setIsProcessing(false);
     }
   }
 
-  // Menus — only SAVVA wired for now
-  const savvaMenuItems = createMemo(() =>
-    isOwnConnectedWallet()
-      ? [
-          { label: t("wallet.menu.transfer"),        onClick: () => setShowTransfer(true) },
-          { label: t("wallet.menu.increaseStaking"), onClick: () => {/* TODO */} },
-          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }),     onClick: addSavvaToWallet },
-        ]
-      : []
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" onClick={close} />
+      <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
+        <form onSubmit={submit} class="p-4 space-y-4">
+          <div class="text-lg font-semibold flex items-center gap-2">
+            <TokenTitleIcon app={app} tokenAddress={props.tokenAddress || ""} />
+            <span>
+              {t("wallet.transfer.titleToken", { token: meta()?.symbol || "" })}
+            </span>
+          </div>
+
+          <AddressInput
+            label={t("wallet.transfer.to")}
+            value={to()}
+            onChange={setTo}
+            onUserSelect={(u) => setTo(u?.address || "")}
+          />
+
+          <AmountInput
+            label={t("wallet.transfer.amount")}
+            tokenAddress={props.tokenAddress || ""}
+            balance={props.maxAmount /* optional BigInt to avoid extra read */}
+            value={amountText()}
+            onChange={({ text, amountWei: wei }) => { setAmountText(text); setAmountWei(wei); }}
+          />
+
+          <Show when={err()}>
+            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+          </Show>
+
+          <div class="pt-1 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={close}
+              disabled={isProcessing()}
+              class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="submit"
+              disabled={isProcessing()}
+              class="px-3 py-1.5 min-w-[120px] rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60 flex items-center justify-center"
+            >
+              <Show when={isProcessing()} fallback={t("wallet.transfer.transferButton")}>
+                <div class="flex items-center gap-2">
+                  <Spinner class="w-4 h-4" />
+                  <span>{t("wallet.transfer.sending")}</span>
+                </div>
+              </Show>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
-  const baseMenuItems    = createMemo(() => (isOwnConnectedWallet() ? [] : []));
-  const nftMenuItems     = createMemo(() => (isOwnConnectedWallet() ? [] : []));
-  const stakedMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
-  const rewardMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+}
+</file>
 
-  // Helper: vertical value with optional menu
-  const ValueWithMenu = (props) => {
-    const items = props.items || [];
-    const canMenu = isOwnConnectedWallet() && items.length > 0;
-    const triggerContent = (
-      <span class="inline-flex items-center gap-1">
-        <TokenValue amount={props.amount} tokenAddress={props.tokenAddress} format="vertical" />
-        <ChevronDownIcon class="w-4 h-4 opacity-70 self-center" />
-      </span>
-    );
-    return canMenu ? (
-      <ContextMenu
-        items={items}
-        positionClass="relative z-10"
-        icon="chevron"
-        buttonClass="inline-flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[hsl(var(--accent))] focus:outline-none"
-        triggerContent={triggerContent}
-      />
-    ) : (
-      <span class="px-2 py-1">
-        <TokenValue amount={props.amount} tokenAddress={props.tokenAddress} format="vertical" />
-      </span>
-    );
-  };
+<file path="src/components/profile/WalletValueMenu.jsx">
+// src/components/profile/WalletValueMenu.jsx
+import { createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { walletAccount } from "../../blockchain/wallet.js";
+import ContextMenu from "../ui/ContextMenu.jsx";
 
-  function handleTransferSubmit({ to, amountText, amountWei, tokenAddress }) {
-    // TODO: wire actual ERC-20/native transfer (prepare tx flow)
-    console.log("transfer submit:", { to, amountText, amountWei, tokenAddress });
-  }
+/**
+ * Lightweight “...” menu shown next to a wallet value.
+ * Renders nothing unless:
+ *  - viewer is authorized
+ *  - viewer's address matches user.address
+ *  - wallet is currently connected with the same address
+ */
+export default function WalletValueMenu(props) {
+  const app = useApp();
+  const { t } = app;
 
-  const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
+  const isOwnWallet = createMemo(() => {
+    const u = props.user;
+    const authed = app.authorizedUser()?.address?.toLowerCase();
+    const connected = walletAccount()?.toLowerCase();
+    const profileAddr = u?.address?.toLowerCase();
+    return !!authed && !!connected && authed === profileAddr && connected === profileAddr;
+  });
+
+  // First menu we need for SAVVA token balance
+  const savvaBalanceItems = createMemo(() => ([
+    { label: t("wallet.menu.transfer"), onClick: () => props.onTransfer?.() },
+    { label: t("wallet.menu.increaseStaking"), onClick: () => props.onIncreaseStaking?.() },
+  ]));
+
+  // Allow custom items via props; default to SAVVA balance menu
+  const items = () => props.items || savvaBalanceItems();
+
+  // Position: small circular button hugging the value on its right
+  const positionClass = props.positionClass || "absolute -top-2 -right-2 z-10";
+
+  if (!isOwnWallet()) return null;
 
   return (
-    <div class="px-2 space-y-6">
-      <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
-        <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error.message}</p>}>
-          <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
-            {/* SAVVA balance — vertical + context menu (transfer opens modal) */}
-            <WalletRow
-              title={t("profile.wallet.savva.title")}
-              description={t("profile.wallet.savva.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.savvaBalance}
-                tokenAddress={savvaTokenAddress()}
-                items={savvaMenuItems()}
-              />
-            </WalletRow>
-
-            {/* Base token — vertical + menu placeholder */}
-            <WalletRow
-              title={baseTokenSymbol()}
-              description={t("profile.wallet.pls.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.baseTokenBalance}
-                tokenAddress="0"
-                items={baseMenuItems()}
-              />
-            </WalletRow>
-          </WalletSection>
-
-          <WalletSection title={t("profile.wallet.nft.title")}>
-            <WalletRow
-              title={t("profile.wallet.nftEarnings.title")}
-              description={t("profile.wallet.nftEarnings.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.nftEarnings}
-                items={nftMenuItems()}
-              />
-            </WalletRow>
-          </WalletSection>
-
-          <WalletSection title={t("profile.wallet.staking.title")}>
-            <WalletRow
-              title={t("profile.wallet.staked.title")}
-              description={t("profile.wallet.staked.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.stakedBalance}
-                items={stakedMenuItems()}
-              />
-            </WalletRow>
-            <WalletRow
-              title={t("profile.wallet.reward.title")}
-              description={t("profile.wallet.reward.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.stakingReward}
-                items={rewardMenuItems()}
-              />
-            </WalletRow>
-          </WalletSection>
-        </Show>
-      </Show>
-
-      <Show when={showTransfer()}>
-        <TransferModal
-          tokenAddress={savvaTokenAddress()}
-          onClose={() => setShowTransfer(false)}
-          onSubmit={handleTransferSubmit}
-          maxAmount={walletData()?.savvaBalance}
-        />
-      </Show>
+    <div class="relative inline-block">
+      {/* anchor is the parent value container */}
+      <ContextMenu items={items()} positionClass={positionClass} />
     </div>
   );
 }
@@ -22113,43 +21949,6 @@ export function getTabComponent(type) {
 }
 </file>
 
-<file path="src/components/ui/icons/ActionIcons.jsx">
-// src/components/ui/icons/ActionIcons.jsx
-export function EditIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class={props.class || "w-5 h-5"} fill="currentColor">
-      <path d="M20.71,3.29a2.91,2.91,0,0,0-2.2-.84,3.25,3.25,0,0,0-2.17,1L9.46,10.29s0,0,0,0a.62.62,0,0,0-.11.17,1,1,0,0,0-.1.18l0,0,L8,14.72A1,1,0,0,0,9,16a.9.9,0,0,0,.28,0l4-1.17,0,0,.18-.1a.62.62,0,0,0,.17-.11l0,0,6.87-6.88a3.25,3.25,0,0,0,1-2.17A2.91,2.91,0,0,0,20.71,3.29Z"></path>
-      <path d="M20,22H4a2,2,0,0,1-2-2V4A2,2,0,0,1,4,2h8a1,1,0,0,1,0,2H4V20H20V12a1,1,0,0,1,2,0v8A2,2,0,0,1,20,22Z"></path>
-    </svg>
-  );
-}
-
-export function ChevronDownIcon(props) {
-  return (
-    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
-      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z" />
-    </svg>
-  );
-}
-
-export function QuestionIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} aria-hidden="true" fill="currentColor">
-      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 14.75a1.25 1.25 0 110 2.5 1.25 1.25 0 010-2.5zM12 5.5a4 4 0 00-4 4 1 1 0 102 0 2 2 0 113.25 1.53c-.43.34-.78.67-1.05 1.02-.38.5-.7 1.1-.7 1.95v.25a1 1 0 102 0c0-.38.12-.62.32-.88.23-.31.57-.59.99-.92A3.5 3.5 0 0012 5.5z"/>
-    </svg>
-  );
-}
-
-export function TrashIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="3 6 5 6 21 6"></polyline>
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-    </svg>
-  );
-}
-</file>
-
 <file path="src/components/ui/icons/ChainLogos.jsx">
 // src/components/ui/icons/ChainLogos.jsx
 export function EthereumLogo(props) {
@@ -22211,6 +22010,26 @@ export default function CopyIcon(props) {
           fill="currentColor"
         ></path>
       </g>
+    </svg>
+  );
+}
+</file>
+
+<file path="src/components/ui/icons/LockIcon.jsx">
+// src/components/ui/icons/LockIcon.jsx
+export default function LockIcon(props) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <path
+        fill-rule="evenodd"
+        clip-rule="evenodd"
+        d="M4 6V4C4 1.79086 5.79086 0 8 0C10.2091 0 12 1.79086 12 4V6H14V16H2V6H4ZM6 4C6 2.89543 6.89543 2 8 2C9.10457 2 10 2.89543 10 4V6H6V4ZM7 13V9H9V13H7Z"
+      ></path>
     </svg>
   );
 }
@@ -22311,6 +22130,370 @@ export default function Address(props) {
       <button onClick={handleCopy} class="hover:text-[hsl(var(--foreground))]">
         <CopyIcon class="w-4 h-4" />
       </button>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/AddressInput.jsx">
+// src/components/ui/AddressInput.jsx
+import { createSignal, createMemo, createResource, Show, For, onCleanup } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import IpfsImage from "./IpfsImage.jsx";
+import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
+import UserCard from "./UserCard.jsx";
+import { navigate } from "../../routing/hashRouter.js";
+
+function isHexAddress(s) {
+  const v = String(s || "").trim();
+  return /^0x[0-9a-fA-F]{40}$/.test(v);
+}
+
+export default function AddressInput(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [text, setText] = createSignal(String(props.value || "").trim());
+  const [open, setOpen] = createSignal(false);
+  const [hoverIdx, setHoverIdx] = createSignal(-1);
+  const [pickedUser, setPickedUser] = createSignal(null);
+
+  let inputRef;
+  let debounceTimer;
+
+  const domain = createMemo(() => app.selectedDomainName?.() || "");
+
+  // Debounced query
+  const [q, setQ] = createSignal("");
+  function scheduleSearch(next) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => setQ(next), 160);
+  }
+  onCleanup(() => clearTimeout(debounceTimer));
+
+  const [results] = createResource(
+    () => ({ domain: domain(), query: q() }),
+    async ({ domain, query }) => {
+      if (!query) return [];
+      try {
+        const list = await app.wsCall?.("search-user", { domain, query });
+        return Array.isArray(list) ? list : [];
+      } catch {
+        return [];
+      }
+    }
+  );
+
+  function emitChange(addr) {
+    props.onChange?.(addr);
+  }
+
+  function chooseUser(u) {
+    if (!u) return;
+    const addr = String(u.address || "").trim();
+    setText(addr);
+    setOpen(false);
+    setPickedUser(u);
+    emitChange(addr);
+    props.onUserSelect?.(u);
+  }
+
+  function clearPicked() {
+    setPickedUser(null);
+    setTimeout(() => inputRef?.focus(), 0);
+  }
+
+  function onInput(e) {
+    const v = e.currentTarget.value;
+    setText(v);
+    setPickedUser(null);
+    const trimmed = String(v || "").trim();
+
+    if (trimmed.length === 0) {
+      setOpen(false);
+      scheduleSearch("");
+      emitChange("");
+      return;
+    }
+
+    // Always allow backend search by partial text or partial address
+    scheduleSearch(trimmed);
+    setOpen(true);
+    emitChange(trimmed);
+  }
+
+  function onKeyDown(e) {
+    if (!open()) return;
+    const items = results() || [];
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHoverIdx((i) => Math.min(items.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHoverIdx((i) => Math.max(0, i - 1));
+    } else if (e.key === "Enter") {
+      if (hoverIdx() >= 0 && items[hoverIdx()]) {
+        e.preventDefault();
+        chooseUser(items[hoverIdx()]);
+      } else if (isHexAddress(text())) {
+        e.preventDefault();
+        setOpen(false);
+        setPickedUser(null);
+        emitChange(text());
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  }
+
+  function goProfile(u) {
+    if (!u) return;
+    const path = u.name ? `/@${u.name}` : `/${u.address}`;
+    navigate(path);
+  }
+
+  return (
+    <div class={`relative ${props.class || ""}`}>
+      <label class="block text-sm">
+        <div class="mb-1">{props.label || t("wallet.transfer.to")}</div>
+
+        {/* When a user is selected — show the FULL UserCard */}
+        <Show
+          when={pickedUser()}
+          fallback={
+            <div class="relative">
+              <input
+                ref={inputRef}
+                value={text()}
+                onInput={onInput}
+                onKeyDown={onKeyDown}
+                onFocus={() => { if (text().trim()) setOpen(true); }}
+                placeholder={props.placeholder || t("addressInput.placeholder")}
+                class="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 pr-9 outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+                autocomplete="off"
+                inputmode="text"
+              />
+              <Show when={isHexAddress(text())}>
+                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] text-xs">{t("common.ok")}</span>
+              </Show>
+            </div>
+          }
+        >
+          <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-2">
+            {/* IMPORTANT: UserCard expects `author`, not `user` */}
+            <UserCard
+              author={pickedUser()}
+              clickable
+              onClick={() => goProfile(pickedUser())}
+            />
+            <div class="mt-2 flex items-center justify-end">
+              <button
+                type="button"
+                class="px-2 py-1 text-xs rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+                onClick={clearPicked}
+                aria-label={t("common.change")}
+                title={t("common.change")}
+              >
+                {t("common.change")}
+              </button>
+            </div>
+          </div>
+        </Show>
+      </label>
+
+      {/* Suggestions */}
+      <Show when={open() && (results()?.length || 0) > 0}>
+        <div class="absolute z-50 mt-1 w-full max-h-72 overflow-auto rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow">
+          <ul class="py-1">
+            <For each={results()}>
+              {(u, idx) => (
+                <li>
+                  <button
+                    type="button"
+                    class={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[hsl(var(--accent))] ${hoverIdx() === idx() ? "bg-[hsl(var(--accent))]" : ""}`}
+                    onMouseEnter={() => setHoverIdx(idx())}
+                    onMouseLeave={() => setHoverIdx(-1)}
+                    onClick={() => chooseUser(u)}
+                  >
+                    <span class="w-6 h-6 rounded overflow-hidden bg-[hsl(var(--muted))] flex-shrink-0">
+                      <IpfsImage
+                        src={u.avatar}
+                        alt=""
+                        class="w-full h-full object-cover"
+                        fallback={<UnknownUserIcon class="w-full h-full object-cover" />}
+                      />
+                    </span>
+                    <div class="min-w-0">
+                      <div class="text-sm leading-tight truncate">{u.name ? `@${u.name}` : (u.display_name || t("profile.user"))}</div>
+                      <div class="text-xs text-[hsl(var(--muted-foreground))] truncate">{u.address}</div>
+                    </div>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+      </Show> 
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/AmountInput.jsx">
+// src/components/ui/AmountInput.jsx
+import { createMemo, createResource, createSignal, Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { createPublicClient, http, formatUnits, parseUnits } from "viem";
+import { walletAccount } from "../../blockchain/wallet.js";
+import TokenValue from "./TokenValue.jsx";
+import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+
+// Minimal ABI for ERC-20 balanceOf()
+const ERC20_MIN_ABI = [
+  { name: "balanceOf", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+];
+
+function isNonEmpty(addr) { return !!addr && /^0x[0-9a-fA-F]{40}$/.test(String(addr)); }
+
+export default function AmountInput(props) {
+  const app = useApp();
+  const { t } = app;
+
+  // ── chain / client ───────────────────────────────────────────────────────────
+  const isBaseToken = createMemo(() => !isNonEmpty(props.tokenAddress));
+  const chain = createMemo(() => app.desiredChain?.());
+  const rpcUrl = createMemo(() => chain()?.rpcUrls?.[0]);
+  const publicClient = createMemo(() => {
+    const url = rpcUrl();
+    return url ? createPublicClient({ chain: chain(), transport: http(url) }) : null;
+  });
+
+  // ── token meta (cached, SAVVA-aware; no JSX here) ────────────────────────────
+  const tokenAddrForMeta = createMemo(() => (isBaseToken() ? "" : props.tokenAddress));
+  const [tokenMeta] = createResource(
+    () => ({ app, addr: tokenAddrForMeta() }),
+    ({ app, addr }) => getTokenInfo(app, addr)
+  );
+  const decimals = createMemo(() => Number(tokenMeta()?.decimals ?? 18));
+  const symbol = createMemo(() => String(tokenMeta()?.symbol || (isBaseToken() ? (chain()?.nativeCurrency?.symbol || "PLS") : "TOK")));
+
+  // Owner address we use for balance lookups
+  const ownerAddr = createMemo(() => {
+    const connected = walletAccount();
+    const authed = app.authorizedUser?.()?.address;
+    return connected || authed || "0x0000000000000000000000000000000000000000";
+  });
+
+  // balance (ERC-20 or base). We show balance for both; MAX only for ERC-20.
+  const [balanceRes, { refetch: refetchBal }] = createResource(
+    () => ({ addr: props.tokenAddress, pc: publicClient(), provided: props.balance, base: isBaseToken(), owner: ownerAddr() }),
+    async ({ addr, pc, provided, base, owner }) => {
+      if (typeof provided === "bigint") return provided;
+      if (!pc || !owner) return 0n;
+      try {
+        if (base) {
+          // native coin balance
+          return await pc.getBalance({ address: owner });
+        } else {
+          return await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "balanceOf", args: [owner] });
+        }
+      } catch { return 0n; }
+    }
+  );
+
+  // ── input state ───────────────────────────────────────────────────────────────
+  const [text, setText] = createSignal(String(props.value || ""));
+  const [error, setError] = createSignal("");
+
+  function toWeiSafe(s, dec) {
+    try { return parseUnits(String(s).trim() || "0", dec); }
+    catch { return null; }
+  }
+  function fromWeiSafe(v, dec) {
+    try { return formatUnits(v || 0n, dec); }
+    catch { return "0"; }
+  }
+
+  function emitChange(nextStr) {
+    const dec = decimals() || 18;
+    const wei = toWeiSafe(nextStr, dec);
+    if (wei === null) {
+      setError(t("common.invalidNumber"));
+      props.onChange?.({ text: nextStr, amountWei: null, decimals: dec, symbol: symbol() });
+    } else {
+      setError("");
+      props.onChange?.({ text: nextStr, amountWei: wei, decimals: dec, symbol: symbol() });
+    }
+  }
+
+  function onInput(e) {
+    const v = e.currentTarget.value;
+    setText(v);
+    emitChange(v);
+  }
+
+  async function useMax() {
+    // Only for non-base tokens
+    if (isBaseToken()) return;
+    let bal = balanceRes();
+    if (typeof bal !== "bigint") {
+      try { bal = await refetchBal(); } catch { bal = 0n; }
+    }
+    const s = fromWeiSafe(bal || 0n, decimals() || 18);
+    setText(s);
+    emitChange(s);
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────────
+  return (
+    <div class={props.class || ""}>
+      <label class="block text-sm">
+        <div class="mb-1 flex items-center justify-between">
+          <span>{props.label || t("wallet.transfer.amount")}</span>
+          <Show when={!isBaseToken() && (props.showMax ?? true)}>
+            <button
+              type="button"
+              onClick={useMax}
+              class="text-xs underline hover:opacity-80 disabled:opacity-50"
+              disabled={balanceRes.loading}
+            >
+              {t("wallet.transfer.max")}
+            </button>
+          </Show>
+        </div>
+
+        <div class="flex items-stretch gap-2">
+          <input
+            value={text()}
+            onInput={onInput}
+            inputmode="decimal"
+            placeholder={props.placeholder || "0.0"}
+            class="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+            autocomplete="off"
+          />
+          <div class="min-w-[64px] px-2 py-2 text-sm text-[hsl(var(--muted-foreground))] flex items-center justify-end">
+            {symbol()}
+          </div>
+        </div>
+
+        {/* Balance line (shown for BOTH base & ERC-20 if we can fetch/know it) */}
+        <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))] flex items-center gap-1">
+          <span>{t("wallet.transfer.balance")}:</span>
+          <Show when={typeof balanceRes() === "bigint"} fallback={<span>—</span>}>
+            <TokenValue amount={balanceRes() || 0n} tokenAddress={isBaseToken() ? "0" : props.tokenAddress} />
+          </Show>
+        </div>
+
+        <Show when={error()}>
+          <div class="mt-1 text-sm text-[hsl(var(--destructive))]">{error()}</div>
+        </Show>
+
+        {/* Optional helper under the balance line, if caller provided one */}
+        <Show when={props.helper}>
+          <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{props.helper}</div>
+        </Show>
+      </label>
     </div>
   );
 }
@@ -23269,6 +23452,95 @@ export function useDomainCategories(app) {
 }
 </file>
 
+<file path="src/hooks/useMarkdownContent.js">
+// src/hooks/useMarkdownContent.js
+import { createMemo, createResource } from "solid-js";
+import { ipfs } from "../ipfs/index.js";
+import { parse } from "yaml";
+import { dbg } from "../utils/debug.js";
+import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
+import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
+
+async function fetchDetails(app, contentObject) {
+  if (!contentObject) return null;
+  const descriptorPath = getPostDescriptorPath(contentObject);
+  const dataCidForContent = getPostContentBaseCid(contentObject);
+  if (!descriptorPath) return { descriptor: null, dataCidForContent };
+
+  try {
+    const { res } = await ipfs.fetchBest(app, descriptorPath);
+    const descriptor = parse(await res.text()) || null;
+    return { descriptor, dataCidForContent };
+  } catch (error) {
+    dbg.error("useMarkdownContent", "Failed to fetch descriptor", { path: descriptorPath, error });
+    return { descriptor: { error: error.message }, dataCidForContent };
+  }
+}
+
+async function fetchContent(params) {
+  const { details, app, lang, chapterIndex } = params;
+  if (!details?.descriptor || !lang) return "";
+
+  const { descriptor, dataCidForContent } = details;
+  const localized = descriptor.locales?.[lang] || descriptor.locales?.en || Object.values(descriptor.locales || {})[0];
+  if (!localized) return "";
+
+  let contentPath;
+  if (chapterIndex === 0) {
+    if (localized.data) return localized.data;
+    if (localized.data_path) contentPath = `${dataCidForContent}/${localized.data_path}`;
+  } else {
+    const chapter = localized.chapters?.[chapterIndex - 1];
+    if (chapter?.data_path) contentPath = `${dataCidForContent}/${chapter.data_path}`;
+  }
+
+  if (contentPath) {
+    try {
+      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways: descriptor.gateways });
+      return await res.text();
+    } catch (error) {
+      dbg.error('useMarkdownContent', 'Failed to fetch content', { path: contentPath, error });
+      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
+    }
+  }
+  return "";
+}
+
+export function useMarkdownContent(props) {
+  const [details] = createResource(() => props.contentObject(), (content) => fetchDetails(props.app, content));
+  
+  const [mainContent] = createResource(
+    () => ({ details: details(), app: props.app, lang: props.lang(), chapterIndex: props.chapterIndex() }),
+    fetchContent
+  );
+
+  const ipfsBaseUrl = createMemo(() => {
+    const d = details();
+    const dataCid = d?.dataCidForContent;
+    if (!d || !dataCid) return "";
+    
+    const gateways = d.descriptor?.gateways || props.contentObject()?.gateways || [];
+    let bestGateway;
+
+    if (props.app.localIpfsEnabled() && props.app.localIpfsGateway()) {
+      bestGateway = props.app.localIpfsGateway();
+    } else if (gateways.length > 0) {
+      bestGateway = gateways[0];
+    } else {
+      bestGateway = props.app.remoteIpfsGateways()[0] || "https://ipfs.io/";
+    }
+    
+    return ipfs.buildUrl(bestGateway, dataCid);
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
+
+  return { details, mainContent, markdownPlugins, ipfsBaseUrl };
+}
+</file>
+
 <file path="src/ipfs/pinning/manager.js">
 // src/ipfs/pinning/manager.js
 import { fetchWithTimeout } from "../../utils/net";
@@ -24148,115 +24420,6 @@ To fetch full chapter content:
 
 ```txt
 <content_base_cid>/content/en/chapter1.md
-```
-</file>
-
-<file path="public/dev_docs/en/getting-started.md">
-# Getting Started
-
-Welcome to the **Getting Started** guide for the SAVVA Platform.
-
-This page walks you through the basic steps to set up the project locally and start contributing.
-
-## Prerequisites
-
-Before you begin, make sure you have the following tools installed:
-
-- **Node.js** (v18 or later recommended)  
-- **npm** or **yarn** package manager  
-- **Git** for cloning the repository  
-- A modern **browser** (Chrome, Firefox, Edge) for development and testing  
-
-## Clone the Repository
-
-The source code is hosted on GitHub. To get the latest version:
-
-```bash
-git clone https://github.com/AlexNa-Holdings/savva-ui-solidjs
-cd savva-ui-solidjs
-````
-
-## Install Dependencies
-
-Inside the project folder, install all required dependencies:
-
-```bash
-npm install
-# or
-yarn install
-```
-
-## Start the Development Server
-
-Run the dev server with hot reloading:
-
-```bash
-npm run dev
-# or
-yarn dev
-```
-
-The app will be available at [http://localhost:5173](http://localhost:5173).
-
-## Build for Production
-
-To create an optimized build:
-
-```bash
-npm run build
-```
-
-The output will be in the `dist/` folder.
-
-## Next Steps
-
-* Explore the **Developer Docs** for architecture and modules.
-* Try switching domains and assets in the **Right Pane**.
-* Contribute by opening issues or pull requests on GitHub.
-
-That’s it! 🎉 You’re ready to start working with the **SAVVA Platform**.
-
-```html
-<!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAVVA · SolidJS</title>
-
-  <!-- Preload theme to avoid flash -->
-  <script>
-    (function () {
-      try {
-        const saved = localStorage.getItem("theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved || (systemDark ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", theme === "dark");
-      } catch { }
-    })();
-  </script>
-
-  <script>
-    (function () {
-      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form: /#/settings
-      if (!location.hash && location.pathname !== "/") {
-        var newHash = "#" + location.pathname + location.search + location.hash;
-        history.replaceState(null, "", "/" + newHash);
-      }
-    })();
-  </script>
-
-
-  <!-- Load app after theme class is set -->
-  <script type="module" src="/src/index.jsx"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-</body>
-
-</html>
 ```
 </file>
 
@@ -25782,6 +25945,254 @@ export default function PostsTab(props) {
 }
 </file>
 
+<file path="src/components/profile/WalletTab.jsx">
+// src/components/profile/WalletTab.jsx
+import { useApp } from "../../context/AppContext.jsx";
+import TokenValue from "../ui/TokenValue.jsx";
+import { createMemo, createResource, Show, createSignal } from "solid-js";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import { createPublicClient, http } from "viem";
+import Spinner from "../ui/Spinner.jsx";
+import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { walletAccount } from "../../blockchain/wallet.js";
+import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
+import TransferModal from "./TransferModal.jsx";
+import IncreaseStakingModal from "./IncreaseStakingModal.jsx";
+
+/* Data */
+async function fetchWalletData({ app, user, refreshKey }) {
+  if (!user?.address || !app.desiredChain()) return null;
+  try {
+    const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+    const savvaTokenContract   = await getSavvaContract(app, "SavvaToken");
+    const contentFundContract  = await getSavvaContract(app, "ContentFund");
+    const stakingContract      = await getSavvaContract(app, "Staking");
+    const [savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward] = await Promise.all([
+      savvaTokenContract.read.balanceOf([user.address]),
+      publicClient.getBalance({ address: user.address }),
+      contentFundContract.read.claimableNftGain([user.address]),
+      stakingContract.read.balanceOf([user.address]),
+      stakingContract.read.claimable([user.address]),
+    ]);
+    const savvaTokenAddress = savvaTokenContract.address;
+    return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward, savvaTokenAddress };
+  } catch (error) {
+    console.error("Failed to fetch wallet data:", error);
+    return { error };
+  }
+}
+
+/* UI blocks */
+const WalletSection = (props) => (
+  <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+    <div class="flex justify-between items-center">
+      <h3 class="text-lg font-medium">{props.title}</h3>
+      <Show when={props.headerAction}><div>{props.headerAction}</div></Show>
+    </div>
+    {props.children}
+  </section>
+);
+
+const WalletRow = (props) => (
+  <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
+    <div class="flex justify-between items-start">
+      <div class="pr-4">
+        <h4 class="font-semibold">{props.title}</h4>
+        <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
+      </div>
+      <div class="flex-shrink-0 relative inline-flex items-center">
+        {props.children}
+      </div>
+    </div>
+  </div>
+);
+
+export default function WalletTab(props) {
+  const app = useApp();
+  const { t } = app;
+  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user, refreshKey: app.walletDataNeedsRefresh() }), fetchWalletData);
+
+  const desiredChain = createMemo(() => app.desiredChain());
+  const baseTokenSymbol = createMemo(() => desiredChain()?.nativeCurrency?.symbol || "PLS");
+
+  const [showTransfer, setShowTransfer] = createSignal(false);
+  const [showIncreaseStaking, setShowIncreaseStaking] = createSignal(false);
+
+  const RefreshButton = () => (
+    <button
+      onClick={refetch}
+      disabled={walletData.loading}
+      class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed"
+      aria-label={t("common.refresh")}
+      title={t("common.refresh")}
+    >
+      <RefreshIcon class="w-5 h-5" />
+    </button>
+  );
+
+  const isOwnConnectedWallet = createMemo(() => {
+    const authed = app.authorizedUser()?.address?.toLowerCase();
+    const connected = walletAccount()?.toLowerCase();
+    const profile = props.user?.address?.toLowerCase();
+    return !!authed && authed === profile && connected === profile;
+  });
+
+  async function addSavvaToWallet() {
+    try {
+      const address = walletData()?.savvaTokenAddress || "";
+      if (!address || !window?.ethereum?.request) return;
+      await window.ethereum.request({
+        method: "wallet_watchAsset",
+        params: {
+          type: "ERC20",
+          options: {
+            address,
+            symbol: "SAVVA",
+            decimals: 18,
+          },
+        },
+      });
+    } catch (e) {
+      console.error("wallet_watchAsset failed:", e);
+    }
+  }
+
+  const savvaMenuItems = createMemo(() =>
+    isOwnConnectedWallet()
+      ? [
+          { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
+          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }),     onClick: addSavvaToWallet },
+        ]
+      : []
+  );
+  const baseMenuItems    = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+  const nftMenuItems     = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+  const stakedMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+  const rewardMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+
+  const ValueWithMenu = (props) => {
+    const items = props.items || [];
+    const canMenu = isOwnConnectedWallet() && items.length > 0;
+    const triggerContent = (
+      <span class="inline-flex items-center gap-1">
+        <TokenValue amount={props.amount} tokenAddress={props.tokenAddress} format="vertical" />
+        <ChevronDownIcon class="w-4 h-4 opacity-70 self-center" />
+      </span>
+    );
+    return canMenu ? (
+      <ContextMenu
+        items={items}
+        positionClass="relative z-10"
+        icon="chevron"
+        buttonClass="inline-flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[hsl(var(--accent))] focus:outline-none"
+        triggerContent={triggerContent}
+      />
+    ) : (
+      <span class="px-2 py-1">
+        <TokenValue amount={props.amount} tokenAddress={props.tokenAddress} format="vertical" />
+      </span>
+    );
+  };
+
+  function handleTransferSubmit() {
+    refetch();
+    app.triggerWalletDataRefresh();
+  }
+  
+  function handleStakeSubmit() {
+    refetch();
+    app.triggerWalletDataRefresh();
+  }
+
+  const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
+
+  return (
+    <div class="px-2 space-y-6">
+      <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
+        <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error.message}</p>}>
+          <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
+            <WalletRow
+              title={t("profile.wallet.savva.title")}
+              description={t("profile.wallet.savva.description")}
+            >
+              <ValueWithMenu
+                amount={walletData()?.savvaBalance}
+                tokenAddress={savvaTokenAddress()}
+                items={savvaMenuItems()}
+              />
+            </WalletRow>
+
+            <WalletRow
+              title={baseTokenSymbol()}
+              description={t("profile.wallet.pls.description")}
+            >
+              <ValueWithMenu
+                amount={walletData()?.baseTokenBalance}
+                tokenAddress="0"
+                items={baseMenuItems()}
+              />
+            </WalletRow>
+          </WalletSection>
+
+          <WalletSection title={t("profile.wallet.nft.title")}>
+            <WalletRow
+              title={t("profile.wallet.nftEarnings.title")}
+              description={t("profile.wallet.nftEarnings.description")}
+            >
+              <ValueWithMenu
+                amount={walletData()?.nftEarnings}
+                items={nftMenuItems()}
+              />
+            </WalletRow>
+          </WalletSection>
+
+          <WalletSection title={t("profile.wallet.staking.title")}>
+            <WalletRow
+              title={t("profile.wallet.staked.title")}
+              description={t("profile.wallet.staked.description")}
+            >
+              <ValueWithMenu
+                amount={walletData()?.stakedBalance}
+                items={stakedMenuItems()}
+              />
+            </WalletRow>
+            <WalletRow
+              title={t("profile.wallet.reward.title")}
+              description={t("profile.wallet.reward.description")}
+            >
+              <ValueWithMenu
+                amount={walletData()?.stakingReward}
+                items={rewardMenuItems()}
+              />
+            </WalletRow>
+          </WalletSection>
+        </Show>
+      </Show>
+
+      <Show when={showTransfer()}>
+        <TransferModal
+          tokenAddress={savvaTokenAddress()}
+          onClose={() => setShowTransfer(false)}
+          onSubmit={handleTransferSubmit}
+          maxAmount={walletData()?.savvaBalance}
+        />
+      </Show>
+
+      <Show when={showIncreaseStaking()}>
+        <IncreaseStakingModal
+          savvaBalance={walletData()?.savvaBalance}
+          savvaTokenAddress={savvaTokenAddress()}
+          onClose={() => setShowIncreaseStaking(false)}
+          onSubmit={handleStakeSubmit}
+        />
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/tabs/ActualTab.jsx">
 // src/components/tabs/ActualTab.jsx
 import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
@@ -26053,6 +26464,43 @@ export default function RightRailLayout(props) {
 }
 </file>
 
+<file path="src/components/ui/icons/ActionIcons.jsx">
+// src/components/ui/icons/ActionIcons.jsx
+export function EditIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class={props.class || "w-5 h-5"} fill="currentColor">
+      <path d="M20.71,3.29a2.91,2.91,0,0,0-2.2-.84,3.25,3.25,0,0,0-2.17,1L9.46,10.29s0,0,0,0a.62.62,0,0,0-.11.17,1,1,0,0,0-.1.18l0,0,L8,14.72A1,1,0,0,0,9,16a.9.9,0,0,0,.28,0l4-1.17,0,0,.18-.1a.62.62,0,0,0,.17-.11l0,0,6.87-6.88a3.25,3.25,0,0,0,1-2.17A2.91,2.91,0,0,0,20.71,3.29Z"></path>
+      <path d="M20,22H4a2,2,0,0,1-2-2V4A2,2,0,0,1,4,2h8a1,1,0,0,1,0,2H4V20H20V12a1,1,0,0,1,2,0v8A2,2,0,0,1,20,22Z"></path>
+    </svg>
+  );
+}
+
+export function ChevronDownIcon(props) {
+  return (
+    <svg viewBox="0 0 16 16" class={props.class || "w-4 h-4"} aria-hidden="true" fill="currentColor">
+      <path d="M8 11.25a.75.75 0 01-.53-.22l-4-4a.75.75 0 111.06-1.06L8 9.94l3.47-3.47a.75.75 0 111.06 1.06l-4 4a.75.75 0 01-.53.22z" />
+    </svg>
+  );
+}
+
+export function QuestionIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} aria-hidden="true" fill="currentColor">
+      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 14.75a1.25 1.25 0 110 2.5 1.25 1.25 0 010-2.5zM12 5.5a4 4 0 00-4 4 1 1 0 102 0 2 2 0 113.25 1.53c-.43.34-.78.67-1.05 1.02-.38.5-.7 1.1-.7 1.95v.25a1 1 0 102 0c0-.38.12-.62.32-.88.23-.31.57-.59.99-.92A3.5 3.5 0 0012 5.5z"/>
+    </svg>
+  );
+}
+
+export function TrashIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  );
+}
+</file>
+
 <file path="src/components/ui/icons/FishIcons.jsx">
 // src/components/ui/icon/FishIcons.jsx
 // Icons sized by parent via Tailwind classes. We enforce a safe default (w-4 h-4)
@@ -26291,153 +26739,6 @@ export default function ClosePageButton(props) {
         <line x1="6" y1="6" x2="18" y2="18" />
       </svg>
     </button>
-  );
-}
-</file>
-
-<file path="src/components/ui/ContextMenu.jsx">
-// src/components/ui/ContextMenu.jsx
-import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
-import { ChevronDownIcon } from "./icons/ActionIcons.jsx";
-
-export default function ContextMenu(props) {
-  const [isOpen, setIsOpen] = createSignal(false);
-  const [menuClass, setMenuClass] = createSignal("bottom-full right-0 mb-2");
-  const [menuWidth, setMenuWidth] = createSignal(undefined);
-
-  let containerRef;
-  let menuRef;     // actual visible menu
-  let sizerRef;    // hidden sizer for measuring
-
-  const handleClickOutside = (event) => {
-    if (containerRef && !containerRef.contains(event.target)) setIsOpen(false);
-  };
-
-  onMount(() => document.addEventListener("mousedown", handleClickOutside));
-  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
-
-  const handleItemClick = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    item.onClick?.();
-    setIsOpen(false);
-  };
-
-  const positionClass = props.positionClass || "absolute -bottom-2 -right-2 z-20";
-  const ButtonIcon = () => <ChevronDownIcon class="w-4 h-4" />;
-
-  function computeWidth() {
-    // If consumer explicitly sets width, respect it
-    if (props.fixedWidthPx && Number.isFinite(props.fixedWidthPx)) {
-      setMenuWidth(Math.max(0, Number(props.fixedWidthPx)));
-      return;
-    }
-
-    const items = Array.isArray(props.items) ? props.items : [];
-    if (!items.length || !sizerRef) {
-      setMenuWidth(undefined);
-      return;
-    }
-
-    // Measure the longest label width with same text styles and padding
-    const PADDING_X = 32; // px-4 on both sides (Tailwind px-4 = 1rem ≈ 16px * 2)
-    const MIN_GAP = 4;    // small safety gap
-
-    let maxText = 0;
-    // use the same text class as menu items to match font metrics
-    const measurer = sizerRef;
-    measurer.style.whiteSpace = "nowrap";
-    items.forEach((it) => {
-      measurer.textContent = String(it?.label ?? "");
-      const w = Math.ceil(measurer.scrollWidth);
-      if (w > maxText) maxText = w;
-    });
-
-    // Also ensure we’re at least as wide as the trigger (so it doesn’t look cramped)
-    const triggerW = containerRef?.getBoundingClientRect?.().width || 0;
-    // Cap to viewport minus small margin
-    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-    const cap = Math.max(240, vw - 24); // never exceed (viewport - 24px)
-
-    const calculated = Math.min(Math.max(maxText + PADDING_X + MIN_GAP, triggerW), cap);
-    setMenuWidth(calculated);
-  }
-
-  function toggleMenu() {
-    const next = !isOpen();
-    if (next && containerRef) {
-      // pick top/bottom placement
-      const btnRect = containerRef.getBoundingClientRect();
-      const estimatedMenuHeight = 160;
-      setMenuClass(btnRect.top < estimatedMenuHeight ? "top-full right-0 mt-2" : "bottom-full right-0 mb-2");
-      // compute width right before opening
-      computeWidth();
-      // and after first paint, in case fonts/layout shift
-      queueMicrotask(() => computeWidth());
-      // keep width correct on resize while open
-      window.addEventListener("resize", computeWidth, { passive: true });
-    } else {
-      window.removeEventListener("resize", computeWidth);
-    }
-    setIsOpen(next);
-  }
-
-  onCleanup(() => window.removeEventListener("resize", computeWidth));
-
-  const triggerClass =
-    props.buttonClass ||
-    "p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]";
-
-  return (
-    <div class={positionClass} ref={el => (containerRef = el)}>
-      <button
-        class={triggerClass}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(); }}
-        aria-haspopup="true"
-        aria-expanded={isOpen()}
-      >
-        {props.triggerContent ? props.triggerContent : <ButtonIcon />}
-      </button>
-
-      {/* Invisible sizer used for width measurement */}
-      <div
-        ref={el => (sizerRef = el)}
-        aria-hidden="true"
-        class="pointer-events-none fixed -top-[9999px] -left-[9999px] text-sm"
-        style={{
-          "line-height": "1.375", // approx leading-snug
-          // mirror item text styles as much as possible
-          "font": "inherit",
-          "letter-spacing": "inherit",
-        }}
-      />
-
-      <Show when={isOpen()}>
-        <div
-          ref={el => (menuRef = el)}
-          class={`absolute ${menuClass()} rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black/10`}
-          style={menuWidth() ? { width: `${menuWidth()}px` } : undefined}
-          role="menu"
-        >
-          <ul class="py-1">
-            <For each={props.items}>
-              {(item) => (
-                <li>
-                  <a
-                    href="#"
-                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))] whitespace-nowrap"
-                    onClick={(e) => handleItemClick(e, item)}
-                    role="menuitem"
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-      </Show>
-    </div>
   );
 }
 </file>
@@ -27185,6 +27486,272 @@ export function getPostDescriptorPath(post) {
 }
 </file>
 
+<file path="src/styles/themed-controls.css">
+/* src/styles/themed-controls.css
+──────────────────────────────────────────────────────────────
+Contents
+1) Themed segmented controls
+2) Light 1px dialog borders
+3) Docs typography (.sv-docs)
+4) Code & syntax highlighting (Shiki / pretty-code)
+────────────────────────────────────────────────────────────── */
+
+/* ---------------------------------------------- */
+/* 1) Themed segmented controls                   */
+/* ---------------------------------------------- */
+
+.themed-segment {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--muted));
+}
+
+.themed-pill {
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  line-height: 1;
+  font-weight: 600;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  outline: none;
+}
+.themed-pill:hover {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+.themed-pill.is-active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+/* Keyboard focus (accessible) */
+.themed-pill:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+.themed-pill--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+}
+.themed-pill--icon svg { display: block; }
+
+/* ---------------------------------------------- */
+/* 2) Light 1px dialog/panel border               */
+/* ---------------------------------------------- */
+
+.themed-dialog {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem; /* preserves rounding if none set on element */
+}
+
+/* ---------------------------------------------- */
+/* 3) Docs typography (.sv-docs)                  */
+/* ---------------------------------------------- */
+
+.sv-docs h1 {
+  margin: 0 0 1rem;
+  font-size: 1.75rem;
+  line-height: 1.25;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.sv-docs h2 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.sv-docs h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs p {
+  margin: 0.5rem 0 0.85rem;
+  line-height: 1.65;
+  color: hsl(var(--foreground));
+}
+
+.sv-docs ul,
+.sv-docs ol {
+  margin: 0.6rem 0 0.9rem 1.25rem;
+  padding: 0;
+}
+.sv-docs li { margin: 0.25rem 0; }
+
+.sv-docs a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sv-docs a:hover { opacity: 0.9; }
+
+.sv-docs blockquote {
+  margin: 1rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid hsl(var(--border));
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  border-radius: 0.25rem;
+}
+
+.sv-docs table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.sv-docs th,
+.sv-docs td {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid hsl(var(--border));
+}
+.sv-docs th {
+  text-align: left;
+  background: hsl(var(--muted));
+}
+
+/* ---------------------------------------------- */
+/* 4) Code & syntax highlighting                  */
+/*    (rehype-pretty-code + Shiki)                */
+/* ---------------------------------------------- */
+
+/* Tweak here to change density in one place */
+.sv-docs { --docs-code-lh: 0.9; } 
+
+.sv-docs pre {
+  position: relative;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.125rem;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  line-height: var(--docs-code-lh); /* was 1.45 */
+}
+
+/* Avoid double backgrounds inside fenced blocks */
+.sv-docs pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* pretty-code: each line is a span; keep them block-level and inherit the tighter line-height */
+.sv-docs pre code > span {
+  display: block;
+  line-height: inherit; /* ensures tighter spacing applies to each line */
+}
+
+/* Inline code */
+.sv-docs :not(pre) > code {
+  display: inline;
+  padding: 0.12rem 0.35rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  font-size: 0.9em;
+}
+
+/* Dual-theme token colors produced by Shiki */
+.sv-docs code[data-theme*=" "],
+.sv-docs code[data-theme*=" "] span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+html.dark .sv-docs code[data-theme*=" "],
+html.dark .sv-docs code[data-theme*=" "] span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+/* Optional: line/word highlights from pretty-code */
+.sv-docs .line--highlighted { background: hsl(var(--accent)); }
+.sv-docs .word--highlighted {
+  padding: 0.05rem 0.2rem;
+  border-radius: 0.2rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* Heading anchors */
+.sv-docs .anchor {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+}
+.sv-docs .anchor:hover { text-decoration: underline; }
+
+/* Copy button */
+.sv-docs pre .sv-copy-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.35rem;
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+.sv-docs pre:hover .sv-copy-btn { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sv-docs pre .sv-copy-btn { transition: none; }
+}
+
+/* Let <pre> background follow computed theme vars from Shiki */
+.sv-docs pre[data-theme] {
+  background: var(--shiki-light-bg, hsl(var(--muted)));
+  color: var(--shiki-light, hsl(var(--foreground)));
+}
+.dark .sv-docs pre[data-theme] {
+  background: var(--shiki-dark-bg, hsl(var(--muted)));
+  color: var(--shiki-dark, hsl(var(--foreground)));
+}
+
+/* Scroll-to-top floating button */
+.sv-to-top {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(12px, 2.5vh, 24px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+
+  background: color-mix(in oklab, hsl(var(--card)) 88%, transparent);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+
+  opacity: .85;
+  backdrop-filter: blur(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 60;
+}
+.sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
+.sv-to-top:active { transform: translateX(-50%) translateY(0); }
+</file>
+
 <file path="src/ui/contextMenuBuilder.js">
 // src/ui/contextMenuBuilder.js
 import { pushToast } from "../ui/toast.js";
@@ -27319,361 +27886,6 @@ tabs:
         - type: content_List
           list_name: main
           count: 7
-</file>
-
-<file path="scripts/i18n.mjs">
-// scripts/i18n.mjs
-import fs from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
-import dotenv from "dotenv";
-import OpenAI from "openai";
-
-// ---------- Config ----------
-const ROOT = process.cwd();
-dotenv.config({ path: path.join(ROOT, ".env") });
-
-const SRC_DIR = path.join(ROOT, "src");
-const I18N_DIR = path.join(SRC_DIR, "i18n");
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const BATCH_SIZE = 60; // how many keys to ask the model about per request
-const targetLang = process.argv[2] || null;
-const onlyEnglish = targetLang === "en";
-
-// ---------- Collect used keys (scan t("key") calls) ----------
-const exts = [".js", ".jsx", ".ts", ".tsx"];
-const usedKeys = new Set();
-
-/**
- * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
- * (If you build keys dynamically, they won’t be picked up by any static scan.)
- */
-// const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
-const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)/g; //allows t(a,b..)
-
-function walk(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === "dist") continue;
-      walk(p);
-    } else if (exts.includes(path.extname(entry.name))) {
-      const text = fs.readFileSync(p, "utf8");
-      let m;
-      while ((m = T_CALL.exec(text))) {
-        usedKeys.add(m[2]);
-      }
-    }
-  }
-}
-
-walk(SRC_DIR);
-
-// ---------- Helpers to load & write lang files ----------
-function isLangFile(name) {
-  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
-}
-function toModuleURL(filePath) {
-  return pathToFileURL(filePath).href;
-}
-async function loadLang(filePath) {
-  const mod = await import(toModuleURL(filePath));
-  const dict = mod?.default || {};
-  const normalized = {};
-  for (const [k, v] of Object.entries(dict)) {
-    normalized[k] = typeof v === "string" ? v : String(v);
-  }
-  return normalized;
-}
-function writeLang(filePath, obj) {
-  const sorted = Object.keys(obj)
-    .sort()
-    .reduce((acc, k) => {
-      acc[k] = obj[k];
-      return acc;
-    }, {});
-  const body =
-    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
-    "export default " +
-    JSON.stringify(sorted, null, 2) +
-    ";\n";
-  fs.writeFileSync(filePath, body, "utf8");
-}
-
-// ---------- OpenAI helpers ----------
-let openai = null;
-if (OPENAI_KEY) {
-  openai = new OpenAI({ apiKey: OPENAI_KEY });
-}
-
-function chunk(arr, size) {
-  const out = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
-async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
-  if (!openai) return {};
-  const res = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          `You are a localization copywriter for a web app. ` +
-          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
-          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
-          `Do not add extra keys.`,
-      },
-      { role: "user", content: prompt },
-    ],
-  });
-  const text = res.choices?.[0]?.message?.content || "{}";
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
-
-async function fillEnglish(keys) {
-  const out = {};
-  for (const group of chunk(keys, BATCH_SIZE)) {
-    const prompt =
-      `For each key, produce an English UI string (microcopy). ` +
-      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
-      JSON.stringify({ keys: group }, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-async function translateTo(langCode, englishPairs) {
-  const out = {};
-  const keys = Object.keys(englishPairs);
-  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
-    const batchToTranslate = {};
-    for (const k of keyGroup) {
-      batchToTranslate[k] = englishPairs[k];
-    }
-    const prompt =
-      `Translate the values in the following JSON object to ${langCode}. ` +
-      `Return a JSON object with the same keys, but with translated string values. ` +
-      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
-      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
-      JSON.stringify(batchToTranslate, null, 2);
-    const json = await askJson(prompt);
-    Object.assign(out, json);
-  }
-  return out;
-}
-
-// ---------- Main ----------
-(async function main() {
-  // Sanity
-  if (!fs.existsSync(I18N_DIR)) {
-    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
-    process.exit(1);
-  }
-
-  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
-  if (langFiles.length === 0) {
-    console.error("[i18n] No language files found in src/i18n");
-    process.exit(1);
-  }
-
-  const enPath = path.join(I18N_DIR, "en.js");
-  if (!fs.existsSync(enPath)) {
-    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
-    process.exit(1);
-  }
-
-  // Load all dicts
-  const dicts = {};
-  for (const f of langFiles) {
-    dicts[f] = await loadLang(path.join(I18N_DIR, f));
-  }
-
-  const desiredKeys = new Set(usedKeys);
-
-  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
-  const enOrig = dicts["en.js"] || {};
-  const enNew = {};
-  const missingEn = [];
-
-  for (const k of desiredKeys) {
-    const v = enOrig[k];
-    const isMissingValue =
-      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-    if (isMissingValue) {
-      enNew[k] = "???";
-      missingEn.push(k);
-    } else {
-      enNew[k] = v;
-    }
-  }
-
-  writeLang(enPath, enNew);
-
-  // ---------- 2) Fill English "???" via OpenAI ----------
-  if (missingEn.length > 0) {
-    if (!openai) {
-      console.warn(
-        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
-      );
-    } else {
-      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
-      const filled = await fillEnglish(missingEn);
-      let filledCount = 0;
-      for (const k of missingEn) {
-        const candidate = filled[k];
-        if (typeof candidate === "string" && candidate.trim()) {
-          enNew[k] = candidate.trim();
-          filledCount++;
-        }
-      }
-      if (filledCount > 0) {
-        writeLang(enPath, enNew);
-        console.log(`[i18n] Filled ${filledCount} English strings.`);
-      }
-    }
-  } else {
-    console.log("[i18n] No missing English strings to fill.");
-  }
-
-  // ---------- 2.5) Detect 'force retranslate' flags on English ('!…') ----------
-  // Only applicable when NOT in en-only mode.
-  const flaggedKeys = new Set();
-  const cleanFlagText = {};
-  if (!onlyEnglish) {
-    for (const k of Object.keys(enNew)) {
-      const v = enNew[k];
-      if (typeof v === "string" && v.startsWith("!")) {
-        flaggedKeys.add(k);
-        cleanFlagText[k] = v.slice(1).trim(); // the source text to re-translate from English
-      }
-    }
-  }
-
-  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
-  if (onlyEnglish) {
-    console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
-    return;
-  }
-
-  // We'll track which flagged keys succeeded in ALL languages,
-  // so we can safely strip '!' from English afterwards.
-  const maybeStripBang = new Set(flaggedKeys); // remove any key that fails in a language
-
-  for (const f of langFiles) {
-    if (f === "en.js") continue;
-
-    const langPath = path.join(I18N_DIR, f);
-    const langCode = path.basename(f, ".js");
-    const langDict = dicts[f] || {};
-
-    // Prune/prepare
-    const out = {};
-    const toTranslate = {};
-
-    for (const k of desiredKeys) {
-      const v = langDict[k];
-      const enVal = enNew[k];
-
-      // Should we force re-translate this key (English starts with '!')?
-      const forceRetranslate = flaggedKeys.has(k);
-
-      // Missing?
-      const isMissing =
-        v == null ||
-        (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
-
-      if (forceRetranslate) {
-        // Mark as missing to ensure we overwrite; queue clean English for translation
-        out[k] = "???";
-        if (cleanFlagText[k]) toTranslate[k] = cleanFlagText[k];
-      } else if (isMissing) {
-        out[k] = "???";
-        if (typeof enVal === "string" && enVal.trim() && enVal !== "???") {
-          toTranslate[k] = enVal;
-        }
-      } else {
-        out[k] = v;
-      }
-    }
-
-    writeLang(langPath, out);
-    const toTranslateCount = Object.keys(toTranslate).length;
-
-    if (toTranslateCount === 0) {
-      console.log(`[i18n] ${langCode}: nothing to translate.`);
-      // If there are flagged keys but nothing to translate for this lang,
-      // we consider it a failure for those keys because they remained as-is.
-      for (const k of flaggedKeys) {
-        if (out[k] === "???") maybeStripBang.delete(k);
-      }
-      continue;
-    }
-
-    if (!openai) {
-      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
-      // Mark all flagged keys as failed for this language.
-      for (const k of flaggedKeys) {
-        if (out[k] === "???") maybeStripBang.delete(k);
-      }
-      continue;
-    }
-
-    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
-    const translated = await translateTo(langCode, toTranslate);
-    let translatedCount = 0;
-
-    for (const key of Object.keys(toTranslate)) {
-      const t = translated[key];
-      if (typeof t === "string" && t.trim()) {
-        out[key] = t.trim();
-        translatedCount++;
-      } else {
-        // translation for this key failed → don't strip '!' later
-        if (flaggedKeys.has(key)) maybeStripBang.delete(key);
-      }
-    }
-
-    // Any flagged key that still left as "???" is a failure for this language
-    for (const k of flaggedKeys) {
-      if (out[k] === "???") maybeStripBang.delete(k);
-    }
-
-    if (translatedCount > 0) {
-      writeLang(langPath, out);
-    }
-    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
-  }
-
-  // ---------- 4) If all non-English languages were updated for a flagged key, strip '!' in English ----------
-  if (maybeStripBang.size > 0) {
-    let changed = 0;
-    for (const k of maybeStripBang) {
-      const v = enNew[k];
-      if (typeof v === "string" && v.startsWith("!")) {
-        const cleaned = v.slice(1).trim();
-        enNew[k] = cleaned || v; // don't produce empty
-        changed++;
-      }
-    }
-    if (changed > 0) {
-      writeLang(enPath, enNew);
-      console.log(`[i18n] Removed leading '!' from ${changed} English key(s) after successful re-translation.`);
-    }
-  }
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
 </file>
 
 <file path="src/blockchain/auth.js">
@@ -27975,6 +28187,153 @@ export default function VerifiedBadge(props) {
 }
 </file>
 
+<file path="src/components/ui/ContextMenu.jsx">
+// src/components/ui/ContextMenu.jsx
+import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+import { ChevronDownIcon } from "./icons/ActionIcons.jsx";
+
+export default function ContextMenu(props) {
+  const [isOpen, setIsOpen] = createSignal(false);
+  const [menuClass, setMenuClass] = createSignal("bottom-full right-0 mb-2");
+  const [menuWidth, setMenuWidth] = createSignal(undefined);
+
+  let containerRef;
+  let menuRef;     // actual visible menu
+  let sizerRef;    // hidden sizer for measuring
+
+  const handleClickOutside = (event) => {
+    if (containerRef && !containerRef.contains(event.target)) setIsOpen(false);
+  };
+
+  onMount(() => document.addEventListener("mousedown", handleClickOutside));
+  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
+
+  const handleItemClick = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    item.onClick?.();
+    setIsOpen(false);
+  };
+
+  const positionClass = props.positionClass || "absolute -bottom-2 -right-2 z-20";
+  const ButtonIcon = () => <ChevronDownIcon class="w-4 h-4" />;
+
+  function computeWidth() {
+    // If consumer explicitly sets width, respect it
+    if (props.fixedWidthPx && Number.isFinite(props.fixedWidthPx)) {
+      setMenuWidth(Math.max(0, Number(props.fixedWidthPx)));
+      return;
+    }
+
+    const items = Array.isArray(props.items) ? props.items : [];
+    if (!items.length || !sizerRef) {
+      setMenuWidth(undefined);
+      return;
+    }
+
+    // Measure the longest label width with same text styles and padding
+    const PADDING_X = 32; // px-4 on both sides (Tailwind px-4 = 1rem ≈ 16px * 2)
+    const MIN_GAP = 4;    // small safety gap
+
+    let maxText = 0;
+    // use the same text class as menu items to match font metrics
+    const measurer = sizerRef;
+    measurer.style.whiteSpace = "nowrap";
+    items.forEach((it) => {
+      measurer.textContent = String(it?.label ?? "");
+      const w = Math.ceil(measurer.scrollWidth);
+      if (w > maxText) maxText = w;
+    });
+
+    // Also ensure we’re at least as wide as the trigger (so it doesn’t look cramped)
+    const triggerW = containerRef?.getBoundingClientRect?.().width || 0;
+    // Cap to viewport minus small margin
+    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    const cap = Math.max(240, vw - 24); // never exceed (viewport - 24px)
+
+    const calculated = Math.min(Math.max(maxText + PADDING_X + MIN_GAP, triggerW), cap);
+    setMenuWidth(calculated);
+  }
+
+  function toggleMenu() {
+    const next = !isOpen();
+    if (next && containerRef) {
+      // pick top/bottom placement
+      const btnRect = containerRef.getBoundingClientRect();
+      const estimatedMenuHeight = 160;
+      setMenuClass(btnRect.top < estimatedMenuHeight ? "top-full right-0 mt-2" : "bottom-full right-0 mb-2");
+      // compute width right before opening
+      computeWidth();
+      // and after first paint, in case fonts/layout shift
+      queueMicrotask(() => computeWidth());
+      // keep width correct on resize while open
+      window.addEventListener("resize", computeWidth, { passive: true });
+    } else {
+      window.removeEventListener("resize", computeWidth);
+    }
+    setIsOpen(next);
+  }
+
+  onCleanup(() => window.removeEventListener("resize", computeWidth));
+
+  const triggerClass =
+    props.buttonClass ||
+    "p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]";
+
+  return (
+    <div class={positionClass} ref={el => (containerRef = el)}>
+      <button
+        class={triggerClass}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(); }}
+        aria-haspopup="true"
+        aria-expanded={isOpen()}
+      >
+        {props.triggerContent ? props.triggerContent : <ButtonIcon />}
+      </button>
+
+      {/* Invisible sizer used for width measurement */}
+      <div
+        ref={el => (sizerRef = el)}
+        aria-hidden="true"
+        class="pointer-events-none fixed -top-[9999px] -left-[9999px] text-sm"
+        style={{
+          "line-height": "1.375", // approx leading-snug
+          // mirror item text styles as much as possible
+          "font": "inherit",
+          "letter-spacing": "inherit",
+        }}
+      />
+
+      <Show when={isOpen()}>
+        <div
+          ref={el => (menuRef = el)}
+          class={`absolute ${menuClass()} rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black/10`}
+          style={menuWidth() ? { width: `${menuWidth()}px` } : undefined}
+          role="menu"
+        >
+          <ul class="py-1">
+            <For each={props.items}>
+              {(item) => (
+                <li>
+                  <a
+                    href="#"
+                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))] whitespace-nowrap"
+                    onClick={(e) => handleItemClick(e, item)}
+                    role="menuitem"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+      </Show>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/LangSelector.jsx">
 // src/components/ui/LangSelector.jsx
 import { For, Show, createMemo, createEffect } from "solid-js";
@@ -28100,128 +28459,6 @@ export default function PostReactions(props) {
         </div>
         <Show when={totalReactions() > 1}>
           <div class=" ml-0">{totalReactions()}</div>
-        </Show>
-      </div>
-    </Show>
-  );
-}
-</file>
-
-<file path="src/components/ui/TokenValue.jsx">
-// src/components/ui/TokenValue.jsx
-import { createMemo, Show, createSignal, createEffect, on, createResource } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import { formatUnits } from "viem";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
-import SavvaTokenIcon from "./icons/SavvaTokenIcon.jsx";
-import { getChainLogo } from "../../blockchain/chainLogos.js";
-
-/**
- * TokenValue — shows amount (with correct decimals) + optional USD value.
- * Props:
- *   - amount: bigint | string | number
- *   - tokenAddress: string | "0" (base token)
- *   - format: "vertical" | (default inline)
- */
-export default function TokenValue(props) {
-  const app = useApp();
-
-  const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
-  const desiredChain = createMemo(() => app.desiredChain());
-
-  const tokenAddressRaw = createMemo(() => props.tokenAddress ?? savvaTokenAddress());
-  const isBaseToken = createMemo(() => tokenAddressRaw() === "0");
-  const tokenAddressForMeta = createMemo(() => (isBaseToken() ? "" : tokenAddressRaw() || ""));
-
-  const isSavvaToken = createMemo(() => {
-    const a = (tokenAddressRaw() || "").toLowerCase();
-    const s = (savvaTokenAddress() || "").toLowerCase();
-    return !isBaseToken() && !!a && !!s && a === s;
-  });
-
-  // Resolve metadata (cached, SAVVA-aware)
-  const [tokenMeta] = createResource(
-    () => ({ app, addr: tokenAddressForMeta() }),
-    ({ app, addr }) => getTokenInfo(app, addr)
-  );
-
-  // Format amount using real decimals
-  const formattedAmount = createMemo(() => {
-    try {
-      const dec = Number(tokenMeta()?.decimals ?? 18);
-      const amt = BigInt(props.amount ?? 0);
-      const num = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
-      return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } catch {
-      return "0.00";
-    }
-  });
-
-  // USD value for SAVVA or base coin (if app provides price)
-  const sourceUsdValue = createMemo(() => {
-    let priceData = null;
-    if (isSavvaToken()) priceData = app.savvaTokenPrice?.();
-    else if (isBaseToken()) priceData = app.baseTokenPrice?.();
-
-    if (!priceData?.price) return null;
-
-    try {
-      const dec = Number(tokenMeta()?.decimals ?? 18);
-      const amt = BigInt(props.amount ?? 0);
-      const units = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
-      const total = units * Number(priceData.price);
-      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
-    } catch {
-      return null;
-    }
-  });
-
-  // animation for USD change
-  const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
-  const [isAnimating, setIsAnimating] = createSignal(false);
-  createEffect(on(sourceUsdValue, (next, prev) => {
-    if (prev == null) { setDisplayUsdValue(next); return; }
-    setDisplayUsdValue(prev);
-    setIsAnimating(true);
-    setTimeout(() => setDisplayUsdValue(next), 200);
-    setTimeout(() => setIsAnimating(false), 400);
-  }, { defer: true }));
-
-  const Icon = () => {
-    if (isSavvaToken()) return <SavvaTokenIcon class="w-4 h-4" />;
-    if (isBaseToken()) {
-      const LogoComponent = getChainLogo(desiredChain()?.id);
-      return LogoComponent ? <LogoComponent class="w-5 h-5" /> : null;
-    }
-    return null;
-  };
-
-  const isVertical = () => props.format === "vertical";
-
-  return (
-    <Show
-      when={isVertical()}
-      fallback={
-        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`}>
-          <Icon />
-          <span class="font-semibold">{formattedAmount()}</span>
-          <Show when={displayUsdValue()}>
-            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
-              ({displayUsdValue()})
-            </span>
-          </Show>
-        </div>
-      }
-    >
-      <div class={`flex flex-col items-end text-sm ${props.class || ''}`}>
-        <div class="flex items-center gap-1.5">
-          <Icon />
-          <span class="font-semibold">{formattedAmount()}</span>
-        </div>
-        <Show when={displayUsdValue()}>
-          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
-            ({displayUsdValue()})
-          </span>
         </Show>
       </div>
     </Show>
@@ -28792,272 +29029,6 @@ export function createTextPreview(markdownText, type = 'post') {
 }
 </file>
 
-<file path="src/styles/themed-controls.css">
-/* src/styles/themed-controls.css
-──────────────────────────────────────────────────────────────
-Contents
-1) Themed segmented controls
-2) Light 1px dialog borders
-3) Docs typography (.sv-docs)
-4) Code & syntax highlighting (Shiki / pretty-code)
-────────────────────────────────────────────────────────────── */
-
-/* ---------------------------------------------- */
-/* 1) Themed segmented controls                   */
-/* ---------------------------------------------- */
-
-.themed-segment {
-  display: inline-flex;
-  gap: 6px;
-  padding: 4px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 9999px;
-  background: hsl(var(--muted));
-}
-
-.themed-pill {
-  appearance: none;
-  cursor: pointer;
-  border: 0;
-  border-radius: 9999px;
-  padding: 6px 12px;
-  line-height: 1;
-  font-weight: 600;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  outline: none;
-}
-.themed-pill:hover {
-  background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-}
-.themed-pill.is-active {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-/* Keyboard focus (accessible) */
-.themed-pill:focus-visible {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
-}
-
-.themed-pill--icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
-}
-.themed-pill--icon svg { display: block; }
-
-/* ---------------------------------------------- */
-/* 2) Light 1px dialog/panel border               */
-/* ---------------------------------------------- */
-
-.themed-dialog {
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem; /* preserves rounding if none set on element */
-}
-
-/* ---------------------------------------------- */
-/* 3) Docs typography (.sv-docs)                  */
-/* ---------------------------------------------- */
-
-.sv-docs h1 {
-  margin: 0 0 1rem;
-  font-size: 1.75rem;
-  line-height: 1.25;
-  font-weight: 700;
-  color: hsl(var(--foreground));
-}
-.sv-docs h2 {
-  margin: 1.5rem 0 0.75rem;
-  font-size: 1.25rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-.sv-docs h3 {
-  margin: 1.25rem 0 0.5rem;
-  font-size: 1.05rem;
-  line-height: 1.35;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-
-.sv-docs p {
-  margin: 0.5rem 0 0.85rem;
-  line-height: 1.65;
-  color: hsl(var(--foreground));
-}
-
-.sv-docs ul,
-.sv-docs ol {
-  margin: 0.6rem 0 0.9rem 1.25rem;
-  padding: 0;
-}
-.sv-docs li { margin: 0.25rem 0; }
-
-.sv-docs a {
-  color: hsl(var(--primary));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.sv-docs a:hover { opacity: 0.9; }
-
-.sv-docs blockquote {
-  margin: 1rem 0;
-  padding: 0.6rem 0.9rem;
-  border-left: 3px solid hsl(var(--border));
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  border-radius: 0.25rem;
-}
-
-.sv-docs table {
-  width: 100%;
-  margin: 1rem 0;
-  border-collapse: collapse;
-  font-size: 0.95rem;
-}
-.sv-docs th,
-.sv-docs td {
-  padding: 0.5rem 0.6rem;
-  border: 1px solid hsl(var(--border));
-}
-.sv-docs th {
-  text-align: left;
-  background: hsl(var(--muted));
-}
-
-/* ---------------------------------------------- */
-/* 4) Code & syntax highlighting                  */
-/*    (rehype-pretty-code + Shiki)                */
-/* ---------------------------------------------- */
-
-/* Tweak here to change density in one place */
-.sv-docs { --docs-code-lh: 0.9; } 
-
-.sv-docs pre {
-  position: relative;
-  margin: 1rem 0 1.25rem;
-  padding: 1rem 1.125rem;
-  overflow-x: auto;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  font-size: 0.9rem;
-  line-height: var(--docs-code-lh); /* was 1.45 */
-}
-
-/* Avoid double backgrounds inside fenced blocks */
-.sv-docs pre code {
-  background: transparent;
-  padding: 0;
-}
-
-/* pretty-code: each line is a span; keep them block-level and inherit the tighter line-height */
-.sv-docs pre code > span {
-  display: block;
-  line-height: inherit; /* ensures tighter spacing applies to each line */
-}
-
-/* Inline code */
-.sv-docs :not(pre) > code {
-  display: inline;
-  padding: 0.12rem 0.35rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.35rem;
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  font-size: 0.9em;
-}
-
-/* Dual-theme token colors produced by Shiki */
-.sv-docs code[data-theme*=" "],
-.sv-docs code[data-theme*=" "] span {
-  color: var(--shiki-light);
-  background-color: var(--shiki-light-bg);
-}
-html.dark .sv-docs code[data-theme*=" "],
-html.dark .sv-docs code[data-theme*=" "] span {
-  color: var(--shiki-dark);
-  background-color: var(--shiki-dark-bg);
-}
-
-/* Optional: line/word highlights from pretty-code */
-.sv-docs .line--highlighted { background: hsl(var(--accent)); }
-.sv-docs .word--highlighted {
-  padding: 0.05rem 0.2rem;
-  border-radius: 0.2rem;
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-/* Heading anchors */
-.sv-docs .anchor {
-  position: relative;
-  color: inherit;
-  text-decoration: none;
-}
-.sv-docs .anchor:hover { text-decoration: underline; }
-
-/* Copy button */
-.sv-docs pre .sv-copy-btn {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.35rem;
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-  font-size: 0.75rem;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-.sv-docs pre:hover .sv-copy-btn { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .sv-docs pre .sv-copy-btn { transition: none; }
-}
-
-/* Let <pre> background follow computed theme vars from Shiki */
-.sv-docs pre[data-theme] {
-  background: var(--shiki-light-bg, hsl(var(--muted)));
-  color: var(--shiki-light, hsl(var(--foreground)));
-}
-.dark .sv-docs pre[data-theme] {
-  background: var(--shiki-dark-bg, hsl(var(--muted)));
-  color: var(--shiki-dark, hsl(var(--foreground)));
-}
-
-/* Scroll-to-top floating button */
-.sv-to-top {
-  position: fixed;
-  left: 50%;
-  bottom: clamp(12px, 2.5vh, 24px);
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 38px;
-  height: 38px;
-  border-radius: 9999px;
-
-  background: color-mix(in oklab, hsl(var(--card)) 88%, transparent);
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 6px 18px rgba(0,0,0,.12);
-
-  opacity: .85;
-  backdrop-filter: blur(6px);
-  transition: opacity .18s ease, transform .18s ease;
-  z-index: 60;
-}
-.sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
-.sv-to-top:active { transform: translateX(-50%) translateY(0); }
-</file>
-
 <file path="package.json">
 {
   "name": "savva-ui-solidjs",
@@ -29235,6 +29206,361 @@ sections:
         file: core-concepts/publishing-posts.md
       - label: Контракт конфігурації
         file: core-concepts/config-contract.md
+</file>
+
+<file path="scripts/i18n.mjs">
+// scripts/i18n.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import dotenv from "dotenv";
+import OpenAI from "openai";
+
+// ---------- Config ----------
+const ROOT = process.cwd();
+dotenv.config({ path: path.join(ROOT, ".env") });
+
+const SRC_DIR = path.join(ROOT, "src");
+const I18N_DIR = path.join(SRC_DIR, "i18n");
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const BATCH_SIZE = 60; // how many keys to ask the model about per request
+const targetLang = process.argv[2] || null;
+const onlyEnglish = targetLang === "en";
+
+// ---------- Collect used keys (scan t("key") calls) ----------
+const exts = [".js", ".jsx", ".ts", ".tsx"];
+const usedKeys = new Set();
+
+/**
+ * Finds t('foo.bar'), t("foo.bar") and t(`foo.bar`) with static literals only.
+ * (If you build keys dynamically, they won’t be picked up by any static scan.)
+ */
+// const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)\1\s*\)/g;
+const T_CALL = /\b(?:i18n\.)?t\(\s*([`'"])([^`'"]+)/g; //allows t(a,b..)
+
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
+      walk(p);
+    } else if (exts.includes(path.extname(entry.name))) {
+      const text = fs.readFileSync(p, "utf8");
+      let m;
+      while ((m = T_CALL.exec(text))) {
+        usedKeys.add(m[2]);
+      }
+    }
+  }
+}
+
+walk(SRC_DIR);
+
+// ---------- Helpers to load & write lang files ----------
+function isLangFile(name) {
+  return name.endsWith(".js") && !/useI18n\.js$/i.test(name);
+}
+function toModuleURL(filePath) {
+  return pathToFileURL(filePath).href;
+}
+async function loadLang(filePath) {
+  const mod = await import(toModuleURL(filePath));
+  const dict = mod?.default || {};
+  const normalized = {};
+  for (const [k, v] of Object.entries(dict)) {
+    normalized[k] = typeof v === "string" ? v : String(v);
+  }
+  return normalized;
+}
+function writeLang(filePath, obj) {
+  const sorted = Object.keys(obj)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = obj[k];
+      return acc;
+    }, {});
+  const body =
+    "// Auto-generated by scripts/i18n.mjs. Do not edit by hand.\n" +
+    "export default " +
+    JSON.stringify(sorted, null, 2) +
+    ";\n";
+  fs.writeFileSync(filePath, body, "utf8");
+}
+
+// ---------- OpenAI helpers ----------
+let openai = null;
+if (OPENAI_KEY) {
+  openai = new OpenAI({ apiKey: OPENAI_KEY });
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function askJson(prompt, schemaHint = "an object mapping keys to strings") {
+  if (!openai) return {};
+  const res = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          `You are a localization copywriter for a web app. ` +
+          `Return ONLY valid JSON (${schemaHint}). Keep strings concise, natural, and product-quality. ` +
+          `Preserve punctuation, capitalization, and any placeholders like {name}, {amount}, {n}, %s, %d exactly. ` +
+          `Do not add extra keys.`,
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+  const text = res.choices?.[0]?.message?.content || "{}";
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+async function fillEnglish(keys) {
+  const out = {};
+  for (const group of chunk(keys, BATCH_SIZE)) {
+    const prompt =
+      `For each key, produce an English UI string (microcopy). ` +
+      `Be terse where appropriate (button labels, placeholders) and clear for longer texts.\n\n` +
+      JSON.stringify({ keys: group }, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+async function translateTo(langCode, englishPairs) {
+  const out = {};
+  const keys = Object.keys(englishPairs);
+  for (const keyGroup of chunk(keys, BATCH_SIZE)) {
+    const batchToTranslate = {};
+    for (const k of keyGroup) {
+      batchToTranslate[k] = englishPairs[k];
+    }
+    const prompt =
+      `Translate the values in the following JSON object to ${langCode}. ` +
+      `Return a JSON object with the same keys, but with translated string values. ` +
+      `Keep placeholders (like {amount}, {n}, %s, %d) unchanged. ` +
+      `Use natural ${langCode} for a consumer web app (not formal/legal).\n\n` +
+      JSON.stringify(batchToTranslate, null, 2);
+    const json = await askJson(prompt);
+    Object.assign(out, json);
+  }
+  return out;
+}
+
+// ---------- Main ----------
+(async function main() {
+  // Sanity
+  if (!fs.existsSync(I18N_DIR)) {
+    console.error(`[i18n] Not found: ${path.relative(ROOT, I18N_DIR)}`);
+    process.exit(1);
+  }
+
+  const langFiles = fs.readdirSync(I18N_DIR).filter(isLangFile);
+  if (langFiles.length === 0) {
+    console.error("[i18n] No language files found in src/i18n");
+    process.exit(1);
+  }
+
+  const enPath = path.join(I18N_DIR, "en.js");
+  if (!fs.existsSync(enPath)) {
+    console.error("[i18n] Missing src/i18n/en.js (source of truth)");
+    process.exit(1);
+  }
+
+  // Load all dicts
+  const dicts = {};
+  for (const f of langFiles) {
+    dicts[f] = await loadLang(path.join(I18N_DIR, f));
+  }
+
+  const desiredKeys = new Set(usedKeys);
+
+  // ---------- 1) Clean English (keep only used, mark missing & "???" as missing) ----------
+  const enOrig = dicts["en.js"] || {};
+  const enNew = {};
+  const missingEn = [];
+
+  for (const k of desiredKeys) {
+    const v = enOrig[k];
+    const isMissingValue =
+      v == null || (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+    if (isMissingValue) {
+      enNew[k] = "???";
+      missingEn.push(k);
+    } else {
+      enNew[k] = v;
+    }
+  }
+
+  writeLang(enPath, enNew);
+
+  // ---------- 2) Fill English "???" via OpenAI ----------
+  if (missingEn.length > 0) {
+    if (!openai) {
+      console.warn(
+        "[i18n] OPENAI_API_KEY not set; skip filling English. Set it in .env to auto-fill."
+      );
+    } else {
+      console.log(`[i18n] Filling ${missingEn.length} missing English strings...`);
+      const filled = await fillEnglish(missingEn);
+      let filledCount = 0;
+      for (const k of missingEn) {
+        const candidate = filled[k];
+        if (typeof candidate === "string" && candidate.trim()) {
+          enNew[k] = candidate.trim();
+          filledCount++;
+        }
+      }
+      if (filledCount > 0) {
+        writeLang(enPath, enNew);
+        console.log(`[i18n] Filled ${filledCount} English strings.`);
+      }
+    }
+  } else {
+    console.log("[i18n] No missing English strings to fill.");
+  }
+
+  // ---------- 2.5) Detect 'force retranslate' flags on English ('!…') ----------
+  // Only applicable when NOT in en-only mode.
+  const flaggedKeys = new Set();
+  const cleanFlagText = {};
+  if (!onlyEnglish) {
+    for (const k of Object.keys(enNew)) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        flaggedKeys.add(k);
+        cleanFlagText[k] = v.slice(1).trim(); // the source text to re-translate from English
+      }
+    }
+  }
+
+  // ---------- 3) For each non-English, prune + add "???" + translate from English ----------
+  if (onlyEnglish) {
+    console.log("[i18n] 'en' parameter detected. Skipping translation for other languages.");
+    return;
+  }
+
+  // We'll track which flagged keys succeeded in ALL languages,
+  // so we can safely strip '!' from English afterwards.
+  const maybeStripBang = new Set(flaggedKeys); // remove any key that fails in a language
+
+  for (const f of langFiles) {
+    if (f === "en.js") continue;
+
+    const langPath = path.join(I18N_DIR, f);
+    const langCode = path.basename(f, ".js");
+    const langDict = dicts[f] || {};
+
+    // Prune/prepare
+    const out = {};
+    const toTranslate = {};
+
+    for (const k of desiredKeys) {
+      const v = langDict[k];
+      const enVal = enNew[k];
+
+      // Should we force re-translate this key (English starts with '!')?
+      const forceRetranslate = flaggedKeys.has(k);
+
+      // Missing?
+      const isMissing =
+        v == null ||
+        (typeof v === "string" && (v.trim() === "" || v.trim() === "???"));
+
+      if (forceRetranslate) {
+        // Mark as missing to ensure we overwrite; queue clean English for translation
+        out[k] = "???";
+        if (cleanFlagText[k]) toTranslate[k] = cleanFlagText[k];
+      } else if (isMissing) {
+        out[k] = "???";
+        if (typeof enVal === "string" && enVal.trim() && enVal !== "???") {
+          toTranslate[k] = enVal;
+        }
+      } else {
+        out[k] = v;
+      }
+    }
+
+    writeLang(langPath, out);
+    const toTranslateCount = Object.keys(toTranslate).length;
+
+    if (toTranslateCount === 0) {
+      console.log(`[i18n] ${langCode}: nothing to translate.`);
+      // If there are flagged keys but nothing to translate for this lang,
+      // we consider it a failure for those keys because they remained as-is.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
+      continue;
+    }
+
+    if (!openai) {
+      console.warn(`[i18n] ${langCode}: OPENAI_API_KEY not set; skip translation.`);
+      // Mark all flagged keys as failed for this language.
+      for (const k of flaggedKeys) {
+        if (out[k] === "???") maybeStripBang.delete(k);
+      }
+      continue;
+    }
+
+    console.log(`[i18n] ${langCode}: translating ${toTranslateCount} keys...`);
+    const translated = await translateTo(langCode, toTranslate);
+    let translatedCount = 0;
+
+    for (const key of Object.keys(toTranslate)) {
+      const t = translated[key];
+      if (typeof t === "string" && t.trim()) {
+        out[key] = t.trim();
+        translatedCount++;
+      } else {
+        // translation for this key failed → don't strip '!' later
+        if (flaggedKeys.has(key)) maybeStripBang.delete(key);
+      }
+    }
+
+    // Any flagged key that still left as "???" is a failure for this language
+    for (const k of flaggedKeys) {
+      if (out[k] === "???") maybeStripBang.delete(k);
+    }
+
+    if (translatedCount > 0) {
+      writeLang(langPath, out);
+    }
+    console.log(`[i18n] ${langCode}: translated ${translatedCount} keys.`);
+  }
+
+  // ---------- 4) If all non-English languages were updated for a flagged key, strip '!' in English ----------
+  if (maybeStripBang.size > 0) {
+    let changed = 0;
+    for (const k of maybeStripBang) {
+      const v = enNew[k];
+      if (typeof v === "string" && v.startsWith("!")) {
+        const cleaned = v.slice(1).trim();
+        enNew[k] = cleaned || v; // don't produce empty
+        changed++;
+      }
+    }
+    if (changed > 0) {
+      writeLang(enPath, enNew);
+      console.log(`[i18n] Removed leading '!' from ${changed} English key(s) after successful re-translation.`);
+    }
+  }
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 </file>
 
 <file path="src/components/editor/CommentEditor.jsx">
@@ -29657,6 +29983,128 @@ export default function PostControls(props) {
         {...modalProps()}
       />
     </>
+  );
+}
+</file>
+
+<file path="src/components/ui/TokenValue.jsx">
+// src/components/ui/TokenValue.jsx
+import { createMemo, Show, createSignal, createEffect, on, createResource } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { formatUnits } from "viem";
+import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import SavvaTokenIcon from "./icons/SavvaTokenIcon.jsx";
+import { getChainLogo } from "../../blockchain/chainLogos.js";
+
+/**
+ * TokenValue — shows amount (with correct decimals) + optional USD value.
+ * Props:
+ *   - amount: bigint | string | number
+ *   - tokenAddress: string | "0" (base token)
+ *   - format: "vertical" | (default inline)
+ */
+export default function TokenValue(props) {
+  const app = useApp();
+
+  const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
+  const desiredChain = createMemo(() => app.desiredChain());
+
+  const tokenAddressRaw = createMemo(() => props.tokenAddress ?? savvaTokenAddress());
+  const isBaseToken = createMemo(() => tokenAddressRaw() === "0");
+  const tokenAddressForMeta = createMemo(() => (isBaseToken() ? "" : tokenAddressRaw() || ""));
+
+  const isSavvaToken = createMemo(() => {
+    const a = (tokenAddressRaw() || "").toLowerCase();
+    const s = (savvaTokenAddress() || "").toLowerCase();
+    return !isBaseToken() && !!a && !!s && a === s;
+  });
+
+  // Resolve metadata (cached, SAVVA-aware)
+  const [tokenMeta] = createResource(
+    () => ({ app, addr: tokenAddressForMeta() }),
+    ({ app, addr }) => getTokenInfo(app, addr)
+  );
+
+  // Format amount using real decimals
+  const formattedAmount = createMemo(() => {
+    try {
+      const dec = Number(tokenMeta()?.decimals ?? 18);
+      const amt = BigInt(props.amount ?? 0);
+      const num = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
+      return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch {
+      return "0.00";
+    }
+  });
+
+  // USD value for SAVVA or base coin (if app provides price)
+  const sourceUsdValue = createMemo(() => {
+    let priceData = null;
+    if (isSavvaToken()) priceData = app.savvaTokenPrice?.();
+    else if (isBaseToken()) priceData = app.baseTokenPrice?.();
+
+    if (!priceData?.price) return null;
+
+    try {
+      const dec = Number(tokenMeta()?.decimals ?? 18);
+      const amt = BigInt(props.amount ?? 0);
+      const units = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
+      const total = units * Number(priceData.price);
+      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
+    } catch {
+      return null;
+    }
+  });
+
+  // animation for USD change
+  const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
+  const [isAnimating, setIsAnimating] = createSignal(false);
+  createEffect(on(sourceUsdValue, (next, prev) => {
+    if (prev == null) { setDisplayUsdValue(next); return; }
+    setDisplayUsdValue(prev);
+    setIsAnimating(true);
+    setTimeout(() => setDisplayUsdValue(next), 200);
+    setTimeout(() => setIsAnimating(false), 400);
+  }, { defer: true }));
+
+  const Icon = () => {
+    if (isSavvaToken()) return <SavvaTokenIcon class="w-4 h-4" />;
+    if (isBaseToken()) {
+      const LogoComponent = getChainLogo(desiredChain()?.id);
+      return LogoComponent ? <LogoComponent class="w-5 h-5" /> : null;
+    }
+    return null;
+  };
+
+  const isVertical = () => props.format === "vertical";
+
+  return (
+    <Show
+      when={isVertical()}
+      fallback={
+        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`}>
+          <Icon />
+          <span class="font-semibold">{formattedAmount()}</span>
+          <Show when={displayUsdValue()}>
+            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
+              ({displayUsdValue()})
+            </span>
+          </Show>
+        </div>
+      }
+    >
+      <div class={`flex flex-col items-end text-sm ${props.class || ''}`}>
+        <div class="flex items-center gap-1.5">
+          <Icon />
+          <span class="font-semibold">{formattedAmount()}</span>
+        </div>
+        <Show when={displayUsdValue()}>
+          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
+            ({displayUsdValue()})
+          </span>
+        </Show>
+      </div>
+    </Show>
   );
 }
 </file>
@@ -30647,107 +31095,6 @@ export default function RightPane({ isOpen, onClose }) {
 }
 </file>
 
-<file path="src/ipfs/index.js">
-// src/ipfs/index.js
-import { fetchWithTimeout } from "../utils/net.js";
-
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
-
-// New helper function to ensure a URL has a protocol
-function ensureProtocol(url) {
-  if (!url || url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  return `https://${url}`;
-}
-
-function normalizeInput(input) {
-  let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
-  return s;
-}
-
-function buildUrl(baseGateway, cidPath) {
-  const normalizedGateway = ensureProtocol(String(baseGateway || "").trim());
-  const base = normalizedGateway.replace(/\/+$/, "");
-  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
-  if (!base || !path) return "";
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
-  return prefix + path;
-}
-
-async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
-  const errors = [];
-  for (const gw of gateways) {
-    const url = buildUrl(gw, cidPath);
-    try {
-      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
-      if (res && res.ok) {
-        return { res, url, gateway: gw };
-      }
-
-      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
-      httpError.url = url;
-      httpError.status = res.status;
-      errors.push(httpError);
-
-    } catch (e) {
-      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
-      networkError.url = url;
-      errors.push(networkError);
-    }
-  }
-  const err = new Error("All IPFS gateways failed");
-  err.causes = errors;
-  if (errors.some(e => e.status === 404)) {
-      err.is404 = true;
-  }
-  throw err;
-}
-
-async function fetchBest(app, ipfsPath, options = {}) {
-  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
-  const cidPath = normalizeInput(ipfsPath);
-  let gatewaysToTry = [];
-  
-  let effectiveTimeout = timeoutMs;
-
-  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-    gatewaysToTry = [app.localIpfsGateway()];
-    effectiveTimeout = 30000;
-  } else {
-    const systemGateways = app.remoteIpfsGateways() || [];
-    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
-  }
-
-  if (gatewaysToTry.length === 0) {
-    throw new Error("No IPFS gateways available to try.");
-  }
-
-  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
-}
-
-async function getJSONBest(app, ipfsPath, options = {}) {
-  const { res, url, gateway } = await fetchBest(app, ipfsPath, {
-    ...options,
-    headers: { Accept: "application/json", ...(options.headers || {}) },
-  });
-  return { data: await res.json(), url, gateway };
-}
-
-export const ipfs = {
-  fetchBest,
-  getJSONBest,
-  normalizeInput,
-  buildUrl,
-};
-</file>
-
 <file path="src/pages/Settings.jsx">
 // src/pages/Settings.jsx
 import { useApp } from "../context/AppContext.jsx";
@@ -31410,6 +31757,116 @@ export function useAppAuth() {
 
   return { authorizedUser, login, logout, handleAuthError, updateAuthorizedUser };
 }
+</file>
+
+<file path="src/ipfs/index.js">
+// src/ipfs/index.js
+import { fetchWithTimeout } from "../utils/net.js";
+
+// Helper function to ensure a URL has a protocol
+function ensureProtocol(url) {
+  if (!url || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `https://${url}`;
+}
+
+// Iteratively strips all known IPFS prefixes to handle cases like 'ipfs:/ipfs/Qm...'
+function normalizeInput(input) {
+  let s = String(input || "").trim();
+  if (!s) return s;
+  let prevS;
+  do {
+    prevS = s;
+    s = s.replace(/^(ipfs:\/\/|\/ipfs\/|ipfs\/)/i, "");
+  } while (s !== prevS && s.length > 0);
+  return s;
+}
+
+// Robustly joins a gateway and a CID path, ensuring no duplicate '/ipfs/' segment.
+function buildUrl(baseGateway, cidPath) {
+  // 1. Normalize gateway: ensure protocol, remove any trailing /ipfs or slashes.
+  let gw = ensureProtocol(String(baseGateway || "").trim());
+  gw = gw.replace(/\/+$/, "");     // remove trailing slashes
+  if (gw.endsWith('/ipfs')) {
+    gw = gw.slice(0, -5);       // remove /ipfs
+  }
+  gw = gw.replace(/\/+$/, "");     // remove slashes again
+
+  // 2. The path is expected to be pre-normalized, but we clean it as a fallback.
+  const path = normalizeInput(cidPath);
+  
+  if (!gw || !path) return "";
+  
+  // 3. Join them correctly.
+  return `${gw}/ipfs/${path}`;
+}
+
+async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {
+  const errors = [];
+  for (const gw of gateways) {
+    const url = buildUrl(gw, cidPath);
+    try {
+      const res = await fetchWithTimeout(url, { timeoutMs, ...init });
+      if (res && res.ok) {
+        return { res, url, gateway: gw };
+      }
+
+      const httpError = new Error(`Gateway ${gw} -> HTTP ${res.status}`);
+      httpError.url = url;
+      httpError.status = res.status;
+      errors.push(httpError);
+
+    } catch (e) {
+      const networkError = new Error(`Gateway ${gw} -> ${e?.name || "Error"}: ${e?.message || e}`);
+      networkError.url = url;
+      errors.push(networkError);
+    }
+  }
+  const err = new Error("All IPFS gateways failed");
+  err.causes = errors;
+  if (errors.some(e => e.status === 404)) {
+      err.is404 = true;
+  }
+  throw err;
+}
+
+async function fetchBest(app, ipfsPath, options = {}) {
+  const { postGateways = [], timeoutMs = 8000, ...fetchOptions } = options;
+  const cidPath = normalizeInput(ipfsPath);
+  let gatewaysToTry = [];
+  
+  let effectiveTimeout = timeoutMs;
+
+  if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+    gatewaysToTry = [app.localIpfsGateway()];
+    effectiveTimeout = 30000;
+  } else {
+    const systemGateways = app.remoteIpfsGateways() || [];
+    gatewaysToTry = [...new Set([...postGateways, ...systemGateways])];
+  }
+
+  if (gatewaysToTry.length === 0) {
+    throw new Error("No IPFS gateways available to try.");
+  }
+
+  return tryGateways(cidPath, gatewaysToTry, { timeoutMs: effectiveTimeout, init: fetchOptions });
+}
+
+async function getJSONBest(app, ipfsPath, options = {}) {
+  const { res, url, gateway } = await fetchBest(app, ipfsPath, {
+    ...options,
+    headers: { Accept: "application/json", ...(options.headers || {}) },
+  });
+  return { data: await res.json(), url, gateway };
+}
+
+export const ipfs = {
+  fetchBest,
+  getJSONBest,
+  normalizeInput,
+  buildUrl,
+};
 </file>
 
 <file path="src/components/auth/AuthorizedUser.jsx">
@@ -34101,253 +34558,6 @@ export default {
 };
 </file>
 
-<file path="src/components/post/CommentCard.jsx">
-// src/components/post/CommentCard.jsx
-import { For, Show, createMemo, createSignal, createResource, Switch, Match, createEffect } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
-import { useApp } from "../../context/AppContext";
-import PostInfo from "../feed/PostInfo";
-import UserCard from "../ui/UserCard";
-import MarkdownView from "../docs/MarkdownView";
-import { ipfs } from "../../ipfs";
-import { getPostContentBaseCid, getPostDescriptorPath } from "../../ipfs/utils";
-import Spinner from "../ui/Spinner";
-import ContextMenu from "../ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
-import { navigate } from "../../routing/hashRouter.js";
-import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
-import { preparePostForEditing } from "../../editor/postImporter.js";
-import { pushErrorToast } from "../../ui/toast.js";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
-import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
-import { useDeleteAction } from "../../hooks/useDeleteAction.js";
-import { parse } from "yaml";
-import ReactionInput from "../post/ReactionInput.jsx";
-
-async function fetchFullContent(params) {
-  const { app, comment, lang } = params;
-  if (!comment || !lang) return "";
-
-  try {
-    const descriptorPath = getPostDescriptorPath(comment);
-    if (!descriptorPath) {
-      return comment.savva_content?.locales?.[lang]?.text_preview || "";
-    }
-
-    const { res: descriptorRes } = await ipfs.fetchBest(app, descriptorPath, { postGateways: comment.gateways });
-    const descriptorText = await descriptorRes.text();
-    const descriptor = parse(descriptorText);
-    if (!descriptor) throw new Error("Could not parse comment descriptor.");
-
-    const dataCidForContent = getPostContentBaseCid(comment);
-    const localizedDescriptor = descriptor.locales?.[lang] || descriptor.locales?.en || descriptor.locales?.[Object.keys(descriptor.locales)[0]];
-    const dataPath = localizedDescriptor?.data_path;
-
-    if (!dataCidForContent || !dataPath) {
-      return localizedDescriptor?.text_preview || "";
-    }
-
-    const fullIpfsPath = `${dataCidForContent}/${dataPath}`;
-    const postGateways = descriptor?.gateways || [];
-    const { res: contentRes } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways });
-    return await contentRes.text();
-  } catch (e) {
-    console.error("Failed to fetch full comment content:", e);
-    return `Error: Could not load full content.`;
-  }
-}
-
-export default function CommentCard(props) {
-  const app = useApp();
-  const { t } = app;
-  const level = () => props.level || 0;
-  
-  const [isExpanded, setIsExpanded] = createSignal(false);
-  const [isHovered, setIsHovered] = createSignal(false);
-  const [isPreparing, setIsPreparing] = createSignal(false);
-  
-  const [comment, setComment] = createStore(props.comment);
-
-  createEffect(() => {
-    const update = app.postUpdate();
-    if (!update || update.cid !== comment.savva_cid) return;
-
-    if (update.type === 'reactionsChanged') {
-      setComment("reactions", reconcile(update.data.reactions));
-      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
-        setComment("my_reaction", update.data.reaction);
-      }
-    }
-  });
-
-  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(() => comment);
-
-  const isAuthor = createMemo(() => {
-    const userAddr = app.authorizedUser()?.address?.toLowerCase();
-    const authorAddr = comment?.author?.address?.toLowerCase();
-    return !!userAddr && userAddr === authorAddr;
-  });
-
-  const localizedPreview = createMemo(() => {
-    const locales = comment.savva_content?.locales;
-    if (!locales) return "";
-    const lang = app.lang();
-    if (locales[lang]?.text_preview) return locales[lang].text_preview;
-    if (locales.en?.text_preview) return locales.en.text_preview;
-    const firstKey = Object.keys(locales)[0];
-    return firstKey ? locales[firstKey].text_preview : "";
-  });
-
-  const [fullContent] = createResource(
-    () => ({
-      shouldFetch: isExpanded(),
-      app: app,
-      comment: comment,
-      lang: app.lang()
-    }),
-    async (params) => {
-      if (!params.shouldFetch) return null;
-      return fetchFullContent(params);
-    }
-  );
-
-  const contextMenuItems = createMemo(() => {
-    if (!comment) return [];
-    return getPostAdminItems(comment, t);
-  });
-
-  const needsTruncation = createMemo(() => {
-    const preview = localizedPreview();
-    return preview.endsWith("...");
-  });
-
-  const ipfsBaseUrl = createMemo(() => {
-    if (!comment) return "";
-    const dataCid = getPostContentBaseCid(comment);
-    if (!dataCid) return "";
-    
-    let bestGateway;
-    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-      bestGateway = app.localIpfsGateway();
-    } else if (Array.isArray(comment.gateways) && comment.gateways.length > 0) {
-      bestGateway = comment.gateways[0];
-    } else {
-      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
-    }
-    
-    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
-    return `${gatewayUrl}ipfs/${dataCid}`;
-  });
-
-  const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
-  ]);
-
-  const handleReply = (e) => {
-    e.stopPropagation();
-    const commentCid = comment?.savva_cid;
-    if (commentCid) {
-      navigate(`/editor/new-comment/${commentCid}`);
-    }
-  };
-
-  const handleEdit = async (e) => {
-    e.stopPropagation();
-    setIsPreparing(true);
-    try {
-      await preparePostForEditing(comment, app);
-      navigate(`/editor/comment/${comment.savva_cid}`);
-    } catch (err) {
-      pushErrorToast(err, { context: "Failed to prepare comment for editing." });
-    } finally {
-      setIsPreparing(false);
-    }
-  };
-
-  return (
-    <div
-      class="relative flex flex-col"
-      style={{ "padding-left": level() > 0 ? "1.5rem" : "0" }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-        <div class="mb-2">
-          <UserCard author={comment.author} compact={false} />
-        </div>
-        
-        <div class="text-sm prose prose-sm max-w-none">
-          <Switch>
-            <Match when={isExpanded() && fullContent.loading}>
-              <div class="flex items-center justify-center h-24">
-                <Spinner />
-              </div>
-            </Match>
-            <Match when={isExpanded() && fullContent()}>
-              <MarkdownView markdown={fullContent()} rehypePlugins={markdownPlugins()} />
-            </Match>
-            <Match when={!isExpanded()}>
-              <MarkdownView markdown={localizedPreview()} rehypePlugins={markdownPlugins()} />
-            </Match>
-          </Switch>
-        </div>
-
-        <div class="mt-2 flex items-center justify-between">
-          <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
-          <div class="flex items-center gap-2 text-xs font-semibold">
-            <Show when={app.authorizedUser()}>
-              <ReactionInput post={comment} />
-            </Show>
-            <Show when={isAuthor()}>
-              <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title="Edit Comment">
-                <Show when={isPreparing()} fallback={<EditIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]" />}>
-                  <Spinner class="w-4 h-4" />
-                </Show>
-              </button>
-              <button
-                  class="p-1"
-                  onClick={openConfirm}
-                  disabled={modalProps().isDeleting}
-                  title="Delete Comment"
-                >
-                <TrashIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]" />
-              </button>
-            </Show>
-            <Show when={needsTruncation() || isExpanded()}>
-              <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
-                {isExpanded() ? t("comment.showLess") : t("comment.showMore")}
-              </button>
-            </Show>
-            <button class="hover:underline" onClick={handleReply}>{t("comment.reply")}</button>
-          </div>
-        </div>
-      </div>
-      
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && contextMenuItems().length > 0}>
-        <div class="context-menu-container">
-          <ContextMenu items={contextMenuItems()} />
-        </div>
-      </Show>
-      
-      <Show when={comment.children?.length > 0}>
-        <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
-          <For each={comment.children}>
-            {(reply) => <CommentCard comment={reply} level={level() + 1} />}
-          </For>
-        </div>
-      </Show>
-
-      <ConfirmModal
-        isOpen={showConfirm()}
-        onClose={closeConfirm}
-        onConfirm={confirmDelete}
-        {...modalProps()}
-      />
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/Header.jsx">
 // src/components/Header.jsx
 import { Show, createSignal, onMount, createMemo } from "solid-js";
@@ -34654,6 +34864,252 @@ export default function MarkdownView(props) {
       innerHTML={html()}
       aria-label={t("docs.article")}
     />
+  );
+}
+</file>
+
+<file path="src/components/post/CommentCard.jsx">
+// src/components/post/CommentCard.jsx
+import { For, Show, createMemo, createSignal, createResource, Switch, Match, createEffect } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
+import { useApp } from "../../context/AppContext";
+import PostInfo from "../feed/PostInfo";
+import UserCard from "../ui/UserCard";
+import MarkdownView from "../docs/MarkdownView";
+import { ipfs } from "../../ipfs";
+import { getPostContentBaseCid, getPostDescriptorPath } from "../../ipfs/utils";
+import Spinner from "../ui/Spinner";
+import ContextMenu from "../ui/ContextMenu.jsx";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { navigate } from "../../routing/hashRouter.js";
+import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
+import { preparePostForEditing } from "../../editor/postImporter.js";
+import { pushErrorToast } from "../../ui/toast.js";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
+import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
+import { useDeleteAction } from "../../hooks/useDeleteAction.js";
+import { parse } from "yaml";
+import ReactionInput from "../post/ReactionInput.jsx";
+
+async function fetchFullContent(params) {
+  const { app, comment, lang } = params;
+  if (!comment || !lang) return "";
+
+  try {
+    const descriptorPath = getPostDescriptorPath(comment);
+    if (!descriptorPath) {
+      return comment.savva_content?.locales?.[lang]?.text_preview || "";
+    }
+
+    const { res: descriptorRes } = await ipfs.fetchBest(app, descriptorPath, { postGateways: comment.gateways });
+    const descriptorText = await descriptorRes.text();
+    const descriptor = parse(descriptorText);
+    if (!descriptor) throw new Error("Could not parse comment descriptor.");
+
+    const dataCidForContent = getPostContentBaseCid(comment);
+    const localizedDescriptor = descriptor.locales?.[lang] || descriptor.locales?.en || descriptor.locales?.[Object.keys(descriptor.locales)[0]];
+    const dataPath = localizedDescriptor?.data_path;
+
+    if (!dataCidForContent || !dataPath) {
+      return localizedDescriptor?.text_preview || "";
+    }
+
+    const fullIpfsPath = `${dataCidForContent}/${dataPath}`;
+    const postGateways = descriptor?.gateways || [];
+    const { res: contentRes } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways });
+    return await contentRes.text();
+  } catch (e) {
+    console.error("Failed to fetch full comment content:", e);
+    return `Error: Could not load full content.`;
+  }
+}
+
+export default function CommentCard(props) {
+  const app = useApp();
+  const { t } = app;
+  const level = () => props.level || 0;
+  
+  const [isExpanded, setIsExpanded] = createSignal(false);
+  const [isHovered, setIsHovered] = createSignal(false);
+  const [isPreparing, setIsPreparing] = createSignal(false);
+  
+  const [comment, setComment] = createStore(props.comment);
+
+  createEffect(() => {
+    const update = app.postUpdate();
+    if (!update || update.cid !== comment.savva_cid) return;
+
+    if (update.type === 'reactionsChanged') {
+      setComment("reactions", reconcile(update.data.reactions));
+      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+        setComment("my_reaction", update.data.reaction);
+      }
+    }
+  });
+
+  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(() => comment);
+
+  const isAuthor = createMemo(() => {
+    const userAddr = app.authorizedUser()?.address?.toLowerCase();
+    const authorAddr = comment?.author?.address?.toLowerCase();
+    return !!userAddr && userAddr === authorAddr;
+  });
+
+  const localizedPreview = createMemo(() => {
+    const locales = comment.savva_content?.locales;
+    if (!locales) return "";
+    const lang = app.lang();
+    if (locales[lang]?.text_preview) return locales[lang].text_preview;
+    if (locales.en?.text_preview) return locales.en.text_preview;
+    const firstKey = Object.keys(locales)[0];
+    return firstKey ? locales[firstKey].text_preview : "";
+  });
+
+  const [fullContent] = createResource(
+    () => ({
+      shouldFetch: isExpanded(),
+      app: app,
+      comment: comment,
+      lang: app.lang()
+    }),
+    async (params) => {
+      if (!params.shouldFetch) return null;
+      return fetchFullContent(params);
+    }
+  );
+
+  const contextMenuItems = createMemo(() => {
+    if (!comment) return [];
+    return getPostAdminItems(comment, t);
+  });
+
+  const needsTruncation = createMemo(() => {
+    const preview = localizedPreview();
+    return preview.endsWith("...");
+  });
+
+  const ipfsBaseUrl = createMemo(() => {
+    if (!comment) return "";
+    const dataCid = getPostContentBaseCid(comment);
+    if (!dataCid) return "";
+    
+    let bestGateway;
+    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
+      bestGateway = app.localIpfsGateway();
+    } else if (Array.isArray(comment.gateways) && comment.gateways.length > 0) {
+      bestGateway = comment.gateways[0];
+    } else {
+      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
+    }
+    
+    return ipfs.buildUrl(bestGateway, dataCid);
+  });
+
+  const markdownPlugins = createMemo(() => [
+    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
+  ]);
+
+  const handleReply = (e) => {
+    e.stopPropagation();
+    const commentCid = comment?.savva_cid;
+    if (commentCid) {
+      navigate(`/editor/new-comment/${commentCid}`);
+    }
+  };
+
+  const handleEdit = async (e) => {
+    e.stopPropagation();
+    setIsPreparing(true);
+    try {
+      await preparePostForEditing(comment, app);
+      navigate(`/editor/comment/${comment.savva_cid}`);
+    } catch (err) {
+      pushErrorToast(err, { context: "Failed to prepare comment for editing." });
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  return (
+    <div
+      class="relative flex flex-col"
+      style={{ "padding-left": level() > 0 ? "1.5rem" : "0" }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+        <div class="mb-2">
+          <UserCard author={comment.author} compact={false} />
+        </div>
+        
+        <div class="text-sm prose prose-sm max-w-none">
+          <Switch>
+            <Match when={isExpanded() && fullContent.loading}>
+              <div class="flex items-center justify-center h-24">
+                <Spinner />
+              </div>
+            </Match>
+            <Match when={isExpanded() && fullContent()}>
+              <MarkdownView markdown={fullContent()} rehypePlugins={markdownPlugins()} />
+            </Match>
+            <Match when={!isExpanded()}>
+              <MarkdownView markdown={localizedPreview()} rehypePlugins={markdownPlugins()} />
+            </Match>
+          </Switch>
+        </div>
+
+        <div class="mt-2 flex items-center justify-between">
+          <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
+          <div class="flex items-center gap-2 text-xs font-semibold flex-shrink-0 whitespace-nowrap">
+            <Show when={app.authorizedUser()}>
+              <ReactionInput post={comment} />
+            </Show>
+            <Show when={isAuthor()}>
+              <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title="Edit Comment">
+                <Show when={isPreparing()} fallback={<EditIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]" />}>
+                  <Spinner class="w-4 h-4" />
+                </Show>
+              </button>
+              <button
+                  class="p-1"
+                  onClick={openConfirm}
+                  disabled={modalProps().isDeleting}
+                  title="Delete Comment"
+                >
+                <TrashIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]" />
+              </button>
+            </Show>
+            <Show when={needsTruncation() || isExpanded()}>
+              <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
+                {isExpanded() ? t("comment.showLess") : t("comment.showMore")}
+              </button>
+            </Show>
+            <button class="hover:underline" onClick={handleReply}>{t("comment.reply")}</button>
+          </div>
+        </div>
+      </div>
+      
+      <Show when={app.authorizedUser()?.isAdmin && isHovered() && contextMenuItems().length > 0}>
+        <div class="context-menu-container">
+          <ContextMenu items={contextMenuItems()} />
+        </div>
+      </Show>
+      
+      <Show when={comment.children?.length > 0}>
+        <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
+          <For each={comment.children}>
+            {(reply) => <CommentCard comment={reply} level={level() + 1} />}
+          </For>
+        </div>
+      </Show>
+
+      <ConfirmModal
+        isOpen={showConfirm()}
+        onClose={closeConfirm}
+        onConfirm={confirmDelete}
+        {...modalProps()}
+      />
+    </div>
   );
 }
 </file>
@@ -36253,6 +36709,7 @@ export default function PostPage() {
 
   const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
   const localizedMainContent = createMemo(() => mainContent());
+
   const ipfsBaseUrl = createMemo(() => {
     const d = details();
     if (!d) return "";
@@ -36268,8 +36725,7 @@ export default function PostPage() {
       bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
     }
     
-    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
-    return `${gatewayUrl}ipfs/${dataCid}`;
+    return ipfs.buildUrl(bestGateway, dataCid);
   });
 
   const markdownPlugins = createMemo(() => [
@@ -36643,6 +37099,7 @@ export function AppProvider(props) {
   
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
+  const [walletDataNeedsRefresh, setWalletDataNeedsRefresh] = Solid.createSignal(0);
 
   const { route } = useHashRouter();
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
@@ -36789,6 +37246,9 @@ export function AppProvider(props) {
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
     postUpdate, setPostUpdate,
+    walletDataNeedsRefresh,
+    triggerWalletDataRefresh: () => setWalletDataNeedsRefresh(c => c + 1),
+    route,
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
     getGuardedWalletClient,
@@ -37898,7 +38358,36 @@ export default {
   "wallet.transfer.max": "Max",
   "wallet.transfer.titleToken": "!Transfer {token} Tokens",
   "wallet.transfer.to": "Send to:",
-  "wallet.transfer.transferButton": "Transfer"
+  "wallet.transfer.transferButton": "Transfer",
+    "wallet.transfer.sending": "Sending...",
+  "wallet.transfer.toast.error": "Transfer failed",
+  "wallet.transfer.toast.pending": "Sending {token}...",
+  "wallet.transfer.toast.success": "Transfer successful!",
+    "wallet.stake.amount": "Amount to Stake:",
+  "wallet.stake.errors.insufficientBalance": "Amount exceeds your available SAVVA balance.",
+  "wallet.stake.myShare": "My Share",
+  "wallet.stake.myStake": "My Stake",
+  "wallet.stake.stakeButton": "Stake",
+  "wallet.stake.staking": "Staking...",
+  "wallet.stake.title": "Increase Stake",
+  "wallet.stake.toast.approving": "Approving SAVVA...",
+  "wallet.stake.toast.error": "Stake failed",
+  "wallet.stake.toast.pending": "Preparing to stake...",
+  "wallet.stake.toast.staking": "Staking SAVVA...",
+  "wallet.stake.toast.success": "Stake successful!",
+  "wallet.stake.totalStaked": "Total Staked",
+    "wallet.stake.amount": "Amount to Stake:",
+  "wallet.stake.errors.insufficientBalance": "Amount exceeds your available SAVVA balance.",
+  "wallet.stake.myShare": "My Share",
+  "wallet.stake.myStake": "My Stake",
+  "wallet.stake.stakeButton": "Stake",
+  "wallet.stake.staking": "Staking...",
+  "wallet.stake.title": "Increase Stake",
+  "wallet.stake.toast.error": "Stake failed",
+  "wallet.stake.toast.pending": "Please sign in your wallet to stake...",
+  "wallet.stake.toast.staking": "Staking transaction sent...",
+  "wallet.stake.toast.success": "Stake successful!",
+  "wallet.stake.totalStaked": "Total Staked",
 };
 </file>
 

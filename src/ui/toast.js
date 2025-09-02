@@ -64,7 +64,6 @@ export function pushErrorToast(err, context = {}) {
     type: "error",
     message: err?.message || "Unexpected error",
     details: errorDetails(err, context),
-    // MODIFICATION: Changed from 0 to 60000ms (1 minute).
-    autohideMs: 60000,
+    autohideMs: 10000,
   });
 }

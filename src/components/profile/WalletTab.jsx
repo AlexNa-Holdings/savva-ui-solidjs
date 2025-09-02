@@ -10,9 +10,10 @@ import ContextMenu from "../ui/ContextMenu.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import TransferModal from "./TransferModal.jsx";
+import IncreaseStakingModal from "./IncreaseStakingModal.jsx";
 
 /* Data */
-async function fetchWalletData({ app, user }) {
+async function fetchWalletData({ app, user, refreshKey }) {
   if (!user?.address || !app.desiredChain()) return null;
   try {
     const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
@@ -62,12 +63,13 @@ const WalletRow = (props) => (
 export default function WalletTab(props) {
   const app = useApp();
   const { t } = app;
-  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user }), fetchWalletData);
+  const [walletData, { refetch }] = createResource(() => ({ app, user: props.user, refreshKey: app.walletDataNeedsRefresh() }), fetchWalletData);
 
   const desiredChain = createMemo(() => app.desiredChain());
   const baseTokenSymbol = createMemo(() => desiredChain()?.nativeCurrency?.symbol || "PLS");
 
   const [showTransfer, setShowTransfer] = createSignal(false);
+  const [showIncreaseStaking, setShowIncreaseStaking] = createSignal(false);
 
   const RefreshButton = () => (
     <button
@@ -88,7 +90,6 @@ export default function WalletTab(props) {
     return !!authed && authed === profile && connected === profile;
   });
 
-  // ——— Action: add SAVVA token to wallet (EIP-747)
   async function addSavvaToWallet() {
     try {
       const address = walletData()?.savvaTokenAddress || "";
@@ -101,7 +102,6 @@ export default function WalletTab(props) {
             address,
             symbol: "SAVVA",
             decimals: 18,
-            // image is optional; omit to avoid cross-origin issues
           },
         },
       });
@@ -110,12 +110,11 @@ export default function WalletTab(props) {
     }
   }
 
-  // Menus — only SAVVA wired for now
   const savvaMenuItems = createMemo(() =>
     isOwnConnectedWallet()
       ? [
-          { label: t("wallet.menu.transfer"),        onClick: () => setShowTransfer(true) },
-          { label: t("wallet.menu.increaseStaking"), onClick: () => {/* TODO */} },
+          { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
+          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
           { label: t("wallet.menu.addToWallet", { token: "SAVVA" }),     onClick: addSavvaToWallet },
         ]
       : []
@@ -125,7 +124,6 @@ export default function WalletTab(props) {
   const stakedMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
   const rewardMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
 
-  // Helper: vertical value with optional menu
   const ValueWithMenu = (props) => {
     const items = props.items || [];
     const canMenu = isOwnConnectedWallet() && items.length > 0;
@@ -150,9 +148,14 @@ export default function WalletTab(props) {
     );
   };
 
-  function handleTransferSubmit({ to, amountText, amountWei, tokenAddress }) {
-    // TODO: wire actual ERC-20/native transfer (prepare tx flow)
-    console.log("transfer submit:", { to, amountText, amountWei, tokenAddress });
+  function handleTransferSubmit() {
+    refetch();
+    app.triggerWalletDataRefresh();
+  }
+  
+  function handleStakeSubmit() {
+    refetch();
+    app.triggerWalletDataRefresh();
   }
 
   const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
@@ -162,7 +165,6 @@ export default function WalletTab(props) {
       <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
         <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error.message}</p>}>
           <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
-            {/* SAVVA balance — vertical + context menu (transfer opens modal) */}
             <WalletRow
               title={t("profile.wallet.savva.title")}
               description={t("profile.wallet.savva.description")}
@@ -174,7 +176,6 @@ export default function WalletTab(props) {
               />
             </WalletRow>
 
-            {/* Base token — vertical + menu placeholder */}
             <WalletRow
               title={baseTokenSymbol()}
               description={t("profile.wallet.pls.description")}
@@ -228,6 +229,15 @@ export default function WalletTab(props) {
           onClose={() => setShowTransfer(false)}
           onSubmit={handleTransferSubmit}
           maxAmount={walletData()?.savvaBalance}
+        />
+      </Show>
+
+      <Show when={showIncreaseStaking()}>
+        <IncreaseStakingModal
+          savvaBalance={walletData()?.savvaBalance}
+          savvaTokenAddress={savvaTokenAddress()}
+          onClose={() => setShowIncreaseStaking(false)}
+          onSubmit={handleStakeSubmit}
         />
       </Show>
     </div>

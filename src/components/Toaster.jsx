@@ -1,6 +1,7 @@
 // src/components/Toaster.jsx
 import { For, Show } from "solid-js";
-import { toasts, dismissToast, toggleToast } from "../ui/toast";
+import { useApp } from "../context/AppContext.jsx";
+import { toasts, dismissToast, toggleToast } from "../ui/toast.js";
 
 const typeStyles = {
   info:    "bg-blue-600",
@@ -18,62 +19,73 @@ async function copy(text) {
 }
 
 export default function Toaster() {
+  const app = useApp();
+  const { t } = app;
+
   return (
-    // Full-width bottom bar container; toasts align right when compact.
-    // We disable pointer events on the container so it doesn't block the page,
-    // and re-enable them on each toast.
     <div class="fixed inset-x-0 bottom-0 z-[1000] p-3 pointer-events-none">
       <div class="flex flex-col gap-2 items-end">
         <For each={toasts()}>
-          {(t) => {
-            const headerColor = typeStyles[t.type] || typeStyles.info;
+          {(toast) => {
+            const headerColor = typeStyles[toast.type] || typeStyles.info;
+
             return (
-              // When expanded: stretch to full width; when compact: hug right (max ~28rem)
               <div
-                class={`pointer-events-auto w-full ${
-                  t.expanded ? "" : "sm:w-[28rem] max-w-[92vw]"
-                }`}
+                class={`pointer-events-auto w-full ${toast.expanded ? "" : "sm:w-[28rem] max-w-[96vw]"}`}
               >
-                <div class="text-white rounded shadow overflow-hidden">
-                  {/* Header bar */}
-                  <div class={`flex items-center justify-between px-3 py-2 ${headerColor}`}>
-                    <span class="text-sm font-medium">{t.message}</span>
-                    <div class="flex items-center gap-1">
-                      <Show when={t.details}>
+                <div class="rounded shadow overflow-hidden text-[hsl(var(--card-foreground))]">
+                  {/* Header */}
+                  <div class={`flex items-center gap-2 px-3 py-2 ${headerColor} text-white`}>
+                    {/* Message — clamp to one line, never push buttons offscreen */}
+                    <span
+                      class="text-sm font-medium min-w-0 flex-1 truncate"
+                      title={String(toast.message || "")}
+                    >
+                      {toast.message}
+                    </span>
+
+                    {/* Actions stay visible */}
+                    <div class="flex items-center gap-1 shrink-0">
+                      <Show when={toast.details}>
                         <button
+                          type="button"
                           class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                          onClick={() => toggleToast(t.id)}
-                          aria-expanded={t.expanded}
-                          title={t.expanded ? "Hide details" : "Show details"}
+                          onClick={() => toggleToast(toast.id)}
+                          aria-expanded={toast.expanded}
+                          title={toast.expanded ? t("ui.toast.hideDetails") : t("ui.toast.showDetails")}
                         >
-                          {t.expanded ? "Hide" : "Details"}
+                          {toast.expanded ? t("ui.toast.hide") : t("ui.toast.details")}
+                        </button>
+                        <button
+                          type="button"
+                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
+                          onClick={() => copy(pretty(toast.details))}
+                          title={t("ui.toast.copyDetails")}
+                        >
+                          {t("common.copy")}
                         </button>
                       </Show>
                       <button
-                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30"
-                        onClick={() => dismissToast(t.id)}
-                        aria-label="Close notification"
+                        type="button"
+                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
+                        onClick={() => dismissToast(toast.id)}
+                        title={t("common.close")}
+                        aria-label={t("common.close")}
                       >
                         ×
                       </button>
                     </div>
                   </div>
 
-                  {/* Details panel — takes full width, tall & scrollable */}
-                  <Show when={t.expanded && t.details}>
-                    <div class="bg-gray-900 text-gray-100 px-4 py-3 max-h-[60vh] overflow-auto">
-                      <pre class="whitespace-pre-wrap break-words text-[12px] leading-tight">
-{pretty(t.details)}
+                  {/* Details (scrollable, safe height) */}
+                  <Show when={toast.expanded && toast.details}>
+                    <div
+                      class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] px-3 py-2 text-xs"
+                      style={{ "max-height": "40vh", "overflow": "auto" }}
+                    >
+                      <pre class="whitespace-pre-wrap leading-snug">
+                        {pretty(toast.details)}
                       </pre>
-                      <div class="mt-2 flex justify-end">
-                        <button
-                          class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs"
-                          onClick={() => copy(pretty(t.details))}
-                          title="Copy details to clipboard"
-                        >
-                          Copy
-                        </button>
-                      </div>
                     </div>
                   </Show>
                 </div>
