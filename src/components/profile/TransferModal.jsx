@@ -10,18 +10,13 @@ import { performTransfer } from "../../blockchain/transactions.js";
 import Spinner from "../ui/Spinner.jsx";
 
 function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
-  const chainId = app.desiredChain?.()?.id;
-  const savvaAddr = (app.info()?.savva_contracts?.SavvaToken?.address || "").toLowerCase();
-  const base = !tokenAddress;
-
-  if (base) {
-    const ChainLogo = getChainLogo(chainId);
-    return ChainLogo ? <ChainLogo class={className} /> : null;
-  }
-  if ((tokenAddress || "").toLowerCase() === savvaAddr) {
-    return <SavvaTokenIcon class={className} />;
-  }
-  return null;
+  const addr = tokenAddress ? String(tokenAddress) : "";
+  const [meta] = createResource(
+    () => ({ app, addr }),
+    ({ app, addr }) => getTokenInfo(app, addr)   // ⟵ always returns { Icon }
+  );
+  const I = meta()?.Icon;
+  return I ? <I class={className} /> : null;
 }
 
 export default function TransferModal(props) {

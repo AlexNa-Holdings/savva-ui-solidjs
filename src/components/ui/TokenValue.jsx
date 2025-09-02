@@ -3,8 +3,6 @@ import { createMemo, Show, createSignal, createEffect, on, createResource } from
 import { useApp } from "../../context/AppContext.jsx";
 import { formatUnits } from "viem";
 import { getTokenInfo } from "../../blockchain/tokenMeta.js";
-import SavvaTokenIcon from "./icons/SavvaTokenIcon.jsx";
-import { getChainLogo } from "../../blockchain/chainLogos.js";
 
 /**
  * TokenValue — shows amount (with correct decimals) + optional USD value.
@@ -17,25 +15,33 @@ export default function TokenValue(props) {
   const app = useApp();
 
   const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
-  const desiredChain = createMemo(() => app.desiredChain());
+  const chainId = createMemo(() => app.desiredChain()?.id || 0);
 
+  // Address to use
   const tokenAddressRaw = createMemo(() => props.tokenAddress ?? savvaTokenAddress());
   const isBaseToken = createMemo(() => tokenAddressRaw() === "0");
-  const tokenAddressForMeta = createMemo(() => (isBaseToken() ? "" : tokenAddressRaw() || ""));
-
-  const isSavvaToken = createMemo(() => {
-    const a = (tokenAddressRaw() || "").toLowerCase();
-    const s = (savvaTokenAddress() || "").toLowerCase();
-    return !isBaseToken() && !!a && !!s && a === s;
+  // Normalize for meta: "" (empty) means native/base coin
+  const tokenAddressForMeta = createMemo(() => {
+    const a = tokenAddressRaw();
+    return (!a || a === "0") ? "" : String(a).toLowerCase();
   });
 
-  // Resolve metadata (cached, SAVVA-aware)
+  // Meta (symbol, decimals, Icon) — key on addr + chain so native coin reacts to network changes
   const [tokenMeta] = createResource(
-    () => ({ app, addr: tokenAddressForMeta() }),
-    ({ app, addr }) => getTokenInfo(app, addr)
+    () => [tokenAddressForMeta(), chainId()],
+    ([addr]) => getTokenInfo(app, addr)
   );
 
-  // Format amount using real decimals
+  // DEV logs
+  if (import.meta.env?.DEV) {
+    createEffect(() => {
+      console.debug("[TokenValue] key →", { addr: tokenAddressForMeta(), chainId: chainId() });
+      console.debug("[TokenValue] meta →", tokenMeta());
+      console.debug("[TokenValue] has Icon →", typeof tokenMeta()?.Icon === "function");
+    });
+  }
+
+  // Amount formatting
   const formattedAmount = createMemo(() => {
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
@@ -47,14 +53,18 @@ export default function TokenValue(props) {
     }
   });
 
-  // USD value for SAVVA or base coin (if app provides price)
+  // SAVVA & SAVVA_VOTES share the same USD price source
+  const isSavvaLike = createMemo(() => {
+    const sym = tokenMeta()?.symbol;
+    return sym === "SAVVA" || sym === "SAVVA_VOTES";
+  });
+
   const sourceUsdValue = createMemo(() => {
     let priceData = null;
-    if (isSavvaToken()) priceData = app.savvaTokenPrice?.();
-    else if (isBaseToken()) priceData = app.baseTokenPrice?.();
+    if (isSavvaLike())        priceData = app.savvaTokenPrice?.();
+    else if (isBaseToken())   priceData = app.baseTokenPrice?.();
 
     if (!priceData?.price) return null;
-
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
@@ -66,7 +76,7 @@ export default function TokenValue(props) {
     }
   });
 
-  // animation for USD change
+  // Tiny animation for USD changes
   const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
   const [isAnimating, setIsAnimating] = createSignal(false);
   createEffect(on(sourceUsdValue, (next, prev) => {
@@ -77,14 +87,16 @@ export default function TokenValue(props) {
     setTimeout(() => setIsAnimating(false), 400);
   }, { defer: true }));
 
-  const Icon = () => {
-    if (isSavvaToken()) return <SavvaTokenIcon class="w-4 h-4" />;
-    if (isBaseToken()) {
-      const LogoComponent = getChainLogo(desiredChain()?.id);
-      return LogoComponent ? <LogoComponent class="w-5 h-5" /> : null;
-    }
-    return null;
-  };
+  // Icon: render NOTHING until we have a real component; then render it.
+  // Using keyed <Show> guarantees the function value (component) is passed cleanly.
+  const Icon = () => (
+    <Show when={tokenMeta()?.Icon} keyed>
+      {(Comp) => {
+        if (import.meta.env?.DEV) console.debug("[TokenValue] <Icon/> render →", { type: typeof Comp, name: Comp?.name });
+        return <Comp class="w-4 h-4" />;
+      }}
+    </Show>
+  );
 
   const isVertical = () => props.format === "vertical";
 
@@ -92,7 +104,7 @@ export default function TokenValue(props) {
     <Show
       when={isVertical()}
       fallback={
-        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`}>
+        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`} data-tv="row">
           <Icon />
           <span class="font-semibold">{formattedAmount()}</span>
           <Show when={displayUsdValue()}>
@@ -103,7 +115,7 @@ export default function TokenValue(props) {
         </div>
       }
     >
-      <div class={`flex flex-col items-end text-sm ${props.class || ''}`}>
+      <div class={`flex flex-col items-end text-sm ${props.class || ''}`} data-tv="row">
         <div class="flex items-center gap-1.5">
           <Icon />
           <span class="font-semibold">{formattedAmount()}</span>

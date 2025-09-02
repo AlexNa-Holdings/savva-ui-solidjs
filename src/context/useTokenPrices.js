@@ -8,7 +8,7 @@ export function useTokenPrices(app) {
 
   const updatePrices = (data) => {
     if (!data || !data.tokens) return;
-    setPrices(prev => ({ ...prev, ...data.tokens }));
+    setPrices((prev) => ({ ...prev, ...data.tokens }));
   };
 
   const fetchInitialPrices = async () => {
@@ -26,22 +26,30 @@ export function useTokenPrices(app) {
   onMount(() => {
     fetchInitialPrices();
   });
-  
+
   const savvaTokenPrice = createMemo(() => {
     const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
-    if (!savvaTokenAddress) return null;
-    return prices()[savvaTokenAddress] || null;
+    const stakingAddress = app.info()?.savva_contracts?.Staking?.address;
+    if (!savvaTokenAddress && !stakingAddress) return null;
+
+    // Prefer direct SAVVA key; fall back to Staking alias
+    const p = prices();
+    return (
+      (savvaTokenAddress && p[savvaTokenAddress]) ||
+      (stakingAddress && p[stakingAddress]) ||
+      null
+    );
   });
-  
+
   const baseTokenPrice = createMemo(() => {
     // The key for the base/native token is an empty string
-    return prices()[""] || null; 
+    return prices()[""] || null;
   });
 
   return {
     allTokenPrices: prices,
     savvaTokenPrice,
     baseTokenPrice,
-    updateTokenPrices: updatePrices
+    updateTokenPrices: updatePrices,
   };
 }

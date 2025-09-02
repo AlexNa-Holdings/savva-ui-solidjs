@@ -251,6 +251,7 @@ src/
       SubscriptionsTab.jsx
       TagList.jsx
       TransferModal.jsx
+      UnstakeModal.jsx
       WalletTab.jsx
       WalletValueMenu.jsx
     settings/
@@ -279,6 +280,7 @@ src/
         LockIcon.jsx
         NftBadge.jsx
         ProfileIcons.jsx
+        QuestionTokenIcon.jsx
         ReactionIcon.jsx
         RefreshIcon.jsx
         SavvaTokenIcon.jsx
@@ -2222,6 +2224,138 @@ export default function TwoColumn(props) {
 }
 </file>
 
+<file path="src/components/main/ConnectionError.jsx">
+// src/components/main/ConnectionError.jsx
+import { Show } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+
+export default function ConnectionError(props) {
+  const { t } = useApp();
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  return (
+    <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))] p-4">
+      <div class="w-full max-w-md p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] text-center shadow-lg">
+        <h2 class="text-xl font-semibold mb-3">{t("error.connection.title")}</h2>
+        <p class="mb-4 text-[hsl(var(--muted-foreground))]">
+          {t("error.connection.message")}
+        </p>
+        <Show when={props.error}>
+          <pre class="mb-4 p-2 text-xs text-left bg-[hsl(var(--muted))] rounded overflow-x-auto">
+            {props.error.message || props.error.toString()}
+          </pre>
+        </Show>
+        <button
+          class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+          onClick={handleRetry}
+        >
+          {t("error.connection.retry")}
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/profile/UnstakeModal.jsx">
+// src/components/profile/UnstakeModal.jsx
+import { createSignal, Show, createResource } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import AmountInput from "../ui/AmountInput.jsx";
+import Spinner from "../ui/Spinner.jsx";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import { createPublicClient, http } from "viem";
+
+export default function UnstakeModal(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const user = () => app.authorizedUser();
+  const [amountText, setAmountText] = createSignal("");
+  const [amountWei, setAmountWei] = createSignal(null);
+  const [err, setErr] = createSignal("");
+  const [isProcessing, setIsProcessing] = createSignal(false);
+
+  const [staked] = createResource(
+    () => ({ app, userAddress: user()?.address }),
+    async ({ app, userAddress }) => {
+      if (!app || !userAddress) return 0n;
+      const staking = await getSavvaContract(app, "Staking");
+      return staking.read.balanceOf([userAddress]); // ERC20-like balanceOf
+    }
+  );
+
+  const close = () => { if (!isProcessing()) props.onClose?.(); };
+
+  function validate() {
+    if (!amountWei() || amountWei() <= 0n) return t("wallet.transfer.errors.badAmount");
+    if (staked() != null && amountWei() > (staked() || 0n)) return t("wallet.stake.errors.insufficientBalance");
+    return "";
+  }
+
+  async function submit(e) {
+    e?.preventDefault?.();
+    const msg = validate();
+    if (msg) { setErr(msg); return; }
+    setErr("");
+    setIsProcessing(true);
+
+    try {
+      const staking = await getSavvaContract(app, "Staking", { write: true });
+      const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+
+      const hash = await staking.write.unstake([amountWei()]); // ABI has unstake(uint256) :contentReference[oaicite:0]{index=0}
+      await publicClient.waitForTransactionReceipt({ hash });
+      props.onSubmit?.();
+      setIsProcessing(false);
+      close();
+    } catch (e) {
+      console.error("unstake failed:", e);
+      setIsProcessing(false);
+    }
+  }
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" onClick={close} />
+      <form onSubmit={submit} class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4">
+        <h3 class="text-lg font-semibold">{t("wallet.unstake.title")}</h3>
+
+        <Show when={!staked.loading} fallback={<div class="flex justify-center p-6"><Spinner /></div>}>
+          <div class="text-sm opacity-70">
+            {t("wallet.staked.title")}: {String(staked() || 0n)}
+          </div>
+        </Show>
+
+        <AmountInput
+          value={amountText()}
+          onInput={(txt, wei) => { setAmountText(txt); setAmountWei(wei); }}
+          placeholder={t("wallet.unstake.amount")}
+        />
+
+        <Show when={err()}>
+          <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+        </Show>
+
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]" onClick={close}>
+            {t("common.cancel")}
+          </button>
+          <button type="submit" disabled={isProcessing()} class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60">
+            <Show when={!isProcessing()} fallback={<Spinner class="w-5 h-5" />}>
+              {t("wallet.unstake.submit")}
+            </Show>
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/settings/Assets.jsx">
 // src/components/settings/Assets.jsx
 import { createSignal, createMemo, Show } from "solid-js";
@@ -2500,6 +2634,19 @@ export default function TabPanelScaffold(props) {
         {props.children ?? t("main.tabs.empty")}
       </div>
     </section>
+  );
+}
+</file>
+
+<file path="src/components/ui/icons/QuestionTokenIcon.jsx">
+// src/components/ui/icons/QuestionTokenIcon.jsx
+// Renders the “question” fallback glyph. Uses currentColor so it matches theme.
+export default function QuestionTokenIcon(props = {}) {
+  const cls = props.class || "w-4 h-4";
+  return (
+    <svg class={cls} viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+      <path fill-rule="evenodd" d="M10 3a7 7 0 100 14 7 7 0 000-14zm-9 7a9 9 0 1118 0 9 9 0 01-18 0zm8.423-3a.923.923 0 00-.923.923v.385a1 1 0 11-2 0v-.385A2.923 2.923 0 019.423 5H10c1.941 0 3.5 1.591 3.5 3.516 0 .927-.48 1.8-1.276 2.29l-1.7 1.046a1 1 0 01-1.048-1.704l1.7-1.046a.691.691 0 00.324-.586C11.5 7.679 10.82 7 10 7h-.577zm.587 8a1 1 0 100-2H10a1 1 0 100 2h.01z" clip-rule="evenodd"></path>
+    </svg>
   );
 }
 </file>
@@ -19906,9 +20053,13 @@ export function clearConfigCache() {
 
 <file path="src/blockchain/tokenMeta.js">
 // src/blockchain/tokenMeta.js
+// Single source of truth for token meta (symbol, decimals, Icon).
 import { createPublicClient, http } from "viem";
+import SavvaTokenIcon from "../components/ui/icons/SavvaTokenIcon.jsx";
+import QuestionTokenIcon from "../components/ui/icons/QuestionTokenIcon.jsx";
+import { getChainLogo } from "./chainLogos.js";
 
-// Minimal ERC-20 ABI (no JSX here)
+// Minimal ERC-20 ABI
 const ERC20_MIN_ABI = [
   { name: "decimals", inputs: [], outputs: [{ type: "uint8" }], stateMutability: "view", type: "function" },
   { name: "symbol",   inputs: [], outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
@@ -19928,8 +20079,13 @@ function _publicClient(app) {
 function _nativeSymbol(app) {
   return app?.desiredChain?.().nativeCurrency?.symbol || "PLS";
 }
+function _normalizeAddr(addr) {
+  if (!addr) return "";
+  const s = String(addr).trim();
+  return s === "0" ? "" : s.toLowerCase();
+}
 
-// Resolve SAVVA/STAKE addresses once per session
+// Resolve SAVVA / STAKING addresses once per session (lazy)
 let _savvaAddrCached = null;
 let _stakingAddrCached = null;
 async function _getSavvaAddresses(app) {
@@ -19940,44 +20096,62 @@ async function _getSavvaAddresses(app) {
     const stakingC = await getSavvaContract(app, "Staking");
     _savvaAddrCached   = (savvaC?.address || "").toLowerCase() || null;
     _stakingAddrCached = (stakingC?.address || "").toLowerCase() || null;
-  } catch { /* noop */ }
+  } catch { /* ignore */ }
   return { savva: _savvaAddrCached, staking: _stakingAddrCached };
+}
+
+// Small component factories (avoid JSX in .js files)
+function makeSavvaIcon() {
+  return function Icon(props = {}) { return SavvaTokenIcon({ class: props.class || "w-4 h-4" }); };
+}
+function makeQuestionIcon() {
+  return function Icon(props = {}) { return QuestionTokenIcon({ class: props.class || "w-4 h-4" }); };
+}
+function makeChainIcon(chainId) {
+  const ChainLogo = getChainLogo(chainId);
+  // If chain logo is missing, fall back to question icon
+  return function Icon(props = {}) {
+    return ChainLogo ? ChainLogo({ class: props.class || "w-5 h-5" }) : QuestionTokenIcon({ class: props.class || "w-4 h-4" });
+  };
 }
 
 /**
  * getTokenInfo(app, tokenAddress)
- * Returns { symbol, decimals } with caching and SAVVA overrides.
+ * Returns a stable meta object:
+ *   { symbol: string, decimals: number, Icon: Component }
  *
  * Rules:
- *  - Base token (empty string): (nativeSymbol, 18)
- *  - SAVVA token address:       ("SAVVA", 18)
- *  - Staking contract address:  ("SAVVA-STAKED", 18)
- *  - Other ERC-20:               read once from chain, then cache
+ *  - Base token ("" or "0"):   { symbol: native,        decimals: 18, Icon: chain logo (or ? fallback) }
+ *  - SAVVA token address:      { symbol: "SAVVA",       decimals: 18, Icon: Savva }
+ *  - Staking contract address: { symbol: "SAVVA_VOTES", decimals: 18, Icon: Savva }
+ *  - Generic ERC-20:           read symbol/decimals via viem, Icon: ? fallback
  */
 export async function getTokenInfo(app, tokenAddress) {
   const chain = app?.desiredChain?.();
   const chainId = chain?.id || 0;
 
-  // Base/native coin (empty address)
-  if (!tokenAddress) {
-    const res = { symbol: _nativeSymbol(app), decimals: 18 };
-    _cache.set(_key(chainId, ""), res);
+  const addr = _normalizeAddr(tokenAddress);
+  const k = _key(chainId, addr);
+
+  // Base/native coin
+  if (!addr) {
+    const res = { symbol: _nativeSymbol(app), decimals: 18, Icon: makeChainIcon(chainId) };
+    _cache.set(k, res);
     return res;
   }
 
-  const addr = String(tokenAddress).toLowerCase();
-  const k = _key(chainId, addr);
+  // Cached?
   if (_cache.has(k)) return _cache.get(k);
 
   // SAVVA overrides
   const { savva, staking } = await _getSavvaAddresses(app);
   if (savva && addr === savva) {
-    const res = { symbol: "SAVVA", decimals: 18 };
+    const res = { symbol: "SAVVA", decimals: 18, Icon: makeSavvaIcon() };
     _cache.set(k, res);
     return res;
   }
   if (staking && addr === staking) {
-    const res = { symbol: "SAVVA-STAKED", decimals: 18 };
+    const res = { symbol: "SAVVA_VOTES", decimals: 18, Icon: makeSavvaIcon() };
     _cache.set(k, res);
     return res;
   }
@@ -19985,7 +20159,7 @@ export async function getTokenInfo(app, tokenAddress) {
   // Generic ERC-20
   const pc = _publicClient(app);
   if (!pc) {
-    const res = { symbol: "TOK", decimals: 18 };
+    const res = { symbol: "TOK", decimals: 18, Icon: makeQuestionIcon() };
     _cache.set(k, res);
     return res;
   }
@@ -20000,7 +20174,7 @@ export async function getTokenInfo(app, tokenAddress) {
     symbol = String(s || "TOK").slice(0, 32);
   } catch {}
 
-  const res = { symbol, decimals };
+  const res = { symbol, decimals, Icon: makeQuestionIcon() };
   _cache.set(k, res);
   return res;
 }
@@ -20823,42 +20997,6 @@ export default function UploadFromUrlModal(props) {
         </div>
       </div>
     </Show>
-  );
-}
-</file>
-
-<file path="src/components/main/ConnectionError.jsx">
-// src/components/main/ConnectionError.jsx
-import { Show } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-
-export default function ConnectionError(props) {
-  const { t } = useApp();
-
-  const handleRetry = () => {
-    window.location.reload();
-  };
-
-  return (
-    <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))] p-4">
-      <div class="w-full max-w-md p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] text-center shadow-lg">
-        <h2 class="text-xl font-semibold mb-3">{t("error.connection.title")}</h2>
-        <p class="mb-4 text-[hsl(var(--muted-foreground))]">
-          {t("error.connection.message")}
-        </p>
-        <Show when={props.error}>
-          <pre class="mb-4 p-2 text-xs text-left bg-[hsl(var(--muted))] rounded overflow-x-auto">
-            {props.error.message || props.error.toString()}
-          </pre>
-        </Show>
-        <button
-          class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
-          onClick={handleRetry}
-        >
-          {t("error.connection.retry")}
-        </button>
-      </div>
-    </div>
   );
 }
 </file>
@@ -25977,150 +26115,6 @@ export default function PostsTab(props) {
 }
 </file>
 
-<file path="src/components/profile/TransferModal.jsx">
-// src/components/profile/TransferModal.jsx
-import { createSignal, Show, createResource } from "solid-js";
-import { useApp } from "../../context/AppContext.jsx";
-import AddressInput from "../ui/AddressInput.jsx";
-import AmountInput from "../ui/AmountInput.jsx";
-import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
-import { getChainLogo } from "../../blockchain/chainLogos.js";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
-import { performTransfer } from "../../blockchain/transactions.js";
-import Spinner from "../ui/Spinner.jsx";
-
-function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
-  const chainId = app.desiredChain?.()?.id;
-  const savvaAddr = (app.info()?.savva_contracts?.SavvaToken?.address || "").toLowerCase();
-  const base = !tokenAddress;
-
-  if (base) {
-    const ChainLogo = getChainLogo(chainId);
-    return ChainLogo ? <ChainLogo class={className} /> : null;
-  }
-  if ((tokenAddress || "").toLowerCase() === savvaAddr) {
-    return <SavvaTokenIcon class={className} />;
-  }
-  return null;
-}
-
-export default function TransferModal(props) {
-  const app = useApp();
-  const { t } = app;
-
-  const [to, setTo] = createSignal(String(props.to || ""));
-  const [amountText, setAmountText] = createSignal("");
-  const [amountWei, setAmountWei] = createSignal(null);
-  const [err, setErr] = createSignal("");
-  const [isProcessing, setIsProcessing] = createSignal(false);
-
-  const close = () => {
-    if (isProcessing()) return;
-    props.onClose?.();
-  };
-
-  const [meta] = createResource(
-    () => ({ app, addr: props.tokenAddress ? String(props.tokenAddress) : "" }),
-    ({ app, addr }) => getTokenInfo(app, addr)
-  );
-
-  function validate() {
-    const a = String(amountText()).trim();
-    const v = Number(a || "0");
-    const addr = String(to()).trim();
-    if (!addr || !(addr.startsWith("0x") && addr.length === 42)) {
-      return t("wallet.transfer.errors.badAddress");
-    }
-    if (!(v > 0) || amountWei() === null) return t("wallet.transfer.errors.badAmount");
-    return "";
-  }
-
-  async function submit(e) {
-    e?.preventDefault?.();
-    const msg = validate();
-    if (msg) { setErr(msg); return; }
-    setErr("");
-    setIsProcessing(true);
-
-    const txData = {
-      to: to().trim(),
-      amountWei: amountWei(),
-      tokenAddress: props.tokenAddress || "",
-    };
-
-    try {
-      await performTransfer(app, txData);
-      props.onSubmit?.(txData);
-      // ✅ clear busy state BEFORE closing so the guard doesn't block
-      setIsProcessing(false);
-      close();
-    } catch (e) {
-      // Error toast is shown inside performTransfer; keep dialog open
-      setIsProcessing(false);
-    }
-  }
-
-  return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" onClick={close} />
-      <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
-        <form onSubmit={submit} class="p-4 space-y-4">
-          <div class="text-lg font-semibold flex items-center gap-2">
-            <TokenTitleIcon app={app} tokenAddress={props.tokenAddress || ""} />
-            <span>{t("wallet.transfer.titleToken")}</span>
-            <Show when={meta()?.symbol}>
-              <span class="text-sm text-[hsl(var(--muted-foreground))]">· {meta().symbol}</span>
-            </Show>
-          </div>
-
-          <AddressInput
-            label={t("wallet.transfer.to")}
-            value={to()}
-            onChange={setTo}
-            onUserSelect={(u) => setTo(u?.address || "")}
-          />
-
-          <AmountInput
-            label={t("wallet.transfer.amount")}
-            tokenAddress={props.tokenAddress || ""}
-            balance={props.maxAmount}
-            value={amountText()}
-            onChange={({ text, amountWei: wei }) => { setAmountText(text); setAmountWei(wei); }}
-          />
-
-          <Show when={err()}>
-            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
-          </Show>
-
-          <div class="pt-1 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={close}
-              disabled={isProcessing()}
-              class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              type="submit"
-              disabled={isProcessing()}
-              class="px-3 py-1.5 min-w-[120px] rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60 flex items-center justify-center"
-            >
-              <Show when={isProcessing()} fallback={t("wallet.transfer.transferButton")}>
-                <div class="flex items-center gap-2">
-                  <Spinner class="w-4 h-4" />
-                  <span>{t("wallet.transfer.sending")}</span>
-                </div>
-              </Show>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-</file>
-
 <file path="src/components/tabs/ActualTab.jsx">
 // src/components/tabs/ActualTab.jsx
 import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
@@ -27118,7 +27112,7 @@ export function useTokenPrices(app) {
 
   const updatePrices = (data) => {
     if (!data || !data.tokens) return;
-    setPrices(prev => ({ ...prev, ...data.tokens }));
+    setPrices((prev) => ({ ...prev, ...data.tokens }));
   };
 
   const fetchInitialPrices = async () => {
@@ -27136,23 +27130,31 @@ export function useTokenPrices(app) {
   onMount(() => {
     fetchInitialPrices();
   });
-  
+
   const savvaTokenPrice = createMemo(() => {
     const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
-    if (!savvaTokenAddress) return null;
-    return prices()[savvaTokenAddress] || null;
+    const stakingAddress = app.info()?.savva_contracts?.Staking?.address;
+    if (!savvaTokenAddress && !stakingAddress) return null;
+
+    // Prefer direct SAVVA key; fall back to Staking alias
+    const p = prices();
+    return (
+      (savvaTokenAddress && p[savvaTokenAddress]) ||
+      (stakingAddress && p[stakingAddress]) ||
+      null
+    );
   });
-  
+
   const baseTokenPrice = createMemo(() => {
     // The key for the base/native token is an empty string
-    return prices()[""] || null; 
+    return prices()[""] || null;
   });
 
   return {
     allTokenPrices: prices,
     savvaTokenPrice,
     baseTokenPrice,
-    updateTokenPrices: updatePrices
+    updateTokenPrices: updatePrices,
   };
 }
 </file>
@@ -27976,6 +27978,147 @@ export default function PostListView(props) {
 }
 </file>
 
+<file path="src/components/profile/TransferModal.jsx">
+// src/components/profile/TransferModal.jsx
+import { createSignal, Show, createResource } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import AddressInput from "../ui/AddressInput.jsx";
+import AmountInput from "../ui/AmountInput.jsx";
+import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
+import { getChainLogo } from "../../blockchain/chainLogos.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { performTransfer } from "../../blockchain/transactions.js";
+import Spinner from "../ui/Spinner.jsx";
+
+function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
+  const chainId = app.desiredChain?.()?.id;
+  const savvaAddr = (app.info()?.savva_contracts?.SavvaToken?.address || "").toLowerCase();
+  const base = !tokenAddress;
+
+  if (base) {
+    const ChainLogo = getChainLogo(chainId);
+    return ChainLogo ? <ChainLogo class={className} /> : null;
+  }
+  if ((tokenAddress || "").toLowerCase() === savvaAddr) {
+    return <SavvaTokenIcon class={className} />;
+  }
+  return null;
+}
+
+export default function TransferModal(props) {
+  const app = useApp();
+  const { t } = app;
+
+  const [to, setTo] = createSignal(String(props.to || ""));
+  const [amountText, setAmountText] = createSignal("");
+  const [amountWei, setAmountWei] = createSignal(null);
+  const [err, setErr] = createSignal("");
+  const [isProcessing, setIsProcessing] = createSignal(false);
+
+  const close = () => {
+    if (isProcessing()) return;
+    props.onClose?.();
+  };
+
+  const [meta] = createResource(
+    () => ({ app, addr: props.tokenAddress ? String(props.tokenAddress) : "" }),
+    ({ app, addr }) => getTokenInfo(app, addr)
+  );
+
+  function validate() {
+    const a = String(amountText()).trim();
+    const v = Number(a || "0");
+    const addr = String(to()).trim();
+    if (!addr || !(addr.startsWith("0x") && addr.length === 42)) {
+      return t("wallet.transfer.errors.badAddress");
+    }
+    if (!(v > 0) || amountWei() === null) return t("wallet.transfer.errors.badAmount");
+    return "";
+  }
+
+  async function submit(e) {
+    e?.preventDefault?.();
+    const msg = validate();
+    if (msg) { setErr(msg); return; }
+    setErr("");
+    setIsProcessing(true);
+
+    const txData = {
+      to: to().trim(),
+      amountWei: amountWei(),
+      tokenAddress: props.tokenAddress || "",
+    };
+
+    try {
+      await performTransfer(app, txData);
+      props.onSubmit?.(txData);
+      // ✅ clear busy state BEFORE closing so the guard doesn't block
+      setIsProcessing(false);
+      close();
+    } catch (e) {
+      // Error toast is shown inside performTransfer; keep dialog open
+      setIsProcessing(false);
+    }
+  }
+
+  return (
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" onClick={close} />
+      <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
+        <form onSubmit={submit} class="p-4 space-y-4">
+          <div class="text-lg font-semibold flex items-center gap-2">
+            <TokenTitleIcon app={app} tokenAddress={props.tokenAddress || ""} />
+            <span>{t("wallet.transfer.titleToken", { token: meta()?.symbol })}</span>
+          </div>
+
+          <AddressInput
+            label={t("wallet.transfer.to")}
+            value={to()}
+            onChange={setTo}
+            onUserSelect={(u) => setTo(u?.address || "")}
+          />
+
+          <AmountInput
+            label={t("wallet.transfer.amount")}
+            tokenAddress={props.tokenAddress || ""}
+            balance={props.maxAmount}
+            value={amountText()}
+            onChange={({ text, amountWei: wei }) => { setAmountText(text); setAmountWei(wei); }}
+          />
+
+          <Show when={err()}>
+            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+          </Show>
+
+          <div class="pt-1 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={close}
+              disabled={isProcessing()}
+              class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="submit"
+              disabled={isProcessing()}
+              class="px-3 py-1.5 min-w-[120px] rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60 flex items-center justify-center"
+            >
+              <Show when={isProcessing()} fallback={t("wallet.transfer.transferButton")}>
+                <div class="flex items-center gap-2">
+                  <Spinner class="w-4 h-4" />
+                  <span>{t("wallet.transfer.sending")}</span>
+                </div>
+              </Show>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/components/ui/icons/ReactionIcon.jsx">
 // src/components/ui/icons/ReactionIcon.jsx
 import { Show } from "solid-js";
@@ -28077,153 +28220,6 @@ export default function VerifiedBadge(props) {
             </g>
         </svg>
     );
-}
-</file>
-
-<file path="src/components/ui/ContextMenu.jsx">
-// src/components/ui/ContextMenu.jsx
-import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
-import { ChevronDownIcon } from "./icons/ActionIcons.jsx";
-
-export default function ContextMenu(props) {
-  const [isOpen, setIsOpen] = createSignal(false);
-  const [menuClass, setMenuClass] = createSignal("bottom-full right-0 mb-2");
-  const [menuWidth, setMenuWidth] = createSignal(undefined);
-
-  let containerRef;
-  let menuRef;     // actual visible menu
-  let sizerRef;    // hidden sizer for measuring
-
-  const handleClickOutside = (event) => {
-    if (containerRef && !containerRef.contains(event.target)) setIsOpen(false);
-  };
-
-  onMount(() => document.addEventListener("mousedown", handleClickOutside));
-  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
-
-  const handleItemClick = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    item.onClick?.();
-    setIsOpen(false);
-  };
-
-  const positionClass = props.positionClass || "absolute -bottom-2 -right-2 z-20";
-  const ButtonIcon = () => <ChevronDownIcon class="w-4 h-4" />;
-
-  function computeWidth() {
-    // If consumer explicitly sets width, respect it
-    if (props.fixedWidthPx && Number.isFinite(props.fixedWidthPx)) {
-      setMenuWidth(Math.max(0, Number(props.fixedWidthPx)));
-      return;
-    }
-
-    const items = Array.isArray(props.items) ? props.items : [];
-    if (!items.length || !sizerRef) {
-      setMenuWidth(undefined);
-      return;
-    }
-
-    // Measure the longest label width with same text styles and padding
-    const PADDING_X = 32; // px-4 on both sides (Tailwind px-4 = 1rem ≈ 16px * 2)
-    const MIN_GAP = 4;    // small safety gap
-
-    let maxText = 0;
-    // use the same text class as menu items to match font metrics
-    const measurer = sizerRef;
-    measurer.style.whiteSpace = "nowrap";
-    items.forEach((it) => {
-      measurer.textContent = String(it?.label ?? "");
-      const w = Math.ceil(measurer.scrollWidth);
-      if (w > maxText) maxText = w;
-    });
-
-    // Also ensure we’re at least as wide as the trigger (so it doesn’t look cramped)
-    const triggerW = containerRef?.getBoundingClientRect?.().width || 0;
-    // Cap to viewport minus small margin
-    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-    const cap = Math.max(240, vw - 24); // never exceed (viewport - 24px)
-
-    const calculated = Math.min(Math.max(maxText + PADDING_X + MIN_GAP, triggerW), cap);
-    setMenuWidth(calculated);
-  }
-
-  function toggleMenu() {
-    const next = !isOpen();
-    if (next && containerRef) {
-      // pick top/bottom placement
-      const btnRect = containerRef.getBoundingClientRect();
-      const estimatedMenuHeight = 160;
-      setMenuClass(btnRect.top < estimatedMenuHeight ? "top-full right-0 mt-2" : "bottom-full right-0 mb-2");
-      // compute width right before opening
-      computeWidth();
-      // and after first paint, in case fonts/layout shift
-      queueMicrotask(() => computeWidth());
-      // keep width correct on resize while open
-      window.addEventListener("resize", computeWidth, { passive: true });
-    } else {
-      window.removeEventListener("resize", computeWidth);
-    }
-    setIsOpen(next);
-  }
-
-  onCleanup(() => window.removeEventListener("resize", computeWidth));
-
-  const triggerClass =
-    props.buttonClass ||
-    "p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]";
-
-  return (
-    <div class={positionClass} ref={el => (containerRef = el)}>
-      <button
-        class={triggerClass}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(); }}
-        aria-haspopup="true"
-        aria-expanded={isOpen()}
-      >
-        {props.triggerContent ? props.triggerContent : <ButtonIcon />}
-      </button>
-
-      {/* Invisible sizer used for width measurement */}
-      <div
-        ref={el => (sizerRef = el)}
-        aria-hidden="true"
-        class="pointer-events-none fixed -top-[9999px] -left-[9999px] text-sm"
-        style={{
-          "line-height": "1.375", // approx leading-snug
-          // mirror item text styles as much as possible
-          "font": "inherit",
-          "letter-spacing": "inherit",
-        }}
-      />
-
-      <Show when={isOpen()}>
-        <div
-          ref={el => (menuRef = el)}
-          class={`absolute ${menuClass()} rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black/10`}
-          style={menuWidth() ? { width: `${menuWidth()}px` } : undefined}
-          role="menu"
-        >
-          <ul class="py-1">
-            <For each={props.items}>
-              {(item) => (
-                <li>
-                  <a
-                    href="#"
-                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))] whitespace-nowrap"
-                    onClick={(e) => handleItemClick(e, item)}
-                    role="menuitem"
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-      </Show>
-    </div>
-  );
 }
 </file>
 
@@ -29839,6 +29835,7 @@ import { walletAccount } from "../../blockchain/wallet.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import TransferModal from "./TransferModal.jsx";
 import IncreaseStakingModal from "./IncreaseStakingModal.jsx";
+import UnstakeModal from "./UnstakeModal.jsx";
 
 export default function WalletTab() {
   const app = useApp();
@@ -29858,7 +29855,6 @@ export default function WalletTab() {
     </button>
   );
 
-  /* Data */
   async function fetchWalletData({ app, user, refreshKey }) {
     if (!user?.address || !app.desiredChain()) return null;
     try {
@@ -29874,19 +29870,16 @@ export default function WalletTab() {
         stakingContract.read.claimable([user.address]),
       ]);
       const savvaTokenAddress = savvaTokenContract.address;
-      return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward, savvaTokenAddress };
+      const stakingTokenAddress = stakingContract.address; // ERC20-like share token
+      return { savvaBalance, baseTokenBalance, nftEarnings, stakedBalance, stakingReward, savvaTokenAddress, stakingTokenAddress };
     } catch (error) {
       console.error("Failed to fetch wallet data:", error);
       return { error };
     }
   }
 
-  const [walletData, { refetch }] = createResource(
-    () => ({ app, user: user(), refreshKey: refreshKey() }),
-    fetchWalletData
-  );
+  const [walletData, { refetch }] = createResource(() => ({ app, user: user(), refreshKey: refreshKey() }), fetchWalletData);
 
-  /* Helpers */
   const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
 
   function isOwnConnectedWallet() {
@@ -29895,24 +29888,18 @@ export default function WalletTab() {
     return !!wa && !!u?.address && String(wa).toLowerCase() === String(u.address).toLowerCase();
   }
 
-  /* Menus & modals */
   const [showTransfer, setShowTransfer] = createSignal(false);           // SAVVA transfer
-  const [showBaseTransfer, setShowBaseTransfer] = createSignal(false);   // Base token transfer
+  const [showBaseTransfer, setShowBaseTransfer] = createSignal(false);   // base coin transfer
   const [showIncreaseStaking, setShowIncreaseStaking] = createSignal(false);
+  const [showStakeTransfer, setShowStakeTransfer] = createSignal(false); // transfer staked-ERC20
+  const [showUnstake, setShowUnstake] = createSignal(false);
 
   async function addSavvaToWallet() {
     try {
       const token = await getSavvaContract(app, "SavvaToken");
       await window.ethereum?.request?.({
         method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: {
-            address: token.address,
-            symbol: "SAVVA",
-            decimals: 18,
-          },
-        },
+        params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
       });
     } catch {}
   }
@@ -29927,16 +29914,42 @@ export default function WalletTab() {
       : []
   );
 
-  // ✅ Base coin: single “Transfer” menu item that opens TransferModal with empty token address
   const baseMenuItems = createMemo(() =>
     isOwnConnectedWallet()
       ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }]
       : []
   );
 
-  const nftMenuItems     = createMemo(() => (isOwnConnectedWallet() ? [] : []));
-  const stakedMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
-  const rewardMenuItems  = createMemo(() => (isOwnConnectedWallet() ? [] : []));
+  // Staked: Increase Staking, Transfer (staking token), Unstake
+  const stakedMenuItems = createMemo(() =>
+    isOwnConnectedWallet()
+      ? [
+          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+          { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) }, // ERC20 transfer of staking share
+          { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
+        ]
+      : []
+  );
+
+  // NFT Earnings Claim remains from earlier step
+  const hasClaimableNft = createMemo(() => {
+    const v = walletData()?.nftEarnings;
+    return typeof v === "bigint" ? v > 0n : (Number(v || 0) > 0);
+  });
+  const nftMenuItems = createMemo(() =>
+    isOwnConnectedWallet() && hasClaimableNft()
+      ? [{ label: t("wallet.menu.claim"), onClick: async () => {
+          try {
+            const cf = await getSavvaContract(app, "ContentFund", { write: true });
+            const hash = await cf.write.claimNFTGain([]);
+            const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+            await pc.waitForTransactionReceipt({ hash });
+          } finally { refetch(); app.triggerWalletDataRefresh?.(); }
+        }}]
+      : []
+  );
+
+  const rewardMenuItems = createMemo(() => (isOwnConnectedWallet() ? [] : []));
 
   const ValueWithMenu = (props) => {
     const items = props.items || [];
@@ -29962,104 +29975,99 @@ export default function WalletTab() {
     );
   };
 
-  function handleTransferSubmit() {
-    refetch();
-    app.triggerWalletDataRefresh();
-  }
-  function handleStakeSubmit() {
-    refetch();
-    app.triggerWalletDataRefresh();
-  }
+  function handleTransferSubmit() { refetch(); app.triggerWalletDataRefresh?.(); }
+  function handleStakeSubmit()    { refetch(); app.triggerWalletDataRefresh?.(); }
+  function handleUnstakeSubmit()  { refetch(); app.triggerWalletDataRefresh?.(); }
 
-  const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
-
-  /* Layout blocks */
-  const WalletSection = (props) => (
-    <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <h3 class="text-lg font-medium">{props.title}</h3>
-        <Show when={props.headerAction}><div>{props.headerAction}</div></Show>
-      </div>
-      {props.children}
-    </section>
-  );
-
-  const WalletRow = (props) => (
-    <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
-      <div class="flex justify-between items-start">
-        <div class="pr-4">
-          <h4 class="font-semibold">{props.title}</h4>
-          <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{props.description}</p>
-        </div>
-        <div class="flex-shrink-0 relative inline-flex items-center">{props.children}</div>
-      </div>
-    </div>
-  );
+  const savvaTokenAddress   = () => walletData()?.savvaTokenAddress || "";
+  const stakingTokenAddress = () => walletData()?.stakingTokenAddress || ""; // ERC20-like (Staking) — can be transferred by TransferModal :contentReference[oaicite:1]{index=1}
 
   return (
     <div class="px-2 space-y-6">
       <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
-        <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error.message}</p>}>
-          <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
-            <WalletRow
-              title={t("profile.wallet.savva.title")}
-              description={t("profile.wallet.savva.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.savvaBalance}
-                tokenAddress={savvaTokenAddress()}
-                items={savvaMenuItems()}
-              />
-            </WalletRow>
+        <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error?.message}</p>}>
+          <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <h3 class="text-lg font-medium">{t("profile.wallet.balances.title")}</h3>
+              <RefreshButton />
+            </div>
 
-            <WalletRow
-              title={baseTokenSymbol()}
-              description={t("profile.wallet.pls.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.baseTokenBalance}
-                tokenAddress="0"
-                items={baseMenuItems()}
-              />
-            </WalletRow>
-          </WalletSection>
+            <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
+              <div class="flex justify-between items-start">
+                <div class="pr-4">
+                  <h4 class="font-semibold">{t("profile.wallet.savva.title")}</h4>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("profile.wallet.savva.description")}</p>
+                </div>
+                <div class="flex-shrink-0 relative inline-flex items-center">
+                  <ValueWithMenu amount={walletData()?.savvaBalance} tokenAddress={savvaTokenAddress()} items={savvaMenuItems()} />
+                </div>
+              </div>
+            </div>
 
-          <WalletSection title={t("profile.wallet.nft.title")}>
-            <WalletRow
-              title={t("profile.wallet.nftEarnings.title")}
-              description={t("profile.wallet.nftEarnings.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.nftEarnings}
-                items={nftMenuItems()}
-              />
-            </WalletRow>
-          </WalletSection>
+            <div class="py-2 border-t border-[hsl(var(--border))]">
+              <div class="flex justify-between items-start">
+                <div class="pr-4">
+                  <h4 class="font-semibold">{baseTokenSymbol()}</h4>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("profile.wallet.pls.description")}</p>
+                </div>
+                <div class="flex-shrink-0 relative inline-flex items-center">
+                  <ValueWithMenu amount={walletData()?.baseTokenBalance} tokenAddress="0" items={baseMenuItems()} />
+                </div>
+              </div>
+            </div>
+          </section>
 
-          <WalletSection title={t("profile.wallet.staking.title")}>
-            <WalletRow
-              title={t("profile.wallet.staked.title")}
-              description={t("profile.wallet.staked.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.stakedBalance}
-                items={stakedMenuItems()}
-              />
-            </WalletRow>
-            <WalletRow
-              title={t("profile.wallet.reward.title")}
-              description={t("profile.wallet.reward.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.stakingReward}
-                items={rewardMenuItems()}
-              />
-            </WalletRow>
-          </WalletSection>
+          <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <h3 class="text-lg font-medium">{t("profile.wallet.nft.title")}</h3>
+            </div>
+
+            <div class="py-2">
+              <div class="flex justify-between items-start">
+                <div class="pr-4">
+                  <h4 class="font-semibold">{t("profile.wallet.nftEarnings.title")}</h4>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("profile.wallet.nftEarnings.description")}</p>
+                </div>
+                <div class="flex-shrink-0 relative inline-flex items-center">
+                  <ValueWithMenu amount={walletData()?.nftEarnings} items={nftMenuItems()} />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <h3 class="text-lg font-medium">{t("profile.wallet.staking.title")}</h3>
+            </div>
+
+            <div class="py-2">
+              <div class="flex justify-between items-start">
+                <div class="pr-4">
+                  <h4 class="font-semibold">{t("profile.wallet.staked.title")}</h4>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("profile.wallet.staked.description")}</p>
+                </div>
+                <div class="flex-shrink-0 relative inline-flex items-center">
+                  <ValueWithMenu amount={walletData()?.stakedBalance} tokenAddress={stakingTokenAddress()} items={stakedMenuItems()} />
+                </div>
+              </div>
+            </div>
+
+            <div class="py-2">
+              <div class="flex justify-between items-start">
+                <div class="pr-4">
+                  <h4 class="font-semibold">{t("profile.wallet.reward.title")}</h4>
+                  <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("profile.wallet.reward.description")}</p>
+                </div>
+                <div class="flex-shrink-0 relative inline-flex items-center">
+                  <ValueWithMenu amount={walletData()?.stakingReward} items={[]} />
+                </div>
+              </div>
+            </div>
+          </section>
         </Show>
       </Show>
 
-      {/* SAVVA transfer modal */}
+      {/* SAVVA transfer */}
       <Show when={showTransfer()}>
         <TransferModal
           tokenAddress={savvaTokenAddress()}
@@ -30069,17 +30077,27 @@ export default function WalletTab() {
         />
       </Show>
 
-      {/* ✅ Base-token transfer modal (empty / native) */}
+      {/* Base-token transfer */}
       <Show when={showBaseTransfer()}>
         <TransferModal
-          tokenAddress=""                 // empty = native coin
+          tokenAddress=""
           onClose={() => setShowBaseTransfer(false)}
           onSubmit={handleTransferSubmit}
           maxAmount={walletData()?.baseTokenBalance}
         />
       </Show>
 
-      {/* Increase staking (SAVVA) */}
+      {/* Staked token transfer (staking is ERC20-like, so TransferModal works) */}
+      <Show when={showStakeTransfer()}>
+        <TransferModal
+          tokenAddress={stakingTokenAddress()}
+          onClose={() => setShowStakeTransfer(false)}
+          onSubmit={handleTransferSubmit}
+          maxAmount={walletData()?.stakedBalance}
+        />
+      </Show>
+
+      {/* Increase staking */}
       <Show when={showIncreaseStaking()}>
         <IncreaseStakingModal
           savvaBalance={walletData()?.savvaBalance}
@@ -30087,6 +30105,164 @@ export default function WalletTab() {
           onClose={() => setShowIncreaseStaking(false)}
           onSubmit={handleStakeSubmit}
         />
+      </Show>
+
+      {/* Unstake */}
+      <Show when={showUnstake()}>
+        <UnstakeModal
+          onClose={() => setShowUnstake(false)}
+          onSubmit={handleUnstakeSubmit}
+        />
+      </Show>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/ContextMenu.jsx">
+// src/components/ui/ContextMenu.jsx
+import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { ChevronDownIcon } from "./icons/ActionIcons.jsx";
+
+export default function ContextMenu(props) {
+  const { t } = useApp();
+
+  const [isOpen, setIsOpen] = createSignal(false);
+  const [menuClass, setMenuClass] = createSignal("top-full right-0 mt-1");
+  const [menuWidth, setMenuWidth] = createSignal(undefined);
+
+  let rootRef;     // wrapper around the button (positioning context)
+  let menuRef;     // visible menu element
+  let sizerRef;    // hidden measurer
+
+  // ——— helpers ————————————————————————————————————————————————————————————
+  const outside = (e) => { if (rootRef && !rootRef.contains(e.target)) setIsOpen(false); };
+
+  function computeWidth() {
+    if (props.fixedWidthPx && Number.isFinite(props.fixedWidthPx)) {
+      setMenuWidth(Math.max(0, Number(props.fixedWidthPx)));
+      return;
+    }
+    const items = Array.isArray(props.items) ? props.items : [];
+    if (!items.length || !sizerRef) { setMenuWidth(undefined); return; }
+
+    const PADDING_X = 32;
+    const MIN_GAP = 4;
+
+    let maxText = 0;
+    const measurer = sizerRef;
+    measurer.style.whiteSpace = "nowrap";
+    items.forEach((it) => {
+      measurer.textContent = String(it?.label ?? "");
+      maxText = Math.max(maxText, Math.ceil(measurer.scrollWidth));
+    });
+
+    const triggerW = rootRef?.getBoundingClientRect?.().width || 0;
+    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    const cap = Math.max(240, vw - 24);
+
+    setMenuWidth(Math.min(Math.max(maxText + PADDING_X + MIN_GAP, triggerW), cap));
+  }
+
+  function decidePlacement() {
+    if (!rootRef) return;
+    const btnRect = rootRef.getBoundingClientRect();
+    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
+    // conservative height guess; real height comes slightly larger with many items
+    const estimatedMenuHeight = 180;
+    const spaceBelow = vh - btnRect.bottom;
+    const shouldFlipUp = spaceBelow < estimatedMenuHeight;
+
+    // Default BELOW; flip ABOVE only if needed.
+    setMenuClass(shouldFlipUp ? "bottom-full right-0 mb-1" : "top-full right-0 mt-1");
+  }
+
+  function toggle() {
+    const next = !isOpen();
+    if (next) {
+      decidePlacement();
+      computeWidth();
+      queueMicrotask(computeWidth);
+      window.addEventListener("resize", computeWidth, { passive: true });
+      window.addEventListener("resize", decidePlacement, { passive: true });
+      document.addEventListener("mousedown", outside);
+    } else {
+      window.removeEventListener("resize", computeWidth);
+      window.removeEventListener("resize", decidePlacement);
+      document.removeEventListener("mousedown", outside);
+    }
+    setIsOpen(next);
+  }
+
+  onCleanup(() => {
+    window.removeEventListener("resize", computeWidth);
+    window.removeEventListener("resize", decidePlacement);
+    document.removeEventListener("mousedown", outside);
+  });
+
+  const triggerClass =
+    props.buttonClass ||
+    "p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] " +
+    "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]";
+
+  // ——— render ————————————————————————————————————————————————————————————
+  return (
+    <div
+      ref={el => (rootRef = el)}
+      class={props.class || ""}
+      // RELATIVE + inline-block keeps the menu snug to the button with no weird gaps
+      style="position: relative; display: inline-block;"
+    >
+      <button
+        class={triggerClass}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
+        aria-haspopup="true"
+        aria-expanded={isOpen() ? "true" : "false"}
+        aria-label={props.ariaLabel || t("ui.openMenu")}
+        title={props.title || ""}
+        type="button"
+      >
+        {props.triggerContent ? props.triggerContent : <ChevronDownIcon class="w-4 h-4" />}
+      </button>
+
+      {/* Invisible sizer */}
+      <div
+        ref={el => (sizerRef = el)}
+        aria-hidden="true"
+        class="pointer-events-none fixed -top-[9999px] -left-[9999px] text-sm"
+        style={{ "line-height": "1.375", font: "inherit", "letter-spacing": "inherit" }}
+      />
+
+      <Show when={isOpen()}>
+        <div
+          ref={el => (menuRef = el)}
+          // z-50 ensures the menu is above cards/controls; border+bg remove see-through effect
+          class={`absolute ${menuClass()} z-50 rounded-md border border-[hsl(var(--border))] ` +
+                 `bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg`}
+          style={menuWidth() ? { width: `${menuWidth()}px` } : undefined}
+          role="menu"
+        >
+          <ul class="py-1">
+            <For each={props.items}>
+              {(item) => (
+                <li>
+                  <button
+                    type="button"
+                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))]"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); item.onClick?.(); setIsOpen(false); }}
+                    role="menuitem"
+                    aria-label={String(item.label || "")}
+                    title={String(item.label || "")}
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
       </Show>
     </div>
   );
@@ -30099,8 +30275,7 @@ import { createMemo, Show, createSignal, createEffect, on, createResource } from
 import { useApp } from "../../context/AppContext.jsx";
 import { formatUnits } from "viem";
 import { getTokenInfo } from "../../blockchain/tokenMeta.js";
-import SavvaTokenIcon from "./icons/SavvaTokenIcon.jsx";
-import { getChainLogo } from "../../blockchain/chainLogos.js";
+import QuestionTokenIcon from "./icons/QuestionTokenIcon.jsx";
 
 /**
  * TokenValue — shows amount (with correct decimals) + optional USD value.
@@ -30115,23 +30290,33 @@ export default function TokenValue(props) {
   const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
   const desiredChain = createMemo(() => app.desiredChain());
 
+  // 1) Determine the address we should use
   const tokenAddressRaw = createMemo(() => props.tokenAddress ?? savvaTokenAddress());
   const isBaseToken = createMemo(() => tokenAddressRaw() === "0");
-  const tokenAddressForMeta = createMemo(() => (isBaseToken() ? "" : tokenAddressRaw() || ""));
-
-  const isSavvaToken = createMemo(() => {
-    const a = (tokenAddressRaw() || "").toLowerCase();
-    const s = (savvaTokenAddress() || "").toLowerCase();
-    return !isBaseToken() && !!a && !!s && a === s;
+  // Normalize for meta: "" (empty) means native/base coin
+  const tokenAddressForMeta = createMemo(() => {
+    const a = tokenAddressRaw();
+    return (!a || a === "0") ? "" : String(a).toLowerCase();
   });
 
-  // Resolve metadata (cached, SAVVA-aware)
+  // 2) Async token meta — single source of truth (symbol, decimals, Icon)
   const [tokenMeta] = createResource(
-    () => ({ app, addr: tokenAddressForMeta() }),
-    ({ app, addr }) => getTokenInfo(app, addr)
+    tokenAddressForMeta,
+    (addr) => getTokenInfo(app, addr)
   );
 
-  // Format amount using real decimals
+  // 🔎 DEV-only debug to see what's happening
+  if (import.meta.env?.DEV) {
+    createEffect(() => {
+      // These logs will re-run whenever address or meta change
+      // eslint-disable-next-line no-console
+      console.debug("[TokenValue] addr →", tokenAddressForMeta());
+      // eslint-disable-next-line no-console
+      console.debug("[TokenValue] meta →", tokenMeta());
+    });
+  }
+
+  // 3) Format amount using real decimals
   const formattedAmount = createMemo(() => {
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
@@ -30143,14 +30328,19 @@ export default function TokenValue(props) {
     }
   });
 
-  // USD value for SAVVA or base coin (if app provides price)
+  // 4) Treat SAVVA and SAVVA_VOTES the same for USD pricing
+  const isSavvaLike = createMemo(() => {
+    const sym = tokenMeta()?.symbol;
+    return sym === "SAVVA" || sym === "SAVVA_VOTES";
+  });
+
+  // 5) Compute USD value for SAVVA-like or base coin (if price is available)
   const sourceUsdValue = createMemo(() => {
     let priceData = null;
-    if (isSavvaToken()) priceData = app.savvaTokenPrice?.();
-    else if (isBaseToken()) priceData = app.baseTokenPrice?.();
+    if (isSavvaLike())        priceData = app.savvaTokenPrice?.();
+    else if (isBaseToken())   priceData = app.baseTokenPrice?.();
 
     if (!priceData?.price) return null;
-
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
@@ -30162,7 +30352,7 @@ export default function TokenValue(props) {
     }
   });
 
-  // animation for USD change
+  // 6) Tiny animation for USD changes
   const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
   const [isAnimating, setIsAnimating] = createSignal(false);
   createEffect(on(sourceUsdValue, (next, prev) => {
@@ -30173,13 +30363,11 @@ export default function TokenValue(props) {
     setTimeout(() => setIsAnimating(false), 400);
   }, { defer: true }));
 
+  // 7) Icon from meta (falls back to question glyph while loading/unavailable)
   const Icon = () => {
-    if (isSavvaToken()) return <SavvaTokenIcon class="w-4 h-4" />;
-    if (isBaseToken()) {
-      const LogoComponent = getChainLogo(desiredChain()?.id);
-      return LogoComponent ? <LogoComponent class="w-5 h-5" /> : null;
-    }
-    return null;
+    const meta = tokenMeta(); // undefined while loading → we show question until resolved
+    const I = meta?.Icon;
+    return I ? <I class="w-4 h-4" /> : <QuestionTokenIcon class="w-4 h-4" />;
   };
 
   const isVertical = () => props.format === "vertical";
@@ -32083,6 +32271,68 @@ export function useAppAuth() {
 }
 </file>
 
+<file path="src/index.css">
+/* src/index.css */
+@import "tailwindcss";
+@import "./styles/tabs.css";
+@import "./styles/themed-controls.css";
+@import "./styles/layout.css";
+@import "../public/domain_default/domain.css";
+
+/* Custom utility for multi-line truncation */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Animation for the post fund badge */
+@keyframes bounce-short {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-bounce-short {
+  animation: bounce-short 0.3s ease-in-out;
+}
+
+/* General purpose update animation */
+@keyframes default-update-animation {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  49% {
+    transform: translateY(50%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.default-animation {
+  animation: default-update-animation 0.4s ease-in-out;
+}
+</file>
+
 <file path="src/components/auth/AuthorizedUser.jsx">
 // src/components/auth/AuthorizedUser.jsx
 import { createSignal, Show, onMount, onCleanup } from "solid-js";
@@ -33277,68 +33527,6 @@ export default function ProfileEditPage() {
             />
         </>
     );
-}
-</file>
-
-<file path="src/index.css">
-/* src/index.css */
-@import "tailwindcss";
-@import "./styles/tabs.css";
-@import "./styles/themed-controls.css";
-@import "./styles/layout.css";
-@import "../public/domain_default/domain.css";
-
-/* Custom utility for multi-line truncation */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-
-/* Animation for the post fund badge */
-@keyframes bounce-short {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-50%);
-  }
-}
-
-.animate-bounce-short {
-  animation: bounce-short 0.3s ease-in-out;
-}
-
-/* General purpose update animation */
-@keyframes default-update-animation {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  49% {
-    transform: translateY(50%);
-    opacity: 0;
-  }
-  50% {
-    transform: translateY(-50%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.default-animation {
-  animation: default-update-animation 0.4s ease-in-out;
 }
 </file>
 
@@ -36132,12 +36320,10 @@ export function handleCommentCounterUpdate(app, payload) {
 }
 
 export function handlePing(app) {
-  dbg.log("Alerts:ping", "Received ping, sending pong.");
   app.ws?.sendJson({ type: 'pong' });
 }
 
 export function handlePong() {
-  dbg.log("Alerts:pong", "Received pong.");
   // Do nothing
 }
 

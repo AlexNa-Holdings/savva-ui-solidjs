@@ -1,7 +1,11 @@
 // src/blockchain/tokenMeta.js
+// Single source of truth for token meta (symbol, decimals, Icon).
 import { createPublicClient, http } from "viem";
+import SavvaTokenIcon from "../components/ui/icons/SavvaTokenIcon.jsx";
+import QuestionTokenIcon from "../components/ui/icons/QuestionTokenIcon.jsx";
+import { getChainLogo } from "./chainLogos.js";
 
-// Minimal ERC-20 ABI (no JSX here)
+// Minimal ERC-20 ABI
 const ERC20_MIN_ABI = [
   { name: "decimals", inputs: [], outputs: [{ type: "uint8" }], stateMutability: "view", type: "function" },
   { name: "symbol",   inputs: [], outputs: [{ type: "string" }], stateMutability: "view", type: "function" },
@@ -21,8 +25,13 @@ function _publicClient(app) {
 function _nativeSymbol(app) {
   return app?.desiredChain?.().nativeCurrency?.symbol || "PLS";
 }
+function _normalizeAddr(addr) {
+  if (!addr) return "";
+  const s = String(addr).trim();
+  return s === "0" ? "" : s.toLowerCase();
+}
 
-// Resolve SAVVA/STAKE addresses once per session
+// Resolve SAVVA / STAKING addresses once per session (lazy)
 let _savvaAddrCached = null;
 let _stakingAddrCached = null;
 async function _getSavvaAddresses(app) {
@@ -33,44 +42,62 @@ async function _getSavvaAddresses(app) {
     const stakingC = await getSavvaContract(app, "Staking");
     _savvaAddrCached   = (savvaC?.address || "").toLowerCase() || null;
     _stakingAddrCached = (stakingC?.address || "").toLowerCase() || null;
-  } catch { /* noop */ }
+  } catch { /* ignore */ }
   return { savva: _savvaAddrCached, staking: _stakingAddrCached };
+}
+
+// Small component factories (avoid JSX in .js files)
+function makeSavvaIcon() {
+  return function Icon(props = {}) { return SavvaTokenIcon({ class: props.class || "w-4 h-4" }); };
+}
+function makeQuestionIcon() {
+  return function Icon(props = {}) { return QuestionTokenIcon({ class: props.class || "w-4 h-4" }); };
+}
+function makeChainIcon(chainId) {
+  const ChainLogo = getChainLogo(chainId);
+  // If chain logo is missing, fall back to question icon
+  return function Icon(props = {}) {
+    return ChainLogo ? ChainLogo({ class: props.class || "w-5 h-5" }) : QuestionTokenIcon({ class: props.class || "w-4 h-4" });
+  };
 }
 
 /**
  * getTokenInfo(app, tokenAddress)
- * Returns { symbol, decimals } with caching and SAVVA overrides.
+ * Returns a stable meta object:
+ *   { symbol: string, decimals: number, Icon: Component }
  *
  * Rules:
- *  - Base token (empty string): (nativeSymbol, 18)
- *  - SAVVA token address:       ("SAVVA", 18)
- *  - Staking contract address:  ("SAVVA-STAKED", 18)
- *  - Other ERC-20:               read once from chain, then cache
+ *  - Base token ("" or "0"):   { symbol: native,        decimals: 18, Icon: chain logo (or ? fallback) }
+ *  - SAVVA token address:      { symbol: "SAVVA",       decimals: 18, Icon: Savva }
+ *  - Staking contract address: { symbol: "SAVVA_VOTES", decimals: 18, Icon: Savva }
+ *  - Generic ERC-20:           read symbol/decimals via viem, Icon: ? fallback
  */
 export async function getTokenInfo(app, tokenAddress) {
   const chain = app?.desiredChain?.();
   const chainId = chain?.id || 0;
 
-  // Base/native coin (empty address)
-  if (!tokenAddress) {
-    const res = { symbol: _nativeSymbol(app), decimals: 18 };
-    _cache.set(_key(chainId, ""), res);
+  const addr = _normalizeAddr(tokenAddress);
+  const k = _key(chainId, addr);
+
+  // Base/native coin
+  if (!addr) {
+    const res = { symbol: _nativeSymbol(app), decimals: 18, Icon: makeChainIcon(chainId) };
+    _cache.set(k, res);
     return res;
   }
 
-  const addr = String(tokenAddress).toLowerCase();
-  const k = _key(chainId, addr);
+  // Cached?
   if (_cache.has(k)) return _cache.get(k);
 
   // SAVVA overrides
   const { savva, staking } = await _getSavvaAddresses(app);
   if (savva && addr === savva) {
-    const res = { symbol: "SAVVA", decimals: 18 };
+    const res = { symbol: "SAVVA", decimals: 18, Icon: makeSavvaIcon() };
     _cache.set(k, res);
     return res;
   }
   if (staking && addr === staking) {
-    const res = { symbol: "SAVVA-STAKED", decimals: 18 };
+    const res = { symbol: "SAVVA_VOTES", decimals: 18, Icon: makeSavvaIcon() };
     _cache.set(k, res);
     return res;
   }
@@ -78,7 +105,7 @@ export async function getTokenInfo(app, tokenAddress) {
   // Generic ERC-20
   const pc = _publicClient(app);
   if (!pc) {
-    const res = { symbol: "TOK", decimals: 18 };
+    const res = { symbol: "TOK", decimals: 18, Icon: makeQuestionIcon() };
     _cache.set(k, res);
     return res;
   }
@@ -93,7 +120,7 @@ export async function getTokenInfo(app, tokenAddress) {
     symbol = String(s || "TOK").slice(0, 32);
   } catch {}
 
-  const res = { symbol, decimals };
+  const res = { symbol, decimals, Icon: makeQuestionIcon() };
   _cache.set(k, res);
   return res;
 }
