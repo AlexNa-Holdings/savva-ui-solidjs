@@ -249,6 +249,12 @@ export default {
   "profile.wallet.staked.description": "The amount of tokens staked by you on the platform. The more you stake, the more voting weight and rewards you get.",
   "profile.wallet.staked.title": "Staked",
   "profile.wallet.staking.title": "Staking",
+  "profile.wallet.unstaked.available.desc": "Once your cooldown ends, these tokens can be withdrawn to your wallet.",
+  "profile.wallet.unstaked.available.title": "Available to withdraw",
+  "profile.wallet.unstaked.countdown.placeholder": "Time remaining...",
+  "profile.wallet.unstaked.requests.title": "Pending withdraw requests",
+  "profile.wallet.unstaked.table.amount": "Amount",
+  "profile.wallet.unstaked.table.status": "Pending",
   "reactions.${reactionType()}": "React with {reactionType}",
   "reactions.${type}": "{type} Reaction",
   "reactions.angry": "Angry",
@@ -431,5 +437,7 @@ export default {
   "wallet.unstake.amountPlaceholder": "Amount to Unstake",
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
-  "wallet.unstake.title": "Unstake Funds"
+  "wallet.unstake.title": "Unstake Funds",
+  "wallet.unstake.withdrawNow": "Withdraw",
+  "wallet.unstaked.availableNow": "Available Now"
 };

@@ -1,7 +1,7 @@
 // src/components/profile/WalletTab.jsx
 import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
-import { createMemo, createResource, Show, createSignal } from "solid-js";
+import { createMemo, createResource, Show, createSignal, For } from "solid-js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
 import Spinner from "../ui/Spinner.jsx";
@@ -50,12 +50,16 @@ export default function WalletTab() {
         nftEarnings,
         stakedBalance,
         stakingReward,
+        availableUnstaked,
+        unstakeRequests,
       ] = await Promise.all([
         savvaTokenContract.read.balanceOf([user.address]),
         publicClient.getBalance({ address: user.address }),
         contentFundContract.read.claimableNftGain([user.address]),
         stakingContract.read.balanceOf([user.address]),
         stakingContract.read.claimable([user.address]),
+        stakingContract.read.getAvailableUnstaked([user.address]),
+        stakingContract.read.getUnstakeRequests([user.address]),
       ]);
 
       return {
@@ -64,6 +68,8 @@ export default function WalletTab() {
         nftEarnings,
         stakedBalance,
         stakingReward,
+        availableUnstaked,
+        unstakeRequests,
         savvaTokenAddress: savvaTokenContract.address,
         stakingTokenAddress: stakingContract.address,
       };
@@ -86,7 +92,7 @@ export default function WalletTab() {
     const wa = walletAccount();
     const u = user();
     return !!wa && !!u?.address && String(wa).toLowerCase() === String(u.address).toLowerCase();
-    }
+  }
 
   // ── modals ───────────────────────────────────────────────────────────────────
   const [showTransfer, setShowTransfer] = createSignal(false);
@@ -100,10 +106,7 @@ export default function WalletTab() {
       const token = await getSavvaContract(app, "SavvaToken");
       await window.ethereum?.request?.({
         method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: { address: token.address, symbol: "SAVVA", decimals: 18 },
-        },
+        params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
       });
     } catch {}
   }
@@ -113,8 +116,8 @@ export default function WalletTab() {
     try {
       const contentFund = await getSavvaContract(app, "ContentFund", { write: true });
       const hash = await contentFund.write.claimNFTGain([]);
-      const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+      await pc.waitForTransactionReceipt({ hash });
     } catch (e) {
       console.error("claimNFTGain failed:", e);
     } finally {
@@ -127,13 +130,12 @@ export default function WalletTab() {
     try {
       const staking = await getSavvaContract(app, "Staking", { write: true });
       const hash = await staking.write.compoundGain([]);
-      const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+      await pc.waitForTransactionReceipt({ hash });
     } catch (e) {
       console.error("compoundGain failed:", e);
     } finally {
-      refetch();
-      app.triggerWalletDataRefresh?.();
+      refetch(); app.triggerWalletDataRefresh?.();
     }
   }
 
@@ -141,13 +143,25 @@ export default function WalletTab() {
     try {
       const staking = await getSavvaContract(app, "Staking", { write: true });
       const hash = await staking.write.claimGain([]);
-      const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+      await pc.waitForTransactionReceipt({ hash });
     } catch (e) {
       console.error("claimGain failed:", e);
     } finally {
-      refetch();
-      app.triggerWalletDataRefresh?.();
+      refetch(); app.triggerWalletDataRefresh?.();
+    }
+  }
+
+  async function handleClaimUnstaked() {
+    try {
+      const staking = await getSavvaContract(app, "Staking", { write: true });
+      const hash = await staking.write.claimUnstaked([]);
+      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+      await pc.waitForTransactionReceipt({ hash });
+    } catch (e) {
+      console.error("claimUnstaked failed:", e);
+    } finally {
+      refetch(); app.triggerWalletDataRefresh?.();
     }
   }
 
@@ -163,9 +177,7 @@ export default function WalletTab() {
   );
 
   const baseMenuItems = createMemo(() =>
-    isOwnConnectedWallet()
-      ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }]
-      : []
+    isOwnConnectedWallet() ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }] : []
   );
 
   const stakedMenuItems = createMemo(() =>
@@ -194,13 +206,24 @@ export default function WalletTab() {
     return typeof v === "bigint" ? v > 0n : Number(v || 0) > 0;
   });
 
-  // NEW: reward menu → Add to staked (compound) / Withdraw (claim)
   const rewardMenuItems = createMemo(() =>
     isOwnConnectedWallet() && hasStakingReward()
       ? [
           { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
           { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
         ]
+      : []
+  );
+
+  // NEW: available-unstaked menu (single item: Withdraw)
+  const hasAvailableUnstaked = createMemo(() => {
+    const v = walletData()?.availableUnstaked;
+    return typeof v === "bigint" ? v > 0n : Number(v || 0) > 0;
+  });
+
+  const availableMenuItems = createMemo(() =>
+    isOwnConnectedWallet() && hasAvailableUnstaked()
+      ? [{ label: t("wallet.menu.withdraw"), onClick: handleClaimUnstaked }]
       : []
   );
 
@@ -232,7 +255,7 @@ export default function WalletTab() {
   function handleStakeSubmit()    { refetch(); app.triggerWalletDataRefresh?.(); }
   function handleUnstakeSubmit()  { refetch(); app.triggerWalletDataRefresh?.(); }
 
-  // ── layout ───────────────────────────────────────────────────────────────────
+  // ── layout helpers ───────────────────────────────────────────────────────────
   const WalletSection = (props) => (
     <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
       <div class="flex justify-between items-center">
@@ -255,8 +278,18 @@ export default function WalletTab() {
     </div>
   );
 
+  // helpers
+  function isReqAvailable(ts) {
+    const now = Math.floor(Date.now() / 1000);
+    return Number(ts) <= now;
+  }
+
+  const availableUnstaked = () => walletData()?.availableUnstaked || 0n;
+  const unstakeRequests   = () => walletData()?.unstakeRequests || [];
+
+  // ── render ───────────────────────────────────────────────────────────────────
   return (
-    <div class="px-2 space-y-6">
+    <div class="px-2 space-y-6 mx-auto max-w-3xl">
       <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
         <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error?.message}</p>}>
           <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
@@ -288,14 +321,12 @@ export default function WalletTab() {
               title={t("profile.wallet.nftEarnings.title")}
               description={t("profile.wallet.nftEarnings.description")}
             >
-              <ValueWithMenu
-                amount={walletData()?.nftEarnings}
-                items={nftMenuItems()}
-              />
+              <ValueWithMenu amount={walletData()?.nftEarnings} items={nftMenuItems()} />
             </WalletRow>
           </WalletSection>
 
           <WalletSection title={t("profile.wallet.staking.title")}>
+            {/* Staked and Reward rows */}
             <WalletRow
               title={t("profile.wallet.staked.title")}
               description={t("profile.wallet.staked.description")}
@@ -306,16 +337,65 @@ export default function WalletTab() {
                 items={stakedMenuItems()}
               />
             </WalletRow>
+
             <WalletRow
               title={t("profile.wallet.reward.title")}
               description={t("profile.wallet.reward.description")}
             >
               <ValueWithMenu
                 amount={walletData()?.stakingReward}
-                // default TokenValue address = SAVVA (good if reward is in SAVVA)
                 items={rewardMenuItems()}
               />
             </WalletRow>
+
+            {/* Available to withdraw — same pattern as other rows, before the table */}
+            <WalletRow
+              title={t("profile.wallet.unstaked.available.title")}
+              description={t("profile.wallet.unstaked.available.desc")}
+            >
+              <ValueWithMenu
+                amount={availableUnstaked()}
+                tokenAddress={savvaTokenAddress()}
+                items={availableMenuItems()}
+              />
+            </WalletRow>
+
+            {/* Current withdraw requests table */}
+            <Show when={Array.isArray(unstakeRequests()) && unstakeRequests().length > 0}>
+              <div class="pt-3">
+                <div class="font-semibold mb-2">{t("profile.wallet.unstaked.requests.title")}</div>
+                <div class="overflow-x-auto rounded-md border border-[hsl(var(--border))]">
+                  <table class="w-full text-sm">
+                    <thead class="bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                      <tr>
+                        <th class="text-left px-3 py-2">{t("profile.wallet.unstaked.table.status")}</th>
+                        <th class="text-right px-3 py-2">{t("profile.wallet.unstaked.table.amount")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={unstakeRequests()}>
+                        {(r) => (
+                          <tr class="border-t border-[hsl(var(--border))]">
+                            <td class="px-3 py-2">
+                              <Show when={isReqAvailable(r.timestamp)} fallback={
+                                <span class="opacity-80" data-countdown-ts={Number(r.timestamp)}>
+                                  {t("profile.wallet.unstaked.countdown.placeholder")}
+                                </span>
+                              }>
+                                <span class="text-emerald-600">{t("wallet.unstaked.availableNow")}</span>
+                              </Show>
+                            </td>
+                            <td class="px-3 py-2 text-right">
+                              <TokenValue amount={r.amount} tokenAddress={savvaTokenAddress()} />
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </Show>
           </WalletSection>
         </Show>
       </Show>
@@ -340,7 +420,7 @@ export default function WalletTab() {
         />
       </Show>
 
-      {/* Staked token transfer (staking is ERC20-like) */}
+      {/* Staked token transfer */}
       <Show when={showStakeTransfer()}>
         <TransferModal
           tokenAddress={stakingTokenAddress()}
