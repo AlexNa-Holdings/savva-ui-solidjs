@@ -87,10 +87,7 @@ export default function TransferModal(props) {
         <form onSubmit={submit} class="p-4 space-y-4">
           <div class="text-lg font-semibold flex items-center gap-2">
             <TokenTitleIcon app={app} tokenAddress={props.tokenAddress || ""} />
-            <span>{t("wallet.transfer.titleToken")}</span>
-            <Show when={meta()?.symbol}>
-              <span class="text-sm text-[hsl(var(--muted-foreground))]">· {meta().symbol}</span>
-            </Show>
+            <span>{t("wallet.transfer.titleToken", { token: meta()?.symbol })}</span>
           </div>
 
           <AddressInput

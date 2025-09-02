@@ -1,123 +1,124 @@
 // src/components/ui/ContextMenu.jsx
 import { createSignal, onMount, onCleanup, Show, For } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
 import { ChevronDownIcon } from "./icons/ActionIcons.jsx";
 
 export default function ContextMenu(props) {
+  const { t } = useApp();
+
   const [isOpen, setIsOpen] = createSignal(false);
-  const [menuClass, setMenuClass] = createSignal("bottom-full right-0 mb-2");
+  const [menuClass, setMenuClass] = createSignal("top-full right-0 mt-1");
   const [menuWidth, setMenuWidth] = createSignal(undefined);
 
-  let containerRef;
-  let menuRef;     // actual visible menu
-  let sizerRef;    // hidden sizer for measuring
+  let rootRef;     // wrapper around the button (positioning context)
+  let menuRef;     // visible menu element
+  let sizerRef;    // hidden measurer
 
-  const handleClickOutside = (event) => {
-    if (containerRef && !containerRef.contains(event.target)) setIsOpen(false);
-  };
-
-  onMount(() => document.addEventListener("mousedown", handleClickOutside));
-  onCleanup(() => document.removeEventListener("mousedown", handleClickOutside));
-
-  const handleItemClick = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    item.onClick?.();
-    setIsOpen(false);
-  };
-
-  const positionClass = props.positionClass || "absolute -bottom-2 -right-2 z-20";
-  const ButtonIcon = () => <ChevronDownIcon class="w-4 h-4" />;
+  // ——— helpers ————————————————————————————————————————————————————————————
+  const outside = (e) => { if (rootRef && !rootRef.contains(e.target)) setIsOpen(false); };
 
   function computeWidth() {
-    // If consumer explicitly sets width, respect it
     if (props.fixedWidthPx && Number.isFinite(props.fixedWidthPx)) {
       setMenuWidth(Math.max(0, Number(props.fixedWidthPx)));
       return;
     }
-
     const items = Array.isArray(props.items) ? props.items : [];
-    if (!items.length || !sizerRef) {
-      setMenuWidth(undefined);
-      return;
-    }
+    if (!items.length || !sizerRef) { setMenuWidth(undefined); return; }
 
-    // Measure the longest label width with same text styles and padding
-    const PADDING_X = 32; // px-4 on both sides (Tailwind px-4 = 1rem ≈ 16px * 2)
-    const MIN_GAP = 4;    // small safety gap
+    const PADDING_X = 32;
+    const MIN_GAP = 4;
 
     let maxText = 0;
-    // use the same text class as menu items to match font metrics
     const measurer = sizerRef;
     measurer.style.whiteSpace = "nowrap";
     items.forEach((it) => {
       measurer.textContent = String(it?.label ?? "");
-      const w = Math.ceil(measurer.scrollWidth);
-      if (w > maxText) maxText = w;
+      maxText = Math.max(maxText, Math.ceil(measurer.scrollWidth));
     });
 
-    // Also ensure we’re at least as wide as the trigger (so it doesn’t look cramped)
-    const triggerW = containerRef?.getBoundingClientRect?.().width || 0;
-    // Cap to viewport minus small margin
+    const triggerW = rootRef?.getBoundingClientRect?.().width || 0;
     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-    const cap = Math.max(240, vw - 24); // never exceed (viewport - 24px)
+    const cap = Math.max(240, vw - 24);
 
-    const calculated = Math.min(Math.max(maxText + PADDING_X + MIN_GAP, triggerW), cap);
-    setMenuWidth(calculated);
+    setMenuWidth(Math.min(Math.max(maxText + PADDING_X + MIN_GAP, triggerW), cap));
   }
 
-  function toggleMenu() {
+  function decidePlacement() {
+    if (!rootRef) return;
+    const btnRect = rootRef.getBoundingClientRect();
+    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
+    // conservative height guess; real height comes slightly larger with many items
+    const estimatedMenuHeight = 180;
+    const spaceBelow = vh - btnRect.bottom;
+    const shouldFlipUp = spaceBelow < estimatedMenuHeight;
+
+    // Default BELOW; flip ABOVE only if needed.
+    setMenuClass(shouldFlipUp ? "bottom-full right-0 mb-1" : "top-full right-0 mt-1");
+  }
+
+  function toggle() {
     const next = !isOpen();
-    if (next && containerRef) {
-      // pick top/bottom placement
-      const btnRect = containerRef.getBoundingClientRect();
-      const estimatedMenuHeight = 160;
-      setMenuClass(btnRect.top < estimatedMenuHeight ? "top-full right-0 mt-2" : "bottom-full right-0 mb-2");
-      // compute width right before opening
+    if (next) {
+      decidePlacement();
       computeWidth();
-      // and after first paint, in case fonts/layout shift
-      queueMicrotask(() => computeWidth());
-      // keep width correct on resize while open
+      queueMicrotask(computeWidth);
       window.addEventListener("resize", computeWidth, { passive: true });
+      window.addEventListener("resize", decidePlacement, { passive: true });
+      document.addEventListener("mousedown", outside);
     } else {
       window.removeEventListener("resize", computeWidth);
+      window.removeEventListener("resize", decidePlacement);
+      document.removeEventListener("mousedown", outside);
     }
     setIsOpen(next);
   }
 
-  onCleanup(() => window.removeEventListener("resize", computeWidth));
+  onCleanup(() => {
+    window.removeEventListener("resize", computeWidth);
+    window.removeEventListener("resize", decidePlacement);
+    document.removeEventListener("mousedown", outside);
+  });
 
   const triggerClass =
     props.buttonClass ||
-    "p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]";
+    "p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] " +
+    "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]";
 
+  // ——— render ————————————————————————————————————————————————————————————
   return (
-    <div class={positionClass} ref={el => (containerRef = el)}>
+    <div
+      ref={el => (rootRef = el)}
+      class={props.class || ""}
+      // RELATIVE + inline-block keeps the menu snug to the button with no weird gaps
+      style="position: relative; display: inline-block;"
+    >
       <button
         class={triggerClass}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(); }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(); }}
         aria-haspopup="true"
-        aria-expanded={isOpen()}
+        aria-expanded={isOpen() ? "true" : "false"}
+        aria-label={props.ariaLabel || t("ui.openMenu")}
+        title={props.title || ""}
+        type="button"
       >
-        {props.triggerContent ? props.triggerContent : <ButtonIcon />}
+        {props.triggerContent ? props.triggerContent : <ChevronDownIcon class="w-4 h-4" />}
       </button>
 
-      {/* Invisible sizer used for width measurement */}
+      {/* Invisible sizer */}
       <div
         ref={el => (sizerRef = el)}
         aria-hidden="true"
         class="pointer-events-none fixed -top-[9999px] -left-[9999px] text-sm"
-        style={{
-          "line-height": "1.375", // approx leading-snug
-          // mirror item text styles as much as possible
-          "font": "inherit",
-          "letter-spacing": "inherit",
-        }}
+        style={{ "line-height": "1.375", font: "inherit", "letter-spacing": "inherit" }}
       />
 
       <Show when={isOpen()}>
         <div
           ref={el => (menuRef = el)}
-          class={`absolute ${menuClass()} rounded-md shadow-lg bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] ring-1 ring-black/10`}
+          // z-50 ensures the menu is above cards/controls; border+bg remove see-through effect
+          class={`absolute ${menuClass()} z-50 rounded-md border border-[hsl(var(--border))] ` +
+                 `bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-lg`}
           style={menuWidth() ? { width: `${menuWidth()}px` } : undefined}
           role="menu"
         >
@@ -125,14 +126,16 @@ export default function ContextMenu(props) {
             <For each={props.items}>
               {(item) => (
                 <li>
-                  <a
-                    href="#"
-                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))] whitespace-nowrap"
-                    onClick={(e) => handleItemClick(e, item)}
+                  <button
+                    type="button"
+                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))]"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); item.onClick?.(); setIsOpen(false); }}
                     role="menuitem"
+                    aria-label={String(item.label || "")}
+                    title={String(item.label || "")}
                   >
                     {item.label}
-                  </a>
+                  </button>
                 </li>
               )}
             </For>
