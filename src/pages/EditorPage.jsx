@@ -22,6 +22,7 @@ import CommentEditor from "../components/editor/CommentEditor.jsx";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { whenWsOpen } from "../net/wsRuntime.js";
 import { TrashIcon } from "../components/ui/icons/ActionIcons.jsx";
+import { getAllUploadedFileNames, deleteUploadedFile } from "../editor/storage.js";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
@@ -265,31 +266,46 @@ export default function EditorPage() {
     setPostParams(prev => ({ ...prev, [field]: value }));
   };
   
-  const handleConfirmClear = () => {
-    const newPostData = {};
-    const newPostParams = {
-      guid: editorMode() === 'new_post' ? crypto.randomUUID() : postParams().guid,
-      publishAsNewPost: editorMode() === 'edit_post' ? false : undefined,
-      locales: {}
-    };
-
-    if (editorMode() === 'new_comment') {
-        newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
+const handleConfirmClear = async () => {
+  // 1) remove all files from uploads/
+  try {
+    const names = await getAllUploadedFileNames(baseDir());
+    for (const name of names) {
+      await deleteUploadedFile(baseDir(), name);
     }
+  } catch (e) {
+    // keep UX resilient even if OPFS is unavailable
+    dbg.warn?.("EditorPage", "Failed to clear uploads", e);
+  }
 
-    for (const langCode of domainLangCodes()) {
-        newPostData[langCode] = { title: "", body: "", chapters: [] };
-        newPostParams.locales[langCode] = { chapters: [] };
-    }
-
-    batch(() => {
-        setPostData(newPostData);
-        setPostParams(newPostParams);
-        setEditingChapterIndex(-1);
-        setShowChapters(false);
-        setThumbnailUrl(null);
-    });
+  // 2) reset draft params/content
+  const newPostData = {};
+  const newPostParams = {
+    guid: editorMode() === "new_post" ? crypto.randomUUID() : postParams().guid,
+    publishAsNewPost: editorMode() === "edit_post" ? false : undefined,
+    locales: {},
   };
+  if (editorMode() === "new_comment") {
+    newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
+  }
+  for (const langCode of domainLangCodes()) {
+    newPostData[langCode] = { title: "", body: "", chapters: [] };
+    newPostParams.locales[langCode] = { chapters: [] };
+  }
+
+  batch(() => {
+    setPostData(newPostData);
+    setPostParams(newPostParams);
+    setEditingChapterIndex(-1);
+    setShowChapters(false);
+    setThumbnailUrl(null);
+    setFilesRevision((r) => r + 1); // refresh files drawer
+  });
+
+  // 3) success toast
+  pushToast({ type: "success", message: t("editor.publish.draftCleared") });
+  setShowConfirmClear(false);
+};
 
   const updateChapterTitle = (index, newTitle) => {
     setPostParams(prev => {
