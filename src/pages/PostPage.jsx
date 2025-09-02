@@ -199,6 +199,7 @@ export default function PostPage() {
 
   const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
   const localizedMainContent = createMemo(() => mainContent());
+
   const ipfsBaseUrl = createMemo(() => {
     const d = details();
     if (!d) return "";
@@ -214,8 +215,7 @@ export default function PostPage() {
       bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
     }
     
-    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
-    return `${gatewayUrl}ipfs/${dataCid}`;
+    return ipfs.buildUrl(bestGateway, dataCid);
   });
 
   const markdownPlugins = createMemo(() => [

@@ -1,10 +1,7 @@
 // src/ipfs/index.js
 import { fetchWithTimeout } from "../utils/net.js";
 
-function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
-function stripPrefix(s, p) { return s.startsWith(p) ? s.slice(p.length) : s; }
-
-// New helper function to ensure a URL has a protocol
+// Helper function to ensure a URL has a protocol
 function ensureProtocol(url) {
   if (!url || url.startsWith('http://') || url.startsWith('https://')) {
     return url;
@@ -12,23 +9,35 @@ function ensureProtocol(url) {
   return `https://${url}`;
 }
 
+// Iteratively strips all known IPFS prefixes to handle cases like 'ipfs:/ipfs/Qm...'
 function normalizeInput(input) {
   let s = String(input || "").trim();
-  if (!s) throw new Error("ipfs: empty input");
-  s = stripPrefix(s, "ipfs://");
-  s = stripPrefix(s, "/ipfs/");
-  s = stripPrefix(s, "ipfs/");
+  if (!s) return s;
+  let prevS;
+  do {
+    prevS = s;
+    s = s.replace(/^(ipfs:\/\/|\/ipfs\/|ipfs\/)/i, "");
+  } while (s !== prevS && s.length > 0);
   return s;
 }
 
+// Robustly joins a gateway and a CID path, ensuring no duplicate '/ipfs/' segment.
 function buildUrl(baseGateway, cidPath) {
-  const normalizedGateway = ensureProtocol(String(baseGateway || "").trim());
-  const base = normalizedGateway.replace(/\/+$/, "");
-  const path = String(cidPath || "").trim().replace(/^\/+/g, "");
-  if (!base || !path) return "";
-  const hasIpfs = /\/ipfs$/i.test(base);
-  const prefix = hasIpfs ? `${base}/` : `${base}/ipfs/`;
-  return prefix + path;
+  // 1. Normalize gateway: ensure protocol, remove any trailing /ipfs or slashes.
+  let gw = ensureProtocol(String(baseGateway || "").trim());
+  gw = gw.replace(/\/+$/, "");     // remove trailing slashes
+  if (gw.endsWith('/ipfs')) {
+    gw = gw.slice(0, -5);       // remove /ipfs
+  }
+  gw = gw.replace(/\/+$/, "");     // remove slashes again
+
+  // 2. The path is expected to be pre-normalized, but we clean it as a fallback.
+  const path = normalizeInput(cidPath);
+  
+  if (!gw || !path) return "";
+  
+  // 3. Join them correctly.
+  return `${gw}/ipfs/${path}`;
 }
 
 async function tryGateways(cidPath, gateways, { timeoutMs = 8000, init = {} } = {}) {

@@ -131,8 +131,7 @@ export default function CommentCard(props) {
       bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
     }
     
-    const gatewayUrl = bestGateway.endsWith("/") ? bestGateway : `${bestGateway}/`;
-    return `${gatewayUrl}ipfs/${dataCid}`;
+    return ipfs.buildUrl(bestGateway, dataCid);
   });
 
   const markdownPlugins = createMemo(() => [
@@ -190,7 +189,7 @@ export default function CommentCard(props) {
 
         <div class="mt-2 flex items-center justify-between">
           <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
-          <div class="flex items-center gap-2 text-xs font-semibold">
+          <div class="flex items-center gap-2 text-xs font-semibold flex-shrink-0 whitespace-nowrap">
             <Show when={app.authorizedUser()}>
               <ReactionInput post={comment} />
             </Show>
@@ -242,3 +241,4 @@ export default function CommentCard(props) {
     </div>
   );
 }
+

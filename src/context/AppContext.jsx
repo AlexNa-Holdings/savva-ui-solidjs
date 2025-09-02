@@ -25,6 +25,7 @@ export function AppProvider(props) {
   
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
+  const [walletDataNeedsRefresh, setWalletDataNeedsRefresh] = Solid.createSignal(0);
 
   const { route } = useHashRouter();
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
@@ -171,6 +172,9 @@ export function AppProvider(props) {
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
     postUpdate, setPostUpdate,
+    walletDataNeedsRefresh,
+    triggerWalletDataRefresh: () => setWalletDataNeedsRefresh(c => c + 1),
+    route,
     setDomain: (d) => { conn.setDomain(d); auth.logout(); },
     clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
     getGuardedWalletClient,
