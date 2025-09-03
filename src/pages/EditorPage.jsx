@@ -9,7 +9,7 @@ import EditorToolbar from "../components/editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../components/editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../components/editor/EditorFilesButton.jsx";
-import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft, addUploadedFile } from "../editor/storage.js";
+import { loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft, addUploadedFile, getAllUploadedFileNames, deleteUploadedFile } from "../editor/storage.js";
 import { dbg } from "../utils/debug.js";
 import EditorChapterSelector from "../components/editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../components/editor/EditorTocButton.jsx";
@@ -22,29 +22,21 @@ import CommentEditor from "../components/editor/CommentEditor.jsx";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { whenWsOpen } from "../net/wsRuntime.js";
 import { TrashIcon } from "../components/ui/icons/ActionIcons.jsx";
-import { getAllUploadedFileNames, deleteUploadedFile } from "../editor/storage.js";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
   if (!identifier || !domain || !app.wsMethod) return null;
-  
+
   await whenWsOpen();
-  
+
   const contentList = app.wsMethod("content-list");
-  const requestParams = {
-    domain: domain,
-    lang: lang,
-    limit: 1,
-  };
-  if (identifier.startsWith("0x")) {
-    requestParams.savva_cid = identifier;
-  } else {
-    requestParams.short_cid = identifier;
-  }
+  const requestParams = { domain, lang, limit: 1 };
+  if (identifier.startsWith("0x")) requestParams.savva_cid = identifier;
+  else requestParams.short_cid = identifier;
+
   const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
+  if (user?.address) requestParams.my_addr = toChecksumAddress(user.address);
+
   const res = await contentList(requestParams);
   const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
   return arr[0] || null;
@@ -71,20 +63,23 @@ export default function EditorPage() {
   const [isFullScreen, setIsFullScreen] = createSignal(false);
   const [filesRevision, setFilesRevision] = createSignal(0);
 
+  // NEW: the id to show in CommentEditor (post or comment that is the PARENT)
+  const [parentPreviewCid, setParentPreviewCid] = createSignal(null);
+
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
 
   const routeParams = createMemo(() => {
     const path = route();
-    if (path.startsWith("/editor/new-comment/")) return { mode: "new_comment", parent_savva_cid: path.split('/')[3] };
-    if (path.startsWith("/editor/comment/")) return { mode: "edit_comment", id: path.split('/')[3] };
+    if (path.startsWith("/editor/new-comment/")) return { mode: "new_comment", parent_savva_cid: path.split("/")[3] };
+    if (path.startsWith("/editor/comment/")) return { mode: "edit_comment", id: path.split("/")[3] };
     if (path.startsWith("/editor/new")) return { mode: "new_post" };
-    if (path.startsWith("/editor/edit/")) return { mode: "edit_post", id: path.split('/')[3] };
+    if (path.startsWith("/editor/edit/")) return { mode: "edit_post", id: path.split("/")[3] };
     return { mode: "unknown" };
   });
 
   const editorMode = () => routeParams().mode;
-  
+
   const baseDir = createMemo(() => {
     const mode = editorMode();
     if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
@@ -98,32 +93,64 @@ export default function EditorPage() {
     return fromDomain.length > 0 ? fromDomain : ["en"];
   });
 
+  // Resolve which card to show on top for comment modes:
+  // - new_comment: use parent id from the route
+  // - edit_comment: fetch the comment, take its parent_savva_cid
+  createEffect(on(routeParams, (rp) => {
+    if (!rp) return;
+    const mode = rp.mode;
+    if (mode === "new_comment") {
+      setParentPreviewCid(rp.parent_savva_cid);
+      return;
+    }
+    if (mode === "edit_comment") {
+      setParentPreviewCid(null);
+      (async () => {
+        try {
+          const current = await fetchPostByIdentifier({
+            identifier: rp.id,
+            domain: app.selectedDomainName(),
+            app,
+            lang: app.lang(),
+          });
+          setParentPreviewCid(current?.parent_savva_cid || null);
+        } catch (e) {
+          dbg.error("EditorPage", "Failed to resolve parent for edited comment", e);
+          setParentPreviewCid(null);
+        }
+      })();
+      return;
+    }
+    setParentPreviewCid(null);
+  }));
+
   const loadEditorContent = async () => {
     try {
       const mode = editorMode();
       if (mode === "new_comment") {
         await clearDraft(baseDir());
+
         const parentCid = routeParams().parent_savva_cid;
         const parentObject = await fetchPostByIdentifier({
-            identifier: parentCid,
-            domain: app.selectedDomainName(),
-            app,
-            lang: app.lang()
+          identifier: parentCid,
+          domain: app.selectedDomainName(),
+          app,
+          lang: app.lang(),
         });
         if (!parentObject) throw new Error("Parent content not found.");
-        
+
         const isReplyToComment = !!parentObject.parent_savva_cid;
-        const newPostParams = { 
-          locales: {}, 
+        const newPostParams = {
+          locales: {},
           guid: crypto.randomUUID(),
           parent_savva_cid: parentObject.savva_cid,
-          root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid
+          root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid,
         };
 
         const newPostData = {};
         for (const langCode of domainLangCodes()) {
-            newPostData[langCode] = { title: "", body: "", chapters: [] };
-            newPostParams.locales[langCode] = { chapters: [] };
+          newPostData[langCode] = { title: "", body: "", chapters: [] };
+          newPostParams.locales[langCode] = { chapters: [] };
         }
         batch(() => {
           setPostData(newPostData);
@@ -132,25 +159,25 @@ export default function EditorPage() {
       } else {
         const draft = await loadDraft(baseDir());
         if (draft && draft.content) {
-            batch(() => {
-              setPostData(draft.content);
-              const params = draft.params || {};
-              if (editorMode() === "new_post" && !params.guid) {
-                  params.guid = crypto.randomUUID();
-              }
-              setPostParams(params);
-            });
-        } else if (editorMode() === "new_post") {
-            const newPostData = {};
-            const newPostParams = { locales: {}, guid: crypto.randomUUID() };
-            for (const langCode of domainLangCodes()) {
-                newPostData[langCode] = { title: "", body: "", chapters: [] };
-                newPostParams.locales[langCode] = { chapters: [] };
+          batch(() => {
+            setPostData(draft.content);
+            const params = draft.params || {};
+            if (editorMode() === "new_post" && !params.guid) {
+              params.guid = crypto.randomUUID();
             }
-            batch(() => {
-              setPostData(newPostData);
-              setPostParams(newPostParams);
-            });
+            setPostParams(params);
+          });
+        } else if (editorMode() === "new_post") {
+          const newPostData = {};
+          const newPostParams = { locales: {}, guid: crypto.randomUUID() };
+          for (const langCode of domainLangCodes()) {
+            newPostData[langCode] = { title: "", body: "", chapters: [] };
+            newPostParams.locales[langCode] = { chapters: [] };
+          }
+          batch(() => {
+            setPostData(newPostData);
+            setPostParams(newPostParams);
+          });
         } else {
           dbg.error("EditorPage", `Draft not found for edit mode in '${baseDir()}', navigating back.`);
           navigate(lastTabRoute() || "/");
@@ -162,33 +189,53 @@ export default function EditorPage() {
     }
   };
 
-  createEffect(on(baseDir, (currentBaseDir) => {
-    if (currentBaseDir && currentBaseDir !== "unknown") {
-      loadEditorContent();
-    }
-  }));
+  createEffect(
+    on(
+      baseDir,
+      (currentBaseDir) => {
+        if (currentBaseDir && currentBaseDir !== "unknown") {
+          loadEditorContent();
+        }
+      }
+    )
+  );
 
   onMount(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
-          case 'f': e.preventDefault(); setShowFiles(p => !p); break;
-          case 'p': e.preventDefault(); setShowPreview(p => !p); break;
-          case 'm': e.preventDefault(); setIsFullScreen(p => !p); break;
+          case "f":
+            e.preventDefault();
+            setShowFiles((p) => !p);
+            break;
+          case "p":
+            e.preventDefault();
+            setShowPreview((p) => !p);
+            break;
+          case "m":
+            e.preventDefault();
+            setIsFullScreen((p) => !p);
+            break;
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
-  createEffect(on([postData, postParams], ([data, params]) => {
-    if (data === null) return;
-    clearTimeout(autoSaveTimeoutId);
-    autoSaveTimeoutId = setTimeout(() => {
-      saveDraft(baseDir(), { content: data, params: params });
-    }, 500);
-  }, { defer: true }));
+  createEffect(
+    on(
+      [postData, postParams],
+      ([data, params]) => {
+        if (data === null) return;
+        clearTimeout(autoSaveTimeoutId);
+        autoSaveTimeoutId = setTimeout(() => {
+          saveDraft(baseDir(), { content: data, params: params });
+        }, 500);
+      },
+      { defer: true }
+    )
+  );
 
   createEffect(async () => {
     const thumbPath = postParams()?.thumbnail;
@@ -200,19 +247,21 @@ export default function EditorPage() {
     }
   });
 
-  createEffect(on(activeLang, (lang) => {
-    if (!postData()?.[lang]) {
-        setPostData(p => ({...p, [lang]: { title: "", body: "", chapters: [] }}));
-        setPostParams(p => {
-            const locales = {...(p.locales || {})};
-            if (!locales[lang]) locales[lang] = { chapters: [] };
-            return {...p, locales};
+  createEffect(
+    on(activeLang, (lang) => {
+      if (!postData()?.[lang]) {
+        setPostData((p) => ({ ...p, [lang]: { title: "", body: "", chapters: [] } }));
+        setPostParams((p) => {
+          const locales = { ...(p.locales || {}) };
+          if (!locales[lang]) locales[lang] = { chapters: [] };
+          return { ...p, locales };
         });
-    }
-    const chapters = postData()?.[lang]?.chapters || [];
-    setShowChapters(chapters.length > 0);
-    setEditingChapterIndex(-1);
-  }));
+      }
+      const chapters = postData()?.[lang]?.chapters || [];
+      setShowChapters(chapters.length > 0);
+      setEditingChapterIndex(-1);
+    })
+  );
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
@@ -220,12 +269,12 @@ export default function EditorPage() {
 
     let imagePasted = false;
     for (const item of items) {
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
         e.preventDefault();
         imagePasted = true;
 
         const file = item.getAsFile();
-        const extension = file.type.split('/')[1] || 'png';
+        const extension = file.type.split("/")[1] || "png";
         const fileName = `pasted-image-${Date.now()}.${extension}`;
         const newFile = new File([file], fileName, { type: file.type });
 
@@ -240,7 +289,7 @@ export default function EditorPage() {
     }
 
     if (imagePasted) {
-      setFilesRevision(r => r + 1);
+      setFilesRevision((r) => r + 1);
     }
   };
 
@@ -253,62 +302,58 @@ export default function EditorPage() {
   const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
 
   const updateField = (field, value) => {
-    setPostData(prev => ({
+    setPostData((prev) => ({
       ...prev,
       [activeLang()]: {
         ...(prev?.[activeLang()] || { chapters: [] }),
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
   };
 
   const updateParam = (field, value) => {
-    setPostParams(prev => ({ ...prev, [field]: value }));
+    setPostParams((prev) => ({ ...prev, [field]: value }));
   };
-  
-const handleConfirmClear = async () => {
-  // 1) remove all files from uploads/
-  try {
-    const names = await getAllUploadedFileNames(baseDir());
-    for (const name of names) {
-      await deleteUploadedFile(baseDir(), name);
+
+  const handleConfirmClear = async () => {
+    try {
+      const names = await getAllUploadedFileNames(baseDir());
+      for (const name of names) {
+        await deleteUploadedFile(baseDir(), name);
+      }
+    } catch (e) {
+      dbg.warn?.("EditorPage", "Failed to clear uploads", e);
     }
-  } catch (e) {
-    // keep UX resilient even if OPFS is unavailable
-    dbg.warn?.("EditorPage", "Failed to clear uploads", e);
-  }
 
-  // 2) reset draft params/content
-  const newPostData = {};
-  const newPostParams = {
-    guid: editorMode() === "new_post" ? crypto.randomUUID() : postParams().guid,
-    publishAsNewPost: editorMode() === "edit_post" ? false : undefined,
-    locales: {},
+    const newPostData = {};
+    const newPostParams = {
+      guid: editorMode() === "new_post" ? crypto.randomUUID() : postParams().guid,
+      publishAsNewPost: editorMode() === "edit_post" ? false : undefined,
+      locales: {},
+    };
+    if (editorMode() === "new_comment") {
+      newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
+    }
+    for (const langCode of domainLangCodes()) {
+      newPostData[langCode] = { title: "", body: "", chapters: [] };
+      newPostParams.locales[langCode] = { chapters: [] };
+    }
+
+    batch(() => {
+      setPostData(newPostData);
+      setPostParams(newPostParams);
+      setEditingChapterIndex(-1);
+      setShowChapters(false);
+      setThumbnailUrl(null);
+      setFilesRevision((r) => r + 1);
+    });
+
+    pushToast({ type: "success", message: t("editor.publish.draftCleared") });
+    setShowConfirmClear(false);
   };
-  if (editorMode() === "new_comment") {
-    newPostParams.parent_savva_cid = routeParams().parent_savva_cid;
-  }
-  for (const langCode of domainLangCodes()) {
-    newPostData[langCode] = { title: "", body: "", chapters: [] };
-    newPostParams.locales[langCode] = { chapters: [] };
-  }
-
-  batch(() => {
-    setPostData(newPostData);
-    setPostParams(newPostParams);
-    setEditingChapterIndex(-1);
-    setShowChapters(false);
-    setThumbnailUrl(null);
-    setFilesRevision((r) => r + 1); // refresh files drawer
-  });
-
-  // 3) success toast
-  pushToast({ type: "success", message: t("editor.publish.draftCleared") });
-  setShowConfirmClear(false);
-};
 
   const updateChapterTitle = (index, newTitle) => {
-    setPostParams(prev => {
+    setPostParams((prev) => {
       const lang = activeLang();
       const locales = { ...(prev.locales || {}) };
       const langParams = locales[lang] || { chapters: [] };
@@ -327,14 +372,14 @@ const handleConfirmClear = async () => {
     const newIndex = (postData()[activeLang()]?.chapters || []).length;
 
     batch(() => {
-      setPostData(prev => {
+      setPostData((prev) => {
         const lang = activeLang();
         const langData = prev[lang] || { title: "", body: "", chapters: [] };
         const chapters = [...(langData.chapters || []), newChapterContent];
         return { ...prev, [lang]: { ...langData, chapters } };
       });
 
-      setPostParams(prev => {
+      setPostParams((prev) => {
         const lang = activeLang();
         const locales = { ...(prev.locales || {}) };
         const langParams = locales[lang] || { chapters: [] };
@@ -350,18 +395,18 @@ const handleConfirmClear = async () => {
     if (editingChapterIndex() === -1) return;
     setShowConfirmDelete(true);
   };
-  
+
   const confirmRemoveChapter = () => {
     const indexToRemove = editingChapterIndex();
-    
+
     batch(() => {
-      setPostData(prev => {
+      setPostData((prev) => {
         const lang = activeLang();
         const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
         return { ...prev, [lang]: { ...prev[lang], chapters } };
       });
 
-      setPostParams(prev => {
+      setPostParams((prev) => {
         const lang = activeLang();
         const newLocales = { ...(prev.locales || {}) };
         if (newLocales[lang]?.chapters) {
@@ -384,37 +429,34 @@ const handleConfirmClear = async () => {
     if (index === -1) return langData.body;
     return langData.chapters?.[index]?.body || "";
   });
-  
+
   const handleEditorInput = (value) => {
     const index = editingChapterIndex();
     if (index === -1) {
-      updateField('body', value);
+      updateField("body", value);
     } else {
-        const lang = activeLang();
-        const chapters = [...(postData()[lang]?.chapters || [])];
-        chapters[index] = { ...chapters[index], body: value };
-        updateField('chapters', chapters);
+      const lang = activeLang();
+      const chapters = [...(postData()[lang]?.chapters || [])];
+      chapters[index] = { ...chapters[index], body: value };
+      updateField("chapters", chapters);
     }
   };
 
   const handleInsertFile = (fileName, fileType) => {
     const url = `uploads/${fileName}`;
     let markdown;
-    if (fileType === 'image' || fileType === 'video') {
-      markdown = `![${fileName}](${url})`;
-    } else {
-      markdown = `[${fileName}](${url})`;
-    }
+    if (fileType === "image" || fileType === "video") markdown = `![${fileName}](${url})`;
+    else markdown = `[${fileName}](${url})`;
     insertTextAtCursor(textareaRef, markdown, handleEditorInput);
   };
 
   const handleSetThumbnail = (fileName) => {
     const relativePath = `uploads/${fileName}`;
-    setPostParams(prev => ({ ...prev, thumbnail: relativePath }));
+    setPostParams((prev) => ({ ...prev, thumbnail: relativePath }));
   };
 
   const handleDeleteThumbnail = () => {
-    setPostParams(prev => {
+    setPostParams((prev) => {
       const { thumbnail, ...rest } = prev;
       return rest;
     });
@@ -426,11 +468,16 @@ const handleConfirmClear = async () => {
 
   const title = createMemo(() => {
     switch (editorMode()) {
-      case "new_post": return t("editor.titleNewPost");
-      case "edit_post": return t("editor.titleEditPost");
-      case "new_comment": return t("editor.titleNewCommentFor");
-      case "edit_comment": return t("editor.titleEditComment");
-      default: return t("editor.title");
+      case "new_post":
+        return t("editor.titleNewPost");
+      case "edit_post":
+        return t("editor.titleEditPost");
+      case "new_comment":
+        return t("editor.titleNewCommentFor");
+      case "edit_comment":
+        return t("editor.titleEditComment");
+      default:
+        return t("editor.title");
     }
   });
 
@@ -441,28 +488,30 @@ const handleConfirmClear = async () => {
     const paramChapters = postParams()?.locales?.[activeLang()]?.chapters || [];
     return contentChapters.map((c, i) => ({
       ...c,
-      title: paramChapters?.[i]?.title || ""
+      title: paramChapters?.[i]?.title || "",
     }));
   });
 
   const filledLangs = createMemo(() => {
     const data = postData();
     if (!data) return [];
-    return domainLangCodes().filter(langCode => {
-        const langData = data[langCode];
-        return langData && langData.title?.trim() && (langData.body?.trim() || langData.chapters?.some(c => c.body?.trim()));
+    return domainLangCodes().filter((langCode) => {
+      const langData = data[langCode];
+      return langData && langData.title?.trim() && (langData.body?.trim() || langData.chapters?.some((c) => c.body?.trim()));
     });
   });
 
   return (
-    <main classList={{
-      "p-4 max-w-7xl mx-auto space-y-4": !isFullScreen(),
-      "h-[calc(100vh-3rem)] flex flex-col": isFullScreen()
-    }}>
+    <main
+      classList={{
+        "p-4 max-w-7xl mx-auto space-y-4": !isFullScreen(),
+        "h-[calc(100vh-3rem)] flex flex-col": isFullScreen(),
+      }}
+    >
       <Show
         when={!showFullPreview()}
         fallback={
-          <EditorFullPreview 
+          <EditorFullPreview
             postData={postData()}
             postParams={postParams()}
             activeLang={activeLang()}
@@ -480,18 +529,19 @@ const handleConfirmClear = async () => {
       >
         <>
           <Show when={!isFullScreen()}>
-             <ClosePageButton mode="close" />
+            <ClosePageButton mode="close" />
             <header class="flex justify-between items-start gap-4">
               <h2 class="text-2xl font-semibold flex-1 min-w-0">{title()}</h2>
-              <Show when={editorMode() === 'new_post' || editorMode() === 'edit_post'}>
+              <Show when={editorMode() === "new_post" || editorMode() === "edit_post"}>
                 <div class="w-48 flex-shrink-0 space-y-2">
                   <div class="relative group aspect-video rounded bg-[hsl(var(--muted))] flex items-center justify-center overflow-hidden">
-                    <Show when={thumbnailUrl()}
+                    <Show
+                      when={thumbnailUrl()}
                       fallback={<span class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.sidebar.thumbnailPlaceholder")}</span>}
                     >
                       <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
                       <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button 
+                        <button
                           onClick={handleDeleteThumbnail}
                           title={t("editor.thumbnail.delete")}
                           class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
@@ -502,11 +552,7 @@ const handleConfirmClear = async () => {
                     </Show>
                   </div>
                   <div class="flex justify-center">
-                    <LangSelector
-                        codes={domainLangCodes()}
-                        value={activeLang()}
-                        onChange={setActiveLang}
-                    />
+                    <LangSelector codes={domainLangCodes()} value={activeLang()} onChange={setActiveLang} />
                   </div>
                 </div>
               </Show>
@@ -519,7 +565,10 @@ const handleConfirmClear = async () => {
                 <>
                   <Show when={editorMode() === 'new_comment' || editorMode() === 'edit_comment'}>
                     <div class="mt-4">
-                      <CommentEditor savva_cid={routeParams().parent_savva_cid || routeParams().id} />
+                      <CommentEditor
+                        savva_cid={routeParams().parent_savva_cid || routeParams().id}
+                        resolveParentIfComment={editorMode() === 'edit_comment'}
+                      />
                       <div class="flex justify-end items-center gap-2 my-4">
                         <LangSelector
                           codes={domainLangCodes()}
@@ -530,19 +579,24 @@ const handleConfirmClear = async () => {
                       </div>
                     </div>
                   </Show>
-                  
-                  <Show when={editorMode() === 'new_post' || editorMode() === 'edit_post'}>
+
+                  <Show when={editorMode() === "new_post" || editorMode() === "edit_post"}>
                     <div class="flex items-center gap-4 mb-4">
                       <input
                         type="text"
                         value={currentLangData().title}
-                        onInput={(e) => updateField('title', e.currentTarget.value)}
+                        onInput={(e) => updateField("title", e.currentTarget.value)}
                         placeholder={t("editor.titlePlaceholder")}
                         class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
                       />
                       <div class="flex-shrink-0 flex items-center gap-2">
                         <Show when={!showChapters()}>
-                          <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
+                          <EditorTocButton
+                            onClick={() => {
+                              handleAddChapter();
+                              setShowChapters(true);
+                            }}
+                          />
                         </Show>
                         <Show when={!showFiles()}>
                           <EditorFilesButton onClick={() => setShowFiles(true)} />
@@ -550,30 +604,31 @@ const handleConfirmClear = async () => {
                       </div>
                     </div>
                   </Show>
-                  
-                  <Show when={showChapters() && editorMode() !== 'new_comment' && editorMode() !== 'edit_comment'}>
+
+                  <Show when={showChapters() && editorMode() !== "new_comment" && editorMode() !== "edit_comment"}>
                     <div class="mb-4">
-                        <EditorChapterSelector
-                            chapters={combinedChapters()}
-                            activeIndex={editingChapterIndex()}
-                            onSelectIndex={setEditingChapterIndex}
-                            onAdd={handleAddChapter}
-                            onRemove={handleRemoveChapter}
-                            onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
-                        />
+                      <EditorChapterSelector
+                        chapters={combinedChapters()}
+                        activeIndex={editingChapterIndex()}
+                        onSelectIndex={setEditingChapterIndex}
+                        onAdd={handleAddChapter}
+                        onRemove={handleRemoveChapter}
+                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                      />
                     </div>
                   </Show>
                 </>
               </Show>
-              
+
               <EditorToolbar
                 isPreview={showPreview()}
                 onTogglePreview={() => setShowPreview(!showPreview())}
                 getTextareaRef={() => textareaRef}
                 onValueChange={handleEditorInput}
                 isFullScreen={isFullScreen()}
-                onToggleFullScreen={() => setIsFullScreen(p => !p)}
+                onToggleFullScreen={() => setIsFullScreen((p) => !p)}
               />
+
               <MarkdownInput
                 editorRef={(el) => (textareaRef = el)}
                 value={currentEditorContent()}
@@ -591,10 +646,10 @@ const handleConfirmClear = async () => {
                     <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
                     <div class="grid grid-cols-[24rem_auto] items-center gap-x-4 gap-y-4">
                       <div class="justify-self-start self-start">
-                        <label for="nsfw-checkbox" class="font-medium">{t("editor.params.nsfw.label")}</label>
-                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                          {t("editor.params.nsfw.help")}
-                        </p>
+                        <label for="nsfw-checkbox" class="font-medium">
+                          {t("editor.params.nsfw.label")}
+                        </label>
+                        <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.params.nsfw.help")}</p>
                       </div>
                       <div class="justify-self-start">
                         <input
@@ -602,28 +657,32 @@ const handleConfirmClear = async () => {
                           type="checkbox"
                           class="h-5 w-5"
                           checked={postParams().nsfw || false}
-                          onInput={(e) => updateParam('nsfw', e.currentTarget.checked)}
+                          onInput={(e) => updateParam("nsfw", e.currentTarget.checked)}
                         />
                       </div>
-                      <Show when={editorMode() !== 'new_comment' && editorMode() !== 'edit_comment'}>
-                        <label class="font-medium" for="fundraiser-id">{t("editor.params.fundraiser.label")}</label>
+
+                      <Show when={editorMode() !== "new_comment" && editorMode() !== "edit_comment"}>
+                        <label class="font-medium" for="fundraiser-id">
+                          {t("editor.params.fundraiser.label")}
+                        </label>
                         <div class="justify-self-start">
                           <input
                             id="fundraiser-id"
                             type="number"
                             value={postParams().fundraiser || 0}
-                            onInput={(e) => updateParam('fundraiser', parseInt(e.currentTarget.value, 10) || 0)}
+                            onInput={(e) => updateParam("fundraiser", parseInt(e.currentTarget.value, 10) || 0)}
                             class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
                             min="0"
                           />
                         </div>
                       </Show>
-                      <Show when={editorMode() === 'edit_post'}>
+
+                      <Show when={editorMode() === "edit_post"}>
                         <div class="justify-self-start self-start">
-                          <label for="publish-as-new-checkbox" class="font-medium">{t("editor.params.publishAsNew.label")}</label>
-                          <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                            {t("editor.params.publishAsNew.help")}
-                          </p>
+                          <label for="publish-as-new-checkbox" class="font-medium">
+                            {t("editor.params.publishAsNew.label")}
+                          </label>
+                          <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.params.publishAsNew.help")}</p>
                         </div>
                         <div class="justify-self-start">
                           <input
@@ -631,7 +690,7 @@ const handleConfirmClear = async () => {
                             type="checkbox"
                             class="h-5 w-5"
                             checked={postParams().publishAsNewPost || false}
-                            onInput={(e) => updateParam('publishAsNewPost', e.currentTarget.checked)}
+                            onInput={(e) => updateParam("publishAsNewPost", e.currentTarget.checked)}
                           />
                         </div>
                       </Show>
@@ -639,14 +698,14 @@ const handleConfirmClear = async () => {
                   </div>
 
                   <div class="mt-6 flex justify-end items-center gap-4">
-                    <button 
+                    <button
                       onClick={() => setShowConfirmClear(true)}
                       title={t("editor.clearDraft")}
                       class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
                     >
                       <TrashIcon />
                     </button>
-                    <button 
+                    <button
                       onClick={() => setShowFullPreview(true)}
                       class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
                     >
@@ -660,7 +719,7 @@ const handleConfirmClear = async () => {
         </>
       </Show>
 
-      <EditorFilesDrawer 
+      <EditorFilesDrawer
         isOpen={showFiles()}
         onClose={() => setShowFiles(false)}
         baseDir={baseDir()}
@@ -669,6 +728,7 @@ const handleConfirmClear = async () => {
         onInsertUrl={handleInsertUrl}
         filesRevision={filesRevision()}
       />
+
       <ConfirmModal
         isOpen={showConfirmDelete()}
         onClose={() => setShowConfirmDelete(false)}
@@ -676,14 +736,16 @@ const handleConfirmClear = async () => {
         title={t("editor.chapters.confirmDeleteTitle")}
         message={t("editor.chapters.confirmDeleteMessage")}
       />
-       <ConfirmModal
+
+      <ConfirmModal
         isOpen={showConfirmClear()}
         onClose={() => setShowConfirmClear(false)}
         onConfirm={handleConfirmClear}
         title={t("editor.clearDraftTitle")}
         message={t("editor.clearDraftMessage")}
       />
-      <PostSubmissionWizard 
+
+      <PostSubmissionWizard
         isOpen={showPublishWizard()}
         onClose={() => setShowPublishWizard(false)}
         onSuccess={handlePublishSuccess}
