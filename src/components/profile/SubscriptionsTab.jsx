@@ -7,6 +7,8 @@ import TokenValue from "../ui/TokenValue.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import SubscribeModal from "./SubscribeModal.jsx";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import { createPublicClient, http } from "viem";
 
 async function fetchSponsees(params) {
   const { app, user_addr, n_weeks, offset, limit } = params;
@@ -14,7 +16,7 @@ async function fetchSponsees(params) {
   try {
     const getSponsees = app.wsMethod("get-sponsees");
     const res = await getSponsees({
-      domain: "",
+      domain: "", // Empty domain to get sponsees across all domains
       user_addr,
       n_weeks,
       limit,
@@ -102,13 +104,37 @@ export default function SubscriptionsTab(props) {
     setSelected(sub);
     setShowSub(true);
   }
-  function handleEdited() {
-    // refresh list after successful subscribe/edit
+
+  async function refreshList() {
     setSponsees([]);
     setOffset(0);
     setHasMore(true);
+    await loadMore();
+  }
+
+  function handleEdited() {
     setShowSub(false);
-    loadMore();
+    refreshList();
+  }
+
+  // DELETE: call AuthorsClubs.stop(domain, author)
+  async function handleDelete(sub) {
+    try {
+      const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
+      const hash = await clubs.write.stop([String(sub.domain || ""), String(sub.user?.address || "")]);
+
+      const pc = createPublicClient({
+        chain: app.desiredChain(),
+        transport: http(app.desiredChain()?.rpcUrls?.[0]),
+      });
+      await pc.waitForTransactionReceipt({ hash });
+
+      // refresh after successful stop
+      await refreshList();
+    } catch (e) {
+      console.error("SubscriptionsTab: stop() failed", e);
+      // optionally: show a toast here if you have one
+    }
   }
 
   return (
@@ -171,7 +197,7 @@ export default function SubscriptionsTab(props) {
                           class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
                           aria-label={t("common.delete")}
                           title={t("common.delete")}
-                          onClick={() => props.onDelete?.(sponsee)}
+                          onClick={() => handleDelete(sponsee)}
                         >
                           <TrashIcon class="w-4 h-4" />
                         </button>

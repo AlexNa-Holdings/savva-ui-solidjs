@@ -13,7 +13,6 @@ import Spinner from "../ui/Spinner.jsx";
 export default function SubscribeModal(props) {
   const app = useApp();
   const { t } = app;
-  const log = (...a) => (window?.dbg?.log ? window.dbg.log(...a) : console.debug(...a));
 
   const authorAddr = () => String(props.author?.address || "");
   const domain = () => String(props.domain || "");
@@ -22,12 +21,12 @@ export default function SubscribeModal(props) {
   const [isBusy, setIsBusy] = createSignal(false);
   const [err, setErr] = createSignal("");
 
-  // Form state
+  // ── form state ───────────────────────────────────────────────────────────────
   const [amountText, setAmountText] = createSignal(""); // weekly amount (text)
   const [amountWei, setAmountWei] = createSignal(0n);   // weekly amount (wei)
   const [weeksText, setWeeksText] = createSignal("1");  // default 1 week
 
-  // STAKING token (SAVVA_VOTES) for value inputs + allowance
+  // ── STAKING token (SAVVA_VOTES) for value inputs + allowance ────────────────
   const [stakingInfo] = createResource(
     () => app.desiredChain()?.id,
     async () => {
@@ -39,7 +38,7 @@ export default function SubscribeModal(props) {
   const stakingAddr = () => stakingInfo()?.addr || "";
   const stakingDecimals = () => Number(stakingInfo()?.decimals ?? 18);
 
-  // Current subscription + current frame
+  // ── Current subscription + current frame ─────────────────────────────────────
   const [subInfo] = createResource(
     () => ({ domain: domain(), userAddr: userAddr(), author: authorAddr(), chain: app.desiredChain()?.id }),
     async ({ domain, userAddr, author }) => {
@@ -55,7 +54,7 @@ export default function SubscribeModal(props) {
     }
   );
 
-  // Initialize weekly amount from current sub; otherwise keep empty (0n)
+  // ── Initialize weekly amount from current sub; otherwise leave EMPTY (0n) ───
   let didInit = false;
   createEffect(() => {
     if (didInit) return;
@@ -64,30 +63,19 @@ export default function SubscribeModal(props) {
     if (!s || !stakingAddr() || !Number.isFinite(dec)) return;
 
     if (s.amountPerWeek && s.amountPerWeek > 0n) {
-      const txt = formatAmountWithDecimals(s.amountPerWeek, dec, 6).replace(/(\.\d*?[1-9])0+$/,"$1").replace(/\.$/, "");
+      const txt = formatAmountWithDecimals(s.amountPerWeek, dec, 6)
+        .replace(/(\.\d*?[1-9])0+$/,"$1")
+        .replace(/\.$/, "");
       setAmountText(txt);
       setAmountWei(s.amountPerWeek);
-      log("Subscribe:init prefill", { txt, wei: s.amountPerWeek.toString() });
     } else {
       setAmountText("");
       setAmountWei(0n);
-      log("Subscribe:init empty");
     }
     didInit = true;
   });
 
-  // Keep the actual input DOM in sync with amountText (in case AmountInput is semi-controlled)
-  let amountWrapRef;
-  createEffect(() => {
-    const txt = amountText();
-    const el = amountWrapRef?.querySelector("input");
-    if (el && el.value !== txt) {
-      el.value = txt ?? "";
-      log("Subscribe:sync DOM input", { txt });
-    }
-  });
-
-  // Weeks parsing/validation
+  // ── Weeks parsing/validation ─────────────────────────────────────────────────
   const weeksNum = () => {
     const s = (weeksText() || "").trim();
     if (s === "") return NaN;
@@ -97,7 +85,7 @@ export default function SubscribeModal(props) {
   const weeksTooBig = () => Number(weeksNum()) > 52;
   const weeksValid = () => !isNaN(weeksNum()) && weeksNum() >= 1 && weeksNum() <= 52;
 
-  // Amount parsing (STAKING decimals)
+  // ── Amount input parsing (STAKING token decimals) ────────────────────────────
   function normalizeAmount(txt) {
     return (txt ?? "").toString().trim().replace(/,/g, ".").replace(/[^\d.]/g, "");
   }
@@ -106,31 +94,36 @@ export default function SubscribeModal(props) {
     setErr("");
     if (typeof weiMaybe === "bigint") {
       setAmountWei(weiMaybe);
-      log("Subscribe:onInput provided wei", weiMaybe.toString());
       return;
     }
     try {
       const norm = normalizeAmount(txt);
       if (!norm || norm === ".") { setAmountWei(0n); return; }
-      const w = parseUnits(norm, isNaN(stakingDecimals()) ? 18 : stakingDecimals());
-      setAmountWei(w);
-      log("Subscribe:onInput parsed", { norm, wei: w.toString() });
+      setAmountWei(parseUnits(norm, isNaN(stakingDecimals()) ? 18 : stakingDecimals()));
     } catch {
       setAmountWei(0n);
     }
   }
 
-  // Total price — only when weeks valid AND weekly amount (wei) > 0
+  // ── Total price — only when weeks valid AND weekly amount > 0 ────────────────
   const totalWei = () => (weeksValid() && amountWei() > 0n ? amountWei() * BigInt(weeksNum()) : 0n);
 
-  // Allowance on STAKING token to AuthorsClubs
+  // ── Allowance on STAKING token to AuthorsClubs (WRITE CLIENT!) ──────────────
   const MAX_UINT = (1n << 256n) - 1n;
   async function ensureAllowance(needed) {
-    const staking = await getSavvaContract(app, "Staking");
+    // guard: require connected wallet
+    const u = userAddr();
+    if (!u) throw new Error("WALLET_NOT_CONNECTED");
+
+    // READ allowance
+    const stakingRead = await getSavvaContract(app, "Staking"); // read-only OK
     const clubs = await getSavvaContract(app, "AuthorsClubs");
-    const allowance = await staking.read.allowance([userAddr(), clubs.address]);
+    const allowance = await stakingRead.read.allowance([u, clubs.address]);
     if (allowance >= needed) return;
-    const hash = await staking.write.approve([clubs.address, MAX_UINT]);
+
+    // WRITE approve using a write-enabled contract (provides account to viem)
+    const stakingWrite = await getSavvaContract(app, "Staking", { write: true });
+    const hash = await stakingWrite.write.approve([clubs.address, MAX_UINT]);
     const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
     await pc.waitForTransactionReceipt({ hash });
   }
@@ -143,6 +136,7 @@ export default function SubscribeModal(props) {
     return "";
   }
 
+  // ── Submit ───────────────────────────────────────────────────────────────────
   async function submit(e) {
     e?.preventDefault?.();
     setErr("");
@@ -153,10 +147,14 @@ export default function SubscribeModal(props) {
     try {
       const need = totalWei();
       await ensureAllowance(need);
+
+      // WRITE purchase
       const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
       const hash = await clubs.write.buy([domain(), authorAddr(), amountWei(), BigInt(weeksNum())]);
+
       const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
       await pc.waitForTransactionReceipt({ hash });
+
       props.onSubmit?.();
       setIsBusy(false);
       props.onClose?.();
@@ -167,7 +165,7 @@ export default function SubscribeModal(props) {
     }
   }
 
-  // Weeks left helper
+  // ── Weeks left helper ────────────────────────────────────────────────────────
   const weeksLeft = () => {
     const s = subInfo();
     if (!s) return 0;
@@ -185,10 +183,12 @@ export default function SubscribeModal(props) {
 
         <p class="text-sm opacity-80">{t("subscriptions.info")}</p>
 
+        {/* Author */}
         <div class="rounded-md border border-[hsl(var(--border))] p-2">
           <UserCard author={props.author} />
         </div>
 
+        {/* Current subscription */}
         <Show when={!subInfo.loading} fallback={<div class="flex justify-center"><Spinner /></div>}>
           <Show when={subInfo()?.amountPerWeek > 0n}>
             <div class="rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] p-3 space-y-1">
@@ -210,16 +210,14 @@ export default function SubscribeModal(props) {
 
         {/* Form */}
         <div class="space-y-3">
-          <div ref={(el) => (amountWrapRef = el)}>
-            <AmountInput
-              label={t("subscriptions.form.weeklyAmount")}
-              tokenAddress={stakingAddr()}
-              value={amountText()}
-              onInput={handleAmountChange}
-              onChange={(v) => handleAmountChange(v?.text ?? "", v?.amountWei)}
-              placeholder={t("subscriptions.form.weeklyAmountPlaceholder")}
-            />
-          </div>
+          <AmountInput
+            label={t("subscriptions.form.weeklyAmount")}
+            tokenAddress={stakingAddr()}
+            value={amountText()}
+            onInput={handleAmountChange}
+            onChange={(v) => handleAmountChange(v?.text ?? "", v?.amountWei)}
+            placeholder={t("subscriptions.form.weeklyAmountPlaceholder")}
+          />
 
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium">{t("subscriptions.form.weeks")}</label>
