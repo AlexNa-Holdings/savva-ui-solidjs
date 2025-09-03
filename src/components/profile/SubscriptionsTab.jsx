@@ -4,6 +4,9 @@ import { useApp } from "../../context/AppContext.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
+import { walletAccount } from "../../blockchain/wallet.js";
+import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
+import SubscribeModal from "./SubscribeModal.jsx";
 
 async function fetchSponsees(params) {
   const { app, user_addr, n_weeks, offset, limit } = params;
@@ -11,7 +14,7 @@ async function fetchSponsees(params) {
   try {
     const getSponsees = app.wsMethod("get-sponsees");
     const res = await getSponsees({
-      domain: "", // Empty domain to get sponsees across all domains
+      domain: "",
       user_addr,
       n_weeks,
       limit,
@@ -33,67 +36,90 @@ export default function SubscriptionsTab(props) {
   const user = () => props.user;
 
   const [showActiveOnly, setShowActiveOnly] = createSignal(true);
-  const nWeeks = createMemo(() => showActiveOnly() ? 1 : 0);
-  
+  const nWeeks = createMemo(() => (showActiveOnly() ? 1 : 0));
+
   const [sponsees, setSponsees] = createSignal([]);
   const [offset, setOffset] = createSignal(0);
   const [hasMore, setHasMore] = createSignal(true);
   const [loading, setLoading] = createSignal(false);
 
+  const isOwnConnectedWallet = createMemo(() => {
+    const wa = walletAccount();
+    const u = user();
+    if (!wa || !u?.address) return false;
+    return String(wa).toLowerCase() === String(u.address).toLowerCase();
+  });
+
+  // subscribe modal state
+  const [showSub, setShowSub] = createSignal(false);
+  const [selected, setSelected] = createSignal(null);
+
   const loadMore = async () => {
     if (loading() || !hasMore()) return;
     setLoading(true);
-    
-    const result = await fetchSponsees({ 
-      app, 
-      user_addr: user().address, 
-      n_weeks: nWeeks(), 
-      offset: offset(), 
-      limit: 20 
+
+    const result = await fetchSponsees({
+      app,
+      user_addr: user().address,
+      n_weeks: nWeeks(),
+      offset: offset(),
+      limit: 20,
     });
-    
+
     if (result.sponsees.length > 0) {
-      setSponsees(prev => [...prev, ...result.sponsees]);
+      setSponsees((prev) => [...prev, ...result.sponsees]);
     }
-    
-    if (result.next_offset) {
-      setOffset(result.next_offset);
-    } else {
-      setHasMore(false);
-    }
+
+    if (result.next_offset) setOffset(result.next_offset);
+    else setHasMore(false);
 
     setLoading(false);
   };
-  
-  createEffect(on(nWeeks, () => {
+
+  createEffect(
+    on(nWeeks, () => {
+      setSponsees([]);
+      setOffset(0);
+      setHasMore(true);
+      loadMore();
+    })
+  );
+
+  onMount(() => {
+    loadMore();
+    const handleScroll = () => {
+      const threshold = 300;
+      const nearBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - threshold;
+      if (nearBottom) loadMore();
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    onCleanup(() => window.removeEventListener("scroll", handleScroll));
+  });
+
+  function openEdit(sub) {
+    setSelected(sub);
+    setShowSub(true);
+  }
+  function handleEdited() {
+    // refresh list after successful subscribe/edit
     setSponsees([]);
     setOffset(0);
     setHasMore(true);
+    setShowSub(false);
     loadMore();
-  }));
-  
-  onMount(() => {
-    loadMore(); // Initial load
-    const handleScroll = () => {
-      const scrollThreshold = 300;
-      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
-      if (nearBottom) {
-        loadMore();
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    onCleanup(() => window.removeEventListener('scroll', handleScroll));
-  });
+  }
 
   return (
     <div class="px-2">
       <div class="flex items-center justify-end mb-4">
         <label class="flex items-center gap-2 text-sm cursor-pointer">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             class="rounded"
-            checked={showActiveOnly()} 
-            onChange={e => setShowActiveOnly(e.currentTarget.checked)} 
+            checked={showActiveOnly()}
+            onChange={(e) => setShowActiveOnly(e.currentTarget.checked)}
           />
           {t("profile.subscribers.showActiveOnly")}
         </label>
@@ -103,10 +129,13 @@ export default function SubscriptionsTab(props) {
         <table class="w-full text-sm text-left">
           <thead class="text-xs text-[hsl(var(--muted-foreground))] uppercase bg-[hsl(var(--muted))]">
             <tr>
-              <th scope="col" class="px-4 py-2">{t("profile.subscribers.table.user")}</th>
-              <th scope="col" class="px-4 py-2">{t("profile.subscribers.table.domain")}</th>
-              <th scope="col" class="px-4 py-2 text-center">{t("profile.subscribers.table.weeks")}</th>
-              <th scope="col" class="px-4 py-2 text-right">{t("profile.subscribers.table.amount")}</th>
+              <th class="px-4 py-2">{t("profile.subscribers.table.user")}</th>
+              <th class="px-4 py-2">{t("profile.subscribers.table.domain")}</th>
+              <th class="px-4 py-2 text-center">{t("profile.subscribers.table.weeks")}</th>
+              <th class="px-4 py-2 text-right">{t("profile.subscribers.table.amount")}</th>
+              <Show when={isOwnConnectedWallet()}>
+                <th class="px-4 py-2 text-right w-[88px]">{t("profile.subscribers.table.actions")}</th>
+              </Show>
             </tr>
           </thead>
           <tbody>
@@ -120,14 +149,41 @@ export default function SubscriptionsTab(props) {
                   <td class="px-4 py-2 text-center">
                     {sponsee.weeks < 1 ? t("profile.subscribers.table.expired") : sponsee.weeks}
                   </td>
-                  <td class="px-4 py-2 flex justify-end">
-                    <TokenValue amount={sponsee.amount} format="vertical" />
+                  <td class="px-4 py-2">
+                    <div class="flex justify-end">
+                      <TokenValue amount={sponsee.amount} format="vertical" />
+                    </div>
                   </td>
+                  <Show when={isOwnConnectedWallet()}>
+                    <td class="px-4 py-2">
+                      <div class="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
+                          aria-label={t("common.edit")}
+                          title={t("common.edit")}
+                          onClick={() => openEdit(sponsee)}
+                        >
+                          <EditIcon class="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
+                          aria-label={t("common.delete")}
+                          title={t("common.delete")}
+                          onClick={() => props.onDelete?.(sponsee)}
+                        >
+                          <TrashIcon class="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </Show>
                 </tr>
               )}
             </For>
           </tbody>
         </table>
+
         <Show when={loading()}>
           <div class="flex justify-center p-4"><Spinner /></div>
         </Show>
@@ -137,6 +193,16 @@ export default function SubscriptionsTab(props) {
           </p>
         </Show>
       </div>
+
+      {/* Subscribe / Edit modal */}
+      <Show when={showSub() && selected()}>
+        <SubscribeModal
+          domain={selected()?.domain}
+          author={selected()?.user}
+          onClose={() => setShowSub(false)}
+          onSubmit={handleEdited}
+        />
+      </Show>
     </div>
   );
 }

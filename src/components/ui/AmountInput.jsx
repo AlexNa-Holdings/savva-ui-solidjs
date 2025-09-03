@@ -1,5 +1,5 @@
 // src/components/ui/AmountInput.jsx
-import { createMemo, createResource, createSignal, Show } from "solid-js";
+import { createMemo, createResource, createSignal, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { createPublicClient, http, formatUnits, parseUnits } from "viem";
 import { walletAccount } from "../../blockchain/wallet.js";
@@ -26,23 +26,25 @@ export default function AmountInput(props) {
     return url ? createPublicClient({ chain: chain(), transport: http(url) }) : null;
   });
 
-  // ── token meta (cached, SAVVA-aware; no JSX here) ────────────────────────────
+  // ── token meta (cached) ──────────────────────────────────────────────────────
   const tokenAddrForMeta = createMemo(() => (isBaseToken() ? "" : props.tokenAddress));
   const [tokenMeta] = createResource(
     () => ({ app, addr: tokenAddrForMeta() }),
     ({ app, addr }) => getTokenInfo(app, addr)
   );
   const decimals = createMemo(() => Number(tokenMeta()?.decimals ?? 18));
-  const symbol = createMemo(() => String(tokenMeta()?.symbol || (isBaseToken() ? (chain()?.nativeCurrency?.symbol || "PLS") : "TOK")));
+  const symbol = createMemo(() =>
+    String(tokenMeta()?.symbol || (isBaseToken() ? (chain()?.nativeCurrency?.symbol || "PLS") : "TOK"))
+  );
 
-  // Owner address we use for balance lookups
+  // Owner address (balance lookups)
   const ownerAddr = createMemo(() => {
     const connected = walletAccount();
     const authed = app.authorizedUser?.()?.address;
     return connected || authed || "0x0000000000000000000000000000000000000000";
   });
 
-  // balance (ERC-20 or base). We show balance for both; MAX only for ERC-20.
+  // balance (ERC-20 or base). MAX only for ERC-20.
   const [balanceRes, { refetch: refetchBal }] = createResource(
     () => ({ addr: props.tokenAddress, pc: publicClient(), provided: props.balance, base: isBaseToken(), owner: ownerAddr() }),
     async ({ addr, pc, provided, base, owner }) => {
@@ -50,7 +52,6 @@ export default function AmountInput(props) {
       if (!pc || !owner) return 0n;
       try {
         if (base) {
-          // native coin balance
           return await pc.getBalance({ address: owner });
         } else {
           return await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "balanceOf", args: [owner] });
@@ -59,10 +60,11 @@ export default function AmountInput(props) {
     }
   );
 
-  // ── input state ───────────────────────────────────────────────────────────────
-  const [text, setText] = createSignal(String(props.value || ""));
+  // ── input state (controlled) ─────────────────────────────────────────────────
+  const [text, setText] = createSignal(String(props.value ?? ""));
   const [error, setError] = createSignal("");
 
+  // utils
   function toWeiSafe(s, dec) {
     try { return parseUnits(String(s).trim() || "0", dec); }
     catch { return null; }
@@ -72,14 +74,17 @@ export default function AmountInput(props) {
     catch { return "0"; }
   }
 
-  function emitChange(nextStr) {
+  // emit both shapes, to be compatible with all callers
+  function emitBoth(nextStr) {
     const dec = decimals() || 18;
     const wei = toWeiSafe(nextStr, dec);
     if (wei === null) {
       setError(t("common.invalidNumber"));
+      props.onInput?.(nextStr, undefined);
       props.onChange?.({ text: nextStr, amountWei: null, decimals: dec, symbol: symbol() });
     } else {
       setError("");
+      props.onInput?.(nextStr, wei);
       props.onChange?.({ text: nextStr, amountWei: wei, decimals: dec, symbol: symbol() });
     }
   }
@@ -87,11 +92,11 @@ export default function AmountInput(props) {
   function onInput(e) {
     const v = e.currentTarget.value;
     setText(v);
-    emitChange(v);
+    emitBoth(v);
   }
 
+  // Programmatic MAX (only for non-base tokens)
   async function useMax() {
-    // Only for non-base tokens
     if (isBaseToken()) return;
     let bal = balanceRes();
     if (typeof bal !== "bigint") {
@@ -99,8 +104,50 @@ export default function AmountInput(props) {
     }
     const s = fromWeiSafe(bal || 0n, decimals() || 18);
     setText(s);
-    emitChange(s);
+    emitBoth(s);
   }
+
+  // Keep internal text in sync with external `value` prop
+  createEffect(() => {
+    const ext = String(props.value ?? "");
+    if (ext !== text()) {
+      setText(ext);
+      emitBoth(ext);
+    }
+  });
+
+  // When tokenAddress/decimals change, re-parse current text with new decimals
+  createEffect(() => {
+    decimals(); // subscribe
+    const current = text();
+    emitBoth(current);
+  });
+
+  // ── USD approximate value ────────────────────────────────────────────────────
+  const isSavvaLike = createMemo(() => {
+    const sym = (tokenMeta()?.symbol || "").toUpperCase();
+    return sym === "SAVVA" || sym === "SAVVA_VOTES";
+  });
+
+  const usdPrice = createMemo(() => {
+    if (isSavvaLike()) return app.savvaTokenPrice?.()?.price ?? null;
+    if (isBaseToken()) return app.baseTokenPrice?.()?.price ?? null;
+    return null; // unknown tokens: no USD
+  });
+
+  const usdText = createMemo(() => {
+    try {
+      const dec = decimals() || 18;
+      const wei = toWeiSafe(text(), dec);
+      const units = !wei ? 0 : parseFloat(formatUnits(wei, dec));
+      const p = usdPrice();
+      if (!p || units <= 0) return null;
+      const total = units * Number(p);
+      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
+    } catch {
+      return null;
+    }
+  });
 
   // ── UI ────────────────────────────────────────────────────────────────────────
   return (
@@ -134,11 +181,16 @@ export default function AmountInput(props) {
           </div>
         </div>
 
-        {/* Balance line (shown for BOTH base & ERC-20 if we can fetch/know it) */}
-        <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))] flex items-center gap-1">
-          <span>{t("wallet.transfer.balance")}:</span>
-          <Show when={typeof balanceRes() === "bigint"} fallback={<span>—</span>}>
-            <TokenValue amount={balanceRes() || 0n} tokenAddress={isBaseToken() ? "0" : props.tokenAddress} />
+        {/* Balance + USD line (one line) */}
+        <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))] flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1">
+            <span>{t("wallet.transfer.balance")}:</span>
+            <Show when={typeof balanceRes() === "bigint"} fallback={<span>—</span>}>
+              <TokenValue amount={balanceRes() || 0n} tokenAddress={isBaseToken() ? "0" : props.tokenAddress} />
+            </Show>
+          </div>
+          <Show when={usdText()}>
+            <div class="tabular-nums">{usdText()}</div>
           </Show>
         </div>
 
