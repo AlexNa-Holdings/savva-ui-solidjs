@@ -152,7 +152,7 @@ export default function AmountInput(props) {
   // ── UI ────────────────────────────────────────────────────────────────────────
   return (
     <div class={props.class || ""}>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium">
         <div class="mb-1 flex items-center justify-between">
           <span>{props.label || t("wallet.transfer.amount")}</span>
           <Show when={!isBaseToken() && (props.showMax ?? true)}>

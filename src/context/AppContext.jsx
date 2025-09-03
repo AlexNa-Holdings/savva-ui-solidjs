@@ -11,6 +11,7 @@ import { pushToast, pushErrorToast } from "../ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
 import { createWalletClient, custom } from "viem";
 import { useTokenPrices } from "./useTokenPrices.js";
+import { dbg } from "../utils/debug.js";
 
 const AppContext = Solid.createContext();
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
@@ -85,6 +86,23 @@ export function AppProvider(props) {
       pushToast({ type: 'info', message: 'Logged out due to domain change.' });
     }
   });
+
+  // NEW: Centralized language synchronization logic
+  Solid.createEffect(() => {
+    const cfg = assets.domainAssetsConfig();
+    if (!cfg) return; // Wait for config to load
+
+    const availableCodes = (cfg.locales || []).map(l => l.code).filter(Boolean);
+    if (availableCodes.length === 0) return;
+
+    const currentLang = i18n.lang();
+    if (!availableCodes.includes(currentLang)) {
+      const newLang = availableCodes[0];
+      dbg.warn("AppContext", `Language mismatch! UI lang '${currentLang}' not in domain's [${availableCodes.join(", ")}]. Forcing to '${newLang}'.`);
+      i18n.setLang(newLang);
+    }
+  });
+
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
   const [requiredAccount, setRequiredAccount] = Solid.createSignal(null);

@@ -24,6 +24,7 @@ import ContextMenu from "../components/ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 import PostControls from "../components/post/PostControls.jsx";
 import PostComments from "../components/post/PostComments.jsx";
+import PostFundCard from "../components/post/PostFundCard.jsx";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -236,21 +237,13 @@ const postForTags = createMemo(() => {
 
   const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
 
-  const RightPanel = () => (
-    <aside class="sticky top-16">
-      <div
-        class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
-        style={{ "max-height": `calc(100vh - 5rem)` }}
-      >
-        <div class="p-4 space-y-3 overflow-y-auto h-full">
-          <h4 class="font-semibold">Right Panel</h4>
-          <p class="text-sm text-[hsl(var(--muted-foreground))]">
-            This panel behaves like the main screen's right rail. It sticks to the top, and this content area will scroll if it's too long.
-          </p>
-        </div>
-      </div>
-    </aside>
-  );
+const RightPanel = () => (
+  <aside class="sticky top-16">
+      <div class="p-0 space-y-2 overflow-y-auto h-full">
+        <PostFundCard post={post} />
+    </div>
+  </aside>
+);
 
   return (
     <main class="sv-container p-4">

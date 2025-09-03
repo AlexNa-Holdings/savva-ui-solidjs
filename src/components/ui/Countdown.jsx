@@ -1,5 +1,5 @@
 // src/components/ui/Countdown.jsx
-import { createSignal, onCleanup, createEffect } from "solid-js";
+import { createSignal, onCleanup, createEffect, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
 function clamp(n) { return n > 0 ? n : 0; }
@@ -14,12 +14,13 @@ function split(totalSec) {
 export default function Countdown(props) {
   const { t } = useApp();
 
-  const targetTs = () => Number(props.targetTs || 0);     // UNIX seconds
-  const size = () => (props.size === "lg" ? "lg" : "sm");  // "sm" | "lg"
+  const targetTs = () => Number(props.targetTs || 0);
+  const size = () => (props.size === "lg" ? "lg" : "sm");
+  const labelPosition = () => props.labelPosition || 'side';
+  const labelStyle = () => props.labelStyle || 'full';
   const anim = () => (props.anim === "reverse" ? "reverse-animation" : "default-animation");
 
-  // Equal box width so all four boxes are identical
-  const boxWidth = () => (size() === "lg" ? "7.5ch" : "5.6ch");
+  const boxWidth = () => (size() === "lg" ? "7.5ch" : "4.5ch");
   const boxPad   = () => (size() === "lg" ? "px-4 py-3" : "px-2 py-1.5");
   const numClass = () => (size() === "lg" ? "text-2xl" : "text-base");
   const labelClass = () => (size() === "lg" ? "text-xs" : "text-[10px]");
@@ -46,51 +47,56 @@ export default function Countdown(props) {
   });
   onCleanup(() => clearInterval(timer));
 
-  const full = {
-    d: t("time.days"),
-    h: t("time.hours"),
-    m: t("time.minutes"),
-    s: t("time.seconds"),
-  };
-  const short = {
-    d: (full.d || "D").slice(0, 1).toUpperCase(),
-    h: (full.h || "H").slice(0, 1).toUpperCase(),
-    m: (full.m || "M").slice(0, 1).toUpperCase(),
-    s: (full.s || "S").slice(0, 1).toUpperCase(),
-  };
+  const labels = createMemo(() => {
+    const full = {
+      d: t("time.days"), h: t("time.hours"),
+      m: t("time.minutes"), s: t("time.seconds"),
+    };
+    if (labelStyle() === 'short') {
+      return {
+        d: (full.d || "D").slice(0, 1).toUpperCase(),
+        h: (full.h || "H").slice(0, 1).toUpperCase(),
+        m: (full.m || "M").slice(0, 1).toUpperCase(),
+        s: (full.s || "S").slice(0, 1).toUpperCase(),
+      };
+    }
+    return full;
+  });
 
-  const BoxLg = (p) => (
-    <div
-      class={`flex flex-col items-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] ${boxPad()}`}
-      style={{ width: boxWidth() }}
-    >
-      <div class={`${labelClass()} opacity-80 mb-1`}>{p.label}</div>
-      <div class={`${numClass()} font-semibold tabular-nums`} classList={{ [anim()]: p.anim }}>
-        {p.value}
+  const Box = (p) => {
+    if (labelPosition() === 'top') {
+      return (
+        <div
+          class={`flex flex-col items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] ${boxPad()}`}
+          style={{ "width": boxWidth() }}
+        >
+          <div class={`${labelClass()} opacity-80`}>{p.label}</div>
+          <div class={`${numClass()} font-semibold tabular-nums`} classList={{ [anim()]: p.anim }}>
+            {p.value}
+          </div>
+        </div>
+      );
+    }
+    // Default to 'side'
+    return (
+       <div
+        class={`flex items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] ${boxPad()}`}
+        style={{ width: boxWidth() }}
+      >
+        <span class={`${labelClass()} font-medium w-3 text-center mr-1`}>{p.label}</span>
+        <span class={`${numClass()} font-semibold tabular-nums`} classList={{ [anim()]: p.anim }}>
+          {p.value}
+        </span>
       </div>
-    </div>
-  );
-
-  const BoxSm = (p) => (
-    <div
-      class={`flex items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] ${boxPad()}`}
-      style={{ width: boxWidth() }}
-    >
-      <span class={`${labelClass()} font-medium w-3 text-center mr-1`}>{p.short}</span>
-      <span class={`${numClass()} font-semibold tabular-nums`} classList={{ [anim()]: p.anim }}>
-        {p.value}
-      </span>
-    </div>
-  );
-
-  const Box = size() === "lg" ? BoxLg : BoxSm;
+    );
+  };
 
   return (
     <div class="flex items-center gap-2" aria-live="polite">
-      <Box label={full.d} short={short.d} value={d()} anim={ad()} />
-      <Box label={full.h} short={short.h} value={h()} anim={ah()} />
-      <Box label={full.m} short={short.m} value={m()} anim={am()} />
-      <Box label={full.s} short={short.s} value={s()} anim={as()} />
+      <Box label={labels().d} value={d()} anim={ad()} />
+      <Box label={labels().h} value={h()} anim={ah()} />
+      <Box label={labels().m} value={m()} anim={am()} />
+      <Box label={labels().s} value={s()} anim={as()} />
     </div>
   );
 }

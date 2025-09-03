@@ -380,7 +380,7 @@ export default function WalletTab() {
                             <td class="px-3 py-2">
                               <Show when={isReqAvailable(r.timestamp)} fallback={
                                 <span class="opacity-80" data-countdown-ts={Number(r.timestamp)}>
-                                  <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" />
+                                  <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" labelStyle="short"/>
 
                                 </span>
                               }>

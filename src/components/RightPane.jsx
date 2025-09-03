@@ -1,5 +1,5 @@
 // src/components/RightPane.jsx
-import { createSignal, Show, createMemo, createEffect } from "solid-js";
+import { createSignal, Show, createMemo } from "solid-js";
 import { navigate } from "../routing/hashRouter";
 import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
@@ -27,24 +27,6 @@ export default function RightPane({ isOpen, onClose }) {
   });
 
   const showLangSelector = createMemo(() => domainLangCodes().length > 1);
-
-  createEffect(() => {
-    const availableCodes = domainLangCodes();
-    const currentLang = app.lang?.();
-    dbg.log("RightPaneEffect", "Running check...", { currentLang, availableCodes: [...availableCodes] });
-
-    if (availableCodes.length === 0) {
-      dbg.log("RightPaneEffect", "-> SKIPPING: No available codes yet.");
-      return;
-    }
-
-    if (!availableCodes.includes(currentLang)) {
-      dbg.warn("RightPaneEffect", `-> MISMATCH! Lang '${currentLang}' is not in [${availableCodes.join(", ")}]. Resetting to '${availableCodes[0]}'.`);
-      app.setLang?.(availableCodes[0]);
-    } else {
-      dbg.log("RightPaneEffect", `-> OK: Lang '${currentLang}' is valid.`);
-    }
-  });
 
   return (
     <>
