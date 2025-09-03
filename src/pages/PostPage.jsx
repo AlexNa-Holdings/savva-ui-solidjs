@@ -25,6 +25,7 @@ import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 import PostControls from "../components/post/PostControls.jsx";
 import PostComments from "../components/post/PostComments.jsx";
 
+
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
@@ -160,6 +161,34 @@ export default function PostPage() {
     }
   });
 
+  createEffect(() => {
+  const d = details();
+  if (!d?.descriptor) return;
+  const locales = d.descriptor.locales || {};
+  const available = Object.keys(locales);
+  if (available.length === 0) return;
+  // prefer current UI lang if available, else first
+  const ui = uiLang();
+  setPostLang(available.includes(ui) ? ui : available[0]);
+});
+
+
+const postForTags = createMemo(() => {
+  const d = details();
+  const lang = postLang();
+  const loc = d?.descriptor?.locales?.[lang] || {};
+  return {
+    savva_content: {
+      locales: {
+        [lang || "en"]: {
+          categories: Array.isArray(loc.categories) ? loc.categories : [],
+          tags: Array.isArray(loc.tags) ? loc.tags : [],
+        },
+      },
+    },
+  };
+});
+
   const contextMenuItems = createMemo(() => {
     if (!post) return [];
     return getPostAdminItems(post, t);
@@ -260,6 +289,7 @@ export default function PostPage() {
                       />
                     </Show>
                   </div>
+                    <PostTags postData={postForTags()} />
                 </div>
 
                 <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">

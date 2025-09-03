@@ -73,7 +73,7 @@ export default {
   "editor.files.uploadSuccess": "File uploaded successfully.",
   "editor.files.uploading": "Uploading...",
   "editor.fullPreview.back": "Back to Editing",
-  "editor.fullPreview.help": "This is a preview of how your post will look once published. Review it carefully before proceeding.",
+  "editor.fullPreview.help": "!This is a preview of how your post will look once published. Review it carefully before publishing.",
   "editor.fullPreview.publish": "Publish",
   "editor.fullPreview.title": "Final Check",
   "editor.params.fundraiser.label": "Promoted Fundrising Campaign ID",

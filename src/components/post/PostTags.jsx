@@ -2,52 +2,44 @@
 import { createMemo, For, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
-// A reusable pill component for consistent styling
-function TagPill(props) {
-    return (
-        <div class="px-2.5 py-1 rounded-md bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs font-medium">
-            {props.children}
-        </div>
-    );
+function Pill(props) {
+  return (
+    <div class="px-2.5 py-1 rounded-md bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs font-medium">
+      {props.children}
+    </div>
+  );
 }
 
 export default function PostTags(props) {
-    const { lang } = useApp();
+  const app = useApp();
+  const lang = () => (app.lang?.() || "en").toLowerCase();
 
-    const localizedContent = createMemo(() => {
-        const currentLang = lang();
-        const locales = props.postData?.savva_content?.locales;
-        if (!locales) return null;
-        
-        // Use the current language, fallback to English, or the first available locale
-        const firstLocaleKey = Object.keys(locales)[0];
-        return locales[currentLang] || locales.en || (firstLocaleKey ? locales[firstLocaleKey] : null);
-    });
+  // locales[lang] with sensible fallbacks
+  const L = createMemo(() => {
+    const locales = props.postData?.savva_content?.locales || {};
+    return locales[lang()] || locales.en || locales[Object.keys(locales)[0]] || null;
+  });
 
-    // Categories are an array from the localized content
-    const categories = createMemo(() => {
-        const content = localizedContent();
-        const cats = content?.categories;
-        return Array.isArray(cats) ? cats : [];
-    });
+  const categories = createMemo(() => (Array.isArray(L()?.categories) ? L().categories : []));
+  const tags = createMemo(() => (Array.isArray(L()?.tags) ? L().tags : []));
 
-    // Tags are also an array from the localized content
-    const tags = createMemo(() => {
-        const content = localizedContent();
-        const t = content?.tags;
-        return Array.isArray(t) ? t : [];
-    });
-
-    return (
-        <Show when={categories().length > 0 || tags().length > 0}>
-            <div class="flex flex-wrap items-center gap-2 pt-1">
-                <For each={categories()}>
-                    {(category) => <TagPill>{category}</TagPill>}
-                </For>
-                <For each={tags()}>
-                    {(tag) => <TagPill>#{tag}</TagPill>}
-                </For>
-            </div>
+  return (
+    <Show when={categories().length > 0 || tags().length > 0}>
+      <div class="flex flex-col gap-1 pt-1">
+        {/* line 1: Categories */}
+        <Show when={categories().length > 0}>
+          <div class="flex flex-wrap items-center gap-2">
+            <For each={categories()}>{(c) => <Pill>{c}</Pill>}</For>
+          </div>
         </Show>
-    );
+
+        {/* line 2: Tags */}
+        <Show when={tags().length > 0}>
+          <div class="flex flex-wrap items-center gap-2">
+            <For each={tags()}>{(t) => <Pill>{t}</Pill>}</For>
+          </div>
+        </Show>
+      </div>
+    </Show>
+  );
 }

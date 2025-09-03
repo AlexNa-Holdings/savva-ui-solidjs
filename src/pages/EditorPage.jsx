@@ -22,6 +22,7 @@ import CommentEditor from "../components/editor/CommentEditor.jsx";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { whenWsOpen } from "../net/wsRuntime.js";
 import { TrashIcon } from "../components/ui/icons/ActionIcons.jsx";
+import AdditionalParametersPost from "../components/editor/AdditionalParametersPost.jsx";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
@@ -642,60 +643,12 @@ export default function EditorPage() {
 
               <Show when={!isFullScreen()}>
                 <>
-                  <div class="mt-6 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
-                    <h3 class="text-lg font-semibold">{t("editor.params.title")}</h3>
-                    <div class="grid grid-cols-[24rem_auto] items-center gap-x-4 gap-y-4">
-                      <div class="justify-self-start self-start">
-                        <label for="nsfw-checkbox" class="font-medium">
-                          {t("editor.params.nsfw.label")}
-                        </label>
-                        <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.params.nsfw.help")}</p>
-                      </div>
-                      <div class="justify-self-start">
-                        <input
-                          id="nsfw-checkbox"
-                          type="checkbox"
-                          class="h-5 w-5"
-                          checked={postParams().nsfw || false}
-                          onInput={(e) => updateParam("nsfw", e.currentTarget.checked)}
-                        />
-                      </div>
-
-                      <Show when={editorMode() !== "new_comment" && editorMode() !== "edit_comment"}>
-                        <label class="font-medium" for="fundraiser-id">
-                          {t("editor.params.fundraiser.label")}
-                        </label>
-                        <div class="justify-self-start">
-                          <input
-                            id="fundraiser-id"
-                            type="number"
-                            value={postParams().fundraiser || 0}
-                            onInput={(e) => updateParam("fundraiser", parseInt(e.currentTarget.value, 10) || 0)}
-                            class="w-24 text-left px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                            min="0"
-                          />
-                        </div>
-                      </Show>
-
-                      <Show when={editorMode() === "edit_post"}>
-                        <div class="justify-self-start self-start">
-                          <label for="publish-as-new-checkbox" class="font-medium">
-                            {t("editor.params.publishAsNew.label")}
-                          </label>
-                          <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("editor.params.publishAsNew.help")}</p>
-                        </div>
-                        <div class="justify-self-start">
-                          <input
-                            id="publish-as-new-checkbox"
-                            type="checkbox"
-                            class="h-5 w-5"
-                            checked={postParams().publishAsNewPost || false}
-                            onInput={(e) => updateParam("publishAsNewPost", e.currentTarget.checked)}
-                          />
-                        </div>
-                      </Show>
-                    </div>
-                  </div>
+                  <AdditionalParametersPost
+                    editorMode={editorMode}
+                    postParams={postParams}
+                    setPostParams={setPostParams}
+                    activeLang={activeLang}
+                  />
 
                   <div class="mt-6 flex justify-end items-center gap-4">
                     <button
