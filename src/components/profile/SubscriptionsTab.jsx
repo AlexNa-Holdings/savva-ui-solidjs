@@ -138,7 +138,7 @@ export default function SubscriptionsTab(props) {
   }
 
   return (
-    <div class="px-2">
+     <div class="px-2 space-y-6 mx-auto max-w-3xl">
       <div class="flex items-center justify-end mb-4">
         <label class="flex items-center gap-2 text-sm cursor-pointer">
           <input

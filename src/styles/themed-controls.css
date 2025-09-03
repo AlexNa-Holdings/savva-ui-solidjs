@@ -262,3 +262,111 @@ html.dark .sv-docs code[data-theme*=" "] span {
 .sv-to-top:hover { opacity: 1; transform: translateX(-50%) translateY(-2px); }
 .sv-to-top:active { transform: translateX(-50%) translateY(0); }
 
+/* --- Switch sizing tokens (tweak as you like) --- */
+:root {
+  --sv-switch-w: 36px;         /* track width */
+  --sv-switch-h: 20px;         /* track height */
+  --sv-switch-pad: 2px;        /* inner padding around the thumb */
+  --sv-switch-radius: 999px;   /* fully rounded track */
+  --sv-switch-anim: 160ms;     /* motion timing */
+}
+
+/* Reduce motion respectfully */
+@media (prefers-reduced-motion: reduce) {
+  :root { --sv-switch-anim: 0ms; }
+}
+
+/* --- Global checkbox → themed switch --- */
+
+/* sizing + tokens */
+:root{
+  --sv-switch-w: 36px;
+  --sv-switch-h: 20px;
+  --sv-switch-pad: 2px;
+  --sv-switch-radius: 999px;
+  --sv-switch-anim: 160ms;
+  --sv-switch-bw: 1px; /* track border width */
+}
+
+@media (prefers-reduced-motion: reduce){
+  :root{ --sv-switch-anim: 0ms; }
+}
+
+/* global checkbox → switch */
+input[type="checkbox"]{
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  box-sizing: border-box;             /* include border in H/W math */
+  inline-size: var(--sv-switch-w);
+  block-size: var(--sv-switch-h);
+  border-radius: var(--sv-switch-radius);
+  margin: 0;
+  cursor: pointer;
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-1px);        /* optical baseline nudge */
+
+  background: hsl(var(--secondary));
+  border: var(--sv-switch-bw) solid hsl(var(--border));
+  transition:
+    background-color var(--sv-switch-anim) ease,
+    border-color var(--sv-switch-anim) ease,
+    box-shadow var(--sv-switch-anim) ease;
+}
+
+/* thumb (centered perfectly) */
+input[type="checkbox"]::after{
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--sv-switch-pad);
+  inline-size: calc(var(--sv-switch-h) - 2*var(--sv-switch-pad) - 2*var(--sv-switch-bw));
+  block-size:  calc(var(--sv-switch-h) - 2*var(--sv-switch-pad) - 2*var(--sv-switch-bw));
+  border-radius: 50%;
+  background: hsl(var(--card-foreground));
+  box-shadow: 0 1px 1px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.12);
+  transform: translateY(-50%) translateX(0);  /* true vertical centering */
+  transition: transform var(--sv-switch-anim) ease, background-color var(--sv-switch-anim) ease;
+}
+
+/* ON */
+input[type="checkbox"]:checked{
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+input[type="checkbox"]:checked::after{
+  background: hsl(var(--primary-foreground));
+  transform: translateY(-50%) translateX(calc(var(--sv-switch-w) - var(--sv-switch-h)));
+}
+
+/* INDETERMINATE */
+input[type="checkbox"]:indeterminate{
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+input[type="checkbox"]:indeterminate::after{
+  transform: translateY(-50%) translateX(calc((var(--sv-switch-w) - var(--sv-switch-h)) / 2));
+  background:
+    linear-gradient(to right,
+      transparent 25%,
+      hsl(var(--primary-foreground)) 25%,
+      hsl(var(--primary-foreground)) 75%,
+      transparent 75%);
+}
+
+/* focus/hover/disabled */
+input[type="checkbox"]:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, hsl(var(--ring)) 35%, transparent);
+}
+input[type="checkbox"]:hover{ filter: brightness(0.98); }
+input[type="checkbox"]:disabled{ opacity:.6; cursor:not-allowed; }
+input[type="checkbox"]:disabled::after{ box-shadow:none; }
+
+/* optional compact */
+input[type="checkbox"].sv-switch--sm{
+  --sv-switch-w: 30px;
+  --sv-switch-h: 16px;
+  --sv-switch-pad: 2px;
+}
