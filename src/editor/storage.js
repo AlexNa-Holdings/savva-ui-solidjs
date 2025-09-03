@@ -214,7 +214,7 @@ export async function loadDraft(baseDir) {
   }
 
   const draft = {
-    content: Object.keys(postData).length > 0 ? postData : { en: { title: "", body: "", chapters: [] } },
+    content: Object.keys(postData).length > 0 ? postData : null,
     params: params
   };
 

@@ -51,7 +51,7 @@ export default function EditorPage() {
 
   const [postData, setPostData] = createSignal(null);
   const [postParams, setPostParams] = createSignal({});
-  const [activeLang, setActiveLang] = createSignal("en");
+  const [activeLang, setActiveLang] = createSignal(app.lang());
   const [showPreview, setShowPreview] = createSignal(false);
   const [showFiles, setShowFiles] = createSignal(false);
   const [showChapters, setShowChapters] = createSignal(false);
@@ -64,7 +64,6 @@ export default function EditorPage() {
   const [isFullScreen, setIsFullScreen] = createSignal(false);
   const [filesRevision, setFilesRevision] = createSignal(0);
 
-  // NEW: the id to show in CommentEditor (post or comment that is the PARENT)
   const [parentPreviewCid, setParentPreviewCid] = createSignal(null);
 
   let autoSaveTimeoutId;
@@ -94,9 +93,6 @@ export default function EditorPage() {
     return fromDomain.length > 0 ? fromDomain : ["en"];
   });
 
-  // Resolve which card to show on top for comment modes:
-  // - new_comment: use parent id from the route
-  // - edit_comment: fetch the comment, take its parent_savva_cid
   createEffect(on(routeParams, (rp) => {
     if (!rp) return;
     const mode = rp.mode;
@@ -130,7 +126,6 @@ export default function EditorPage() {
       const mode = editorMode();
       if (mode === "new_comment") {
         await clearDraft(baseDir());
-
         const parentCid = routeParams().parent_savva_cid;
         const parentObject = await fetchPostByIdentifier({
           identifier: parentCid,
@@ -139,7 +134,6 @@ export default function EditorPage() {
           lang: app.lang(),
         });
         if (!parentObject) throw new Error("Parent content not found.");
-
         const isReplyToComment = !!parentObject.parent_savva_cid;
         const newPostParams = {
           locales: {},
@@ -147,7 +141,6 @@ export default function EditorPage() {
           parent_savva_cid: parentObject.savva_cid,
           root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid,
         };
-
         const newPostData = {};
         for (const langCode of domainLangCodes()) {
           newPostData[langCode] = { title: "", body: "", chapters: [] };
@@ -160,6 +153,18 @@ export default function EditorPage() {
       } else {
         const draft = await loadDraft(baseDir());
         if (draft && draft.content) {
+          const availableLangs = Object.keys(draft.content);
+          const currentUiLang = app.lang();
+          let initialLang = activeLang();
+          if (availableLangs.length > 0 && !availableLangs.includes(currentUiLang)) {
+            initialLang = availableLangs[0];
+            dbg.log("EditorPage:load", `UI lang '${currentUiLang}' not in draft [${availableLangs.join(', ')}]. Falling back to '${initialLang}'.`);
+          } else if (availableLangs.length > 0) {
+            initialLang = currentUiLang;
+            dbg.log("EditorPage:load", `UI lang '${currentUiLang}' is available in draft [${availableLangs.join(', ')}]. Sticking with it.`);
+          } else {
+            dbg.log("EditorPage:load", `Draft has no languages. This should not happen if draft.content exists.`);
+          }
           batch(() => {
             setPostData(draft.content);
             const params = draft.params || {};
@@ -167,6 +172,7 @@ export default function EditorPage() {
               params.guid = crypto.randomUUID();
             }
             setPostParams(params);
+            setActiveLang(initialLang);
           });
         } else if (editorMode() === "new_post") {
           const newPostData = {};
@@ -190,33 +196,23 @@ export default function EditorPage() {
     }
   };
 
-  createEffect(
-    on(
-      baseDir,
-      (currentBaseDir) => {
-        if (currentBaseDir && currentBaseDir !== "unknown") {
-          loadEditorContent();
-        }
-      }
-    )
-  );
+  const uiLang = createMemo(() => app.lang());
+
+  createEffect(() => {
+    const currentBaseDir = baseDir();
+    const currentUiLang = uiLang();
+    if (currentBaseDir && currentBaseDir !== "unknown" && currentUiLang) {
+      loadEditorContent();
+    }
+  });
 
   onMount(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
-          case "f":
-            e.preventDefault();
-            setShowFiles((p) => !p);
-            break;
-          case "p":
-            e.preventDefault();
-            setShowPreview((p) => !p);
-            break;
-          case "m":
-            e.preventDefault();
-            setIsFullScreen((p) => !p);
-            break;
+          case "f": e.preventDefault(); setShowFiles((p) => !p); break;
+          case "p": e.preventDefault(); setShowPreview((p) => !p); break;
+          case "m": e.preventDefault(); setIsFullScreen((p) => !p); break;
         }
       }
     };
@@ -240,45 +236,45 @@ export default function EditorPage() {
 
   createEffect(async () => {
     const thumbPath = postParams()?.thumbnail;
-    if (thumbPath) {
-      const url = await resolveDraftFileUrl(baseDir(), thumbPath);
-      setThumbnailUrl(url);
-    } else {
-      setThumbnailUrl(null);
-    }
+    setThumbnailUrl(thumbPath ? await resolveDraftFileUrl(baseDir(), thumbPath) : null);
   });
 
-  createEffect(
-    on(activeLang, (lang) => {
-      if (!postData()?.[lang]) {
+  const handleLangChange = (lang) => {
+    if (!postData()?.[lang]) {
+      batch(() => {
         setPostData((p) => ({ ...p, [lang]: { title: "", body: "", chapters: [] } }));
         setPostParams((p) => {
           const locales = { ...(p.locales || {}) };
           if (!locales[lang]) locales[lang] = { chapters: [] };
           return { ...p, locales };
         });
-      }
-      const chapters = postData()?.[lang]?.chapters || [];
-      setShowChapters(chapters.length > 0);
-      setEditingChapterIndex(-1);
-    })
-  );
+      });
+    }
+    setActiveLang(lang);
+    setEditingChapterIndex(-1);
+    setShowChapters((postData()?.[lang]?.chapters || []).length > 0);
+  };
+  
+  createEffect(on(activeLang, (lang, prevLang) => {
+    if (prevLang === undefined) return;
+    const chapters = postData()?.[lang]?.chapters || [];
+    setShowChapters(chapters.length > 0);
+    setEditingChapterIndex(-1);
+  }, { defer: true }));
+
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-
     let imagePasted = false;
     for (const item of items) {
       if (item.kind === "file" && item.type.startsWith("image/")) {
         e.preventDefault();
         imagePasted = true;
-
         const file = item.getAsFile();
         const extension = file.type.split("/")[1] || "png";
         const fileName = `pasted-image-${Date.now()}.${extension}`;
         const newFile = new File([file], fileName, { type: file.type });
-
         try {
           await addUploadedFile(baseDir(), newFile);
           const markdownText = `![${fileName}](uploads/${fileName})`;
@@ -288,10 +284,7 @@ export default function EditorPage() {
         }
       }
     }
-
-    if (imagePasted) {
-      setFilesRevision((r) => r + 1);
-    }
+    if (imagePasted) setFilesRevision((r) => r + 1);
   };
 
   const handlePublishSuccess = () => {
@@ -301,31 +294,18 @@ export default function EditorPage() {
   };
 
   const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
-
   const updateField = (field, value) => {
     setPostData((prev) => ({
       ...prev,
-      [activeLang()]: {
-        ...(prev?.[activeLang()] || { chapters: [] }),
-        [field]: value,
-      },
+      [activeLang()]: { ...(prev?.[activeLang()] || { chapters: [] }), [field]: value },
     }));
-  };
-
-  const updateParam = (field, value) => {
-    setPostParams((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleConfirmClear = async () => {
     try {
       const names = await getAllUploadedFileNames(baseDir());
-      for (const name of names) {
-        await deleteUploadedFile(baseDir(), name);
-      }
-    } catch (e) {
-      dbg.warn?.("EditorPage", "Failed to clear uploads", e);
-    }
-
+      for (const name of names) await deleteUploadedFile(baseDir(), name);
+    } catch (e) { dbg.warn?.("EditorPage", "Failed to clear uploads", e); }
     const newPostData = {};
     const newPostParams = {
       guid: editorMode() === "new_post" ? crypto.randomUUID() : postParams().guid,
@@ -339,7 +319,6 @@ export default function EditorPage() {
       newPostData[langCode] = { title: "", body: "", chapters: [] };
       newPostParams.locales[langCode] = { chapters: [] };
     }
-
     batch(() => {
       setPostData(newPostData);
       setPostParams(newPostParams);
@@ -348,7 +327,6 @@ export default function EditorPage() {
       setThumbnailUrl(null);
       setFilesRevision((r) => r + 1);
     });
-
     pushToast({ type: "success", message: t("editor.publish.draftCleared") });
     setShowConfirmClear(false);
   };
@@ -359,9 +337,7 @@ export default function EditorPage() {
       const locales = { ...(prev.locales || {}) };
       const langParams = locales[lang] || { chapters: [] };
       const chapters = [...(langParams.chapters || [])];
-      if (index >= 0 && index < chapters.length) {
-        chapters[index] = { ...chapters[index], title: newTitle };
-      }
+      if (index >= 0 && index < chapters.length) chapters[index] = { ...chapters[index], title: newTitle };
       locales[lang] = { ...langParams, chapters };
       return { ...prev, locales };
     });
@@ -371,7 +347,6 @@ export default function EditorPage() {
     const newChapterContent = { body: "" };
     const newChapterParams = { title: t("editor.chapters.newChapterTitle") || "New Chapter" };
     const newIndex = (postData()[activeLang()]?.chapters || []).length;
-
     batch(() => {
       setPostData((prev) => {
         const lang = activeLang();
@@ -379,7 +354,6 @@ export default function EditorPage() {
         const chapters = [...(langData.chapters || []), newChapterContent];
         return { ...prev, [lang]: { ...langData, chapters } };
       });
-
       setPostParams((prev) => {
         const lang = activeLang();
         const locales = { ...(prev.locales || {}) };
@@ -399,14 +373,12 @@ export default function EditorPage() {
 
   const confirmRemoveChapter = () => {
     const indexToRemove = editingChapterIndex();
-
     batch(() => {
       setPostData((prev) => {
         const lang = activeLang();
         const chapters = (prev[lang]?.chapters || []).filter((_, i) => i !== indexToRemove);
         return { ...prev, [lang]: { ...prev[lang], chapters } };
       });
-
       setPostParams((prev) => {
         const lang = activeLang();
         const newLocales = { ...(prev.locales || {}) };
@@ -417,25 +389,20 @@ export default function EditorPage() {
         return { ...prev, locales: newLocales };
       });
     });
-
     setEditingChapterIndex(indexToRemove >= 1 ? indexToRemove - 1 : -1);
-    if (postData()[activeLang()]?.chapters.length === 0) {
-      setShowChapters(false);
-    }
+    if (postData()[activeLang()]?.chapters.length === 0) setShowChapters(false);
   };
 
   const currentEditorContent = createMemo(() => {
     const langData = currentLangData();
     const index = editingChapterIndex();
-    if (index === -1) return langData.body;
-    return langData.chapters?.[index]?.body || "";
+    return index === -1 ? langData.body : (langData.chapters?.[index]?.body || "");
   });
 
   const handleEditorInput = (value) => {
     const index = editingChapterIndex();
-    if (index === -1) {
-      updateField("body", value);
-    } else {
+    if (index === -1) updateField("body", value);
+    else {
       const lang = activeLang();
       const chapters = [...(postData()[lang]?.chapters || [])];
       chapters[index] = { ...chapters[index], body: value };
@@ -452,8 +419,7 @@ export default function EditorPage() {
   };
 
   const handleSetThumbnail = (fileName) => {
-    const relativePath = `uploads/${fileName}`;
-    setPostParams((prev) => ({ ...prev, thumbnail: relativePath }));
+    setPostParams((prev) => ({ ...prev, thumbnail: `uploads/${fileName}` }));
   };
 
   const handleDeleteThumbnail = () => {
@@ -463,34 +429,23 @@ export default function EditorPage() {
     });
   };
 
-  const handleInsertUrl = (fileName) => {
-    insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
-  };
+  const handleInsertUrl = (fileName) => insertTextAtCursor(textareaRef, `uploads/${fileName}`, handleEditorInput);
 
   const title = createMemo(() => {
     switch (editorMode()) {
-      case "new_post":
-        return t("editor.titleNewPost");
-      case "edit_post":
-        return t("editor.titleEditPost");
-      case "new_comment":
-        return t("editor.titleNewCommentFor");
-      case "edit_comment":
-        return t("editor.titleEditComment");
-      default:
-        return t("editor.title");
+      case "new_post": return t("editor.titleNewPost");
+      case "edit_post": return t("editor.titleEditPost");
+      case "new_comment": return t("editor.titleNewCommentFor");
+      case "edit_comment": return t("editor.titleEditComment");
+      default: return t("editor.title");
     }
   });
 
   const markdownPlugins = createMemo(() => [[rehypeResolveDraftUrls, { baseDir: baseDir() }]]);
-
   const combinedChapters = createMemo(() => {
     const contentChapters = currentLangData().chapters || [];
     const paramChapters = postParams()?.locales?.[activeLang()]?.chapters || [];
-    return contentChapters.map((c, i) => ({
-      ...c,
-      title: paramChapters?.[i]?.title || "",
-    }));
+    return contentChapters.map((c, i) => ({ ...c, title: paramChapters?.[i]?.title || "" }));
   });
 
   const filledLangs = createMemo(() => {
@@ -498,32 +453,20 @@ export default function EditorPage() {
     if (!data) return [];
     return domainLangCodes().filter((langCode) => {
       const langData = data[langCode];
-      return langData && langData.title?.trim() && (langData.body?.trim() || langData.chapters?.some((c) => c.body?.trim()));
+      return langData && (langData.title?.trim() || langData.body?.trim() || langData.chapters?.some((c) => c.body?.trim()));
     });
   });
 
   return (
-    <main
-      classList={{
-        "p-4 max-w-7xl mx-auto space-y-4": !isFullScreen(),
-        "h-[calc(100vh-3rem)] flex flex-col": isFullScreen(),
-      }}
-    >
+    <main classList={{ "p-4 max-w-7xl mx-auto space-y-4": !isFullScreen(), "h-[calc(100vh-3rem)] flex flex-col": isFullScreen() }}>
       <Show
         when={!showFullPreview()}
         fallback={
           <EditorFullPreview
-            postData={postData()}
-            postParams={postParams()}
-            activeLang={activeLang()}
-            thumbnailUrl={thumbnailUrl()}
-            chapters={combinedChapters()}
-            filledLangs={filledLangs()}
+            postData={postData()} postParams={postParams()} activeLang={activeLang()}
+            thumbnailUrl={thumbnailUrl()} chapters={combinedChapters()} filledLangs={filledLangs()}
             onBack={() => setShowFullPreview(false)}
-            onContinue={() => {
-              setShowFullPreview(false);
-              setShowPublishWizard(true);
-            }}
+            onContinue={() => { setShowFullPreview(false); setShowPublishWizard(true); }}
             baseDir={baseDir()}
           />
         }
@@ -542,18 +485,14 @@ export default function EditorPage() {
                     >
                       <img src={thumbnailUrl()} alt="Thumbnail preview" class="w-full h-full object-cover" />
                       <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button
-                          onClick={handleDeleteThumbnail}
-                          title={t("editor.thumbnail.delete")}
-                          class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600"
-                        >
+                        <button onClick={handleDeleteThumbnail} title={t("editor.thumbnail.delete")} class="p-2 rounded-full bg-black/70 text-white hover:bg-red-600">
                           <TrashIcon class="w-5 h-5" />
                         </button>
                       </div>
                     </Show>
                   </div>
                   <div class="flex justify-center">
-                    <LangSelector codes={domainLangCodes()} value={activeLang()} onChange={setActiveLang} />
+                    <LangSelector codes={domainLangCodes()} value={activeLang()} onChange={handleLangChange} />
                   </div>
                 </div>
               </Show>
@@ -566,16 +505,9 @@ export default function EditorPage() {
                 <>
                   <Show when={editorMode() === 'new_comment' || editorMode() === 'edit_comment'}>
                     <div class="mt-4">
-                      <CommentEditor
-                        savva_cid={routeParams().parent_savva_cid || routeParams().id}
-                        resolveParentIfComment={editorMode() === 'edit_comment'}
-                      />
+                      <CommentEditor savva_cid={routeParams().parent_savva_cid || routeParams().id} resolveParentIfComment={editorMode() === 'edit_comment'} />
                       <div class="flex justify-end items-center gap-2 my-4">
-                        <LangSelector
-                          codes={domainLangCodes()}
-                          value={activeLang()}
-                          onChange={setActiveLang}
-                        />
+                        <LangSelector codes={domainLangCodes()} value={activeLang()} onChange={handleLangChange} />
                         <EditorFilesButton onClick={() => setShowFiles(true)} />
                       </div>
                     </div>
@@ -583,21 +515,10 @@ export default function EditorPage() {
 
                   <Show when={editorMode() === "new_post" || editorMode() === "edit_post"}>
                     <div class="flex items-center gap-4 mb-4">
-                      <input
-                        type="text"
-                        value={currentLangData().title}
-                        onInput={(e) => updateField("title", e.currentTarget.value)}
-                        placeholder={t("editor.titlePlaceholder")}
-                        class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
-                      />
+                      <input type="text" value={currentLangData().title} onInput={(e) => updateField("title", e.currentTarget.value)} placeholder={t("editor.titlePlaceholder")} class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"/>
                       <div class="flex-shrink-0 flex items-center gap-2">
                         <Show when={!showChapters()}>
-                          <EditorTocButton
-                            onClick={() => {
-                              handleAddChapter();
-                              setShowChapters(true);
-                            }}
-                          />
+                          <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }}/>
                         </Show>
                         <Show when={!showFiles()}>
                           <EditorFilesButton onClick={() => setShowFiles(true)} />
@@ -608,60 +529,23 @@ export default function EditorPage() {
 
                   <Show when={showChapters() && editorMode() !== "new_comment" && editorMode() !== "edit_comment"}>
                     <div class="mb-4">
-                      <EditorChapterSelector
-                        chapters={combinedChapters()}
-                        activeIndex={editingChapterIndex()}
-                        onSelectIndex={setEditingChapterIndex}
-                        onAdd={handleAddChapter}
-                        onRemove={handleRemoveChapter}
-                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
-                      />
+                      <EditorChapterSelector chapters={combinedChapters()} activeIndex={editingChapterIndex()} onSelectIndex={setEditingChapterIndex} onAdd={handleAddChapter} onRemove={handleRemoveChapter} onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}/>
                     </div>
                   </Show>
                 </>
               </Show>
 
-              <EditorToolbar
-                isPreview={showPreview()}
-                onTogglePreview={() => setShowPreview(!showPreview())}
-                getTextareaRef={() => textareaRef}
-                onValueChange={handleEditorInput}
-                isFullScreen={isFullScreen()}
-                onToggleFullScreen={() => setIsFullScreen((p) => !p)}
-              />
-
-              <MarkdownInput
-                editorRef={(el) => (textareaRef = el)}
-                value={currentEditorContent()}
-                onInput={handleEditorInput}
-                onPaste={handlePaste}
-                placeholder={t("editor.bodyPlaceholder")}
-                showPreview={showPreview()}
-                rehypePlugins={markdownPlugins()}
-                isFullScreen={isFullScreen()}
-              />
+              <EditorToolbar isPreview={showPreview()} onTogglePreview={() => setShowPreview(!showPreview())} getTextareaRef={() => textareaRef} onValueChange={handleEditorInput} isFullScreen={isFullScreen()} onToggleFullScreen={() => setIsFullScreen((p) => !p)} />
+              <MarkdownInput editorRef={(el) => (textareaRef = el)} value={currentEditorContent()} onInput={handleEditorInput} onPaste={handlePaste} placeholder={t("editor.bodyPlaceholder")} showPreview={showPreview()} rehypePlugins={markdownPlugins()} isFullScreen={isFullScreen()} />
 
               <Show when={!isFullScreen()}>
                 <>
-                  <AdditionalParametersPost
-                    editorMode={editorMode}
-                    postParams={postParams}
-                    setPostParams={setPostParams}
-                    activeLang={activeLang}
-                  />
-
+                  <AdditionalParametersPost editorMode={editorMode} postParams={postParams} setPostParams={setPostParams} activeLang={activeLang} />
                   <div class="mt-6 flex justify-end items-center gap-4">
-                    <button
-                      onClick={() => setShowConfirmClear(true)}
-                      title={t("editor.clearDraft")}
-                      class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
-                    >
+                    <button onClick={() => setShowConfirmClear(true)} title={t("editor.clearDraft")} class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]">
                       <TrashIcon />
                     </button>
-                    <button
-                      onClick={() => setShowFullPreview(true)}
-                      class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90"
-                    >
+                    <button onClick={() => setShowFullPreview(true)} class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90">
                       {t("editor.previewPost")}
                     </button>
                   </div>
@@ -672,40 +556,10 @@ export default function EditorPage() {
         </>
       </Show>
 
-      <EditorFilesDrawer
-        isOpen={showFiles()}
-        onClose={() => setShowFiles(false)}
-        baseDir={baseDir()}
-        onInsert={handleInsertFile}
-        onSetThumbnail={handleSetThumbnail}
-        onInsertUrl={handleInsertUrl}
-        filesRevision={filesRevision()}
-      />
-
-      <ConfirmModal
-        isOpen={showConfirmDelete()}
-        onClose={() => setShowConfirmDelete(false)}
-        onConfirm={confirmRemoveChapter}
-        title={t("editor.chapters.confirmDeleteTitle")}
-        message={t("editor.chapters.confirmDeleteMessage")}
-      />
-
-      <ConfirmModal
-        isOpen={showConfirmClear()}
-        onClose={() => setShowConfirmClear(false)}
-        onConfirm={handleConfirmClear}
-        title={t("editor.clearDraftTitle")}
-        message={t("editor.clearDraftMessage")}
-      />
-
-      <PostSubmissionWizard
-        isOpen={showPublishWizard()}
-        onClose={() => setShowPublishWizard(false)}
-        onSuccess={handlePublishSuccess}
-        postData={postData}
-        postParams={postParams}
-        editorMode={editorMode()}
-      />
+      <EditorFilesDrawer isOpen={showFiles()} onClose={() => setShowFiles(false)} baseDir={baseDir()} onInsert={handleInsertFile} onSetThumbnail={handleSetThumbnail} onInsertUrl={handleInsertUrl} filesRevision={filesRevision()} />
+      <ConfirmModal isOpen={showConfirmDelete()} onClose={() => setShowConfirmDelete(false)} onConfirm={confirmRemoveChapter} title={t("editor.chapters.confirmDeleteTitle")} message={t("editor.chapters.confirmDeleteMessage")} />
+      <ConfirmModal isOpen={showConfirmClear()} onClose={() => setShowConfirmClear(false)} onConfirm={handleConfirmClear} title={t("editor.clearDraftTitle")} message={t("editor.clearDraftMessage")} />
+      <PostSubmissionWizard isOpen={showPublishWizard()} onClose={() => setShowPublishWizard(false)} onSuccess={handlePublishSuccess} postData={postData} postParams={postParams} editorMode={editorMode()} />
     </main>
   );
 }
