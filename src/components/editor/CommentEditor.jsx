@@ -1,8 +1,9 @@
 // src/components/editor/CommentEditor.jsx
-import { createResource, Show } from "solid-js";
+import { createResource, Show, Switch, Match, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext";
 import { toChecksumAddress } from "../../blockchain/utils";
 import PostCard from "../feed/PostCard";
+import CommentCard from "../post/CommentCard.jsx";
 import Spinner from "../ui/Spinner";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 
@@ -12,7 +13,7 @@ async function fetchPost(params) {
 
   await whenWsOpen();
   const getList = app.wsMethod("content-list");
-  
+
   const requestParams = {
     domain: app.selectedDomainName(),
     savva_cid: savva_cid,
@@ -37,11 +38,18 @@ async function fetchPost(params) {
 export default function CommentEditor(props) {
   const app = useApp();
   const { t } = app;
-  
-  const [postData] = createResource(() => ({
-    app: app,
-    savva_cid: props.savva_cid
-  }), fetchPost);
+
+  const [postData] = createResource(
+    () => ({ app: app, savva_cid: props.savva_cid }),
+    fetchPost
+  );
+
+  // A comment has a non-empty parent_savva_cid
+  const isComment = createMemo(() => {
+    const raw = postData()?._raw;
+    const parent = raw?.savva_content?.parent_savva_cid;
+    return !!parent && String(parent).length > 0;
+  });
 
   return (
     <div class="mb-4">
@@ -50,17 +58,22 @@ export default function CommentEditor(props) {
           <Spinner />
         </div>
       </Show>
+
       <Show when={postData.error}>
         <p class="text-xs text-[hsl(var(--destructive))]">
           {t("common.error")}: {postData.error}
         </p>
       </Show>
+
       <Show when={!postData.loading && !postData.error && postData()}>
-        <PostCard
-          item={postData()}
-          mode="list"
-          compact={false}
-        />
+        <Switch>
+          <Match when={isComment()}>
+            <CommentCard comment={postData()._raw} level={0} />
+          </Match>
+          <Match when={!isComment()}>
+            <PostCard item={postData()} mode="list" compact={false} />
+          </Match>
+        </Switch>
       </Show>
     </div>
   );
