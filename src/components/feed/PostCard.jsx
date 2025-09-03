@@ -40,13 +40,12 @@ export default function PostCard(props) {
   const app = useApp();
   const { t } = app;
   const [isHovered, setIsHovered] = createSignal(false);
-  
   const [item, setItem] = createStore(props.item);
 
   createEffect(() => {
     const update = app.postUpdate();
     if (!update || update.cid !== item.id) return;
-  
+
     if (update.type === 'reactionsChanged') {
       setItem("_raw", "reactions", reconcile(update.data.reactions));
       if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
@@ -70,13 +69,8 @@ export default function PostCard(props) {
     return author()?.avatar;
   });
 
-  const title = createMemo(() => {
-    return getLocalizedField(content()?.locales, "title", app.lang());
-  });
-
-  const textPreview = createMemo(() => {
-    return getLocalizedField(content()?.locales, "text_preview", app.lang());
-  });
+  const title = createMemo(() => getLocalizedField(content()?.locales, "title", app.lang()));
+  const textPreview = createMemo(() => getLocalizedField(content()?.locales, "text_preview", app.lang()));
 
   const handleCardClick = (e) => {
     if (item.id) {
@@ -105,7 +99,7 @@ export default function PostCard(props) {
     const listModeRounding = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
     return `relative shrink-0 overflow-hidden ${listModeRounding} ${isListMode() ? "h-full aspect-video border-r" : "aspect-video w-full border-b"} border-[hsl(var(--border))]`;
   });
-  
+
   const ImageBlock = () => {
     const roundingClass = isListMode() ? "rounded-l-lg" : "rounded-t-lg";
     return (
@@ -125,11 +119,9 @@ export default function PostCard(props) {
     );
   };
 
-  const contentContainerClasses = createMemo(() => {
-    return isListMode()
-      ? "px-3 py-2 flex-1 flex flex-col min-w-0"
-      : "p-3 flex-1 flex flex-col";
-  });
+  const contentContainerClasses = createMemo(() => (
+    isListMode() ? "px-3 py-2 flex-1 flex flex-col min-w-0" : "p-3 flex-1 flex flex-col"
+  ));
 
   const textPreviewClasses = createMemo(() => {
     const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
@@ -158,7 +150,7 @@ export default function PostCard(props) {
           <UserCard author={author()} compact={props.compact} />
         </div>
       </div>
-      
+
       <Show when={!props.compact}>
         <PostInfo item={item} mode={props.mode} timeFormat="long" />
       </Show>
@@ -166,9 +158,9 @@ export default function PostCard(props) {
   );
 
   return (
-    <article 
-      class={articleClasses()} 
-      onClick={handleCardClick} 
+    <article
+      class={articleClasses()}
+      onClick={handleCardClick}
       style={{ cursor: 'pointer' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -185,9 +177,18 @@ export default function PostCard(props) {
         </div>
       </Show>
 
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && finalContextMenuItems().length > 0}>
-        <div class="context-menu-container">
-          <ContextMenu items={finalContextMenuItems()} />
+      {/* Context menu toggle: fixed overlay in bottom-right, no layout shift */}
+      <Show when={app.authorizedUser()?.isAdmin && finalContextMenuItems().length > 0}>
+        <div class="pointer-events-none absolute top-2 right-2 z-20">
+          <div class="pointer-events-auto">
+            <Show when={isHovered()}>
+              <ContextMenu
+                items={finalContextMenuItems()}
+                positionClass="relative z-20"
+                buttonClass="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+              />
+            </Show>
+          </div>
         </div>
       </Show>
 

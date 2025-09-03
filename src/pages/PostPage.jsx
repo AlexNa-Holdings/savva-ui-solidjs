@@ -25,27 +25,20 @@ import { getPostAdminItems } from "../ui/contextMenuBuilder.js";
 import PostControls from "../components/post/PostControls.jsx";
 import PostComments from "../components/post/PostComments.jsx";
 
-
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
   if (!identifier || !domain || !app.wsMethod) return null;
   const contentList = app.wsMethod("content-list");
-  const requestParams = {
-    domain: domain,
-    lang: lang,
-    limit: 1,
-  };
+  const requestParams = { domain, lang, limit: 1 };
   if (identifier.startsWith("0x")) {
     requestParams.savva_cid = identifier;
   } else {
     requestParams.short_cid = identifier;
   }
   const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
+  if (user?.address) requestParams.my_addr = toChecksumAddress(user.address);
   const res = await contentList(requestParams);
   const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
   return arr[0] || null;
@@ -53,7 +46,7 @@ async function fetchPostByIdentifier(params) {
 
 async function fetchPostDetails(mainPost, app) {
   if (!mainPost) return null;
-  
+
   const descriptorPath = getPostDescriptorPath(mainPost);
   const dataCidForContent = getPostContentBaseCid(mainPost);
 
@@ -82,12 +75,12 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
   if (!localizedDescriptor) return "";
 
   let contentPath;
-  if (chapterIndex === 0) { // Prologue (main content)
+  if (chapterIndex === 0) {
     if (localizedDescriptor.data) return localizedDescriptor.data;
     if (localizedDescriptor.data_path) {
       contentPath = `${dataCidForContent}/${localizedDescriptor.data_path}`;
     }
-  } else { // A specific chapter
+  } else {
     const chapter = localizedDescriptor.chapters?.[chapterIndex - 1];
     if (chapter?.data_path) {
       contentPath = `${dataCidForContent}/${chapter.data_path}`;
@@ -104,7 +97,7 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
       return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
     }
   }
-  
+
   return "";
 }
 
@@ -116,22 +109,15 @@ export default function PostPage() {
   const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
 
   const [postResource] = createResource(
-    () => ({
-      identifier: identifier(),
-      domain: app.selectedDomainName(),
-      app,
-      lang: uiLang()
-    }),
+    () => ({ identifier: identifier(), domain: app.selectedDomainName(), app, lang: uiLang() }),
     fetchPostByIdentifier
   );
-  
+
   const [post, setPost] = createStore(null);
 
   createEffect(() => {
     const resourceData = postResource();
-    if (resourceData) {
-      setPost(reconcile(resourceData));
-    }
+    if (resourceData) setPost(reconcile(resourceData));
   });
 
   const [details] = createResource(postResource, (p) => fetchPostDetails(p, app));
@@ -139,7 +125,7 @@ export default function PostPage() {
   const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
 
   const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }), 
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }),
     ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
   );
 
@@ -167,12 +153,9 @@ export default function PostPage() {
       const availableLangs = Object.keys(details()?.descriptor?.locales || post.savva_content?.locales || {});
       if (availableLangs.length === 0) return;
       const currentUiLang = uiLang();
-      let initialLang = availableLangs[0]; 
-      if (availableLangs.includes(currentUiLang)) {
-        initialLang = currentUiLang;
-      } else if (availableLangs.includes('en')) {
-        initialLang = 'en';
-      }
+      let initialLang = availableLangs[0];
+      if (availableLangs.includes(currentUiLang)) initialLang = currentUiLang;
+      else if (availableLangs.includes('en')) initialLang = 'en';
       setPostLang(initialLang);
     }
   });
@@ -182,15 +165,19 @@ export default function PostPage() {
     return getPostAdminItems(post, t);
   });
 
-  const title = createMemo(() => details()?.descriptor?.locales?.[postLang()]?.title || post?.savva_content?.locales?.[postLang()]?.title || "");
+  const title = createMemo(
+    () => details()?.descriptor?.locales?.[postLang()]?.title || post?.savva_content?.locales?.[postLang()]?.title || ""
+  );
   const thumbnail = createMemo(() => {
     if (!post) return null;
     const d = details();
     const thumbnailPath = d?.descriptor?.thumbnail || post.savva_content?.thumbnail;
     return resolvePostCidPath(post, thumbnailPath);
   });
-  const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || post?.savva_content?.locales || {}));
-  
+  const availableLocales = createMemo(() =>
+    Object.keys(details()?.descriptor?.locales || post?.savva_content?.locales || {})
+  );
+
   const chapterList = createMemo(() => {
     const prologue = { title: t("post.chapters.prologue"), data_path: null };
     const chapters = details()?.descriptor?.locales?.[postLang()]?.chapters || [];
@@ -205,7 +192,7 @@ export default function PostPage() {
     if (!d) return "";
     const dataCid = d.dataCidForContent;
     if (!dataCid) return "";
-    
+
     let bestGateway;
     if (app.localIpfsEnabled() && app.localIpfsGateway()) {
       bestGateway = app.localIpfsGateway();
@@ -214,17 +201,15 @@ export default function PostPage() {
     } else {
       bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
     }
-    
+
     return ipfs.buildUrl(bestGateway, dataCid);
   });
 
-  const markdownPlugins = createMemo(() => [
-    [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
-  ]);
+  const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
 
   const RightPanel = () => (
     <aside class="sticky top-16">
-      <div 
+      <div
         class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] overflow-hidden"
         style={{ "max-height": `calc(100vh - 5rem)` }}
       >
@@ -261,30 +246,35 @@ export default function PostPage() {
           <div class="max-w-5xl mx-auto">
             <article class="space-y-4">
               <header class="flex justify-between items-start gap-4">
-                <div class="relative flex-1 min-w-0 space-y-3">
-                  <h1 class="text-2xl lg:text-3xl font-bold break-words pr-12">{title() || t('common.loading')}</h1>
-                  
-                  <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
-                    <ContextMenu 
-                      items={contextMenuItems()}
-                      positionClass="absolute top-0 right-0 z-20"
-                    />
-                  </Show>
-                  <UserCard author={post.author} />
+                <div class="flex-1 min-w-0 space-y-3">
+                  <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
+
+                  {/* Author line with admin context menu aligned to the right */}
+                  <div class="flex items-center justify-between gap-3">
+                    <UserCard author={post.author} />
+                    <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+                      <ContextMenu
+                        items={contextMenuItems()}
+                        positionClass="relative z-20"
+                        buttonClass="p-1 rounded-md bg-[hsl(var(--background))] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+                      />
+                    </Show>
+                  </div>
                 </div>
+
                 <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
                   <Show when={thumbnail()}>
                     {(src) => (
-                      <IpfsImage 
-                        src={src()} 
-                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" 
+                      <IpfsImage
+                        src={src()}
+                        class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]"
                         alt="Post thumbnail"
                         postGateways={postSpecificGateways()}
                         fallback={<UnknownUserIcon class="w-full h-full object-contain p-4 text-[hsl(var(--muted-foreground))]" />}
                       />
                     )}
                   </Show>
-                  <LangSelector 
+                  <LangSelector
                     codes={availableLocales()}
                     value={postLang()}
                     onChange={setPostLang}
@@ -297,9 +287,9 @@ export default function PostPage() {
                   <div>
                     <Show when={(chapterList()?.length || 0) > 1}>
                       <div class="flex justify-end mb-4">
-                        <ChapterSelector 
-                          chapters={chapterList()} 
-                          selectedIndex={selectedChapterIndex()} 
+                        <ChapterSelector
+                          chapters={chapterList()}
+                          selectedIndex={selectedChapterIndex()}
                           onSelect={setSelectedChapterIndex}
                         />
                       </div>
@@ -312,12 +302,12 @@ export default function PostPage() {
                         <p class="text-sm text-[hsl(var(--destructive))]">Error loading content: {mainContent.error.message}</p>
                       </Match>
                       <Match when={localizedMainContent()}>
-                        <MarkdownView 
-                          markdown={localizedMainContent()} 
+                        <MarkdownView
+                          markdown={localizedMainContent()}
                           rehypePlugins={markdownPlugins()}
                         />
                         <Show when={(chapterList()?.length || 0) > 1}>
-                          <ChapterPager 
+                          <ChapterPager
                             chapters={chapterList()}
                             currentIndex={selectedChapterIndex()}
                             onSelect={setSelectedChapterIndex}
@@ -333,7 +323,6 @@ export default function PostPage() {
               </div>
             </article>
           </div>
-          
         </Match>
       </Switch>
     </main>

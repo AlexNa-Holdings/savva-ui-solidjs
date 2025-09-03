@@ -57,11 +57,11 @@ export default function CommentCard(props) {
   const app = useApp();
   const { t } = app;
   const level = () => props.level || 0;
-  
+
   const [isExpanded, setIsExpanded] = createSignal(false);
   const [isHovered, setIsHovered] = createSignal(false);
   const [isPreparing, setIsPreparing] = createSignal(false);
-  
+
   const [comment, setComment] = createStore(props.comment);
 
   createEffect(() => {
@@ -121,7 +121,7 @@ export default function CommentCard(props) {
     if (!comment) return "";
     const dataCid = getPostContentBaseCid(comment);
     if (!dataCid) return "";
-    
+
     let bestGateway;
     if (app.localIpfsEnabled() && app.localIpfsGateway()) {
       bestGateway = app.localIpfsGateway();
@@ -130,7 +130,7 @@ export default function CommentCard(props) {
     } else {
       bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
     }
-    
+
     return ipfs.buildUrl(bestGateway, dataCid);
   });
 
@@ -166,11 +166,26 @@ export default function CommentCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Fixed overlay context menu in the top-right corner, no layout shifts */}
+      <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
+        <div class="pointer-events-none absolute top-2 right-2 z-20">
+          <div class="pointer-events-auto">
+            <Show when={isHovered()}>
+              <ContextMenu
+                items={contextMenuItems()}
+                positionClass="relative z-20"
+                buttonClass="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+              />
+            </Show>
+          </div>
+        </div>
+      </Show>
+
       <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
         <div class="mb-2">
           <UserCard author={comment.author} compact={false} />
         </div>
-        
+
         <div class="text-sm prose prose-sm max-w-none">
           <Switch>
             <Match when={isExpanded() && fullContent.loading}>
@@ -200,11 +215,11 @@ export default function CommentCard(props) {
                 </Show>
               </button>
               <button
-                  class="p-1"
-                  onClick={openConfirm}
-                  disabled={modalProps().isDeleting}
-                  title="Delete Comment"
-                >
+                class="p-1"
+                onClick={openConfirm}
+                disabled={modalProps().isDeleting}
+                title="Delete Comment"
+              >
                 <TrashIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]" />
               </button>
             </Show>
@@ -217,13 +232,7 @@ export default function CommentCard(props) {
           </div>
         </div>
       </div>
-      
-      <Show when={app.authorizedUser()?.isAdmin && isHovered() && contextMenuItems().length > 0}>
-        <div class="context-menu-container">
-          <ContextMenu items={contextMenuItems()} />
-        </div>
-      </Show>
-      
+
       <Show when={comment.children?.length > 0}>
         <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
           <For each={comment.children}>
@@ -241,4 +250,3 @@ export default function CommentCard(props) {
     </div>
   );
 }
-

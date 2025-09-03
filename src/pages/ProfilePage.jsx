@@ -18,6 +18,9 @@ import SubscriptionsTab from "../components/profile/SubscriptionsTab.jsx";
 import WalletTab from "../components/profile/WalletTab.jsx";
 import TokenValue from "../components/ui/TokenValue.jsx";
 import { walletAccount } from "../blockchain/wallet.js";
+import SubscribeModal from "../components/profile/SubscribeModal.jsx";
+import { getSavvaContract } from "../blockchain/contracts.js";
+import { createPublicClient, http } from "viem";
 
 // Data fetcher for the user profile
 async function fetchUserProfile({ app, identifier }) {
@@ -57,7 +60,7 @@ export default function ProfilePage() {
     return (path.split('?')[0].split('/')[1] || "");
   });
 
-  const [userResource] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
+  const [userResource, { refetch: refetchUser }] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
   const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
 
   const [activeTab, setActiveTab] = createSignal('posts');
@@ -148,10 +151,32 @@ export default function ProfilePage() {
     return "";
   });
 
+  // Subscribe/Unsubscribe wiring
+  const [showSub, setShowSub] = createSignal(false);
+  const domainName = createMemo(() => app.selectedDomainName?.() || "");
+
   const isSubscribed = createMemo(() => {
     const u = userResource();
     return u && u.i_sponsor_for > 0;
   });
+
+  async function handleUnsubscribe(authorAddress) {
+    try {
+      const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
+      const hash = await clubs.write.stop([domainName(), authorAddress]);
+      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain()?.rpcUrls?.[0]) });
+      await pc.waitForTransactionReceipt({ hash });
+      await refetchUser();
+    } catch (e) {
+      console.error("ProfilePage: stop() failed", e);
+      // optionally add toast here
+    }
+  }
+
+  function handleSubscribed() {
+    setShowSub(false);
+    refetchUser();
+  }
 
   return (
     <main class="sv-container p-4 max-w-4xl mx-auto">
@@ -186,12 +211,18 @@ export default function ProfilePage() {
                       <Show
                         when={!isSubscribed()}
                         fallback={
-                          <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]">
+                          <button
+                            class="w-full px-4 py-2 rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"
+                            onClick={() => handleUnsubscribe(user().address)}
+                          >
                             {t("profile.unsubscribe")}
                           </button>
                         }
                       >
-                        <button class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold">
+                        <button
+                          class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold"
+                          onClick={() => setShowSub(true)}
+                        >
                           {t("profile.subscribe")}
                         </button>
                       </Show>
@@ -266,6 +297,16 @@ export default function ProfilePage() {
                   </Switch>
                 </div>
               </div>
+
+              {/* Subscribe / Edit modal */}
+              <Show when={showSub()}>
+                <SubscribeModal
+                  domain={domainName()}
+                  author={user()}
+                  onClose={() => setShowSub(false)}
+                  onSubmit={handleSubscribed}
+                />
+              </Show>
             </div>
           }
         </Match>
