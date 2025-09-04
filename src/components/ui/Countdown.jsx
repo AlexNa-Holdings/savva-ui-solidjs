@@ -92,7 +92,7 @@ export default function Countdown(props) {
   };
 
   return (
-    <div class="flex items-center gap-2" aria-live="polite">
+    <div class="flex items-center gap-1" aria-live="polite">
       <Box label={labels().d} value={d()} anim={ad()} />
       <Box label={labels().h} value={h()} anim={ah()} />
       <Box label={labels().m} value={m()} anim={am()} />
