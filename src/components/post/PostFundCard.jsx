@@ -16,7 +16,6 @@ export default function PostFundCard(props) {
   const roundTime = createMemo(() => Number(fund()?.round_time || 0));
   const nowInSeconds = createMemo(() => Math.floor(Date.now() / 1000));
   const isRoundExpecting = createMemo(() => roundTime() > 0 && roundTime() <= nowInSeconds());
-  const isCountdownActive = createMemo(() => roundTime() > nowInSeconds());
 
   return (
     <>
@@ -26,7 +25,6 @@ export default function PostFundCard(props) {
       >
         <h4 class="font-semibold uppercase text-center">{app.t("post.fund.title")}</h4>
 
-        {/* Current Fund Amount or Explanation */}
         <div class="flex-grow flex items-center justify-center">
           <Show
             when={fund()?.amount > 0 && fund()?.round_time > 0}
@@ -43,39 +41,28 @@ export default function PostFundCard(props) {
           </Show>
         </div>
 
-        {/* Countdown and Round Amount Section - Renders only if there is a round */}
-        <Show when={fund()?.round_time > 0}>
-            <div class="flex flex-col items-center justify-center space-y-2 min-h-[4rem]">
-                <Show when={isCountdownActive()}>
-                    <div class="flex flex-col items-center space-y-2">
-                        <Countdown targetTs={roundTime()} size="sm" labelPosition="top" labelStyle="short" anim="reverse" />
-                        <div class="flex items-center gap-1 text-xs text-center text-[hsl(var(--muted-foreground))]">
-                        <span>{app.t("post.fund.roundAmount")}: </span>
-                        <TokenValue
-                            amount={fund()?.round_value || 0}
-                            tokenAddress={savvaTokenAddress()}
-                        />
-                        </div>
-                    </div>
+        <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
+            <div class="flex justify-center items-center h-12">
+                <Show when={roundTime() > nowInSeconds()}>
+                    <Countdown targetTs={roundTime()} size="sm" labelPosition="top" labelStyle="short" />
                 </Show>
                 <Show when={isRoundExpecting()}>
                     <div class="text-center">
                         <p class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">
-                        {app.t("post.fund.expectingRound")}
+                            {app.t("post.fund.expectingRound")}
                         </p>
-                        <div class="flex items-center justify-center gap-1 text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                        <span>{app.t("post.fund.roundAmount")}: </span>
-                        <TokenValue
-                            amount={fund().round_value}
-                            tokenAddress={savvaTokenAddress()}
-                        />
+                        <div class="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                            <span>{app.t("post.fund.roundAmount")}: </span>
+                            <TokenValue
+                                amount={fund().round_value}
+                                tokenAddress={savvaTokenAddress()}
+                            />
                         </div>
                     </div>
                 </Show>
             </div>
         </Show>
 
-        {/* Contribute Button */}
         <Show when={walletAccount()}>
           <button
             onClick={() => setShowContributeModal(true)}

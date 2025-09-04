@@ -7,9 +7,9 @@ import { getTokenInfo } from "../../blockchain/tokenMeta.js";
 /**
  * TokenValue — shows amount (with correct decimals) + optional USD value.
  * Props:
- *   - amount: bigint | string | number
- *   - tokenAddress: string | "0" (base token)
- *   - format: "vertical" | (default inline)
+ * - amount: bigint | string | number
+ * - tokenAddress: string | "0" (base token)
+ * - format: "vertical" | (default inline)
  */
 export default function TokenValue(props) {
   const app = useApp();
@@ -32,17 +32,8 @@ export default function TokenValue(props) {
     ([addr]) => getTokenInfo(app, addr)
   );
 
-  // DEV logs
-  if (import.meta.env?.DEV) {
-    createEffect(() => {
-      console.debug("[TokenValue] key →", { addr: tokenAddressForMeta(), chainId: chainId() });
-      console.debug("[TokenValue] meta →", tokenMeta());
-      console.debug("[TokenValue] has Icon →", typeof tokenMeta()?.Icon === "function");
-    });
-  }
-
-  // Amount formatting
-  const formattedAmount = createMemo(() => {
+  // Amount formatting and animation
+  const sourceAmount = createMemo(() => {
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
@@ -53,12 +44,24 @@ export default function TokenValue(props) {
     }
   });
 
+  const [displayAmount, setDisplayAmount] = createSignal(sourceAmount());
+  const [isAmountAnimating, setIsAmountAnimating] = createSignal(false);
+  createEffect(on(sourceAmount, (next, prev) => {
+    if (prev === undefined) { setDisplayAmount(next); return; }
+    setDisplayAmount(prev);
+    setIsAmountAnimating(true);
+    setTimeout(() => setDisplayAmount(next), 200);
+    setTimeout(() => setIsAmountAnimating(false), 400);
+  }, { defer: true }));
+
+
   // SAVVA & SAVVA_VOTES share the same USD price source
   const isSavvaLike = createMemo(() => {
     const sym = tokenMeta()?.symbol;
     return sym === "SAVVA" || sym === "SAVVA_VOTES";
   });
 
+  // USD approximate value and animation
   const sourceUsdValue = createMemo(() => {
     let priceData = null;
     if (isSavvaLike())        priceData = app.savvaTokenPrice?.();
@@ -75,26 +78,20 @@ export default function TokenValue(props) {
       return null;
     }
   });
-
-  // Tiny animation for USD changes
+  
   const [displayUsdValue, setDisplayUsdValue] = createSignal(sourceUsdValue());
-  const [isAnimating, setIsAnimating] = createSignal(false);
+  const [isUsdAnimating, setIsUsdAnimating] = createSignal(false);
   createEffect(on(sourceUsdValue, (next, prev) => {
     if (prev == null) { setDisplayUsdValue(next); return; }
     setDisplayUsdValue(prev);
-    setIsAnimating(true);
+    setIsUsdAnimating(true);
     setTimeout(() => setDisplayUsdValue(next), 200);
-    setTimeout(() => setIsAnimating(false), 400);
+    setTimeout(() => setIsUsdAnimating(false), 400);
   }, { defer: true }));
 
-  // Icon: render NOTHING until we have a real component; then render it.
-  // Using keyed <Show> guarantees the function value (component) is passed cleanly.
   const Icon = () => (
     <Show when={tokenMeta()?.Icon} keyed>
-      {(Comp) => {
-        if (import.meta.env?.DEV) console.debug("[TokenValue] <Icon/> render →", { type: typeof Comp, name: Comp?.name });
-        return <Comp class="w-4 h-4" />;
-      }}
+      {(Comp) => <Comp class="w-4 h-4" />}
     </Show>
   );
 
@@ -106,22 +103,22 @@ export default function TokenValue(props) {
       fallback={
         <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`} data-tv="row">
           <Icon />
-          <span class="font-semibold">{formattedAmount()}</span>
+          <span class="font-semibold" classList={{ "default-animation": isAmountAnimating() }}>{displayAmount()}</span>
           <Show when={displayUsdValue()}>
-            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
+            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isUsdAnimating() }}>
               ({displayUsdValue()})
             </span>
           </Show>
         </div>
       }
     >
-      <div class={`flex flex-col items-end text-sm ${props.class || ''}`} data-tv="row">
+      <div class={`flex flex-col items-end text-sm ${props.class || ''}`} data-tv="col">
         <div class="flex items-center gap-1.5">
           <Icon />
-          <span class="font-semibold">{formattedAmount()}</span>
+          <span class="font-semibold" classList={{ "default-animation": isAmountAnimating() }}>{displayAmount()}</span>
         </div>
         <Show when={displayUsdValue()}>
-          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isAnimating() }}>
+          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isUsdAnimating() }}>
             ({displayUsdValue()})
           </span>
         </Show>

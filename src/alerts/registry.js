@@ -13,4 +13,6 @@ export const alertRegistry = {
   react: h.handleReact,
   comment_counter: h.handleCommentCounterUpdate,
   user_info_changed: h.handleUserInfoChanged,
+  fund_contributed: h.handleFundContributed,
+  fund_prize: h.handleFundPrize,
 };

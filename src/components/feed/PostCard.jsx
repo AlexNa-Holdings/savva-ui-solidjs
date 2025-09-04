@@ -53,6 +53,8 @@ export default function PostCard(props) {
       }
     } else if (update.type === 'commentCountChanged') {
       setItem("_raw", "total_childs", update.data.newTotal);
+    } else if (update.type === 'fundChanged') {
+        setItem("_raw", "fund", "amount", reconcile(update.data.amount));
     }
   });
 
@@ -216,3 +218,4 @@ export default function PostCard(props) {
     </article>
   );
 }
+

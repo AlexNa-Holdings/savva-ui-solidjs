@@ -2,6 +2,7 @@
 import { dbg } from "../utils/debug";
 import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
 import { pushToast } from "../ui/toast";
+import { formatUnits } from "viem";
 
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
@@ -60,7 +61,6 @@ export function handleReact(app, payload) {
 
   if (alertDomain === currentDomain) {
     const d = payload.data;
-    // Emit a specific event with only the changed data
     app.setPostUpdate({
       cid: d?.object_id,
       type: 'reactionsChanged',
@@ -101,3 +101,82 @@ export function handleUserInfoChanged(app, payload) {
     dbg.warn?.("Alerts:user_info_changed", "failed to handle", e);
   }
 }
+
+function getLocalizedTitle(multiString, lang) {
+    if (!multiString) return "";
+    return multiString[lang] || multiString.en || Object.values(multiString)[0] || "";
+}
+
+export function handleFundContributed(app, payload) {
+    const { t, lang } = app;
+    const data = payload.data;
+    dbg.log("Alerts:fund_contributed", data);
+
+    if (!data || !data.content_id) return;
+
+    app.setPostUpdate?.({
+        cid: data.content_id,
+        type: "fundChanged",
+        data: { 
+            fund: {
+                amount: data.amount,
+                round_time: data.round_time,
+            }
+        },
+    });
+
+    const title = getLocalizedTitle(data.title, lang());
+    const contributor = data.contributor?.name || "An anonymous user";
+    let formattedAmount = "";
+    try {
+        formattedAmount = parseFloat(formatUnits(BigInt(data.contributed), 18)).toLocaleString();
+    } catch {}
+
+    pushToast({
+        type: "info",
+        message: t("alerts.fund_contributed.message", {
+            title: title,
+            contributor: contributor,
+            amount: formattedAmount,
+            token: "SAVVA",
+        }),
+    });
+}
+
+export function handleFundPrize(app, payload) {
+    const { t, lang } = app;
+    const data = payload.data;
+    dbg.log("Alerts:fund_prize", data);
+
+    if (!data || !data.content_id) return;
+
+    app.setPostUpdate?.({
+        cid: data.content_id,
+        type: "fundChanged",
+        data: { 
+            fund: {
+                amount: data.amount,
+                round_time: data.round_time,
+                round_value: data.prize,
+            }
+        },
+    });
+    
+    const title = getLocalizedTitle(data.title, lang());
+    const winner = data.winner?.name || "An anonymous user";
+    let formattedPrize = "";
+    try {
+        formattedPrize = parseFloat(formatUnits(BigInt(data.prize), 18)).toLocaleString();
+    } catch {}
+
+    pushToast({
+        type: "success",
+        message: t("alerts.fund_prize.message", {
+            title: title,
+            winner: winner,
+            prize: formattedPrize,
+            token: "SAVVA",
+        }),
+    });
+}
+

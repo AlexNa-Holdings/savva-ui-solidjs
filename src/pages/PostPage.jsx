@@ -140,15 +140,19 @@ export default function PostPage() {
     }
   });
 
-  createEffect(() => {
-    const update = app.postUpdate();
-    if (post && update && update.type === 'reactionsChanged' && update.cid === post.savva_cid) {
-      setPost('reactions', update.data.reactions);
+createEffect(() => {
+  const update = app.postUpdate();
+  if (post && update && update.cid === post.savva_cid) {
+    if (update.type === 'reactionsChanged') {
+      setPost('reactions', reconcile(update.data.reactions));
       if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
         setPost('my_reaction', update.data.reaction);
       }
+    } else if (update.type === 'fundChanged' && update.data.fund) {
+      setPost('fund', (prevFund) => reconcile({ ...prevFund, ...update.data.fund }));
     }
-  });
+  }
+});
 
   createEffect(() => {
     if (post && !postLang()) {
