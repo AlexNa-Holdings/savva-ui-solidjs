@@ -111,7 +111,7 @@ export default function ContributeModal(props) {
                 pushToast({ type: "info", message: t("post.fund.toast.approving"), autohideMs: 0, id: approveToastId });
                 const approveHash = await tokenContract.write.approve([fundContract.address, MAX_UINT]);
                 const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
-                app.dismissToast(approveToastId);
+                app.dismissToast?.(approveToastId);
                 if (approveReceipt.status !== 'success') {
                   throw new Error("Token approval transaction failed.");
                 }
@@ -131,8 +131,8 @@ export default function ContributeModal(props) {
                 throw new Error("Contribution transaction failed.");
             }
 
-            app.dismissToast(contribToastId);
-            app.dismissToast(mainToastId);
+            app.dismissToast?.(contribToastId);
+            app.dismissToast?.(mainToastId);
             pushToast({ type: "success", message: t("post.fund.toast.success") });
             props.onClose?.();
             app.triggerWalletDataRefresh?.();
@@ -140,9 +140,9 @@ export default function ContributeModal(props) {
         } catch (error) {
             pushErrorToast(error, { context: t("post.fund.toast.error") });
         } finally {
-            app.dismissToast(mainToastId);
-            app.dismissToast(approveToastId);
-            app.dismissToast(contribToastId);
+            app.dismissToast?.(mainToastId);
+            app.dismissToast?.(approveToastId);
+            app.dismissToast?.(contribToastId);
             setIsProcessing(false);
         }
     };
@@ -215,4 +215,3 @@ export default function ContributeModal(props) {
         </Show>
     );
 }
-
