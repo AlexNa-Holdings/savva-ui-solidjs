@@ -142,9 +142,18 @@ export default function UnstakeModal(props) {
   }
 
   // one handler used for multiple event names (component may emit different ones)
-  const handleAmountChange = (txt, weiMaybe) => {
+  const handleAmountChange = (a, b) => {
     const dec = tokenDecimals();
+    let txt = "", weiMaybe = null;
+    if (typeof a === "object" && a && "text" in a) {
+      txt = String(a.text ?? "");
+      weiMaybe = a.amountWei;
+    } else {
+      txt = String(a ?? "");
+      weiMaybe = b;
+    }
     setAmountText(txt);
+
     if (typeof weiMaybe === "bigint" && weiMaybe >= 0n) {
       setAmountWei(weiMaybe);
       setErr("");

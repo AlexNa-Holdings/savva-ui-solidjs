@@ -181,6 +181,7 @@ export default {
   "post.fund.expectingRound": "Expected Round",
   "post.fund.explanation": "Contribute to boost this post and support the author. A share goes to the author, the rest is pooled and raffled among contributors—your chance to win!",
   "post.fund.predefinedAmounts": "Select a predefined amount",
+  "post.fund.roundAmount": "Round Amount",
   "post.fund.title": "Post Fund",
   "post.fund.toast.approving": "Approving your contribution...",
   "post.fund.toast.contributing": "Contributing funds...",
