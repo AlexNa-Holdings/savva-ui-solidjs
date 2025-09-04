@@ -1,5 +1,5 @@
 // src/blockchain/chainLogos.js
-import { EthereumLogo, PulsechainTestnetLogo, PulsechainLogo } from '../components/ui/icons/ChainLogos.jsx';
+import { EthereumLogo, PulsechainTestnetLogo, PulsechainLogo } from '../x/ui/icons/ChainLogos.jsx';
 
 export const CHAIN_LOGOS = {
   1: EthereumLogo, // Ethereum Mainnet

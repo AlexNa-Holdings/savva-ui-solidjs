@@ -1,8 +1,8 @@
 // src/blockchain/tokenMeta.js
 // Single source of truth for token meta (symbol, decimals, Icon).
 import { createPublicClient, http } from "viem";
-import SavvaTokenIcon from "../components/ui/icons/SavvaTokenIcon.jsx";
-import QuestionTokenIcon from "../components/ui/icons/QuestionTokenIcon.jsx";
+import SavvaTokenIcon from "../x/ui/icons/SavvaTokenIcon.jsx";
+import QuestionTokenIcon from "../x/ui/icons/QuestionTokenIcon.jsx";
 import { getChainLogo } from "./chainLogos.js";
 
 // Minimal ERC-20 ABI

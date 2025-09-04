@@ -105,7 +105,7 @@ gear: true
 * Pokretanje i učitavanje `/default_connect.yaml`, zatim `/info`: **`src/context/AppContext.jsx`** i **`src/hooks/useConnect.js`**. &#x20;
 * Izvor tačke istine (HTTP osnovna + WS URL): **`src/net/endpoints.js`**.&#x20;
 * Rešavanje liste domena, ID lanca, IPFS gateway-eva, okruženje resursa i učitavanje resursa domena: **`src/context/AppContext.jsx`**.  &#x20;
-* Dijalog za prebacivanje koji preuzima `/info` i normalizuje `domains`: **`src/components/SwitchConnectDialog.jsx`**.&#x20;
+* Dijalog za prebacivanje koji preuzima `/info` i normalizuje `domains`: **`src/x/SwitchConnectDialog.jsx`**.&#x20;
 
 ---
 

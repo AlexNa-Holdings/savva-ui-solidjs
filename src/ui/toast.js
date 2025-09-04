@@ -1,4 +1,4 @@
-// src/components/ui/toast.js
+// src/x/ui/toast.js
 import { createSignal } from "solid-js";
 
 export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}

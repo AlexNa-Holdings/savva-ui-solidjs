@@ -106,7 +106,7 @@ gear: true
 * Boot & `/default_connect.yaml` load, then `/info`: **`src/context/AppContext.jsx`** and **`src/hooks/useConnect.js`**. &#x20;
 * Endpoint source of truth (HTTP base + WS URL): **`src/net/endpoints.js`**.&#x20;
 * Domain list resolution, chain ID, IPFS gateways, assets env & domain assets loading: **`src/context/AppContext.jsx`**.  &#x20;
-* Switch dialog that fetches `/info` and normalizes `domains`: **`src/components/SwitchConnectDialog.jsx`**.&#x20;
+* Switch dialog that fetches `/info` and normalizes `domains`: **`src/x/SwitchConnectDialog.jsx`**.&#x20;
 
 ---
 

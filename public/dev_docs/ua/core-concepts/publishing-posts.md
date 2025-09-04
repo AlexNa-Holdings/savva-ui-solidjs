@@ -90,7 +90,7 @@ locales:
 ### Приклад Виклику Контракту
 
 ```javascript
-// З: src/components/editor/wizard_steps/StepPublish.jsx
+// З: src/x/editor/wizard_steps/StepPublish.jsx
 
 const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
 

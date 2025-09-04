@@ -105,7 +105,7 @@ gear: true
 * Démarrage et chargement de `/default_connect.yaml`, puis `/info` : **`src/context/AppContext.jsx`** et **`src/hooks/useConnect.js`**. &#x20;
 * Source de vérité des points de terminaison (base HTTP + URL WS) : **`src/net/endpoints.js`**.&#x20;
 * Résolution de la liste des domaines, ID de chaîne, passerelles IPFS, environnement d'actifs et chargement des actifs du domaine : **`src/context/AppContext.jsx`**.  &#x20;
-* Boîte de dialogue de changement qui récupère `/info` et normalise `domains` : **`src/components/SwitchConnectDialog.jsx`**.&#x20;
+* Boîte de dialogue de changement qui récupère `/info` et normalise `domains` : **`src/x/SwitchConnectDialog.jsx`**.&#x20;
 
 ---
 

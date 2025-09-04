@@ -1,4 +1,4 @@
-// src/components/docs/rehype-rewrite-links.js
+// src/x/docs/rehype-rewrite-links.js
 import { visit } from "unist-util-visit";
 
 /**

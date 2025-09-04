@@ -90,7 +90,7 @@ Frontend izvršava ovu transakciju sa sledećim parametrima:
 ### Primer poziva ugovora
 
 ```javascript
-// Iz: src/components/editor/wizard_steps/StepPublish.jsx
+// Iz: src/x/editor/wizard_steps/StepPublish.jsx
 
 const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
 

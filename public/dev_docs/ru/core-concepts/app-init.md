@@ -105,7 +105,7 @@ gear: true
 * Загрузка и `/default_connect.yaml`, затем `/info`: **`src/context/AppContext.jsx`** и **`src/hooks/useConnect.js`**. &#x20;
 * Источник конечных точек (базовый HTTP + URL WS): **`src/net/endpoints.js`**.&#x20;
 * Разрешение списка доменов, ID цепи, IPFS-шлюзы, загрузка среды активов и активов домена: **`src/context/AppContext.jsx`**.  &#x20;
-* Диалог переключения, который получает `/info` и нормализует `domains`: **`src/components/SwitchConnectDialog.jsx`**.&#x20;
+* Диалог переключения, который получает `/info` и нормализует `domains`: **`src/x/SwitchConnectDialog.jsx`**.&#x20;
 
 ---
 

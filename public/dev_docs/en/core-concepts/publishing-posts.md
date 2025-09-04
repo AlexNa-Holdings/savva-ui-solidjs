@@ -90,7 +90,7 @@ The frontend executes this transaction with the following parameters:
 ### Example Contract Call
 
 ```javascript
-// From: src/components/editor/wizard_steps/StepPublish.jsx
+// From: src/x/editor/wizard_steps/StepPublish.jsx
 
 const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
 

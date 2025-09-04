@@ -1,4 +1,4 @@
-// src/components/editor/text-utils.js
+// src/x/editor/text-utils.js
 
 /**
  * Inserts a given string of text at the current cursor position in a textarea.
