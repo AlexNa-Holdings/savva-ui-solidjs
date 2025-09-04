@@ -1,4 +1,4 @@
-// src/pages/PostPage.jsx
+// src/x/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
@@ -25,6 +25,7 @@ import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import PostControls from "../post/PostControls.jsx";
 import PostComments from "../post/PostComments.jsx";
 import PostFundCard from "../post/PostFundCard.jsx";
+import FundraisingCard from "../post/FundraisingCard.jsx";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -241,13 +242,16 @@ const postForTags = createMemo(() => {
 
   const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
 
-const RightPanel = () => (
-  <aside class="sticky top-16">
+  const RightPanel = () => (
+    <aside class="sticky top-16">
       <div class="p-0 space-y-2 overflow-y-auto h-full">
+        <Show when={details()?.descriptor?.fundraiser > 0}>
+          <FundraisingCard campaignId={details().descriptor.fundraiser} />
+        </Show>
         <PostFundCard post={post} />
-    </div>
-  </aside>
-);
+      </div>
+    </aside>
+  );
 
   return (
     <main class="sv-container p-4">

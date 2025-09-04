@@ -21,6 +21,9 @@ export default function UserCard(props) {
   const author = () => props.author || {};
   const uiLang = () => (app.lang?.() || "en").toLowerCase();
 
+  const textColor = createMemo(() => props.textColorClass || "text-[hsl(var(--foreground))]");
+  const mutedTextColor = createMemo(() => props.mutedTextColorClass || "text-[hsl(var(--muted-foreground))]");
+
   const displayName = createMemo(() => {
     const a = author();
     const addr = String(a.address || "").toLowerCase();
@@ -70,12 +73,12 @@ export default function UserCard(props) {
 
           <div class="min-w-0">
             <Show when={displayName() && !props.compact}>
-              <div class="text-xs pt-1 truncate text-[hsl(var(--foreground))] w-full">
+              <div class={`text-xs pt-1 truncate ${textColor()} w-full`}>
                 {displayName()}
               </div>
             </Show>
 
-            <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} text-[hsl(var(--muted-foreground))]`}>
+            <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? 'text-[11px]' : 'text-xs'} ${mutedTextColor()}`}>
               <Show when={author().name}>
                 <div class="min-w-0 flex items-center">
                   <span class="truncate uppercase font-semibold">{author().name}</span>
@@ -91,7 +94,7 @@ export default function UserCard(props) {
 
               <StakerLevelIcon
                 staked={author().staked}
-                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0 text-[hsl(var(--muted-foreground))]`}
+                class={`${props.compact ? 'w-5 h-4' : 'w-7 h-6'} shrink-0`}
               />
             </div>
           </div>
