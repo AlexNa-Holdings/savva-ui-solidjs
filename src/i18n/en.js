@@ -475,5 +475,18 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now"
+  "wallet.unstaked.availableNow": "Available Now",
+    "fundraising.title": "Fundraising",
+  "fundraising.create": "Create New Campaign",
+  "fundraising.onlyMy": "Show only my campaigns",
+  "fundraising.loginHint": "Connect and authorize to see your own campaigns.",
+  "fundraising.th.id": "ID",
+  "fundraising.th.receiver": "Receiver",
+  "fundraising.th.target": "Target",
+  "fundraising.th.raised": "Raised",
+  "fundraising.th.progress": "Progress",
+  "fundraising.empty": "No fundraising campaigns found.",
+  "fundraising.prev": "Prev",
+  "fundraising.next": "Next",
+  "fundraising.pageX": "Page {{page}}"
 };

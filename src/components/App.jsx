@@ -21,6 +21,7 @@ import AlertManager from "../alerts/AlertManager.jsx";
 import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
 import ProfileEditPage from "../pages/ProfileEditPage.jsx";
+import FundraisingPage from "../pages/FundraisingPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -34,6 +35,7 @@ export default function App() {
     if (r.startsWith("/docs")) return "docs";
     if (r.startsWith("/profile-edit/")) return "profile-edit";
     if (r.startsWith("/editor/")) return "editor";
+    if (r.startsWith("/fundraising")) return "fundraising";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
   });
@@ -109,6 +111,7 @@ export default function App() {
               <Show when={currentView() === 'docs'}><Docs /></Show>
               <Show when={currentView() === 'editor'}><EditorPage /></Show>
               <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
+              <Show when={currentView() === 'fundraising'}><FundraisingPage /></Show>
             </>
           </Show>
           

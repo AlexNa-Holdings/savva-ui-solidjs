@@ -59,6 +59,22 @@ export default function RightPane({ isOpen, onClose }) {
                 </li>
               </Show>
 
+              {/* Fundraising link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/fundraising");
+                    onClose();
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/fundraising"); onClose(); } }}
+                >
+                  {t("rightPane.fundraising")}
+                </div>
+              </li>
+
               {/* Documentation link */}
               <li>
                 <div
@@ -66,8 +82,8 @@ export default function RightPane({ isOpen, onClose }) {
                   role="button" tabIndex={0}
                   onClick={() => {
                     app.setSavedScrollY(window.scrollY);
-                    navigate("/docs"); 
-                    onClose(); 
+                    navigate("/docs");
+                    onClose();
                   }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/docs"); onClose(); } }}
                   aria-label={t("docs.nav")}
@@ -84,8 +100,8 @@ export default function RightPane({ isOpen, onClose }) {
                   role="button" tabIndex={0}
                   onClick={() => {
                     app.setSavedScrollY(window.scrollY);
-                    navigate("/settings"); 
-                    onClose(); 
+                    navigate("/settings");
+                    onClose();
                   }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/settings"); onClose(); } }}
                 >
