@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { createPublicClient, http, formatUnits, parseUnits } from "viem";
 import { walletAccount } from "../../blockchain/wallet.js";
 import TokenValue from "./TokenValue.jsx";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 
 // Minimal ABI for ERC-20 balanceOf()
 const ERC20_MIN_ABI = [

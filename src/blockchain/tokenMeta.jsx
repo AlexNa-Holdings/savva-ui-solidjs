@@ -4,6 +4,7 @@ import { createPublicClient, http } from "viem";
 import SavvaTokenIcon from "../x/ui/icons/SavvaTokenIcon.jsx";
 import QuestionTokenIcon from "../x/ui/icons/QuestionTokenIcon.jsx";
 import { getChainLogo } from "./chainLogos.js";
+import { Show } from "solid-js";
 
 // Minimal ERC-20 ABI
 const ERC20_MIN_ABI = [
@@ -46,31 +47,28 @@ async function _getSavvaAddresses(app) {
   return { savva: _savvaAddrCached, staking: _stakingAddrCached };
 }
 
-// Small component factories (avoid JSX in .js files)
-function makeSavvaIcon() {
-  return function Icon(props = {}) { return SavvaTokenIcon({ class: props.class || "w-4 h-4" }); };
-}
-function makeQuestionIcon() {
-  return function Icon(props = {}) { return QuestionTokenIcon({ class: props.class || "w-4 h-4" }); };
-}
 function makeChainIcon(chainId) {
   const ChainLogo = getChainLogo(chainId);
   // If chain logo is missing, fall back to question icon
   return function Icon(props = {}) {
-    return ChainLogo ? ChainLogo({ class: props.class || "w-5 h-5" }) : QuestionTokenIcon({ class: props.class || "w-4 h-4" });
+      return (
+          <Show when={ChainLogo} fallback={<QuestionTokenIcon {...props} />}>
+              <ChainLogo {...props} />
+          </Show>
+      );
   };
 }
 
 /**
  * getTokenInfo(app, tokenAddress)
  * Returns a stable meta object:
- *   { symbol: string, decimals: number, Icon: Component }
+ * { symbol: string, decimals: number, Icon: Component }
  *
  * Rules:
- *  - Base token ("" or "0"):   { symbol: native,        decimals: 18, Icon: chain logo (or ? fallback) }
- *  - SAVVA token address:      { symbol: "SAVVA",       decimals: 18, Icon: Savva }
- *  - Staking contract address: { symbol: "SAVVA_VOTES", decimals: 18, Icon: Savva }
- *  - Generic ERC-20:           read symbol/decimals via viem, Icon: ? fallback
+ * - Base token ("" or "0"):   { symbol: native,        decimals: 18, Icon: chain logo (or ? fallback) }
+ * - SAVVA token address:      { symbol: "SAVVA",       decimals: 18, Icon: Savva }
+ * - Staking contract address: { symbol: "SAVVA_VOTES", decimals: 18, Icon: Savva }
+ * - Generic ERC-20:           read symbol/decimals via viem, Icon: ? fallback
  */
 export async function getTokenInfo(app, tokenAddress) {
   const chain = app?.desiredChain?.();
@@ -92,12 +90,12 @@ export async function getTokenInfo(app, tokenAddress) {
   // SAVVA overrides
   const { savva, staking } = await _getSavvaAddresses(app);
   if (savva && addr === savva) {
-    const res = { symbol: "SAVVA", decimals: 18, Icon: makeSavvaIcon() };
+    const res = { symbol: "SAVVA", decimals: 18, Icon: SavvaTokenIcon };
     _cache.set(k, res);
     return res;
   }
   if (staking && addr === staking) {
-    const res = { symbol: "SAVVA_VOTES", decimals: 18, Icon: makeSavvaIcon() };
+    const res = { symbol: "SAVVA_VOTES", decimals: 18, Icon: SavvaTokenIcon };
     _cache.set(k, res);
     return res;
   }
@@ -105,7 +103,7 @@ export async function getTokenInfo(app, tokenAddress) {
   // Generic ERC-20
   const pc = _publicClient(app);
   if (!pc) {
-    const res = { symbol: "TOK", decimals: 18, Icon: makeQuestionIcon() };
+    const res = { symbol: "TOK", decimals: 18, Icon: QuestionTokenIcon };
     _cache.set(k, res);
     return res;
   }
@@ -120,7 +118,7 @@ export async function getTokenInfo(app, tokenAddress) {
     symbol = String(s || "TOK").slice(0, 32);
   } catch {}
 
-  const res = { symbol, decimals, Icon: makeQuestionIcon() };
+  const res = { symbol, decimals, Icon: QuestionTokenIcon };
   _cache.set(k, res);
   return res;
 }

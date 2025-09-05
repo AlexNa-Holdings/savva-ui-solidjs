@@ -6,7 +6,7 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { performStake } from "../../blockchain/transactions.js";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { parseUnits } from "viem";
 
 async function fetchStakingInfo({ app, userAddress }) {

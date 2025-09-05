@@ -26,6 +26,8 @@ import PostControls from "../post/PostControls.jsx";
 import PostComments from "../post/PostComments.jsx";
 import PostFundCard from "../post/PostFundCard.jsx";
 import FundraisingCard from "../post/FundraisingCard.jsx";
+import CampaignContributeModal from "../fundraising/CampaignContributeModal.jsx";
+import PostRightPanel from "../post/PostRightPanel.jsx";
 
 
 const getIdentifier = (route) => route().split('/')[2] || "";
@@ -110,6 +112,9 @@ export default function PostPage() {
   const { route } = useHashRouter();
   const identifier = createMemo(() => getIdentifier(route));
   const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+
+  const [showContributeModal, setShowContributeModal] = createSignal(false);
+  const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
 
   const [postResource] = createResource(
     () => ({ identifier: identifier(), domain: app.selectedDomainName(), app, lang: uiLang() }),
@@ -240,18 +245,12 @@ const postForTags = createMemo(() => {
     return ipfs.buildUrl(bestGateway, dataCid);
   });
 
-  const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
+  function openContributeModal(campaignId) {
+    setContributeCampaignId(campaignId);
+    setShowContributeModal(true);
+  }
 
-  const RightPanel = () => (
-    <aside class="sticky top-16">
-      <div class="p-0 space-y-2 overflow-y-auto h-full">
-        <Show when={details()?.descriptor?.fundraiser > 0}>
-          <FundraisingCard campaignId={details().descriptor.fundraiser} />
-        </Show>
-        <PostFundCard post={post} />
-      </div>
-    </aside>
-  );
+  const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
 
   return (
     <main class="sv-container p-4">
@@ -349,13 +348,18 @@ const postForTags = createMemo(() => {
                     <PostControls post={post} />
                     <PostComments post={post} />
                   </div>
-                  <RightPanel />
+                  <PostRightPanel post={post} details={details} onOpenContributeModal={openContributeModal} />
                 </div>
               </div>
             </article>
           </div>
         </Match>
       </Switch>
+      <CampaignContributeModal
+        isOpen={showContributeModal()}
+        onClose={() => setShowContributeModal(false)}
+        campaignId={contributeCampaignId()}
+      />
     </main>
   );
 }

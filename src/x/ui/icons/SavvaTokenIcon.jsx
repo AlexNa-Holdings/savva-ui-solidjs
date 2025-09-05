@@ -4,8 +4,8 @@ export default function SavvaTokenIcon(props) {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 25 25"
-      class={props.class || "w-4 h-4"}
       aria-hidden="true"
+      {...props}
     >
       <g>
         <path

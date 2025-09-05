@@ -3,7 +3,7 @@ import { createSignal, Show, createResource, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import AddressInput from "../ui/AddressInput.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { performTransfer } from "../../blockchain/transactions.js";
 import { parseUnits } from "viem";
 import Spinner from "../ui/Spinner.jsx";

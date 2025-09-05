@@ -1,6 +1,6 @@
 // src/blockchain/tokenAmount.js
 import { parseUnits, formatUnits } from "viem";
-import { getTokenInfo } from "./tokenMeta.js";
+import { getTokenInfo } from "./tokenMeta.jsx";
 
 // Normalize user text like "1,23  " -> "1.23"
 function normalizeDecimalInput(text) {

@@ -1,7 +1,7 @@
 // src/x/main/TokenPrice.jsx
 import { createSignal, createEffect, on, Show, createResource } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 
 function UpArrow() {
   return (

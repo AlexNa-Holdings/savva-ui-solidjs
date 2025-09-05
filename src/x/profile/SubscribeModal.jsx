@@ -2,7 +2,7 @@
 import { createSignal, createResource, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { createPublicClient, http, parseUnits } from "viem";
 import { formatAmountWithDecimals } from "../../blockchain/tokenAmount.js";
 import UserCard from "../ui/UserCard.jsx";

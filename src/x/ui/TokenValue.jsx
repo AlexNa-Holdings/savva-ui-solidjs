@@ -2,8 +2,7 @@
 import { createMemo, Show, createSignal, createEffect, on, createResource } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { formatUnits } from "viem";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
-
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 /**
  * TokenValue — shows amount (with correct decimals) + optional USD value.
  * Props:
@@ -105,7 +104,7 @@ export default function TokenValue(props) {
           <Icon />
           <span class="font-semibold" classList={{ "default-animation": isAmountAnimating() }}>{displayAmount()}</span>
           <Show when={displayUsdValue()}>
-            <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isUsdAnimating() }}>
+            <span class="text-xs opacity-75" classList={{ "default-animation": isUsdAnimating() }}>
               ({displayUsdValue()})
             </span>
           </Show>
@@ -118,7 +117,7 @@ export default function TokenValue(props) {
           <span class="font-semibold" classList={{ "default-animation": isAmountAnimating() }}>{displayAmount()}</span>
         </div>
         <Show when={displayUsdValue()}>
-          <span class="text-xs text-[hsl(var(--muted-foreground))]" classList={{ "default-animation": isUsdAnimating() }}>
+          <span class="text-xs opacity-75" classList={{ "default-animation": isUsdAnimating() }}>
             ({displayUsdValue()})
           </span>
         </Show>

@@ -2,7 +2,7 @@
 import { createSignal, Show, createResource, createMemo, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
-import { getTokenInfo } from "../../blockchain/tokenMeta.js";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { ipfs } from "../../ipfs/index.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { toHexBytes32 } from "../../blockchain/utils.js";

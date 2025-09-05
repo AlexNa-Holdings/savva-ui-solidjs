@@ -87,8 +87,7 @@ export default function FundraisingCard(props) {
   const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
   
   const handleContribute = () => {
-    // Placeholder for opening the contribution modal
-    console.log("Contribute clicked for campaign:", campaignId());
+    props.onContribute?.(campaignId());
   };
 
   return (
@@ -154,4 +153,3 @@ export default function FundraisingCard(props) {
     </div>
   );
 }
-

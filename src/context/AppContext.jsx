@@ -2,12 +2,12 @@
 import * as Solid from "solid-js";
 import { getChainMeta } from "../blockchain/chains";
 import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet";
-import { useI18n } from "../i18n/useI18n";
+import { useI18n } from "../i18n/useI18n.js";
 import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
 import { useAppConnection } from "./useAppConnection.js";
 import { useDomainAssets } from "./useDomainAssets.js";
-import { pushToast, pushErrorToast } from "../ui/toast.js";
+import { pushToast, pushErrorToast, dismissToast } from "../ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
 import { createWalletClient, custom } from "viem";
 import { useTokenPrices } from "./useTokenPrices.js";
@@ -205,6 +205,7 @@ export function AppProvider(props) {
     setUserDisplayNames,
     userAvatars,
     setUserAvatar,
+    dismissToast,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
