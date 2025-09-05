@@ -1,10 +1,10 @@
-// src/blockchain/tokenMeta.js
-// Single source of truth for token meta (symbol, decimals, Icon).
+// src/blockchain/tokenMeta.jsx
 import { createPublicClient, http } from "viem";
 import SavvaTokenIcon from "../x/ui/icons/SavvaTokenIcon.jsx";
 import QuestionTokenIcon from "../x/ui/icons/QuestionTokenIcon.jsx";
 import { getChainLogo } from "./chainLogos.js";
 import { Show } from "solid-js";
+import { CUSTOM_ICON_MAP } from "./customTokenIcons.js";
 
 // Minimal ERC-20 ABI
 const ERC20_MIN_ABI = [
@@ -100,14 +100,32 @@ export async function getTokenInfo(app, tokenAddress) {
     return res;
   }
 
-  // Generic ERC-20
   const pc = _publicClient(app);
   if (!pc) {
     const res = { symbol: "TOK", decimals: 18, Icon: QuestionTokenIcon };
     _cache.set(k, res);
     return res;
   }
+  
+  // Custom icons from our address map
+  const CustomIcon = CUSTOM_ICON_MAP[addr];
+  if (CustomIcon) {
+    let decimals = 18, symbol = "TOK";
+    try {
+      const d = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "decimals" });
+      decimals = Number(d ?? 18);
+    } catch {}
+    try {
+      const s = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "symbol" });
+      symbol = String(s || "TOK").slice(0, 32);
+    } catch {}
+    
+    const res = { symbol, decimals, Icon: CustomIcon };
+    _cache.set(k, res);
+    return res;
+  }
 
+  // Generic ERC-20
   let decimals = 18, symbol = "TOK";
   try {
     const d = await pc.readContract({ address: addr, abi: ERC20_MIN_ABI, functionName: "decimals" });

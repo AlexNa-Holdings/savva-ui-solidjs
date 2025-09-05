@@ -27,7 +27,7 @@ export default function AmountInput(props) {
   });
 
   // ── token meta (cached) ──────────────────────────────────────────────────────
-  const tokenAddrForMeta = createMemo(() => (isBaseToken() ? "" : props.tokenAddress));
+  const tokenAddrForMeta = createMemo(() => (isBaseToken() ? "" : String(props.tokenAddress).toLowerCase()));
   const [tokenMeta] = createResource(
     () => ({ app, addr: tokenAddrForMeta() }),
     ({ app, addr }) => getTokenInfo(app, addr)
@@ -130,9 +130,14 @@ export default function AmountInput(props) {
   });
 
   const usdPrice = createMemo(() => {
+    const allPrices = app.allTokenPrices?.();
+    if (!allPrices) return null;
+    
     if (isSavvaLike()) return app.savvaTokenPrice?.()?.price ?? null;
     if (isBaseToken()) return app.baseTokenPrice?.()?.price ?? null;
-    return null; // unknown tokens: no USD
+
+    const addrLower = tokenAddrForMeta();
+    return allPrices[addrLower]?.price ?? null;
   });
 
   const usdText = createMemo(() => {

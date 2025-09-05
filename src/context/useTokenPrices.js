@@ -1,5 +1,5 @@
 // src/context/useTokenPrices.js
-import { createSignal, onMount, onCleanup, createMemo } from "solid-js";
+import { createSignal, onMount, createMemo } from "solid-js";
 import { whenWsOpen, getWsApi } from "../net/wsRuntime";
 import { dbg } from "../utils/debug";
 
@@ -7,8 +7,29 @@ export function useTokenPrices(app) {
   const [prices, setPrices] = createSignal({});
 
   const updatePrices = (data) => {
-    if (!data || !data.tokens) return;
-    setPrices((prev) => ({ ...prev, ...data.tokens }));
+    if (!data) return;
+    
+    const normalizedTokens = {};
+    if (data.tokens && typeof data.tokens === 'object') {
+        for (const [addr, priceData] of Object.entries(data.tokens)) {
+            normalizedTokens[addr.toLowerCase()] = priceData;
+        }
+    }
+
+    // Also handle legacy flat structure for backward compatibility
+    if (data.base_token_price) {
+        normalizedTokens[""] = { price: data.base_token_price, gain: data.base_token_gain };
+    }
+    if (data.savva_token_price) {
+        const savvaAddr = app.info()?.savva_contracts?.SavvaToken?.address;
+        if (savvaAddr) {
+            normalizedTokens[savvaAddr.toLowerCase()] = { price: data.savva_token_price, gain: data.savva_token_gain };
+        }
+    }
+
+    if (Object.keys(normalizedTokens).length > 0) {
+        setPrices((prev) => ({ ...prev, ...normalizedTokens }));
+    }
   };
 
   const fetchInitialPrices = async () => {
@@ -32,11 +53,10 @@ export function useTokenPrices(app) {
     const stakingAddress = app.info()?.savva_contracts?.Staking?.address;
     if (!savvaTokenAddress && !stakingAddress) return null;
 
-    // Prefer direct SAVVA key; fall back to Staking alias
     const p = prices();
     return (
-      (savvaTokenAddress && p[savvaTokenAddress]) ||
-      (stakingAddress && p[stakingAddress]) ||
+      (savvaTokenAddress && p[savvaTokenAddress.toLowerCase()]) ||
+      (stakingAddress && p[stakingAddress.toLowerCase()]) ||
       null
     );
   });

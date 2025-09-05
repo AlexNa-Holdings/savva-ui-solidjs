@@ -1,6 +1,6 @@
 // src/x/pages/ContributePage.jsx
 import { createMemo } from "solid-js";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/hashRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import ContributeView from "../fundraising/ContributeView.jsx";
 import { useApp } from "../../context/AppContext.jsx";
@@ -16,7 +16,8 @@ export default function ContributePage() {
     });
 
     const handleSuccess = () => {
-        navigate("/fundraising");
+        // The ContributeView component will automatically refetch its data.
+        // No further action is needed here.
     };
 
     return (
@@ -24,7 +25,11 @@ export default function ContributePage() {
             <ClosePageButton />
             <h2 class="text-2xl font-semibold">{t("fundraising.contribute.pageTitle")} #{campaignId()}</h2>
             <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-                <ContributeView campaignId={campaignId()} onSuccess={handleSuccess} />
+                <ContributeView
+                    campaignId={campaignId()}
+                    onSuccess={handleSuccess}
+                    showCancel={false}
+                />
             </div>
         </main>
     );
