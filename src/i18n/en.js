@@ -149,6 +149,7 @@ export default {
   "fundraising.actions.close.label": "Close",
   "fundraising.actions.close.success": "Campaign closed successfully.",
   "fundraising.actions.close.tip": "Close and Receive all funds",
+  "fundraising.actions.link.tip": "Open contribution page",
   "fundraising.card.collected": "Collected",
   "fundraising.card.connectWallet": "Please connect wallet to contribute",
   "fundraising.card.contribute": "Contribute",
@@ -159,9 +160,11 @@ export default {
   "fundraising.contribute.amount": "Amount",
   "fundraising.contribute.connectMessage": "Please connect your wallet to contribute to this campaign.",
   "fundraising.contribute.connectTitle": "Connect Wallet",
+  "fundraising.contribute.donatorsTitle": "Contributors",
+  "fundraising.contribute.feeNotice": "A fee of {n}% will be transferred to the Buy&Burn contract.",
   "fundraising.contribute.notFoundOrFinished": "This fundraising campaign is not available or has ended.",
+  "fundraising.contribute.pageTitle": "Contribute to Campaign",
   "fundraising.contribute.receiver": "Recipient: {name}",
-  "fundraising.contribute.title": "Contribute to Campaign",
   "fundraising.contribute.toast.approving": "Approving token...",
   "fundraising.contribute.toast.error": "Contribution failed.",
   "fundraising.contribute.toast.sending": "Sending contribution...",
@@ -519,10 +522,5 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now",
-   "fundraising.contribute.feeNotice": "A fee of {n}% will be transferred to the Buy&Burn contract.",
-   "fundraising.contribute.donatorsTitle": "Contributors",
-   "fundraising.contribute.pageTitle": "Contribute to Campaign",
-   "fundraising.actions.link.tip": "Open contribution page"
-
+  "wallet.unstaked.availableNow": "Available Now"
 };
