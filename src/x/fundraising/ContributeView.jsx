@@ -202,9 +202,9 @@ export default function ContributeView(props) {
                         }>
                             <div class="space-y-4">
                                 <div class="p-3 rounded bg-[hsl(var(--muted))] space-y-2">
-                                    <p class="text-sm font-semibold line-clamp-2">{campaign()?.title}</p>
+                                    <p class="text-lg font-semibold line-clamp-2">{campaign()?.title}</p>
                                     <div>
-                                        <div class="text-xs text-[hsl(var(--muted-foreground))] mb-1">{t("fundraising.contribute.receiver")}:</div>
+                                        <div class="text-sm text-[hsl(var(--muted-foreground))] mb-1">{t("fundraising.contribute.receiver")}:</div>
                                         <UserCard author={campaign()?.user} />
                                     </div>
                                 </div>

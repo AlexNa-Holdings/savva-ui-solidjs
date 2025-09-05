@@ -164,7 +164,7 @@ export default {
   "fundraising.contribute.feeNotice": "A fee of {n}% will be transferred to the Buy&Burn contract.",
   "fundraising.contribute.notFoundOrFinished": "This fundraising campaign is not available or has ended.",
   "fundraising.contribute.pageTitle": "Contribute to Campaign",
-  "fundraising.contribute.receiver": "Recipient: {name}",
+  "fundraising.contribute.receiver": "!Recipient",
   "fundraising.contribute.toast.approving": "Approving token...",
   "fundraising.contribute.toast.error": "Contribution failed.",
   "fundraising.contribute.toast.sending": "Sending contribution...",
