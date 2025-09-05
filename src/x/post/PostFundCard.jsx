@@ -2,7 +2,7 @@
 import { Show, createSignal, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
-import ContributeModal from "./ContributeModal.jsx";
+import ContributeModal from "../modals/ContributeModal.jsx";
 import Countdown from "../ui/Countdown.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 

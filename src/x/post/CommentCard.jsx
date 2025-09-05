@@ -14,7 +14,7 @@ import { navigate } from "../../routing/hashRouter.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
+import ConfirmModal from "../modals/ConfirmModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 import { parse } from "yaml";

@@ -14,7 +14,7 @@ import ConnectionError from "./main/ConnectionError.jsx";
 import Spinner from "./ui/Spinner.jsx";
 import AssetDebugTap from "../dev/AssetDebugTap.jsx";
 import AlertManager from "../alerts/AlertManager.jsx";
-import SwitchAccountModal from "./auth/SwitchAccountModal.jsx";
+import SwitchAccountModal from "./modals/SwitchAccountModal.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import ProfileEditPage from "./pages/ProfileEditPage.jsx";
 import FundraisingPage from "./pages/FundraisingPage.jsx";
@@ -24,6 +24,7 @@ import PostPage from "./pages/PostPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
 import ContributePage from "./pages/ContributePage.jsx";
 import NpoListPage from "./pages/NpoListPage.jsx";
+import NpoPage from "./pages/NpoPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -39,6 +40,7 @@ export default function App() {
     if (r.startsWith("/editor/")) return "editor";
     if (r.startsWith("/npo-list")) return "npo-list";
     if (r.startsWith("/fundraising")) return "fundraising";
+    if (r.startsWith("/npo/")) return "npo";
     if (r.startsWith("/fr/")) return "contribute";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
@@ -115,6 +117,7 @@ export default function App() {
               <Show when={currentView() === 'docs'}><Docs /></Show>
               <Show when={currentView() === 'editor'}><EditorPage /></Show>
               <Show when={currentView() === 'npo-list'}><NpoListPage /></Show>
+              <Show when={currentView() === 'npo'}><NpoPage /></Show>
               <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
               <Show when={currentView() === 'fundraising'}><FundraisingPage /></Show>
               <Show when={currentView() === 'contribute'}><ContributePage /></Show>

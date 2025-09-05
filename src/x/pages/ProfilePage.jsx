@@ -18,7 +18,7 @@ import SubscriptionsTab from "../profile/SubscriptionsTab.jsx";
 import WalletTab from "../profile/WalletTab.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
-import SubscribeModal from "../profile/SubscribeModal.jsx";
+import SubscribeModal from "../modals/SubscribeModal.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
 

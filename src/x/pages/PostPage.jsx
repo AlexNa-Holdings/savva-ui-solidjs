@@ -26,7 +26,7 @@ import PostControls from "../post/PostControls.jsx";
 import PostComments from "../post/PostComments.jsx";
 import PostFundCard from "../post/PostFundCard.jsx";
 import FundraisingCard from "../post/FundraisingCard.jsx";
-import CampaignContributeModal from "../fundraising/CampaignContributeModal.jsx";
+import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import PostRightPanel from "../post/PostRightPanel.jsx";
 
 

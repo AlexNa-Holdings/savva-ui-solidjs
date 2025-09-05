@@ -6,7 +6,7 @@ import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
 import PostInfo from "../feed/PostInfo.jsx";
 import Spinner from "../ui/Spinner.jsx";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
+import ConfirmModal from "../modals/ConfirmModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 

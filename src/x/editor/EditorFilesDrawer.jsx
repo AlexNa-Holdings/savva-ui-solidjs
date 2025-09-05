@@ -3,9 +3,9 @@ import { Show, createSignal, For, createEffect, on, createMemo } from "solid-js"
 import { useApp } from "../../context/AppContext.jsx";
 import { listUploadedFiles, addUploadedFile, addUploadedFileFromUrl, deleteUploadedFile } from "../../editor/storage.js";
 import FileGridItem from "./FileGridItem.jsx";
-import UploadFromUrlModal from "./UploadFromUrlModal.jsx";
+import UploadFromUrlModal from "../modals/UploadFromUrlModal.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
+import ConfirmModal from "../modals/ConfirmModal.jsx";
 import FileContextMenu from "./FileContextMenu.jsx";
 import { formatBytes } from "../../utils/format.js";
 function CloseIcon(props) {

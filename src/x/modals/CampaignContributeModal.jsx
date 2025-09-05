@@ -1,6 +1,6 @@
 // src/x/fundraising/CampaignContributeModal.jsx
 import { Show } from "solid-js";
-import ContributeView from "./ContributeView.jsx";
+import ContributeView from "../fundraising/ContributeView.jsx";
 
 export default function CampaignContributeModal(props) {
     const handleClose = () => {

@@ -4,8 +4,8 @@ import { useApp } from "../../context/AppContext.jsx";
 import { getPinningServices, addPinningService, updatePinningService, deletePinningService, isPinningEnabled, setPinningEnabled } from "../../ipfs/pinning/storage.js";
 import { testService } from "../../ipfs/pinning/manager.js";
 import { pushToast } from "../../ui/toast.js";
-import PinningServiceModal from "./PinningServiceModal.jsx";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
+import PinningServiceModal from "../modals/PinningServiceModal.jsx";
+import ConfirmModal from "../modals/ConfirmModal.jsx";
 import Spinner from "../ui/Spinner.jsx";
 
 const TestStepRow = (props) => {

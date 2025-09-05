@@ -9,9 +9,9 @@ import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
-import TransferModal from "./TransferModal.jsx";
-import IncreaseStakingModal from "./IncreaseStakingModal.jsx";
-import UnstakeModal from "./UnstakeModal.jsx";
+import TransferModal from "../modals/TransferModal.jsx";
+import IncreaseStakingModal from "../modals/IncreaseStakingModal.jsx";
+import UnstakeModal from "../modals/UnstakeModal.jsx";
 import Countdown from "../ui/Countdown.jsx";
 
 export default function WalletTab() {

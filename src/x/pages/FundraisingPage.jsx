@@ -12,8 +12,8 @@ import { toChecksumAddress } from "../../blockchain/utils.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import NewFundraisingModal from "../fundraising/NewFundraisingModal.jsx";
-import CampaignContributeModal from "../fundraising/CampaignContributeModal.jsx";
+import NewFundraisingModal from "../modals/NewFundraisingModal.jsx";
+import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import { ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
 
 const DEFAULT_LIMIT = 20;

@@ -13,10 +13,10 @@ import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import LangSelector from "../ui/LangSelector.jsx";
 import { EditIcon } from "../ui/icons/ActionIcons.jsx";
-import AvatarEditorModal from "../profile/AvatarEditorModal.jsx";
+import AvatarEditorModal from "../modals/AvatarEditorModal.jsx";
 import { httpBase } from "../../net/endpoints.js";
 import { pushErrorToast, pushToast } from "../../ui/toast.js";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
+import ConfirmModal from "../modals/ConfirmModal.jsx";
 import { createPublicClient, http } from "viem";
 import ContextMenu from "../ui/ContextMenu.jsx";
 

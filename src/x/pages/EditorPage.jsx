@@ -16,7 +16,7 @@ import {
 import { dbg } from "../../utils/debug.js";
 import EditorChapterSelector from "../editor/EditorChapterSelector.jsx";
 import EditorTocButton from "../editor/EditorTocButton.jsx";
-import ConfirmModal from "../ui/ConfirmModal.jsx";
+import ConfirmModal from "../modals/ConfirmModal.jsx";
 import { insertTextAtCursor } from "../../editor/text-utils.js";
 import EditorFullPreview from "../editor/EditorFullPreview.jsx";
 import PostSubmissionWizard from "../editor/PostSubmissionWizard.jsx";
