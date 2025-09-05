@@ -520,6 +520,9 @@ export default {
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
   "wallet.unstaked.availableNow": "Available Now",
-   "fundraising.contribute.feeNotice": "A fee of {n}% will be transferred to the Buy&Burn contract."
+   "fundraising.contribute.feeNotice": "A fee of {n}% will be transferred to the Buy&Burn contract.",
+   "fundraising.contribute.donatorsTitle": "Contributors",
+   "fundraising.contribute.pageTitle": "Contribute to Campaign",
+   "fundraising.actions.link.tip": "Open contribution page"
 
 };

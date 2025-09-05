@@ -22,6 +22,7 @@ import Settings from "./pages/Settings.jsx";
 import Docs from "./pages/Docs.jsx";
 import PostPage from "./pages/PostPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
+import ContributePage from "./pages/ContributePage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -36,6 +37,7 @@ export default function App() {
     if (r.startsWith("/profile-edit/")) return "profile-edit";
     if (r.startsWith("/editor/")) return "editor";
     if (r.startsWith("/fundraising")) return "fundraising";
+    if (r.startsWith("/fr/")) return "contribute";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
   });
@@ -112,6 +114,7 @@ export default function App() {
               <Show when={currentView() === 'editor'}><EditorPage /></Show>
               <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
               <Show when={currentView() === 'fundraising'}><FundraisingPage /></Show>
+              <Show when={currentView() === 'contribute'}><ContributePage /></Show>
             </>
           </Show>
           

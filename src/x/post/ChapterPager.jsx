@@ -1,6 +1,7 @@
 // src/x/post/ChapterPager.jsx
 import { createMemo, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
+import { ArrowLeftIcon, ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
 
 export default function ChapterPager(props) {
   const { t } = useApp();
@@ -32,8 +33,8 @@ export default function ChapterPager(props) {
                 aria-label={t("docs.prev")}
                 title={p().title}
               >
-                <div class="flex items-start gap-2">
-                  <span aria-hidden="true">←</span>
+                <div class="flex items-center gap-2">
+                  <ArrowLeftIcon class="w-6 h-6 shrink-0" />
                   <div class="min-w-0">
                     <div class="font-medium whitespace-normal break-words leading-snug">
                       {p().index > 0 ? `${p().index}. ${p().title}` : p().title}
@@ -56,13 +57,13 @@ export default function ChapterPager(props) {
                 aria-label={t("docs.next")}
                 title={n().title}
               >
-                <div class="flex items-start gap-2 justify-end">
+                <div class="flex items-center gap-2 justify-end">
                   <div class="min-w-0">
                     <div class="font-medium whitespace-normal break-words leading-snug text-right">
                       {n().index > 0 ? `${n().index}. ${n().title}` : n().title}
                     </div>
                   </div>
-                  <span aria-hidden="true">→</span>
+                  <ArrowRightIcon class="w-6 h-6 shrink-0" />
                 </div>
               </button>
             )}

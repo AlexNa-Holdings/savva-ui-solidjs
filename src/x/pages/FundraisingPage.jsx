@@ -13,6 +13,8 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import NewFundraisingModal from "../fundraising/NewFundraisingModal.jsx";
+import CampaignContributeModal from "../fundraising/CampaignContributeModal.jsx";
+import { ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
 
 const DEFAULT_LIMIT = 20;
 
@@ -64,6 +66,8 @@ export default function FundraisingPage() {
   const [loading, setLoading] = createSignal(false);
   const [isClosing, setIsClosing] = createSignal(null);
   const [showCreateModal, setShowCreateModal] = createSignal(false);
+  const [showContributeModal, setShowContributeModal] = createSignal(false);
+  const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
 
   const wsList = createMemo(() => app.wsMethod ? app.wsMethod("list-fundraisers") : null);
   const userAddr = createMemo(() => app.authorizedUser()?.address || "");
@@ -129,6 +133,11 @@ export default function FundraisingPage() {
     const currentUser = app.authorizedUser()?.address?.toLowerCase();
     return currentUser && campaignCreator === currentUser;
   };
+
+  function openContributeModal(campaignId) {
+    setContributeCampaignId(campaignId);
+    setShowContributeModal(true);
+  }
 
   async function handleCloseCampaign(campaignId) {
     setIsClosing(campaignId);
@@ -236,28 +245,39 @@ export default function FundraisingPage() {
                           <TokenValue amount={raisedWei()} format="vertical" />
                         </td>
                         <td class="px-3 py-2 align-top">
-                          <div class="flex items-center gap-2">
-                            <div class="min-w-[140px]">
-                              <ProgressBar value={pct()} />
-                            </div>
-                            <div class="text-xs w-14 tabular-nums">
-                              {pct().toFixed(1)}%
-                            </div>
-                          </div>
+                          <ProgressBar value={pct()} />
                         </td>
                         <td class="px-3 py-2 align-top text-right">
-                          <Show when={!it.finished && isMyCampaign(it)}>
-                            <button
-                              class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-                              onClick={() => handleCloseCampaign(it.id)}
-                              title={t("fundraising.actions.close.tip")}
-                              disabled={isClosing() === it.id}
-                            >
-                              <Show when={isClosing() === it.id} fallback={t("fundraising.actions.close.label")}>
-                                  <Spinner class="w-4 h-4" />
-                              </Show>
-                            </button>
-                          </Show>
+                            <div class="flex items-center justify-end gap-2">
+                                <Show when={!it.finished}>
+                                    <Show 
+                                        when={isMyCampaign(it)}
+                                        fallback={
+                                            <button
+                                                class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+                                                onClick={() => openContributeModal(it.id)}
+                                                title={t("fundraising.card.contribute")}
+                                            >
+                                                {t("fundraising.card.contribute")}
+                                            </button>
+                                        }
+                                    >
+                                        <button
+                                        class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+                                        onClick={() => handleCloseCampaign(it.id)}
+                                        title={t("fundraising.actions.close.tip")}
+                                        disabled={isClosing() === it.id}
+                                        >
+                                        <Show when={isClosing() === it.id} fallback={t("fundraising.actions.close.label")}>
+                                            <Spinner class="w-4 h-4" />
+                                        </Show>
+                                        </button>
+                                    </Show>
+                                </Show>
+                                <a href={`#/fr/${it.id}`} onClick={(e) => e.stopPropagation()} title={t("fundraising.actions.link.tip")} class="p-1 rounded-md hover:bg-[hsl(var(--accent))]">
+                                    <ArrowRightIcon class="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
+                                </a>
+                            </div>
                         </td>
                       </tr>
                     );
@@ -276,6 +296,13 @@ export default function FundraisingPage() {
         onClose={() => setShowCreateModal(false)}
         onSuccess={refreshList}
       />
+      <CampaignContributeModal 
+        isOpen={showContributeModal()}
+        onClose={() => setShowContributeModal(false)}
+        campaignId={contributeCampaignId()}
+        onSuccess={refreshList}
+      />
     </>
   );
 }
+

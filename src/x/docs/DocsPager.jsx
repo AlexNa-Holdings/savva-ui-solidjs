@@ -1,6 +1,7 @@
 // src/x/docs/DocsPager.jsx
 import { createMemo, createResource, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
+import { ArrowLeftIcon, ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
 
 async function fetchSidebar(lang) {
   const res = await fetch(`/dev_docs/${lang}/sidebar.yaml`, { cache: "no-store" });
@@ -54,8 +55,8 @@ export default function DocsPager(props) {
                 aria-label={app.t("docs.prev")}
                 title={p().label}
               >
-                <div class="flex items-start gap-2">
-                  <span aria-hidden="true">←</span>
+                <div class="flex items-center gap-2">
+                  <ArrowLeftIcon class="w-6 h-6 shrink-0" />
                   <div class="min-w-0">
                     <div class="font-medium whitespace-normal break-words leading-snug">
                       {p().label}
@@ -81,7 +82,7 @@ export default function DocsPager(props) {
                 aria-label={app.t("docs.next")}
                 title={n().label}
               >
-                <div class="flex items-start gap-2 justify-end">
+                <div class="flex items-center gap-2 justify-end">
                   <div class="min-w-0">
                     <div class="font-medium whitespace-normal break-words leading-snug text-right">
                       {n().label}
@@ -90,7 +91,7 @@ export default function DocsPager(props) {
                       {n().section}
                     </div>
                   </div>
-                  <span aria-hidden="true">→</span>
+                  <ArrowRightIcon class="w-6 h-6 shrink-0" />
                 </div>
               </button>
             )}
