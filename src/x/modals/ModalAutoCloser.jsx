@@ -1,6 +1,7 @@
 // src/x/modals/ModalAutoCloser.jsx
+// src/x/modals/ModalAutoCloser.jsx
 import { onMount, onCleanup, createEffect } from "solid-js";
-import { onCloseAllModals } from "../../utils/modalBus.js";
+import { onCloseAllModals, markModalOpen, markModalClosed } from "../../utils/modalBus.js";
 import { useHashRouter } from "../../routing/hashRouter.js";
 
 export default function ModalAutoCloser(props) {
@@ -9,8 +10,14 @@ export default function ModalAutoCloser(props) {
   const close = () => props.onClose?.();
 
   let off;
-  onMount(() => { off = onCloseAllModals(close); });
-  onCleanup(() => off && off());
+  onMount(() => {
+    markModalOpen();
+    off = onCloseAllModals(close);
+  });
+  onCleanup(() => {
+    if (off) off();
+    markModalClosed();
+  });
 
   // Safety net: close if route changes anyway
   createEffect(() => { if (route() !== start) close(); });

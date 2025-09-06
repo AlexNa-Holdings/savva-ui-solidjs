@@ -25,6 +25,7 @@ import EditorPage from "./pages/EditorPage.jsx";
 import ContributePage from "./pages/ContributePage.jsx";
 import NpoListPage from "./pages/NpoListPage.jsx";
 import NpoPage from "./pages/NpoPage.jsx";
+import { closeAllModals } from "../utils/modalBus.js";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -56,16 +57,29 @@ export default function App() {
     return `${domainName}|${source}|${cid}|${tabsPath}`;
   });
 
+  // Detect any modal by presence of our shared overlay or ARIA dialog.
+  // TransferModal + others include <ModalBackdrop/> => .sv-modal-overlay. :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4}
+  const isAnyModalOpen = () =>
+    !!document.querySelector('.sv-modal-overlay, [aria-modal="true"], [role="dialog"]:not([aria-hidden="true"])');
+
   onMount(() => {
     const handleKeydown = (e) => {
       if (e.key !== "Escape") return;
-      
-      const view = currentView();
-      if (view !== 'main') {
-        navigate(app.lastTabRoute() || "/");
-        return; 
+      if (e.defaultPrevented) return;
+
+      // If a modal is open, close it via the modal bus and stop page-level ESC.
+      if (isAnyModalOpen()) {
+        e.preventDefault();
+        closeAllModals(); // ModalAutoCloser listens and invokes onClose on each modal. :contentReference[oaicite:5]{index=5}
+        return;
       }
-      
+
+      const view = currentView();
+      if (view !== "main") {
+        navigate(app.lastTabRoute() || "/"); // navigate() already closes modals defensively. :contentReference[oaicite:6]{index=6}
+        return;
+      }
+
       setIsPaneOpen(false);
     };
     document.addEventListener("keydown", handleKeydown);
@@ -73,7 +87,7 @@ export default function App() {
   });
 
   createEffect(on(currentView, (view) => {
-    if (view === 'main') {
+    if (view === "main") {
       requestAnimationFrame(() => {
         const y = app.savedScrollY();
         window.scrollTo(0, y);
