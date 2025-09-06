@@ -9,6 +9,9 @@ import EditorToolbar from "../editor/EditorToolbar.jsx";
 import EditorFilesDrawer from "../editor/EditorFilesDrawer.jsx";
 import { rehypeResolveDraftUrls } from "../../docs/rehype-resolve-draft-urls.js";
 import EditorFilesButton from "../editor/EditorFilesButton.jsx";
+import EditorActionsRow from "../editor/EditorActionsRow.jsx";
+import AdditionalParametersPost from "../editor/AdditionalParametersPost.jsx";
+
 import {
   loadDraft, saveDraft, resolveDraftFileUrl, DRAFT_DIRS, clearDraft,
   addUploadedFile, getAllUploadedFileNames, deleteUploadedFile
@@ -25,7 +28,7 @@ import CommentEditor from "../editor/CommentEditor.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { TrashIcon } from "../ui/icons/ActionIcons.jsx";
-import AdditionalParametersPost from "../editor/AdditionalParametersPost.jsx";
+import { createAIPostHandler } from "../../ai/AIPostHandler.js";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
@@ -72,6 +75,7 @@ export default function EditorPage() {
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
 
+  // ----- routing / editor mode -----
   const routeParams = createMemo(() => {
     const path = route();
     if (path.startsWith("/editor/new-comment/")) return { mode: "new_comment", parent_savva_cid: path.split("/")[3] };
@@ -80,8 +84,37 @@ export default function EditorPage() {
     if (path.startsWith("/editor/edit/")) return { mode: "edit_post", id: path.split("/")[3] };
     return { mode: "unknown" };
   });
-
   const editorMode = () => routeParams().mode;
+
+  // A stable draftKey for AI snapshots (depends on route)
+  const draftKey = createMemo(() => {
+    const domain = app.selectedDomainName?.() || "domain";
+    const rp = routeParams();
+    if (rp.mode === "edit_post") return `${domain}/post/${rp.id}`;
+    if (rp.mode === "new_post") return `${domain}/post/new`;
+    if (rp.mode === "new_comment") return `${domain}/comment/new/${rp.parent_savva_cid || "root"}`;
+    if (rp.mode === "edit_comment") return `${domain}/comment/${rp.id}`;
+    return `${domain}/editor`;
+  });
+
+  // ----- AI integration: read/apply/transform -----
+  function readEditorState() {
+    return {
+      postData: postData(),
+      postParams: postParams(),
+      activeLang: activeLang(),
+      editingChapterIndex: editingChapterIndex(),
+    };
+  }
+  function applyEditorState(s) {
+    if (!s) return;
+    if (typeof s.postData !== "undefined") setPostData(s.postData);
+    if (typeof s.postParams !== "undefined") setPostParams(s.postParams);
+    if (typeof s.activeLang !== "undefined") setActiveLang(s.activeLang);
+    if (typeof s.editingChapterIndex !== "undefined") setEditingChapterIndex(s.editingChapterIndex);
+  }
+
+
 
   const baseDir = createMemo(() => {
     const mode = editorMode();
@@ -94,6 +127,16 @@ export default function EditorPage() {
   const domainLangCodes = createMemo(() => {
     const fromDomain = (domainAssetsConfig?.()?.locales || []).map((l) => l.code).filter(Boolean);
     return fromDomain.length > 0 ? fromDomain : ["en"];
+  });
+
+  const ai = createAIPostHandler({
+    draftKey: draftKey(),
+    readState: readEditorState,
+    applyState: applyEditorState,
+    t,
+    onToast: pushToast,
+    supportedLangs: () => domainLangCodes(),
+    editorMode: () => editorMode(),
   });
 
   createEffect(on(routeParams, (rp) => {
@@ -264,7 +307,6 @@ export default function EditorPage() {
     setShowChapters(chapters.length > 0);
     setEditingChapterIndex(-1);
   }, { defer: true }));
-
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
@@ -544,13 +586,33 @@ export default function EditorPage() {
               <Show when={!isFullScreen()}>
                 <>
                   <AdditionalParametersPost editorMode={editorMode} postParams={postParams} setPostParams={setPostParams} activeLang={activeLang} />
-                  <div class="mt-6 flex justify-end items-center gap-4">
-                    <button onClick={() => setShowConfirmClear(true)} title={t("editor.clearDraft")} class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]">
-                      <TrashIcon />
-                    </button>
-                    <button onClick={() => setShowFullPreview(true)} class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90">
-                      {t("editor.previewPost")}
-                    </button>
+                  <div class="mt-6">
+                    <EditorActionsRow
+                      deleteButton={
+                        <button
+                          onClick={() => setShowConfirmClear(true)}
+                          title={t("editor.clearDraft")}
+                          class="p-2 rounded-md border border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
+                        >
+                          <TrashIcon />
+                        </button>
+                      }
+                      renderPreviewButton={({ withAiIcon, AiIconEl }) => (
+                        <button
+                          onClick={() => setShowFullPreview(true)}
+                          class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 flex items-center"
+                        >
+                          {withAiIcon && <span class="mr-2">{AiIconEl}</span>}
+                          {t("editor.previewPost")}
+                        </button>
+                      )}
+                      aiPending={ai.pending()}
+                      aiRunning={ai.running()}
+                      aiProgress={ai.progress()}
+                      onAiRun={ai.run}
+                      onAiUndo={ai.undo}
+                      onAiConfirm={ai.confirm}
+                    />
                   </div>
                 </>
               </Show>
