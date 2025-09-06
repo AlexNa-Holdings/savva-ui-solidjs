@@ -114,8 +114,6 @@ export default function EditorPage() {
     if (typeof s.editingChapterIndex !== "undefined") setEditingChapterIndex(s.editingChapterIndex);
   }
 
-
-
   const baseDir = createMemo(() => {
     const mode = editorMode();
     if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
@@ -211,6 +209,7 @@ export default function EditorPage() {
           } else {
             dbg.log("EditorPage:load", `Draft has no languages. This should not happen if draft.content exists.`);
           }
+          const initialChapters = (draft.content?.[initialLang]?.chapters || []);
           batch(() => {
             setPostData(draft.content);
             const params = draft.params || {};
@@ -219,6 +218,8 @@ export default function EditorPage() {
             }
             setPostParams(params);
             setActiveLang(initialLang);
+            // Ensure chapters block is shown on initial load when chapters already exist
+            setShowChapters(initialChapters.length > 0);
           });
         } else if (editorMode() === "new_post") {
           const newPostData = {};
@@ -230,6 +231,7 @@ export default function EditorPage() {
           batch(() => {
             setPostData(newPostData);
             setPostParams(newPostParams);
+            setShowChapters(false);
           });
         } else {
           dbg.error("EditorPage", `Draft not found for edit mode in '${baseDir()}', navigating back.`);
@@ -307,6 +309,15 @@ export default function EditorPage() {
     setShowChapters(chapters.length > 0);
     setEditingChapterIndex(-1);
   }, { defer: true }));
+
+  // Keep chapters block visibility in sync when draft data loads/changes
+  createEffect(
+    on([postData, activeLang], ([data, lang]) => {
+      if (!data) return;
+      const chapters = data?.[lang]?.chapters || [];
+      setShowChapters(chapters.length > 0);
+    }, { defer: true })
+  );
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
@@ -407,6 +418,7 @@ export default function EditorPage() {
         locales[lang] = { ...langParams, chapters };
         return { ...prev, locales };
       });
+      setShowChapters(true);
     });
     setEditingChapterIndex(newIndex);
   };
@@ -560,7 +572,13 @@ export default function EditorPage() {
 
                   <Show when={editorMode() === "new_post" || editorMode() === "edit_post"}>
                     <div class="flex items-center gap-4 mb-4">
-                      <input type="text" value={currentLangData().title} onInput={(e) => updateField("title", e.currentTarget.value)} placeholder={t("editor.titlePlaceholder")} class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]" />
+                      <input
+                        type="text"
+                        value={currentLangData().title}
+                        onInput={(e) => updateField("title", e.currentTarget.value)}
+                        placeholder={t("editor.titlePlaceholder")}
+                        class="flex-1 w-full text-2xl font-bold px-2 py-1 bg-transparent border-b border-[hsl(var(--border))] focus:outline-none focus:border-[hsl(var(--primary))]"
+                      />
                       <div class="flex-shrink-0 flex items-center gap-2">
                         <Show when={!showChapters()}>
                           <EditorTocButton onClick={() => { handleAddChapter(); setShowChapters(true); }} />
@@ -574,18 +592,46 @@ export default function EditorPage() {
 
                   <Show when={showChapters() && editorMode() !== "new_comment" && editorMode() !== "edit_comment"}>
                     <div class="mb-4">
-                      <EditorChapterSelector chapters={combinedChapters()} activeIndex={editingChapterIndex()} onSelectIndex={setEditingChapterIndex} onAdd={handleAddChapter} onRemove={handleRemoveChapter} onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)} />
+                      <EditorChapterSelector
+                        chapters={combinedChapters()}
+                        activeIndex={editingChapterIndex()}
+                        onSelectIndex={setEditingChapterIndex}
+                        onAdd={handleAddChapter}
+                        onRemove={handleRemoveChapter}
+                        onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                      />
                     </div>
                   </Show>
                 </>
               </Show>
 
-              <EditorToolbar isPreview={showPreview()} onTogglePreview={() => setShowPreview(!showPreview())} getTextareaRef={() => textareaRef} onValueChange={handleEditorInput} isFullScreen={isFullScreen()} onToggleFullScreen={() => setIsFullScreen((p) => !p)} />
-              <MarkdownInput editorRef={(el) => (textareaRef = el)} value={currentEditorContent()} onInput={handleEditorInput} onPaste={handlePaste} placeholder={t("editor.bodyPlaceholder")} showPreview={showPreview()} rehypePlugins={markdownPlugins()} isFullScreen={isFullScreen()} />
+              <EditorToolbar
+                isPreview={showPreview()}
+                onTogglePreview={() => setShowPreview(!showPreview())}
+                getTextareaRef={() => textareaRef}
+                onValueChange={handleEditorInput}
+                isFullScreen={isFullScreen()}
+                onToggleFullScreen={() => setIsFullScreen((p) => !p)}
+              />
+              <MarkdownInput
+                editorRef={(el) => (textareaRef = el)}
+                value={currentEditorContent()}
+                onInput={handleEditorInput}
+                onPaste={handlePaste}
+                placeholder={t("editor.bodyPlaceholder")}
+                showPreview={showPreview()}
+                rehypePlugins={markdownPlugins()}
+                isFullScreen={isFullScreen()}
+              />
 
               <Show when={!isFullScreen()}>
                 <>
-                  <AdditionalParametersPost editorMode={editorMode} postParams={postParams} setPostParams={setPostParams} activeLang={activeLang} />
+                  <AdditionalParametersPost
+                    editorMode={editorMode}
+                    postParams={postParams}
+                    setPostParams={setPostParams}
+                    activeLang={activeLang}
+                  />
                   <div class="mt-6">
                     <EditorActionsRow
                       deleteButton={
@@ -621,10 +667,37 @@ export default function EditorPage() {
         </>
       </Show>
 
-      <EditorFilesDrawer isOpen={showFiles()} onClose={() => setShowFiles(false)} baseDir={baseDir()} onInsert={handleInsertFile} onSetThumbnail={handleSetThumbnail} onInsertUrl={handleInsertUrl} filesRevision={filesRevision()} />
-      <ConfirmModal isOpen={showConfirmDelete()} onClose={() => setShowConfirmDelete(false)} onConfirm={confirmRemoveChapter} title={t("editor.chapters.confirmDeleteTitle")} message={t("editor.chapters.confirmDeleteMessage")} />
-      <ConfirmModal isOpen={showConfirmClear()} onClose={() => setShowConfirmClear(false)} onConfirm={handleConfirmClear} title={t("editor.clearDraftTitle")} message={t("editor.clearDraftMessage")} />
-      <PostSubmissionWizard isOpen={showPublishWizard()} onClose={() => setShowPublishWizard(false)} onSuccess={handlePublishSuccess} postData={postData} postParams={postParams} editorMode={editorMode()} />
+      <EditorFilesDrawer
+        isOpen={showFiles()}
+        onClose={() => setShowFiles(false)}
+        baseDir={baseDir()}
+        onInsert={handleInsertFile}
+        onSetThumbnail={handleSetThumbnail}
+        onInsertUrl={handleInsertUrl}
+        filesRevision={filesRevision()}
+      />
+      <ConfirmModal
+        isOpen={showConfirmDelete()}
+        onClose={() => setShowConfirmDelete(false)}
+        onConfirm={confirmRemoveChapter}
+        title={t("editor.chapters.confirmDeleteTitle")}
+        message={t("editor.chapters.confirmDeleteMessage")}
+      />
+      <ConfirmModal
+        isOpen={showConfirmClear()}
+        onClose={() => setShowConfirmClear(false)}
+        onConfirm={handleConfirmClear}
+        title={t("editor.clearDraftTitle")}
+        message={t("editor.clearDraftMessage")}
+      />
+      <PostSubmissionWizard
+        isOpen={showPublishWizard()}
+        onClose={() => setShowPublishWizard(false)}
+        onSuccess={handlePublishSuccess}
+        postData={postData}
+        postParams={postParams}
+        editorMode={editorMode()}
+      />
     </main>
   );
 }

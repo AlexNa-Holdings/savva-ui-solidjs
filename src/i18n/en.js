@@ -642,7 +642,10 @@ export default {
   "editor.ai.errors.cleanTooMuch": "Cleanup would modify too much, skipping.",
   "editor.ai.errors.unsupported": "Detected language is not supported for this domain.",
    "editor.ai.progress.makeChapterTitles": "Creating chapter titles",
-  "editor.ai.errors.noChaptersToTitle": "No chapters require titles."
+  "editor.ai.errors.noChaptersToTitle": "No chapters require titles.",
+  "editor.ai.progress.rebaseLocales": "Rebasing locales",
+  "editor.ai.errors.api": "AI request failed.",
+  "editor.ai.errors.ambiguous": "Could not confidently determine a base language."
 
 
 };

@@ -21,7 +21,9 @@ function resolveSupportedLangs(opts, state) {
   return Array.from(set);
 }
 
-// ---------- AI tasks ----------
+// ---------- AI tasks already in your flow (analyze, clean, title, chapter titles) ----------
+// (Unchanged from your latest version; included here only where relevant differences exist)
+
 function makeAnalyzeAiTask(t, opts) {
   return {
     id: "analyze",
@@ -81,47 +83,62 @@ function makeCleanOriginalAiTask(t, opts) {
       if (langData.body?.trim()) items.push({ id: "body", text: langData.body });
       if (typeof langData.title === "string" && langData.title.trim()) items.push({ id: "title", text: langData.title });
       if (Array.isArray(langData.chapters)) {
-        langData.chapters.forEach((ch, i) => {
-          if (ch?.body?.trim()) items.push({ id: `ch_${i}`, text: ch.body });
-          if (typeof ch?.title === "string" && ch.title.trim()) items.push({ id: `cht_${i}`, text: ch.title });
-        });
+        langData.chapters.forEach((ch, i) => { if (ch?.body?.trim()) items.push({ id: `ch_${i}`, text: ch.body }); });
       }
+
+      const paramsChs = state?.postParams?.locales?.[baseLang]?.chapters || [];
+      paramsChs.forEach((cp, i) => {
+        if (cp?.title && String(cp.title).trim()) items.push({ id: `cht_${i}`, text: String(cp.title) });
+      });
+
       if (items.length === 0) throw new Error(t("editor.ai.errors.nothingToClean"));
 
       const ai = createAiClient();
       let cleaned;
-      try {
-        cleaned = await ai.cleanTextBatch(items, { languageHint: baseLang });
-      } catch {
-        throw new Error(t("editor.ai.errors.api"));
-      }
+      try { cleaned = await ai.cleanTextBatch(items, { languageHint: baseLang }); }
+      catch { throw new Error(t("editor.ai.errors.api")); }
 
-      // Apply atomically
       const map = new Map(cleaned.map((x) => [x.id, x.text]));
       let changed = false;
       const next = deepClone(state);
-      const ld = { ...(next.postData?.[baseLang] || {}) };
 
-      if (langData.body?.trim() && map.has("body") && map.get("body") !== langData.body) { ld.body = map.get("body"); changed = true; }
+      // postData content
+      const nextLD = { ...(next.postData?.[baseLang] || {}) };
+      if (langData.body?.trim() && map.has("body") && map.get("body") !== langData.body) { nextLD.body = map.get("body"); changed = true; }
       if (typeof langData.title === "string" && langData.title.trim() && map.has("title") && map.get("title") !== langData.title) {
-        ld.title = map.get("title"); changed = true;
+        nextLD.title = map.get("title"); changed = true;
       }
-
       if (Array.isArray(langData.chapters)) {
         const chs = (langData.chapters || []).map((c) => ({ ...(c || {}) }));
         for (let i = 0; i < chs.length; i++) {
           if (chs[i]?.body?.trim() && map.has(`ch_${i}`) && map.get(`ch_${i}`) !== chs[i].body) {
             chs[i].body = map.get(`ch_${i}`); changed = true;
           }
-          if (typeof chs[i]?.title === "string" && chs[i].title.trim() && map.has(`cht_${i}`) && map.get(`cht_${i}`) !== chs[i].title) {
-            chs[i].title = map.get(`cht_${i}`); changed = true;
+        }
+        nextLD.chapters = chs;
+      }
+      next.postData = { ...(next.postData || {}), [baseLang]: nextLD };
+
+      // chapter titles -> postParams
+      const locales = { ...(next.postParams?.locales || {}) };
+      const langParams = { ...(locales[baseLang] || {}) };
+      const chParams = Array.isArray(langParams.chapters) ? [...langParams.chapters] : [];
+      const totalCh = Array.isArray(nextLD.chapters) ? nextLD.chapters.length : chParams.length;
+      while (chParams.length < totalCh) chParams.push({});
+      for (let i = 0; i < totalCh; i++) {
+        const key = `cht_${i}`;
+        if (map.has(key)) {
+          const newTitle = map.get(key);
+          if (typeof newTitle === "string" && newTitle !== (chParams[i]?.title || "")) {
+            chParams[i] = { ...(chParams[i] || {}), title: newTitle };
+            changed = true;
           }
         }
-        ld.chapters = chs;
       }
+      langParams.chapters = chParams;
+      next.postParams = { ...(next.postParams || {}), locales: { ...locales, [baseLang]: langParams } };
 
       if (!changed) return { state, modified: false };
-      next.postData = { ...(next.postData || {}), [baseLang]: ld };
       return { state: next, modified: true };
     },
   };
@@ -148,13 +165,8 @@ function makeTitleAiTask(t, opts) {
 
       const ai = createAiClient();
       let title;
-      try {
-        title = await ai.proposeTitle(baseLang, { body: langData.body || "", chapters: langData.chapters || [] });
-      } catch (e) {
-        const msg = String(e?.message || "");
-        if (msg === "no_title") throw new Error(t("editor.ai.errors.noContentForTitle"));
-        throw new Error(t("editor.ai.errors.api"));
-      }
+      try { title = await ai.proposeTitle(baseLang, { body: langData.body || "", chapters: langData.chapters || [] }); }
+      catch (e) { throw new Error(t("editor.ai.errors.api")); }
 
       let final = title.replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
       if (!final) throw new Error(t("editor.ai.errors.noContentForTitle"));
@@ -181,48 +193,137 @@ function makeChapterTitlesAiTask(t, opts) {
       if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
 
       const langData = state?.postData?.[baseLang];
-      if (!Array.isArray(langData?.chapters) || langData.chapters.length === 0) return { state, modified: false };
+      const chs = Array.isArray(langData?.chapters) ? langData.chapters : [];
+      if (chs.length === 0) return { state, modified: false };
 
+      const curParamsChapters = state?.postParams?.locales?.[baseLang]?.chapters || [];
       const targets = [];
-      langData.chapters.forEach((ch, i) => {
-        const hasBody = !!(ch?.body && ch.body.trim());
-        const hasTitle = !!(ch?.title && String(ch.title).trim());
+      for (let i = 0; i < chs.length; i++) {
+        const hasBody = !!(chs[i]?.body && chs[i].body.trim());
+        const hasTitle = !!(curParamsChapters[i]?.title && String(curParamsChapters[i].title).trim());
         if (hasBody && !hasTitle) targets.push(i);
-      });
+      }
       if (targets.length === 0) return { state, modified: false };
 
       const ai = createAiClient();
       const proposals = new Map();
       try {
-        // sequential to keep it simple & predictable
         for (const i of targets) {
-          const tt = await ai.proposeChapterTitle(baseLang, { body: langData.chapters[i].body, index: i });
+          const tt = await ai.proposeChapterTitle(baseLang, { body: chs[i].body, index: i });
           let final = String(tt || "").replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
           if (final.length > 60) final = final.slice(0, 57).trimEnd() + "…";
           if (!final) continue;
           proposals.set(i, final);
         }
-      } catch {
-        throw new Error(t("editor.ai.errors.api"));
-      }
+      } catch { throw new Error(t("editor.ai.errors.api")); }
 
-      if (proposals.size === 0) throw new Error(t("editor.ai.errors.noChaptersToTitle"));
+      if (proposals.size === 0) return { state, modified: false };
 
       const next = deepClone(state);
-      const chs = (next.postData?.[baseLang]?.chapters || []).map((c) => ({ ...(c || {}) }));
+      const locales = { ...(next.postParams?.locales || {}) };
+      const langParams = { ...(locales[baseLang] || {}) };
+      const chParams = Array.isArray(langParams.chapters) ? [...langParams.chapters] : [];
+      while (chParams.length < chs.length) chParams.push({});
       let changed = false;
       for (const [i, title] of proposals.entries()) {
-        if (!chs[i].title || !String(chs[i].title).trim()) {
-          chs[i].title = title;
+        if (!chParams[i]?.title || String(chParams[i].title).trim() === "") {
+          chParams[i] = { ...(chParams[i] || {}), title };
           changed = true;
         }
       }
       if (!changed) return { state, modified: false };
+      langParams.chapters = chParams;
+      next.postParams = { ...(next.postParams || {}), locales: { ...locales, [baseLang]: langParams } };
+      return { state: next, modified: true };
+    },
+  };
+}
 
-      next.postData = {
-        ...(next.postData || {}),
-        [baseLang]: { ...(next.postData?.[baseLang] || {}), chapters: chs }
+// ---------- NEW: one-shot translation task ----------
+function makeTranslateAiTask(t, opts) {
+  return {
+    id: "translateAll",
+    label: t("editor.ai.progress.translate"),
+    run: async (state) => {
+      const mode = typeof opts.editorMode === "function" ? opts.editorMode() : opts.editorMode;
+      if (mode === "new_comment" || mode === "edit_comment") return { state, modified: false };
+
+      const supported = resolveSupportedLangs(opts, state);
+      const meta = opts._getMeta?.() || {};
+      const base = meta.analysis?.baseLang || normCode(state?.activeLang) || supported[0];
+      if (!base) throw new Error(t("editor.ai.errors.ambiguous"));
+
+      const targets = supported.filter((x) => x !== base);
+      if (targets.length === 0) return { state, modified: false };
+
+      // Build source structure from base language
+      const srcLD = state?.postData?.[base] || {};
+      const srcChParams = state?.postParams?.locales?.[base]?.chapters || [];
+      const chapters = Array.isArray(srcLD.chapters) ? srcLD.chapters : [];
+      const sourceStruct = {
+        title: String(srcLD.title || ""),
+        body: String(srcLD.body || ""),
+        chapters: chapters.map((c, i) => ({
+          title: String(srcChParams[i]?.title || ""),
+          body: String(c?.body || "")
+        }))
       };
+
+      const ai = createAiClient();
+      let translations;
+      try {
+        translations = await ai.translateStructure(base, targets, sourceStruct);
+      } catch {
+        throw new Error(t("editor.ai.errors.api"));
+      }
+
+      // Apply atomically
+      const next = deepClone(state);
+      let changed = false;
+
+      for (const lang of targets) {
+        const tdata = translations?.[lang];
+        if (!tdata) continue;
+
+        // postData (title + body + chapter bodies)
+        const cur = next.postData?.[lang] || {};
+        const newTitle = typeof tdata.title === "string" ? tdata.title : cur.title || "";
+        const newBody = typeof tdata.body === "string" ? tdata.body : cur.body || "";
+
+        const srcChLen = sourceStruct.chapters.length;
+        const tdChapters = Array.isArray(tdata.chapters) ? tdata.chapters : [];
+        const mergedBodies = [];
+        for (let i = 0; i < srcChLen; i++) {
+          const tb = tdChapters[i]?.body;
+          const curBody = cur.chapters?.[i]?.body || "";
+          mergedBodies[i] = { ...(cur.chapters?.[i] || {}), body: typeof tb === "string" ? tb : curBody };
+        }
+
+        const nextContent = { ...cur, title: newTitle, body: newBody, chapters: mergedBodies };
+        const prevSerialized = JSON.stringify(next.postData?.[lang] || {});
+        const nextSerialized = JSON.stringify(nextContent);
+        if (prevSerialized !== nextSerialized) {
+          next.postData = { ...(next.postData || {}), [lang]: nextContent };
+          changed = true;
+        }
+
+        // postParams.locales (chapter titles)
+        const locales = { ...(next.postParams?.locales || {}) };
+        const lp = { ...(locales[lang] || {}) };
+        const curChParams = Array.isArray(lp.chapters) ? [...lp.chapters] : [];
+        while (curChParams.length < srcChLen) curChParams.push({});
+        for (let i = 0; i < srcChLen; i++) {
+          const tt = tdChapters[i]?.title;
+          if (typeof tt === "string" && tt !== (curChParams[i]?.title || "")) {
+            curChParams[i] = { ...(curChParams[i] || {}), title: tt };
+            changed = true;
+          }
+        }
+        lp.chapters = curChParams;
+        next.postParams = { ...(next.postParams || {}), locales: { ...locales, [lang]: lp } };
+      }
+
+      if (!changed) return { state, modified: false };
       return { state: next, modified: true };
     },
   };
@@ -252,10 +353,11 @@ export function createAIPostHandler(opts) {
   const tasksSupplier = () => {
     const tasks = [makeAnalyzeAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta })];
     if (isPostMode()) {
-      // Order: analyze → clean texts & titles → make post title → make chapter titles
+      // Order: analyze → clean texts & titles → make post title → make chapter titles → translate all
       tasks.push(makeCleanOriginalAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
       tasks.push(makeTitleAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
       tasks.push(makeChapterTitlesAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
+      tasks.push(makeTranslateAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
     }
     return tasks;
   };

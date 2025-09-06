@@ -8,10 +8,14 @@ function safeModel(cfg) { return cfg.model || "gpt-4o-mini"; }
 function parseJsonStrict(s) {
   const raw = String(s || "").trim();
   try { return JSON.parse(raw); } catch {}
-  const m = raw.match(/```json([\s\S]*?)```/i) || raw.match(/```([\s\S]*?)```/i);
-  if (m && m[1]) { try { return JSON.parse(m[1]); } catch {} }
+  const fenced = raw.match(/```json([\s\S]*?)```/i) || raw.match(/```([\s\S]*?)```/i);
+  if (fenced && fenced[1]) {
+    try { return JSON.parse(fenced[1]); } catch {}
+  }
   const b = raw.indexOf("{"), e = raw.lastIndexOf("}");
-  if (b >= 0 && e > b) { try { return JSON.parse(raw.slice(b, e + 1)); } catch {} }
+  if (b >= 0 && e > b) {
+    try { return JSON.parse(raw.slice(b, e + 1)); } catch {}
+  }
   throw new Error("Bad JSON from AI");
 }
 
@@ -70,12 +74,13 @@ async function callGemini({ baseUrl, apiKey, model, messages }) {
   });
   const j = await res.json();
   if (!res.ok) throw new Error(j?.error?.message || res.statusText);
-  return j?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
+  const content = j?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
+  return content;
 }
 
 export function createAiClient(explicitCfg) {
   const cfg = explicitCfg || getAiConfig();
-  const kind = cfg?.providerId || "openai";
+  const providerId = cfg?.providerId || "openai";
   const model = safeModel(cfg);
   const baseUrl = cfg.baseUrl;
   const apiKey = cfg.apiKey;
@@ -83,10 +88,12 @@ export function createAiClient(explicitCfg) {
 
   async function chat(messages) {
     if (!apiKey || !baseUrl || !model) throw new Error("AI not configured");
-    if (kind === "anthropic") return callAnthropic({ baseUrl, apiKey, model, messages });
-    if (kind === "gemini") return callGemini({ baseUrl, apiKey, model, messages });
-    if (kind === "azure-openai" || kind === "azure_openai")
+    if (providerId === "anthropic") return callAnthropic({ baseUrl, apiKey, model, messages });
+    if (providerId === "gemini") return callGemini({ baseUrl, apiKey, model, messages });
+    if (providerId === "azure-openai" || providerId === "azure_openai") {
       return callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages });
+    }
+    // openai, openai-compatible, groq, together, mistral → OpenAI-compatible
     return callOpenAICompat({ baseUrl, apiKey, model, messages });
   }
 
@@ -136,6 +143,34 @@ export function createAiClient(explicitCfg) {
     return { base, confidence: isFinite(confidence) ? confidence : 0 };
   }
 
+  async function classifyLocales(samples, { allowed = [], baseHint } = {}) {
+    const sys = [
+      "You are a strict language classifier for a publishing pipeline.",
+      "For EACH item, infer the single dominant language code from the ALLOWED list only.",
+      "Ignore the 'locale' label in the input; judge by content.",
+      "If not enough text to decide, use a low confidence.",
+      'Respond ONLY with strict JSON: {"locales":[{"locale":"ru","lang":"en","confidence":0.82}, ...]}'
+    ].join(" ");
+    const trimmed = (samples || []).map(s => ({
+      locale: s.locale,
+      text: String(s.text || "").slice(0, 6000)
+    }));
+    const user = [
+      `ALLOWED: ${JSON.stringify(allowed)}`,
+      baseHint ? `BASE_HINT: ${baseHint}` : "",
+      "ITEMS:",
+      JSON.stringify(trimmed, null, 2)
+    ].join("\n");
+    const content = await chat([{ role: "system", content: sys }, { role: "user", content: user }]);
+    const j = parseJsonStrict(content);
+    const arr = Array.isArray(j?.locales) ? j.locales : [];
+    return arr.map(x => ({
+      locale: String(x?.locale || "").toLowerCase().slice(0, 10),
+      lang: String(x?.lang || "").toLowerCase().slice(0, 2),
+      confidence: Number(x?.confidence ?? 0)
+    }));
+  }
+
   async function proposeTitle(baseLang, { body, chapters }) {
     const parts = [];
     if (body) parts.push(String(body));
@@ -171,5 +206,32 @@ export function createAiClient(explicitCfg) {
     return title;
   }
 
-  return { cleanTextBatch, detectBaseLanguage, proposeTitle, proposeChapterTitle };
+  async function translateStructure(baseLang, targetLangs, structure) {
+    const sys = [
+      "You are a careful translator for a publishing workflow.",
+      `Source language: ${baseLang}. Translate to ALL requested target languages.`,
+      "Preserve Markdown formatting, code fences (```...```), inline code (`...`), links and URLs exactly.",
+      "Do NOT translate code, URLs, or placeholders like {variable}. Keep chapter count and order identical.",
+      'Respond ONLY with strict JSON of the form: {"translations":{"<lang>":{"title":"...","body":"...","chapters":[{"title":"...","body":"..."}, ...]}, ...}}'
+    ].join(" ");
+    const user = [
+      `TARGET_LANGS: ${JSON.stringify(targetLangs)}`,
+      "SOURCE_STRUCTURE:",
+      JSON.stringify(structure, null, 2)
+    ].join("\n");
+    const content = await chat([{ role: "system", content: sys }, { role: "user", content: user }]);
+    const j = parseJsonStrict(content);
+    if (!j || typeof j !== "object" || !j.translations) throw new Error("no_translations");
+    return j.translations;
+  }
+
+  return {
+    chat,
+    cleanTextBatch,
+    detectBaseLanguage,
+    classifyLocales,
+    proposeTitle,
+    proposeChapterTitle,
+    translateStructure
+  };
 }
