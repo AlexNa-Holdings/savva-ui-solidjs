@@ -5,9 +5,11 @@ import AmountInput from "../ui/AmountInput.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
-import { performStake } from "../../blockchain/transactions.js";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { parseUnits } from "viem";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
+
+const MAX_UINT = (1n << 256n) - 1n;
 
 async function fetchStakingInfo({ app, userAddress }) {
   if (!app || !userAddress) return null;
@@ -28,7 +30,9 @@ export default function IncreaseStakingModal(props) {
   const app = useApp();
   const { t } = app;
   const log = (...a) => (window?.dbg?.log ? window.dbg.log(...a) : console.debug(...a));
-  const user = () => app.authorizedUser();
+
+  // actor-aware subject (self or selected NPO)
+  const subjectAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
   const [amountText, setAmountText] = createSignal("");
   const [amountWei, setAmountWei] = createSignal(0n);
@@ -36,7 +40,7 @@ export default function IncreaseStakingModal(props) {
   const [isProcessing, setIsProcessing] = createSignal(false);
 
   const [stakingInfo] = createResource(
-    () => ({ app, userAddress: user()?.address }),
+    () => ({ app, userAddress: subjectAddr() }),
     fetchStakingInfo
   );
 
@@ -129,6 +133,7 @@ export default function IncreaseStakingModal(props) {
     return "";
   }
 
+  // Actor-aware approve + stake
   async function submit(e) {
     e.preventDefault();
     setErr("");
@@ -154,12 +159,36 @@ export default function IncreaseStakingModal(props) {
 
     setIsProcessing(true);
     try {
-      await performStake(app, { amountWei: v });
+      const staking = await getSavvaContract(app, "Staking");
+      const token = await getSavvaContract(app, "SavvaToken");
+
+      // Check allowance for the ACTOR
+      const owner = subjectAddr();
+      const spender = staking.address;
+      const current = await token.read.allowance([owner, spender]);
+
+      if (current < v) {
+        await sendAsActor(app, {
+          contractName: "SavvaToken",
+          functionName: "approve",
+          args: [spender, MAX_UINT],
+        });
+      }
+
+      // Stake via actor (NPO => NPO.multicall)
+      await sendAsActor(app, {
+        contractName: "Staking",
+        functionName: "stake",
+        args: [v],
+      });
+
       props.onSubmit?.();
       setIsProcessing(false);
       close();
     } catch (eTx) {
       setIsProcessing(false);
+      // optionally surface error via toast outside (caller)
+      log("Stake: tx failed", eTx?.message || eTx);
     }
   }
 

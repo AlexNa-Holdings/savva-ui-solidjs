@@ -37,8 +37,10 @@ export default function AmountInput(props) {
     String(tokenMeta()?.symbol || (isBaseToken() ? (chain()?.nativeCurrency?.symbol || "PLS") : "TOK"))
   );
 
-  // Owner address (balance lookups)
+  // Owner address (balance lookups) — USE ACTOR FIRST
   const ownerAddr = createMemo(() => {
+    const actor = app.actorAddress?.();
+    if (actor) return actor;
     const connected = walletAccount();
     const authed = app.authorizedUser?.()?.address;
     return connected || authed || "0x0000000000000000000000000000000000000000";
@@ -116,9 +118,9 @@ export default function AmountInput(props) {
     }
   });
 
-  // When tokenAddress/decimals change, re-parse current text with new decimals
+  // When tokenAddress/decimals/actor change, re-parse current text and refetch
   createEffect(() => {
-    decimals(); // subscribe
+    decimals(); ownerAddr(); // subscribe
     const current = text();
     emitBoth(current);
   });
@@ -132,7 +134,7 @@ export default function AmountInput(props) {
   const usdPrice = createMemo(() => {
     const allPrices = app.allTokenPrices?.();
     if (!allPrices) return null;
-    
+
     if (isSavvaLike()) return app.savvaTokenPrice?.()?.price ?? null;
     if (isBaseToken()) return app.baseTokenPrice?.()?.price ?? null;
 

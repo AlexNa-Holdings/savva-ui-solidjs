@@ -6,6 +6,7 @@ import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import AddressInput from "../ui/AddressInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
+import { sendAsUser } from "../../blockchain/npoMulticall.js"; // actor-aware helpers (config must be "as user")
 
 function bytes32ToString(hex) {
   if (!hex || typeof hex !== "string" || !hex.startsWith("0x")) return "";
@@ -35,10 +36,7 @@ export default function AddMemberModal(props) {
       return next;
     });
   }
-
-  function selectedArray() {
-    return Array.from(selected());
-  }
+  const selectedArray = () => Array.from(selected());
 
   function close() {
     if (submitting()) return;
@@ -66,17 +64,24 @@ export default function AddMemberModal(props) {
     }
   });
 
+  // IMPORTANT: NPO configuration must be executed "as user" (not via NPO.multicall)
+  // We use sendAsUser so that msg.sender is the admin EOA.
   async function onAdd() {
     if (submitting()) return;
     const member = addr()?.trim();
+    if (!props.npoAddr) { pushErrorToast({ message: t("errors.missingParam") }); return; }
     if (!member) { pushErrorToast({ message: t("errors.invalidAddress") }); return; }
 
     try {
       setSubmitting(true);
-      const client = await app.getGuardedWalletClient?.();
-      if (!client) throw new Error("No wallet client");
-      const c = getContract({ address: props.npoAddr, abi: SavvaNPOAbi, client });
-      await c.write.addMember([member, selectedArray()]);
+
+      await sendAsUser(app, {
+        target: props.npoAddr,
+        abi: SavvaNPOAbi,
+        functionName: "addMember",
+        args: [member, selectedArray()],
+      });
+
       pushToast({ type: "success", message: t("npo.addMember.added") });
       props.onAdded?.();
     } catch (e) {

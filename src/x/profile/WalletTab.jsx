@@ -1,26 +1,37 @@
 // src/x/profile/WalletTab.jsx
 import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
-import { createMemo, createResource, Show, createSignal, For } from "solid-js";
+import { createMemo, createResource, Show, createSignal, For, createEffect } from "solid-js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
 import Spinner from "../ui/Spinner.jsx";
 import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import TransferModal from "../modals/TransferModal.jsx";
 import IncreaseStakingModal from "../modals/IncreaseStakingModal.jsx";
 import UnstakeModal from "../modals/UnstakeModal.jsx";
 import Countdown from "../ui/Countdown.jsx";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 export default function WalletTab(props) {
   const app = useApp();
   const { t } = app;
 
-  // The profile whose wallet we show. Falls back to authorized user.
   const viewedUser = () => props.user || app.authorizedUser();
   const [refreshKey, setRefreshKey] = createSignal(0);
+
+  // 🔁 Refresh data automatically when ACTOR changes (wallet open)
+  createEffect(() => {
+    app.actorAddress?.();              // subscribe to actor
+    setRefreshKey((v) => v + 1);       // trigger refetch
+  });
+
+  const isActorProfile = createMemo(() => {
+    const actor = (app.actorAddress?.() || "").toLowerCase();
+    const viewed = (viewedUser()?.address || "").toLowerCase();
+    return !!actor && !!viewed && actor === viewed;
+  });
 
   const RefreshButton = () => (
     <button
@@ -34,8 +45,7 @@ export default function WalletTab(props) {
     </button>
   );
 
-  // ── data ─────────────────────────────────────────────────────────────────────
-  async function fetchWalletData({ app, user, refreshKey }) {
+  async function fetchWalletData({ app, user }) {
     if (!user?.address || !app.desiredChain()) return null;
     try {
       const publicClient = createPublicClient({
@@ -90,13 +100,6 @@ export default function WalletTab(props) {
   const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
   const stakingTokenAddress = () => walletData()?.stakingTokenAddress || "";
 
-  function isOwnConnectedWallet() {
-    const wa = walletAccount();
-    const u = viewedUser();
-    return !!wa && !!u?.address && String(wa).toLowerCase() === String(u.address).toLowerCase();
-  }
-
-  // ── modals ───────────────────────────────────────────────────────────────────
   const [showTransfer, setShowTransfer] = createSignal(false);
   const [showBaseTransfer, setShowBaseTransfer] = createSignal(false);
   const [showStakeTransfer, setShowStakeTransfer] = createSignal(false);
@@ -110,66 +113,36 @@ export default function WalletTab(props) {
         method: "wallet_watchAsset",
         params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
       });
-    } catch { /* ignore */ }
+    } catch {}
   }
 
-  // ── actions ──────────────────────────────────────────────────────────────────
   async function handleClaimNftEarnings() {
     try {
-      const contentFund = await getSavvaContract(app, "ContentFund", { write: true });
-      const hash = await contentFund.write.claimNFTGain([]);
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await pc.waitForTransactionReceipt({ hash });
-    } catch (e) {
-      console.error("claimNFTGain failed:", e);
-    } finally {
-      refetch();
-      app.triggerWalletDataRefresh?.();
-    }
+      await sendAsActor(app, { contractName: "ContentFund", functionName: "claimNFTGain", args: [] });
+    } catch (e) { console.error("claimNFTGain failed:", e); }
+    finally { refetch(); app.triggerWalletDataRefresh?.(); }
   }
-
   async function handleCompoundReward() {
     try {
-      const staking = await getSavvaContract(app, "Staking", { write: true });
-      const hash = await staking.write.compoundGain([]);
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await pc.waitForTransactionReceipt({ hash });
-    } catch (e) {
-      console.error("compoundGain failed:", e);
-    } finally {
-      refetch(); app.triggerWalletDataRefresh?.();
-    }
+      await sendAsActor(app, { contractName: "Staking", functionName: "compoundGain", args: [] });
+    } catch (e) { console.error("compoundGain failed:", e); }
+    finally { refetch(); app.triggerWalletDataRefresh?.(); }
   }
-
   async function handleWithdrawReward() {
     try {
-      const staking = await getSavvaContract(app, "Staking", { write: true });
-      const hash = await staking.write.claimGain([]);
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await pc.waitForTransactionReceipt({ hash });
-    } catch (e) {
-      console.error("claimGain failed:", e);
-    } finally {
-      refetch(); app.triggerWalletDataRefresh?.();
-    }
+      await sendAsActor(app, { contractName: "Staking", functionName: "claimGain", args: [] });
+    } catch (e) { console.error("claimGain failed:", e); }
+    finally { refetch(); app.triggerWalletDataRefresh?.(); }
   }
-
   async function handleClaimUnstaked() {
     try {
-      const staking = await getSavvaContract(app, "Staking", { write: true });
-      const hash = await staking.write.claimUnstaked([]);
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await pc.waitForTransactionReceipt({ hash });
-    } catch (e) {
-      console.error("claimUnstaked failed:", e);
-    } finally {
-      refetch(); app.triggerWalletDataRefresh?.();
-    }
+      await sendAsActor(app, { contractName: "Staking", functionName: "claimUnstaked", args: [] });
+    } catch (e) { console.error("claimUnstaked failed:", e); }
+    finally { refetch(); app.triggerWalletDataRefresh?.(); }
   }
 
-  // ── menus (hidden when viewing someone else) ─────────────────────────────────
   const savvaMenuItems = createMemo(() =>
-    isOwnConnectedWallet()
+    isActorProfile()
       ? [
           { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
           { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
@@ -177,13 +150,9 @@ export default function WalletTab(props) {
         ]
       : []
   );
-
-  const baseMenuItems = createMemo(() =>
-    isOwnConnectedWallet() ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }] : []
-  );
-
+  const baseMenuItems = createMemo(() => (isActorProfile() ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }] : []));
   const stakedMenuItems = createMemo(() =>
-    isOwnConnectedWallet()
+    isActorProfile()
       ? [
           { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
           { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
@@ -196,41 +165,28 @@ export default function WalletTab(props) {
     const v = walletData()?.nftEarnings;
     return typeof v === "bigint" ? v > 0n : Number(v || 0) > 0;
   });
-
-  const nftMenuItems = createMemo(() =>
-    isOwnConnectedWallet() && hasClaimableNft()
-      ? [{ label: t("wallet.menu.claim"), onClick: handleClaimNftEarnings }]
-      : []
-  );
-
+  const nftMenuItems = createMemo(() => (isActorProfile() && hasClaimableNft() ? [{ label: t("wallet.menu.claim"), onClick: handleClaimNftEarnings }] : []));
   const hasStakingReward = createMemo(() => {
     const v = walletData()?.stakingReward;
     return typeof v === "bigint" ? v > 0n : Number(v || 0) > 0;
   });
-
   const rewardMenuItems = createMemo(() =>
-    isOwnConnectedWallet() && hasStakingReward()
+    isActorProfile() && hasStakingReward()
       ? [
           { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
           { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
         ]
       : []
   );
-
   const hasAvailableUnstaked = createMemo(() => {
     const v = walletData()?.availableUnstaked;
     return typeof v === "bigint" ? v > 0n : Number(v || 0) > 0;
   });
-
-  const availableMenuItems = createMemo(() =>
-    isOwnConnectedWallet() && hasAvailableUnstaked()
-      ? [{ label: t("wallet.menu.withdraw"), onClick: handleClaimUnstaked }]
-      : []
-  );
+  const availableMenuItems = createMemo(() => (isActorProfile() && hasAvailableUnstaked() ? [{ label: t("wallet.menu.withdraw"), onClick: handleClaimUnstaked }] : []));
 
   const ValueWithMenu = (props) => {
     const items = props.items || [];
-    const canMenu = isOwnConnectedWallet() && items.length > 0;
+    const canMenu = isActorProfile() && items.length > 0;
     const triggerContent = (
       <span class="inline-flex items-center gap-1">
         <TokenValue amount={props.amount} tokenAddress={props.tokenAddress} format="vertical" />
@@ -256,7 +212,6 @@ export default function WalletTab(props) {
   function handleStakeSubmit() { refetch(); app.triggerWalletDataRefresh?.(); }
   function handleUnstakeSubmit() { refetch(); app.triggerWalletDataRefresh?.(); }
 
-  // ── layout helpers ───────────────────────────────────────────────────────────
   const WalletSection = (props) => (
     <section class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] rounded-lg shadow p-4 space-y-3">
       <div class="flex justify-between items-center">
@@ -266,7 +221,6 @@ export default function WalletTab(props) {
       {props.children}
     </section>
   );
-
   const WalletRow = (props) => (
     <div class="py-2 border-t border-[hsl(var(--border))] first:border-t-0 first:pt-0 last:pb-0">
       <div class="flex justify-between items-start">
@@ -279,7 +233,6 @@ export default function WalletTab(props) {
     </div>
   );
 
-  // helpers
   function isReqAvailable(ts) {
     const now = Math.floor(Date.now() / 1000);
     return Number(ts) <= now;
@@ -288,75 +241,36 @@ export default function WalletTab(props) {
   const availableUnstaked = () => walletData()?.availableUnstaked || 0n;
   const unstakeRequests = () => walletData()?.unstakeRequests || [];
 
-  // ── render ───────────────────────────────────────────────────────────────────
   return (
     <div class="px-2 space-y-6 mx-auto max-w-3xl">
       <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
         <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error?.message}</p>}>
           <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
-            <WalletRow
-              title={t("profile.wallet.savva.title")}
-              description={t("profile.wallet.savva.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.savvaBalance}
-                tokenAddress={savvaTokenAddress()}
-                items={savvaMenuItems()}
-              />
+            <WalletRow title={t("profile.wallet.savva.title")} description={t("profile.wallet.savva.description")}>
+              <ValueWithMenu amount={walletData()?.savvaBalance} tokenAddress={walletData()?.savvaTokenAddress} items={savvaMenuItems()} />
             </WalletRow>
-
-            <WalletRow
-              title={baseTokenSymbol()}
-              description={t("profile.wallet.pls.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.baseTokenBalance}
-                tokenAddress="0"
-                items={baseMenuItems()}
-              />
+            <WalletRow title={baseTokenSymbol()} description={t("profile.wallet.pls.description")}>
+              <ValueWithMenu amount={walletData()?.baseTokenBalance} tokenAddress="0" items={baseMenuItems()} />
             </WalletRow>
           </WalletSection>
 
           <WalletSection title={t("profile.wallet.nft.title")}>
-            <WalletRow
-              title={t("profile.wallet.nftEarnings.title")}
-              description={t("profile.wallet.nftEarnings.description")}
-            >
+            <WalletRow title={t("profile.wallet.nftEarnings.title")} description={t("profile.wallet.nftEarnings.description")}>
               <ValueWithMenu amount={walletData()?.nftEarnings} items={nftMenuItems()} />
             </WalletRow>
           </WalletSection>
 
           <WalletSection title={t("profile.wallet.staking.title")}>
-            <WalletRow
-              title={t("profile.wallet.staked.title")}
-              description={t("profile.wallet.staked.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.stakedBalance}
-                tokenAddress={stakingTokenAddress()}
-                items={stakedMenuItems()}
-              />
+            <WalletRow title={t("profile.wallet.staked.title")} description={t("profile.wallet.staked.description")}>
+              <ValueWithMenu amount={walletData()?.stakedBalance} tokenAddress={walletData()?.stakingTokenAddress} items={stakedMenuItems()} />
             </WalletRow>
 
-            <WalletRow
-              title={t("profile.wallet.reward.title")}
-              description={t("profile.wallet.reward.description")}
-            >
-              <ValueWithMenu
-                amount={walletData()?.stakingReward}
-                items={rewardMenuItems()}
-              />
+            <WalletRow title={t("profile.wallet.reward.title")} description={t("profile.wallet.reward.description")}>
+              <ValueWithMenu amount={walletData()?.stakingReward} items={rewardMenuItems()} />
             </WalletRow>
 
-            <WalletRow
-              title={t("profile.wallet.unstaked.available.title")}
-              description={t("profile.wallet.unstaked.available.desc")}
-            >
-              <ValueWithMenu
-                amount={availableUnstaked()}
-                tokenAddress={savvaTokenAddress()}
-                items={availableMenuItems()}
-              />
+            <WalletRow title={t("profile.wallet.unstaked.available.title")} description={t("profile.wallet.unstaked.available.desc")}>
+              <ValueWithMenu amount={availableUnstaked()} tokenAddress={walletData()?.savvaTokenAddress} items={availableMenuItems()} />
             </WalletRow>
 
             <Show when={Array.isArray(unstakeRequests()) && unstakeRequests().length > 0}>
@@ -384,7 +298,7 @@ export default function WalletTab(props) {
                               </Show>
                             </td>
                             <td class="px-3 py-2 text-right">
-                              <TokenValue amount={r.amount} tokenAddress={savvaTokenAddress()} />
+                              <TokenValue amount={r.amount} tokenAddress={walletData()?.savvaTokenAddress} />
                             </td>
                           </tr>
                         )}
@@ -398,52 +312,21 @@ export default function WalletTab(props) {
         </Show>
       </Show>
 
-      {/* SAVVA transfer */}
+      {/* Modals */}
       <Show when={showTransfer()}>
-        <TransferModal
-          tokenAddress={savvaTokenAddress()}
-          onClose={() => setShowTransfer(false)}
-          onSubmit={handleTransferSubmit}
-          maxAmount={walletData()?.savvaBalance}
-        />
+        <TransferModal tokenAddress={walletData()?.savvaTokenAddress} onClose={() => setShowTransfer(false)} onSubmit={() => { setShowTransfer(false); refetch(); }} maxAmount={walletData()?.savvaBalance} />
       </Show>
-
-      {/* Base-token transfer */}
       <Show when={showBaseTransfer()}>
-        <TransferModal
-          tokenAddress=""   // native coin
-          onClose={() => setShowBaseTransfer(false)}
-          onSubmit={handleTransferSubmit}
-          maxAmount={walletData()?.baseTokenBalance}
-        />
+        <TransferModal tokenAddress="" onClose={() => setShowBaseTransfer(false)} onSubmit={() => { setShowBaseTransfer(false); refetch(); }} maxAmount={walletData()?.baseTokenBalance} />
       </Show>
-
-      {/* Staked token transfer */}
       <Show when={showStakeTransfer()}>
-        <TransferModal
-          tokenAddress={stakingTokenAddress()}
-          onClose={() => setShowStakeTransfer(false)}
-          onSubmit={handleTransferSubmit}
-          maxAmount={walletData()?.stakedBalance}
-        />
+        <TransferModal tokenAddress={walletData()?.stakingTokenAddress} onClose={() => setShowStakeTransfer(false)} onSubmit={() => { setShowStakeTransfer(false); refetch(); }} maxAmount={walletData()?.stakedBalance} />
       </Show>
-
-      {/* Increase staking */}
       <Show when={showIncreaseStaking()}>
-        <IncreaseStakingModal
-          savvaBalance={walletData()?.savvaBalance}
-          savvaTokenAddress={savvaTokenAddress()}
-          onClose={() => setShowIncreaseStaking(false)}
-          onSubmit={handleStakeSubmit}
-        />
+        <IncreaseStakingModal savvaBalance={walletData()?.savvaBalance} savvaTokenAddress={walletData()?.savvaTokenAddress} onClose={() => setShowIncreaseStaking(false)} onSubmit={() => { setShowIncreaseStaking(false); refetch(); }} />
       </Show>
-
-      {/* Unstake */}
       <Show when={showUnstake()}>
-        <UnstakeModal
-          onClose={() => setShowUnstake(false)}
-          onSubmit={handleUnstakeSubmit}
-        />
+        <UnstakeModal onClose={() => setShowUnstake(false)} onSubmit={() => { setShowUnstake(false); refetch(); }} />
       </Show>
     </div>
   );

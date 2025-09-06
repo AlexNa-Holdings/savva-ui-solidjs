@@ -4,11 +4,10 @@ import { useApp } from "../../context/AppContext.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import SubscribeModal from "../modals/SubscribeModal.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 async function fetchSponsees(params) {
   const { app, user_addr, n_weeks, offset, limit } = params;
@@ -16,7 +15,7 @@ async function fetchSponsees(params) {
   try {
     const getSponsees = app.wsMethod("get-sponsees");
     const res = await getSponsees({
-      domain: "", // Empty domain to get sponsees across all domains
+      domain: "", // all domains
       user_addr,
       n_weeks,
       limit,
@@ -45,16 +44,14 @@ export default function SubscriptionsTab(props) {
   const [hasMore, setHasMore] = createSignal(true);
   const [loading, setLoading] = createSignal(false);
 
-  const isOwnConnectedWallet = createMemo(() => {
-    const wa = walletAccount();
-    const u = user();
-    if (!wa || !u?.address) return false;
-    return String(wa).toLowerCase() === String(u.address).toLowerCase();
-  });
-
-  // subscribe modal state
   const [showSub, setShowSub] = createSignal(false);
   const [selected, setSelected] = createSignal(null);
+
+  const isActorProfile = createMemo(() => {
+    const actor = (app.actorAddress?.() || "").toLowerCase();
+    const viewed = (user()?.address || "").toLowerCase();
+    return !!actor && !!viewed && actor === viewed;
+  });
 
   const loadMore = async () => {
     if (loading() || !hasMore()) return;
@@ -78,67 +75,49 @@ export default function SubscriptionsTab(props) {
     setLoading(false);
   };
 
-  createEffect(
-    on(nWeeks, () => {
-      setSponsees([]);
-      setOffset(0);
-      setHasMore(true);
-      loadMore();
-    })
-  );
+  const refreshList = async () => {
+    setSponsees([]);
+    setOffset(0);
+    setHasMore(true);
+    await loadMore();
+  };
+
+  // refresh when filter toggles
+  createEffect(on(nWeeks, refreshList, { defer: true }));
+
+  // 🔁 refresh when ACTOR changes (tab open)
+  createEffect(on(() => app.actorAddress?.(), refreshList, { defer: true }));
 
   onMount(() => {
     loadMore();
     const handleScroll = () => {
       const threshold = 300;
-      const nearBottom =
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - threshold;
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - threshold;
       if (nearBottom) loadMore();
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     onCleanup(() => window.removeEventListener("scroll", handleScroll));
   });
 
-  function openEdit(sub) {
-    setSelected(sub);
-    setShowSub(true);
-  }
+  function openEdit(sub) { setSelected(sub); setShowSub(true); }
 
-  async function refreshList() {
-    setSponsees([]);
-    setOffset(0);
-    setHasMore(true);
-    await loadMore();
-  }
+  async function handleEdited() { setShowSub(false); await refreshList(); }
 
-  function handleEdited() {
-    setShowSub(false);
-    refreshList();
-  }
-
-  // DELETE: call AuthorsClubs.stop(domain, author)
   async function handleDelete(sub) {
     try {
-      const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
-      const hash = await clubs.write.stop([String(sub.domain || ""), String(sub.user?.address || "")]);
-
-      const pc = createPublicClient({
-        chain: app.desiredChain(),
-        transport: http(app.desiredChain()?.rpcUrls?.[0]),
+      await sendAsActor(app, {
+        contractName: "AuthorsClubs",
+        functionName: "stop",
+        args: [String(sub.domain || ""), String(sub.user?.address || "")],
       });
-      await pc.waitForTransactionReceipt({ hash });
-
-      // refresh after successful stop
       await refreshList();
     } catch (e) {
       console.error("SubscriptionsTab: stop() failed", e);
-      // optionally: show a toast here if you have one
     }
   }
 
   return (
-     <div class="px-2 space-y-6 mx-auto max-w-3xl">
+    <div class="px-2 space-y-6 mx-auto max-w-3xl">
       <div class="flex items-center justify-end mb-4">
         <label class="flex items-center gap-2 text-sm cursor-pointer">
           <input
@@ -159,7 +138,7 @@ export default function SubscriptionsTab(props) {
               <th class="px-4 py-2">{t("profile.subscribers.table.domain")}</th>
               <th class="px-4 py-2 text-center">{t("profile.subscribers.table.weeks")}</th>
               <th class="px-4 py-2 text-right">{t("profile.subscribers.table.amount")}</th>
-              <Show when={isOwnConnectedWallet()}>
+              <Show when={isActorProfile()}>
                 <th class="px-4 py-2 text-right w-[88px]">{t("profile.subscribers.table.actions")}</th>
               </Show>
             </tr>
@@ -168,37 +147,19 @@ export default function SubscriptionsTab(props) {
             <For each={sponsees()}>
               {(sponsee) => (
                 <tr class="border-b border-[hsl(var(--border))]">
-                  <td class="px-4 py-2 font-medium">
-                    <UserCard author={sponsee.user} />
-                  </td>
+                  <td class="px-4 py-2 font-medium"><UserCard author={sponsee.user} /></td>
                   <td class="px-4 py-2">{sponsee.domain}</td>
                   <td class="px-4 py-2 text-center">
                     {sponsee.weeks < 1 ? t("profile.subscribers.table.expired") : sponsee.weeks}
                   </td>
-                  <td class="px-4 py-2">
-                    <div class="flex justify-end">
-                      <TokenValue amount={sponsee.amount} format="vertical" />
-                    </div>
-                  </td>
-                  <Show when={isOwnConnectedWallet()}>
+                  <td class="px-4 py-2"><div class="flex justify-end"><TokenValue amount={sponsee.amount} format="vertical" /></div></td>
+                  <Show when={isActorProfile()}>
                     <td class="px-4 py-2">
                       <div class="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
-                          aria-label={t("common.edit")}
-                          title={t("common.edit")}
-                          onClick={() => openEdit(sponsee)}
-                        >
+                        <button type="button" class="p-1 rounded-md hover:bg-[hsl(var(--accent))]" aria-label={t("common.edit")} title={t("common.edit")} onClick={() => openEdit(sponsee)}>
                           <EditIcon class="w-4 h-4" />
                         </button>
-                        <button
-                          type="button"
-                          class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
-                          aria-label={t("common.delete")}
-                          title={t("common.delete")}
-                          onClick={() => handleDelete(sponsee)}
-                        >
+                        <button type="button" class="p-1 rounded-md hover:bg-[hsl(var(--accent))]" aria-label={t("common.delete")} title={t("common.delete")} onClick={() => handleDelete(sponsee)}>
                           <TrashIcon class="w-4 h-4" />
                         </button>
                       </div>
@@ -210,24 +171,14 @@ export default function SubscriptionsTab(props) {
           </tbody>
         </table>
 
-        <Show when={loading()}>
-          <div class="flex justify-center p-4"><Spinner /></div>
-        </Show>
+        <Show when={loading()}><div class="flex justify-center p-4"><Spinner /></div></Show>
         <Show when={!loading() && sponsees().length === 0}>
-          <p class="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-            {t("profile.subscribers.noResults")}
-          </p>
+          <p class="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">{t("profile.subscribers.noResults")}</p>
         </Show>
       </div>
 
-      {/* Subscribe / Edit modal */}
       <Show when={showSub() && selected()}>
-        <SubscribeModal
-          domain={selected()?.domain}
-          author={selected()?.user}
-          onClose={() => setShowSub(false)}
-          onSubmit={handleEdited}
-        />
+        <SubscribeModal domain={selected()?.domain} author={selected()?.user} onClose={() => setShowSub(false)} onSubmit={handleEdited} />
       </Show>
     </div>
   );

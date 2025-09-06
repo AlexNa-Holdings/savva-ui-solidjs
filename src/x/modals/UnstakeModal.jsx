@@ -1,19 +1,22 @@
 // src/x/profile/UnstakeModal.jsx
 import { Show, createSignal, createResource, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { createPublicClient, http, parseUnits } from "viem";
+import { parseUnits } from "viem";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 export default function UnstakeModal(props) {
   const app = useApp();
   const { t } = app;
   const log = (...a) => (window?.dbg?.log ? window.dbg.log(...a) : console.debug(...a));
 
+  // STRICT: current actor only; no fallback to authorized user
+  const actorAddr = () => app.actorAddress?.() || "";
+
   const stakingAddress = () => app.info()?.savva_contracts?.Staking?.address || "";
-  const userAddress = () => app.authorizedUser()?.address || "";
 
   const [amountText, setAmountText] = createSignal("");
   const [amountWei, setAmountWei] = createSignal(0n);
@@ -29,11 +32,12 @@ export default function UnstakeModal(props) {
     if (s === "." || s === "") throw new Error("empty");
     return s;
   };
-  const parseWithDecimals = (text, decimals) => parseUnits(normalizeDecimalInput(text), Number.isFinite(decimals) ? Number(decimals) : 18);
+  const parseWithDecimals = (text, decimals) =>
+    parseUnits(normalizeDecimalInput(text), Number.isFinite(decimals) ? Number(decimals) : 18);
 
-  // staked (for validation)
+  // staked (for validation) — read stake for the ACTOR
   const [staked] = createResource(
-    () => ({ user: userAddress(), chain: app.desiredChain() }),
+    () => ({ user: actorAddr(), chain: app.desiredChain() }),
     async ({ user }) => {
       if (!user) return 0n;
       const staking = await getSavvaContract(app, "Staking");
@@ -46,7 +50,7 @@ export default function UnstakeModal(props) {
   // staking token decimals for exact parsing
   const [stakingMeta] = createResource(
     () => stakingAddress(),
-    (addr) => addr ? getTokenInfo(app, addr.toLowerCase()) : null
+    (addr) => (addr ? getTokenInfo(app, addr.toLowerCase()) : null)
   );
   const tokenDecimals = () => Number(stakingMeta()?.decimals ?? 18);
 
@@ -57,9 +61,9 @@ export default function UnstakeModal(props) {
       try {
         const cfg = await getSavvaContract(app, "Config");
         let sec;
-        if (cfg?.read?.staking_withdraw_delay)      sec = await cfg.read.staking_withdraw_delay([]);
-        else if (cfg?.read?.stakingWithdrawDelay)   sec = await cfg.read.stakingWithdrawDelay([]);
-        else if (cfg?.read?.get)                    sec = await cfg.read.get(["staking_withdraw_delay"]);
+        if (cfg?.read?.staking_withdraw_delay) sec = await cfg.read.staking_withdraw_delay([]);
+        else if (cfg?.read?.stakingWithdrawDelay) sec = await cfg.read.stakingWithdrawDelay([]);
+        else if (cfg?.read?.get) sec = await cfg.read.get(["staking_withdraw_delay"]);
         const days = Math.ceil(Number(sec || 0) / 86400);
         log("Unstake: withdraw delay (days)", days);
         return days;
@@ -93,6 +97,7 @@ export default function UnstakeModal(props) {
   }
 
   function validate(v) {
+    if (!actorAddr()) return t("wallet.errors.noActor"); // guard
     const val = typeof v === "bigint" ? v : amountWei();
     const cur = staked() || 0n;
     log("Unstake: validate", { text: amountText(), wei: val?.toString?.(), cur: cur?.toString?.() });
@@ -101,13 +106,14 @@ export default function UnstakeModal(props) {
     return "";
   }
 
+  // actor-aware unstake
   async function submit(e) {
     e?.preventDefault?.();
     setErr("");
 
     let v = amountWei();
-    // If our handlers didn't fire (text empty / wei zero), grab the live value from the inner <input>
-    if ((!v || v <= 0n)) {
+    // If handlers didn't fire, grab live value
+    if (!v || v <= 0n) {
       const inputEl = inputWrapEl?.querySelector("input");
       const liveTxt = inputEl?.value ?? amountText();
       try {
@@ -122,16 +128,20 @@ export default function UnstakeModal(props) {
     }
 
     const msg = validate(v);
-    if (msg) { setErr(msg); return; }
+    if (msg) {
+      setErr(msg);
+      return;
+    }
 
     setIsProcessing(true);
     try {
-      const staking = await getSavvaContract(app, "Staking", { write: true });
-      const hash = await staking.write.unstake([v]);
-      log("Unstake: tx sent", { hash });
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await pc.waitForTransactionReceipt({ hash });
-      log("Unstake: tx confirmed", { hash });
+      // Route via ACTOR (NPO => SavvaNPO.multicall; self => direct)
+      await sendAsActor(app, {
+        contractName: "Staking",
+        functionName: "unstake",
+        args: [v],
+      });
+
       props.onSubmit?.();
       setIsProcessing(false);
       close();
@@ -141,7 +151,7 @@ export default function UnstakeModal(props) {
     }
   }
 
-  // one handler used for multiple event names (component may emit different ones)
+  // unified handler for AmountInput
   const handleAmountChange = (a, b) => {
     const dec = tokenDecimals();
     let txt = "", weiMaybe = null;
@@ -171,6 +181,9 @@ export default function UnstakeModal(props) {
     }
   };
 
+  // Disabled UI when actor is missing (defensive)
+  const actorMissing = () => !actorAddr();
+
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" onClick={close} />
@@ -180,33 +193,39 @@ export default function UnstakeModal(props) {
       >
         <h3 class="text-lg font-semibold">{t("wallet.unstake.title")}</h3>
 
-        <p class="text-sm opacity-80">
-          {t("wallet.unstake.notice", { days: withdrawDays() || 0 })}
-        </p>
+        <Show when={!actorMissing()}>
+          <p class="text-sm opacity-80">
+            {t("wallet.unstake.notice", { days: withdrawDays() || 0 })}
+          </p>
+        </Show>
+        <Show when={actorMissing()}>
+          <div class="text-sm text-[hsl(var(--destructive))]">
+            {t("wallet.errors.noActor")}
+          </div>
+        </Show>
 
-        <div ref={el => (inputWrapEl = el)} class="space-y-2">
+        <div ref={(el) => (inputWrapEl = el)} class="space-y-2">
           <AmountInput
             value={amountText()}
             tokenAddress={stakingAddress()}
             onInput={handleAmountChange}
             onChange={handleAmountChange}
             placeholder={t("wallet.unstake.amountPlaceholder")}
+            disabled={actorMissing()}
           />
           <div class="flex justify-end">
             <button
               type="button"
-              class="text-xs underline opacity-80 hover:opacity-100"
+              class="text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
+              disabled={actorMissing()}
               onClick={async () => {
                 const max = staked() || 0n;
                 setAmountWei(max);
-                // best effort to reflect text: derive string with current decimals
                 try {
                   const dec = tokenDecimals();
-                  // quick format to text; minimal fraction trimming
-                  const s = (Number(max) === 0 ? "0" : (max / 10n ** BigInt(dec))).toString(); // coarse; visual only
+                  const s = Number(max) === 0 ? "0" : (max / 10n ** BigInt(dec)).toString();
                   setAmountText(s);
-                } catch { /* ignore */ }
-                // also stuff value directly if we can reach the inner input
+                } catch {}
                 const inputEl = inputWrapEl?.querySelector("input");
                 if (inputEl) inputEl.value = amountText();
                 log("Unstake: Max set", { wei: max.toString() });
@@ -231,7 +250,7 @@ export default function UnstakeModal(props) {
           </button>
           <button
             type="submit"
-            disabled={isProcessing()}
+            disabled={isProcessing() || actorMissing()}
             class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
           >
             <Show when={!isProcessing()} fallback={<Spinner class="w-5 h-5" />}>

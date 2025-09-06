@@ -6,15 +6,15 @@ import TokenValue from "../ui/TokenValue.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { getConfigParam } from "../../blockchain/config.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
-async function fetchStakeCheck({ app, user }) {
-  if (!user) return { hasEnoughStake: false, minStakeWei: 0n };
+async function fetchStakeCheck({ app, actorAddress }) {
+  if (!actorAddress) return { hasEnoughStake: false, minStakeWei: 0n };
   try {
     const minStakeWei = await getConfigParam(app, "min_staked_for_fundrasing");
     const stakingContract = await getSavvaContract(app, "Staking");
-    const userStakeWei = await stakingContract.read.balanceOf([user.address]);
+    const userStakeWei = await stakingContract.read.balanceOf([actorAddress]);
     const hasEnoughStake = userStakeWei >= minStakeWei;
     return { minStakeWei, userStakeWei, hasEnoughStake };
   } catch (e) {
@@ -26,16 +26,21 @@ async function fetchStakeCheck({ app, user }) {
 export default function NewFundraisingModal(props) {
   const app = useApp();
   const { t } = app;
-  const user = () => app.authorizedUser();
+
+  // Actor-aware subject (self or selected NPO)
+  const actorAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
   const [title, setTitle] = createSignal("");
   const [amountText, setAmountText] = createSignal("");
   const [amountWei, setAmountWei] = createSignal(0n);
   const [isProcessing, setIsProcessing] = createSignal(false);
 
-  const [stakeCheck] = createResource(() => ({ app, user: user() }), fetchStakeCheck);
-  const canCreate = createMemo(() => stakeCheck()?.hasEnoughStake);
-  
+  const [stakeCheck] = createResource(
+    () => ({ app, actorAddress: actorAddr() }),
+    fetchStakeCheck
+  );
+  const canCreate = createMemo(() => !!stakeCheck()?.hasEnoughStake);
+
   const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address || "";
   const stakingTokenAddress = () => app.info()?.savva_contracts?.Staking?.address || "";
 
@@ -56,28 +61,22 @@ export default function NewFundraisingModal(props) {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!canCreate() || isProcessing() || !title().trim() || amountWei() <= 0n) {
-      return;
-    }
+    if (!canCreate() || isProcessing() || !title().trim() || amountWei() <= 0n) return;
 
     setIsProcessing(true);
     try {
-      const contract = await getSavvaContract(app, "Fundraiser", { write: true });
-      const hash = await contract.write.createCampaign([title().trim(), amountWei()]);
-
-      const publicClient = createPublicClient({
-        chain: app.desiredChain(),
-        transport: http(app.desiredChain().rpcUrls[0]),
+      // Create fundraiser via ACTOR (NPO => SavvaNPO.multicall; self => direct)
+      await sendAsActor(app, {
+        contractName: "Fundraiser",
+        functionName: "createCampaign",
+        args: [title().trim(), amountWei()],
       });
-      await publicClient.waitForTransactionReceipt({ hash });
 
       pushToast({ type: "success", message: t("fundraising.createModal.toast.success") });
       props.onSuccess?.();
-      
-      // Corrected Logic: Set processing to false *before* closing.
+
       setIsProcessing(false);
       handleClose();
-
     } catch (err) {
       setIsProcessing(false);
       pushErrorToast(err, { context: t("fundraising.createModal.toast.error") });
@@ -92,19 +91,24 @@ export default function NewFundraisingModal(props) {
           <form onSubmit={handleCreate} class="p-4 space-y-4">
             <h3 class="text-lg font-semibold">{t("fundraising.createModal.title")}</h3>
 
-            <Show when={stakeCheck.loading} fallback={
-              <Show when={!canCreate()}>
-                <div class="p-3 text-sm text-center rounded bg-[hsl(var(--muted))]">
-                  <span>{t("fundraising.createModal.insufficientStake.message")}&nbsp;</span>
-                  <TokenValue amount={stakeCheck()?.minStakeWei} tokenAddress={stakingTokenAddress()} />
-                </div>
-              </Show>
-            }>
+            <Show
+              when={stakeCheck.loading}
+              fallback={
+                <Show when={!canCreate()}>
+                  <div class="p-3 text-sm text-center rounded bg-[hsl(var(--muted))]">
+                    <span>{t("fundraising.createModal.insufficientStake.message")}&nbsp;</span>
+                    <TokenValue amount={stakeCheck()?.minStakeWei} tokenAddress={stakingTokenAddress()} />
+                  </div>
+                </Show>
+              }
+            >
               <div class="flex justify-center p-4"><Spinner /></div>
             </Show>
 
             <div>
-              <label for="campaign-title" class="text-sm font-medium">{t("fundraising.createModal.title.label")}</label>
+              <label for="campaign-title" class="text-sm font-medium">
+                {t("fundraising.createModal.title.label")}
+              </label>
               <div class="relative">
                 <textarea
                   id="campaign-title"
@@ -115,7 +119,9 @@ export default function NewFundraisingModal(props) {
                   disabled={!canCreate()}
                   class="mt-1 w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] resize-none"
                 />
-                <div class="absolute right-2 bottom-2 text-xs text-[hsl(var(--muted-foreground))]">{charsLeft()}</div>
+                <div class="absolute right-2 bottom-2 text-xs text-[hsl(var(--muted-foreground))]">
+                  {charsLeft()}
+                </div>
               </div>
             </div>
 
@@ -131,10 +137,18 @@ export default function NewFundraisingModal(props) {
             />
 
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={handleClose} class="px-4 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50">
+              <button
+                type="button"
+                onClick={handleClose}
+                class="px-4 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+              >
                 {t("common.cancel")}
               </button>
-              <button type="submit" disabled={!canCreate() || isProcessing() || !title().trim() || amountWei() <= 0n} class="px-4 py-2 min-w-[140px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60">
+              <button
+                type="submit"
+                disabled={!canCreate() || isProcessing() || !title().trim() || amountWei() <= 0n}
+                class="px-4 py-2 min-w-[140px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+              >
                 <Show when={isProcessing()} fallback={t("fundraising.createModal.createButton")}>
                   <Spinner class="w-5 h-5" />
                 </Show>

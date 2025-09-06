@@ -9,12 +9,11 @@ import Spinner from "../ui/Spinner.jsx";
 import ProgressBar from "../ui/ProgressBar.jsx";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
-import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import NewFundraisingModal from "../modals/NewFundraisingModal.jsx";
 import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import { ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 const DEFAULT_LIMIT = 20;
 
@@ -69,8 +68,9 @@ export default function FundraisingPage() {
   const [showContributeModal, setShowContributeModal] = createSignal(false);
   const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
 
-  const wsList = createMemo(() => app.wsMethod ? app.wsMethod("list-fundraisers") : null);
-  const userAddr = createMemo(() => app.authorizedUser()?.address || "");
+  const wsList = createMemo(() => (app.wsMethod ? app.wsMethod("list-fundraisers") : null));
+  // Actor-aware: filter "only my" by current actor (self or NPO)
+  const actorAddr = createMemo(() => app.actorAddress?.() || "");
 
   async function loadMore() {
     if (loading() || !hasMore()) return;
@@ -80,22 +80,22 @@ export default function FundraisingPage() {
       await whenWsOpen();
       const fetcher = wsList();
       if (!fetcher) return;
-      
+
       const req = {
         id: 0,
         limit: DEFAULT_LIMIT,
         offset: offset(),
         show_finished: showFinished(),
       };
-      if (onlyMy() && userAddr()) req.user = toChecksumAddress(userAddr());
-      
+      if (onlyMy() && actorAddr()) req.user = toChecksumAddress(actorAddr());
+
       const res = await fetcher(req);
       const list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-      
+
       if (list.length > 0) {
-        setCampaigns(prev => [...prev, ...list]);
+        setCampaigns((prev) => [...prev, ...list]);
       }
-      
+
       if (res?.next_offset) {
         setOffset(res.next_offset);
       } else {
@@ -107,7 +107,7 @@ export default function FundraisingPage() {
       setLoading(false);
     }
   }
-  
+
   const refreshList = () => {
     setCampaigns([]);
     setOffset(0);
@@ -115,7 +115,7 @@ export default function FundraisingPage() {
     queueMicrotask(loadMore);
   };
 
-  createEffect(on([onlyMy, showFinished], refreshList, { defer: true }));
+  createEffect(on([onlyMy, showFinished, actorAddr], refreshList, { defer: true }));
 
   onMount(() => {
     loadMore();
@@ -124,14 +124,15 @@ export default function FundraisingPage() {
       const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - scrollThreshold;
       if (nearBottom) loadMore();
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    onCleanup(() => window.removeEventListener('scroll', handleScroll));
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    onCleanup(() => window.removeEventListener("scroll", handleScroll));
   });
 
+  // Actor-aware: can close if the campaign was created by the current actor
   const isMyCampaign = (campaign) => {
     const campaignCreator = campaign?.user?.address?.toLowerCase();
-    const currentUser = app.authorizedUser()?.address?.toLowerCase();
-    return currentUser && campaignCreator === currentUser;
+    const currentActor = actorAddr()?.toLowerCase();
+    return !!currentActor && campaignCreator === currentActor;
   };
 
   function openContributeModal(campaignId) {
@@ -139,19 +140,16 @@ export default function FundraisingPage() {
     setShowContributeModal(true);
   }
 
+  // Close campaign via ACTOR (NPO => SavvaNPO.multicall; self => direct)
   async function handleCloseCampaign(campaignId) {
     setIsClosing(campaignId);
     try {
-      const contract = await getSavvaContract(app, "Fundraiser", { write: true });
-      const hash = await contract.write.closeCampaign([campaignId]);
-      
-      const publicClient = createPublicClient({
-          chain: app.desiredChain(),
-          transport: http(app.desiredChain().rpcUrls[0]),
+      await sendAsActor(app, {
+        contractName: "Fundraiser",
+        functionName: "closeCampaign",
+        args: [campaignId],
       });
 
-      await publicClient.waitForTransactionReceipt({ hash });
-      
       pushToast({ type: "success", message: t("fundraising.actions.close.success") });
       refreshList();
     } catch (e) {
@@ -163,7 +161,7 @@ export default function FundraisingPage() {
 
   const toggleOnlyMy = (e) => setOnlyMy(e.currentTarget.checked);
   const toggleShowFinished = (e) => setShowFinished(e.currentTarget.checked);
-  const showLoginHint = createMemo(() => onlyMy() && !userAddr());
+  const showLoginHint = createMemo(() => onlyMy() && !app.authorizedUser?.());
 
   return (
     <>
@@ -213,75 +211,85 @@ export default function FundraisingPage() {
                 </tr>
               </thead>
               <tbody>
-                <Show when={campaigns().length > 0} fallback={
-                  <Show when={!loading()}>
-                    <tr>
-                      <td colSpan="6" class="px-3 py-6 text-center text-[hsl(var(--muted-foreground))]">
-                        {t("fundraising.empty")}
-                      </td>
-                    </tr>
-                  </Show>
-                }>
-                  <For each={campaigns()}>{(it) => {
-                    const id = () => it?.id;
-                    const targetWei = () => toWeiBigInt(it?.target_amount);
-                    const raisedWei = () => toWeiBigInt(it?.raised);
-                    const pct = () => percentOf(raisedWei(), targetWei());
-                    return (
-                      <tr class="border-t border-[hsl(var(--border))]">
-                        <td class="px-3 py-2 align-top font-mono">{id()}</td>
-                        <td class="px-3 py-2 align-top">
-                          <UserCard author={it?.user} compact={true} />
-                          <Show when={it?.title}>
-                            <div class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2 mt-1">
-                              {it.title}
-                            </div>
-                          </Show>
-                        </td>
-                        <td class="px-3 py-2 align-top text-right">
-                          <TokenValue amount={targetWei()} format="vertical" />
-                        </td>
-                        <td class="px-3 py-2 align-top text-right">
-                          <TokenValue amount={raisedWei()} format="vertical" />
-                        </td>
-                        <td class="px-3 py-2 align-top">
-                          <ProgressBar value={pct()} />
-                        </td>
-                        <td class="px-3 py-2 align-top text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                <Show when={!it.finished}>
-                                    <Show 
-                                        when={isMyCampaign(it)}
-                                        fallback={
-                                            <button
-                                                class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
-                                                onClick={() => openContributeModal(it.id)}
-                                                title={t("fundraising.card.contribute")}
-                                            >
-                                                {t("fundraising.card.contribute")}
-                                            </button>
-                                        }
-                                    >
-                                        <button
-                                        class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-                                        onClick={() => handleCloseCampaign(it.id)}
-                                        title={t("fundraising.actions.close.tip")}
-                                        disabled={isClosing() === it.id}
-                                        >
-                                        <Show when={isClosing() === it.id} fallback={t("fundraising.actions.close.label")}>
-                                            <Spinner class="w-4 h-4" />
-                                        </Show>
-                                        </button>
-                                    </Show>
-                                </Show>
-                                <a href={`#/fr/${it.id}`} onClick={(e) => e.stopPropagation()} title={t("fundraising.actions.link.tip")} class="p-1 rounded-md hover:bg-[hsl(var(--accent))]">
-                                    <ArrowRightIcon class="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
-                                </a>
-                            </div>
+                <Show
+                  when={campaigns().length > 0}
+                  fallback={
+                    <Show when={!loading()}>
+                      <tr>
+                        <td colSpan="6" class="px-3 py-6 text-center text-[hsl(var(--muted-foreground))]">
+                          {t("fundraising.empty")}
                         </td>
                       </tr>
-                    );
-                  }}</For>
+                    </Show>
+                  }
+                >
+                  <For each={campaigns()}>
+                    {(it) => {
+                      const id = () => it?.id;
+                      const targetWei = () => toWeiBigInt(it?.target_amount);
+                      const raisedWei = () => toWeiBigInt(it?.raised);
+                      const pct = () => percentOf(raisedWei(), targetWei());
+                      return (
+                        <tr class="border-t border-[hsl(var(--border))]">
+                          <td class="px-3 py-2 align-top font-mono">{id()}</td>
+                          <td class="px-3 py-2 align-top">
+                            <UserCard author={it?.user} compact={true} />
+                            <Show when={it?.title}>
+                              <div class="text-xs text-[hsl(var(--muted-foreground))] line-clamp-2 mt-1">
+                                {it.title}
+                              </div>
+                            </Show>
+                          </td>
+                          <td class="px-3 py-2 align-top text-right">
+                            <TokenValue amount={targetWei()} format="vertical" />
+                          </td>
+                          <td class="px-3 py-2 align-top text-right">
+                            <TokenValue amount={raisedWei()} format="vertical" />
+                          </td>
+                          <td class="px-3 py-2 align-top">
+                            <ProgressBar value={pct()} />
+                          </td>
+                          <td class="px-3 py-2 align-top text-right">
+                            <div class="flex items-center justify-end gap-2">
+                              <Show when={!it.finished}>
+                                <Show
+                                  when={isMyCampaign(it)}
+                                  fallback={
+                                    <button
+                                      class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+                                      onClick={() => openContributeModal(it.id)}
+                                      title={t("fundraising.card.contribute")}
+                                    >
+                                      {t("fundraising.card.contribute")}
+                                    </button>
+                                  }
+                                >
+                                  <button
+                                    class="px-2 py-1 text-xs rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+                                    onClick={() => handleCloseCampaign(it.id)}
+                                    title={t("fundraising.actions.close.tip")}
+                                    disabled={isClosing() === it.id}
+                                  >
+                                    <Show when={isClosing() === it.id} fallback={t("fundraising.actions.close.label")}>
+                                      <Spinner class="w-4 h-4" />
+                                    </Show>
+                                  </button>
+                                </Show>
+                              </Show>
+                              <a
+                                href={`#/fr/${it.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                title={t("fundraising.actions.link.tip")}
+                                class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
+                              >
+                                <ArrowRightIcon class="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
+                              </a>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }}
+                  </For>
                 </Show>
               </tbody>
             </table>
@@ -291,12 +299,12 @@ export default function FundraisingPage() {
           </Show>
         </div>
       </main>
-      <NewFundraisingModal 
+      <NewFundraisingModal
         isOpen={showCreateModal()}
         onClose={() => setShowCreateModal(false)}
         onSuccess={refreshList}
       />
-      <CampaignContributeModal 
+      <CampaignContributeModal
         isOpen={showContributeModal()}
         onClose={() => setShowContributeModal(false)}
         campaignId={contributeCampaignId()}
@@ -305,4 +313,3 @@ export default function FundraisingPage() {
     </>
   );
 }
-

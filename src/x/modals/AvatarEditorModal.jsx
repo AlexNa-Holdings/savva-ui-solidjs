@@ -9,12 +9,16 @@ const HANDLE_HOT = 22;      // generous hit area for mouse
 const MIN_SIZE = 48;
 
 export default function AvatarEditorModal(props) {
-  const { t } = useApp();
+  const app = useApp();
+  const { t } = app;
 
   const [imgEl, setImgEl] = createSignal(null);
   const [crop, setCrop] = createSignal({ x: 10, y: 10, size: 200 });
   const [drag, setDrag] = createSignal(null); // {mode:'drag'|'tl'|'br', startX, startY, startCrop}
   const [processing, setProcessing] = createSignal(false);
+
+  // actor-aware subject (who the avatar belongs to)
+  const subjectAddr = () => props.subjectAddr || app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
   let canvas;
   let fileInput;
@@ -221,7 +225,8 @@ export default function AvatarEditorModal(props) {
     out.toBlob(async (blob) => {
       try {
         if (!blob) throw new Error("Render failed");
-        await props.onSave?.(blob);
+        // Actor-aware: pass the subject address (self or selected NPO) to the caller
+        await props.onSave?.(blob, subjectAddr());
         props.onClose?.();
       } finally {
         setProcessing(false);

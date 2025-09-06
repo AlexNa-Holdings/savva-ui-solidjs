@@ -4,9 +4,11 @@ import { useApp } from "../../context/AppContext.jsx";
 import AddressInput from "../ui/AddressInput.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
-import { performTransfer } from "../../blockchain/transactions.js";
 import { parseUnits } from "viem";
 import Spinner from "../ui/Spinner.jsx";
+import { sendAsActor, buildCall } from "../../blockchain/npoMulticall.js";
+import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
+import { createPublicClient, http } from "viem";
 
 function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
   const addr = tokenAddress ? String(tokenAddress) : "";
@@ -18,12 +20,23 @@ function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
   return I ? <I class={className} /> : null;
 }
 
+// Minimal ERC20 transfer ABI
+const ERC20_TRANSFER_ABI = [
+  {
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ type: "address", name: "to" }, { type: "uint256", name: "amount" }],
+    outputs: [{ type: "bool" }],
+  },
+];
+
 export default function TransferModal(props) {
   const app = useApp();
   const { t } = app;
   const log = (...a) => (window?.dbg?.log ? window.dbg.log(...a) : console.debug(...a));
 
-  const tokenAddr = () => (props.tokenAddress ? String(props.tokenAddress) : "");
+  const tokenAddr = () => (props.tokenAddress ? String(props.tokenAddress) : ""); // empty => native coin
 
   const [to, setTo] = createSignal(String(props.to || ""));
   const [amountText, setAmountText] = createSignal("");
@@ -135,19 +148,49 @@ export default function TransferModal(props) {
 
     setIsProcessing(true);
     try {
-      const txData = {
-        to: to().trim(),
-        amountWei: v,
-        tokenAddress: tokenAddr(),
-      };
-      await performTransfer(app, txData);
-      props.onSubmit?.(txData);
+      // Branch by token type
+      if (tokenAddr()) {
+        // ERC-20 transfer via ACTOR (NPO => NPO.multicall; self => direct)
+        await sendAsActor(app, {
+          target: tokenAddr(),
+          abi: ERC20_TRANSFER_ABI,
+          functionName: "transfer",
+          args: [to().trim(), v],
+        });
+      } else {
+        // Native coin transfer:
+        // - Self: direct sendTransaction
+        // - NPO: call SavvaNPO.withdrawNative(to, amount)
+        const isNpo = app.isActingAsNpo?.() === true;
+        if (isNpo) {
+          await sendAsActor(app, {
+            target: app.actorAddress?.(), // call NPO's own method via multicall
+            abi: SavvaNPOAbi,
+            functionName: "withdrawNative",
+            args: [to().trim(), v],
+          });
+        } else {
+          const wc = await app.getGuardedWalletClient?.();
+          if (!wc) throw new Error(t("tx.errorNoWallet"));
+          const chain = app.desiredChain?.();
+          const rpc =
+            chain?.rpcUrls?.[0] ||
+            chain?.rpcUrls?.default?.http?.[0] ||
+            chain?.rpcUrls?.public?.http?.[0];
+          const pc = createPublicClient({ chain, transport: http(rpc) });
+          const hash = await wc.sendTransaction({ to: to().trim(), value: v });
+          await pc.waitForTransactionReceipt({ hash });
+        }
+      }
+
+      props.onSubmit?.({ to: to().trim(), amountWei: v, tokenAddress: tokenAddr() });
       setIsProcessing(false);
-      // close only when not busy
       if (!isProcessing()) props.onClose?.();
     } catch (eTx) {
-      // performTransfer shows its own toast; keep dialog open for correction
+      // keep dialog open for correction
       setIsProcessing(false);
+      log("Transfer: tx failed", eTx?.message || eTx);
+      // Optional: surface a toast outside
     }
   }
 
@@ -158,7 +201,7 @@ export default function TransferModal(props) {
         <form onSubmit={submit} class="p-4 space-y-4">
           <div class="text-lg font-semibold flex items-center gap-2">
             <TokenTitleIcon app={app} tokenAddress={tokenAddr()} />
-            <span>{t("wallet.transfer.titleToken", { token: meta()?.symbol })}</span>
+            <span>{t("wallet.transfer.titleToken", { token: meta()?.symbol || (tokenAddr() ? "ERC-20" : t("wallet.nativeToken")) })}</span>
           </div>
 
           <AddressInput

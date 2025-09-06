@@ -7,21 +7,52 @@ import { pushToast, pushErrorToast } from "../ui/toast.js";
 const toBigInt = (v) => (typeof v === "bigint" ? v : v == null || v === "" ? 0n : BigInt(v));
 
 function requireActor(app) {
-  const isNpo = app.actorIsNpo?.();
-  const address = app.actorAddress?.();
+  const isNpo = (app.isActingAsNpo?.() ?? app.actorIsNpo?.() ?? app.actorProfile?.()?.is_npo ?? false) === true;
+  const address = app.actorAddress?.() || app.authorizedUser?.()?.address || "";
   if (!address) throw new Error("Actor address is not available");
-  return { isNpo: !!isNpo, address };
+  return { isNpo, address };
+}
+
+// supports both shapes:
+// - old: { rpcUrls: ["https://..."] }
+// - viem: { rpcUrls: { default: { http: ["https://..."] }, public: { http: [...] } } }
+function resolveRpcUrlFrom(chainLike) {
+  if (!chainLike) return null;
+  const u = chainLike.rpcUrls;
+  if (!u) return null;
+  if (Array.isArray(u)) return u[0] || null;          // old shape
+  if (typeof u === "string") return u;                // very old / custom
+  const d = u.default?.http?.[0];
+  const p = u.public?.http?.[0];
+  return d || p || null;                               // viem shape
+}
+
+function resolveRpcUrl(app, walletClient, chainFromApp) {
+  return (
+    resolveRpcUrlFrom(chainFromApp) ||
+    resolveRpcUrlFrom(walletClient?.chain) ||
+    app.info?.()?.rpc_url ||
+    import.meta?.env?.VITE_RPC_URL ||
+    null
+  );
 }
 
 async function getClients(app) {
   const walletClient = await app.getGuardedWalletClient?.();
-  if (!walletClient) throw new Error("Wallet client not available");
-  const chain = app.desiredChain?.();
-  const rpc =
-    chain?.rpcUrls?.default?.http?.[0] ||
-    chain?.rpcUrls?.public?.http?.[0] ||
-    app.info?.()?.rpc_url;
-  const publicClient = createPublicClient({ chain, transport: http(rpc) });
+  if (!walletClient) throw new Error(app.t?.("tx.errorNoWallet") || "Wallet client not available");
+
+  const chainFromApp = app.desiredChain?.() || null;
+  const rpcUrl = resolveRpcUrl(app, walletClient, chainFromApp);
+  if (!rpcUrl) {
+    throw new Error(app.t?.("error.rpcNotConfigured") || "RPC URL is not configured for the current chain.");
+  }
+
+  // Match your older, working pattern: pass chain from app and explicit http(rpcUrl)
+  const publicClient = createPublicClient({
+    chain: chainFromApp || walletClient.chain || undefined,
+    transport: http(rpcUrl),
+  });
+
   return { walletClient, publicClient };
 }
 
@@ -39,9 +70,13 @@ export async function buildCallByContractName(app, contractName, functionName, a
 
 export function erc20ApproveCall(tokenAddress, spender, amount) {
   const ERC20_APPROVE_ABI = [
-    { name: "approve", type: "function", stateMutability: "nonpayable",
+    {
+      name: "approve",
+      type: "function",
+      stateMutability: "nonpayable",
       inputs: [{ type: "address", name: "spender" }, { type: "uint256", name: "amount" }],
-      outputs: [{ type: "bool" }] },
+      outputs: [{ type: "bool" }],
+    },
   ];
   return buildCall({
     target: tokenAddress,
@@ -85,7 +120,7 @@ export async function sendAsUser(app, spec) {
   }
 }
 
-// Auto-detect actor from useActor (NPO => multicall, self => direct)
+// Auto-detect actor from AppContext actor API (NPO => multicall, self => direct)
 export async function sendAsActor(app, spec) {
   const { isNpo } = requireActor(app);
   return isNpo ? sendViaNpoMulticall(app, spec) : sendAsUser(app, spec);
@@ -108,7 +143,8 @@ async function sendViaNpoMulticall(app, spec) {
         : buildCall({ target: spec.target, abi: spec.abi, functionName, args, valueWei });
 
     const npo = getContract({ address: npoAddr, abi: SavvaNPOAbi, client: walletClient });
-    // Pass an array of Call structs (object form to avoid field-order mistakes)
+
+    // SavvaNPO.multicall((address target, bytes data, uint256 value)[] calls)
     const calls = [{ target: call.target, data: call.data, value: call.value }];
     const hash = await npo.write.multicall([calls]);
 

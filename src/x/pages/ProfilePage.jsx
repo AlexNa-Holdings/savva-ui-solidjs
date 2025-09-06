@@ -1,4 +1,4 @@
-// src/pages/ProfilePage.jsx
+// src/x/pages/ProfilePage.jsx
 import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
@@ -8,6 +8,7 @@ import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import StakerLevelIcon from "../ui/StakerLevelIcon.jsx";
 import VerifiedBadge from "../ui/icons/VerifiedBadge.jsx";
+import NpoIcon from "../ui/icons/NpoIcon.jsx";
 import Tabs from "../ui/Tabs.jsx";
 import Address from "../ui/Address.jsx";
 import { ipfs } from "../../ipfs/index.js";
@@ -65,31 +66,31 @@ export default function ProfilePage() {
 
   const [activeTab, setActiveTab] = createSignal('posts');
 
-  const isMyProfile = createMemo(() => {
-    const authorizedAddr = app.authorizedUser()?.address?.toLowerCase();
+  // EDIT button should show if we are viewing the *actor's* profile (self or selected NPO)
+  const isActorProfile = createMemo(() => {
+    const actorAddr = app.actorAddress?.()?.toLowerCase();
     const profileAddr = userResource()?.address?.toLowerCase();
-    return !!authorizedAddr && authorizedAddr === profileAddr;
+    return !!actorAddr && !!profileAddr && actorAddr === profileAddr;
   });
 
   const canEdit = createMemo(() => {
     const connectedWallet = walletAccount()?.toLowerCase();
-    return isMyProfile() && !!connectedWallet && connectedWallet === app.authorizedUser()?.address?.toLowerCase();
+    const authAddr = app.authorizedUser()?.address?.toLowerCase();
+    // We can edit when the viewed profile == current actor AND the connected wallet matches the authorized user
+    return isActorProfile() && !!connectedWallet && connectedWallet === authAddr;
   });
 
   const handleEditProfile = () => {
     navigate(`/profile-edit/${identifier()}`);
   };
 
-  const TABS = createMemo(() => {
-    const tabs = [
-      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-      // Wallet is visible for any profile; actions are gated inside WalletTab
-      { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> },
-    ];
-    return tabs;
-  });
+  const TABS = createMemo(() => ([
+    { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+    { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+    { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+    // Wallet is visible for any profile; actions are gated inside WalletTab
+    { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> },
+  ]));
 
   // Read ?tab= from current hash route (reactive to route() changes)
   const desiredTab = createMemo(() => {
@@ -98,7 +99,7 @@ export default function ProfilePage() {
     return new URLSearchParams(qs).get("tab") || "";
   });
 
-  // Apply ?tab= when available and valid; also covers late-appearance of 'wallet'
+  // Apply ?tab= when available and valid
   createEffect(() => {
     const tab = desiredTab();
     if (!tab) return;
@@ -205,7 +206,9 @@ export default function ProfilePage() {
                         fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
                       />
                     </div>
-                    <Show when={app.authorizedUser() && app.authorizedUser().address.toLowerCase() !== user().address.toLowerCase()}>
+
+                    {/* Hide subscribe/unsubscribe when we're on the ACTOR's profile */}
+                    <Show when={app.authorizedUser() && !isActorProfile()}>
                       <Show
                         when={!isSubscribed()}
                         fallback={
@@ -249,11 +252,24 @@ export default function ProfilePage() {
                         <TokenValue amount={user().total_sponsoring} />
                         <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
                       </div>
+
+                      {/* Received from subscribers */}
                       <div class="flex items-center gap-2 mt-1 text-sm">
                         <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
                         <TokenValue amount={user().total_sponsored} />
                         <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
                       </div>
+
+                      {/* If NPO: show NPO icon on the NEXT line with tip "NPO" */}
+                      <Show when={user().is_npo}>
+                        <div class="mt-1">
+                          <NpoIcon
+                            class="w-7 h-7 opacity-95"
+                            title={t("npo.short")}
+                            aria-label={t("npo.short")}
+                          />
+                        </div>
+                      </Show>
                     </div>
 
                     <Show when={aboutText()}>

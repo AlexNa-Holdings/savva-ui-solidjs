@@ -3,12 +3,14 @@ import { createSignal, createResource, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
-import { createPublicClient, http, parseUnits } from "viem";
+import { parseUnits } from "viem";
+import { toHexBytes32 } from "../../blockchain/utils.js";
 import { formatAmountWithDecimals } from "../../blockchain/tokenAmount.js";
 import UserCard from "../ui/UserCard.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import Spinner from "../ui/Spinner.jsx";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 export default function SubscribeModal(props) {
   const app = useApp();
@@ -16,7 +18,8 @@ export default function SubscribeModal(props) {
 
   const authorAddr = () => String(props.author?.address || "");
   const domain = () => String(props.domain || "");
-  const userAddr = () => app.authorizedUser()?.address || "";
+  // Actor-aware: all writes/read context should be for the actor (self or selected NPO)
+  const actorAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
   const [isBusy, setIsBusy] = createSignal(false);
   const [err, setErr] = createSignal("");
@@ -38,9 +41,14 @@ export default function SubscribeModal(props) {
   const stakingAddr = () => stakingInfo()?.addr || "";
   const stakingDecimals = () => Number(stakingInfo()?.decimals ?? 18);
 
-  // ── Current subscription + current frame ─────────────────────────────────────
+  // ── Current subscription + current frame (for the ACTOR) ─────────────────────
   const [subInfo] = createResource(
-    () => ({ domain: domain(), userAddr: userAddr(), author: authorAddr(), chain: app.desiredChain()?.id }),
+    () => ({
+      domain: domain(),
+      userAddr: actorAddr(),
+      author: authorAddr(),
+      chain: app.desiredChain()?.id,
+    }),
     async ({ domain, userAddr, author }) => {
       const clubs = await getSavvaContract(app, "AuthorsClubs");
       const [sub, club] = await Promise.all([
@@ -108,35 +116,35 @@ export default function SubscribeModal(props) {
   // ── Total price — only when weeks valid AND weekly amount > 0 ────────────────
   const totalWei = () => (weeksValid() && amountWei() > 0n ? amountWei() * BigInt(weeksNum()) : 0n);
 
-  // ── Allowance on STAKING token to AuthorsClubs (WRITE CLIENT!) ──────────────
+  // ── Allowance on STAKING token to AuthorsClubs (actor-aware) ────────────────
   const MAX_UINT = (1n << 256n) - 1n;
   async function ensureAllowance(needed) {
-    // guard: require connected wallet
-    const u = userAddr();
-    if (!u) throw new Error("WALLET_NOT_CONNECTED");
+    const owner = actorAddr();
+    if (!owner) throw new Error("WALLET_NOT_CONNECTED");
 
-    // READ allowance
-    const stakingRead = await getSavvaContract(app, "Staking"); // read-only OK
+    // READ allowance for actor
+    const stakingRead = await getSavvaContract(app, "Staking");
     const clubs = await getSavvaContract(app, "AuthorsClubs");
-    const allowance = await stakingRead.read.allowance([u, clubs.address]);
+    const allowance = await stakingRead.read.allowance([owner, clubs.address]);
     if (allowance >= needed) return;
 
-    // WRITE approve using a write-enabled contract (provides account to viem)
-    const stakingWrite = await getSavvaContract(app, "Staking", { write: true });
-    const hash = await stakingWrite.write.approve([clubs.address, MAX_UINT]);
-    const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-    await pc.waitForTransactionReceipt({ hash });
+    // Approve via ACTOR (NPO => NPO.multicall; self => direct)
+    await sendAsActor(app, {
+      contractName: "Staking",
+      functionName: "approve",
+      args: [clubs.address, MAX_UINT],
+    });
   }
 
   function validate() {
     if (!authorAddr()) return t("subscriptions.errors.noAuthor");
-    if (!userAddr()) return t("subscriptions.errors.notAuthorized");
+    if (!actorAddr()) return t("subscriptions.errors.notAuthorized");
     if (amountWei() <= 0n) return t("wallet.transfer.errors.badAmount");
     if (!weeksValid()) return t("subscriptions.errors.badWeeks");
     return "";
   }
 
-  // ── Submit ───────────────────────────────────────────────────────────────────
+  // ── Submit (actor-aware) ─────────────────────────────────────────────────────
   async function submit(e) {
     e?.preventDefault?.();
     setErr("");
@@ -146,14 +154,14 @@ export default function SubscribeModal(props) {
     setIsBusy(true);
     try {
       const need = totalWei();
-      await ensureAllowance(need);
+      if (need > 0n) await ensureAllowance(need);
 
-      // WRITE purchase
-      const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
-      const hash = await clubs.write.buy([domain(), authorAddr(), amountWei(), BigInt(weeksNum())]);
-
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
-      await pc.waitForTransactionReceipt({ hash });
+      // BUY via ACTOR (NPO => NPO.multicall; self => direct)
+      await sendAsActor(app, {
+        contractName: "AuthorsClubs",
+        functionName: "buy",
+        args: [domain(), authorAddr(), amountWei(), BigInt(weeksNum())],
+      });
 
       props.onSubmit?.();
       setIsBusy(false);

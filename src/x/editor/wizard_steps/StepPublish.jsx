@@ -5,6 +5,7 @@ import Spinner from "../../ui/Spinner.jsx";
 import { toHexBytes32 } from "../../../blockchain/utils.js";
 import { sendAsActor } from "../../../blockchain/npoMulticall.js";
 
+
 function parseViemError(e) {
   if (e?.shortMessage) return e.shortMessage;
   if (e?.message?.includes("User rejected")) return "User rejected the request.";
@@ -32,18 +33,14 @@ export default function StepPublish(props) {
       const descriptorCid = cleanCid(props.publishedData()?.descriptorCid);
       const guid = props.postParams()?.guid;
 
-      // author must be the current actor (from useActor, no fallbacks)
       const actorAddr = app.actorAddress?.();
-      if (!domain || !descriptorCid || !guid || !actorAddr) {
-        throw new Error(t("editor.publish.publishing.missingData"));
-      }
 
       let contentType;
       switch (props.editorMode) {
-        case "new_post":      contentType = "post"; break;
-        case "edit_post":     contentType = props.postParams()?.publishAsNewPost ? "post" : "post-edit"; break;
-        case "new_comment":   contentType = "comment"; break;
-        case "edit_comment":  contentType = "comment-edit"; break;
+        case "new_post": contentType = "post"; break;
+        case "edit_post": contentType = props.postParams()?.publishAsNewPost ? "post" : "post-edit"; break;
+        case "new_comment": contentType = "comment"; break;
+        case "edit_comment": contentType = "comment-edit"; break;
         default: throw new Error(`Unknown editor mode: ${props.editorMode}`);
       }
 
@@ -54,7 +51,7 @@ export default function StepPublish(props) {
       });
 
       setStatus("publishing");
-      try { setTxHash(receipt?.transactionHash || null); } catch {}
+      try { setTxHash(receipt?.transactionHash || null); } catch { }
 
       props.onComplete?.();
     } catch (e) {

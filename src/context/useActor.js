@@ -1,123 +1,37 @@
 // src/context/useActor.js
-import { createSignal, createMemo, createEffect } from "solid-js";
+import * as Solid from "solid-js";
 import { getWsApi } from "../net/wsRuntime.js";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { pushErrorToast } from "../ui/toast.js";
 
-const ACTOR_KEY = "savva_actor_v1";
+export function useActor(input = {}) {
+  // Support both signatures: { app } or { auth, conn, selectedDomainName }
+  const app  = input.app || null;
+  const auth = input.auth || app || {};
+  const domSig = input.selectedDomainName;
 
-function readPersisted() {
-  try { return JSON.parse(localStorage.getItem(ACTOR_KEY) || "null") || null; } catch { return null; }
-}
-function writePersisted(v) {
-  try { if (!v) localStorage.removeItem(ACTOR_KEY); else localStorage.setItem(ACTOR_KEY, JSON.stringify(v)); } catch {}
-}
+  const domainName = () =>
+    app?.selectedDomainName?.() ??
+    (typeof domSig === "function" ? domSig() : (domSig || ""));
 
-/**
- * Centralized "acting as" state.
- * - mode: 'self' | 'npo'
- * - actorAddress(): the effective address for signing/attribution
- * - actorProfile(): resolved profile of the current actor (user or NPO)
- * - npoMemberships(): the confirmed NPOs the user can act as
- */
-export function useActor({ app, t }) {
-  const [actor, setActor] = createSignal({ mode: "self", address: "" });
-  const [npoMemberships, setNpoMemberships] = createSignal([]);
-  const [selectedNpoProfile, setSelectedNpoProfile] = createSignal(null);
+  const authorizedUser = () =>
+    (typeof auth.authorizedUser === "function" ? auth.authorizedUser() : null) || null;
 
-  const authorizedUser = () => app.authorizedUser?.();
-  const domainName = () => app.selectedDomainName?.() || "";
+  const [actor, setActor] = Solid.createSignal({ mode: "self", address: "" }); // 'self' | 'npo'
+  const [npoMemberships, setNpoMemberships] = Solid.createSignal([]);
+  const [selectedNpoProfile, setSelectedNpoProfile] = Solid.createSignal(null);
 
-  const actorAddress = createMemo(() => {
-    const a = actor();
-    if (a.mode === "npo" && a.address) return a.address;
-    return authorizedUser()?.address || "";
-  });
+  const isActingAsNpo = Solid.createMemo(() => actor().mode === "npo" && !!actor().address);
+  const actorAddress  = Solid.createMemo(() => (isActingAsNpo() ? actor().address : (authorizedUser()?.address || "")));
+  const actorProfile  = Solid.createMemo(() => (isActingAsNpo() ? selectedNpoProfile() : authorizedUser() || null));
 
-  const isActingAsNpo = createMemo(() => actor().mode === "npo" && !!actor().address);
-
-  const actorProfile = createMemo(() => {
-    if (isActingAsNpo()) return selectedNpoProfile();
-    return authorizedUser() || null;
-  });
-
-  let prevUserAddr = null;
-  let prevDomain = null;
-  let initialized = false;
-
-  // Initial restore (same domain + same user)
-  createEffect(() => {
-    const u = authorizedUser();
-    const dom = domainName();
-    if (!u || !dom || initialized) return;
-
-    const persisted = readPersisted();
-    if (
-      persisted &&
-      persisted.domain === dom &&
-      persisted.user?.toLowerCase() === (u.address || "").toLowerCase() &&
-      persisted.mode === "npo" &&
-      persisted.address
-    ) {
-      setActor({ mode: "npo", address: String(persisted.address) });
-      void refreshActorProfile(String(persisted.address));
-    } else {
-      setActor({ mode: "self", address: "" });
-      setSelectedNpoProfile(null);
-    }
-    initialized = true;
-    prevUserAddr = u.address || null;
-    prevDomain = dom;
-  });
-
-  // On LOGIN (null -> address), force 'self' as per spec; on LOGOUT clear everything.
-  createEffect(() => {
-    const u = authorizedUser();
-    const current = u?.address || null;
-
-    const isLogin = (prevUserAddr == null && current != null);
-    const isLogout = (prevUserAddr != null && current == null);
-    const userChanged = (prevUserAddr && current && prevUserAddr.toLowerCase() !== current.toLowerCase());
-
-    if (isLogin || userChanged) {
-      // After authorization we start as self.
-      setActor({ mode: "self", address: "" });
-      setSelectedNpoProfile(null);
-      writePersisted({ domain: domainName(), user: current, mode: "self" });
-      void refreshNpoMemberships();
-    } else if (isLogout) {
-      setActor({ mode: "self", address: "" });
-      setSelectedNpoProfile(null);
-      setNpoMemberships([]);
-      writePersisted(null);
-    }
-
-    prevUserAddr = current;
-  });
-
-  // On DOMAIN change, clear actor + memberships (spec).
-  createEffect(() => {
-    const dom = domainName();
-    if (!initialized) return;
-    if (prevDomain && dom && dom !== prevDomain) {
-      setActor({ mode: "self", address: "" });
-      setSelectedNpoProfile(null);
-      setNpoMemberships([]);
-      // Keep persisted entry for same-domain restores; will be ignored on mismatch.
-    }
-    prevDomain = dom;
-  });
-
-  async function refreshActorProfile(addr) {
+  async function refreshActorProfile(address) {
     try {
       const api = getWsApi();
-      const profile = await api.call("get-user", {
-        domain: domainName(),
-        user_addr: toChecksumAddress(addr),
-      });
-      setSelectedNpoProfile(profile || { address: addr, is_npo: true });
-    } catch (e) {
-      pushErrorToast(e, { message: t("errors.loadFailed") });
+      const res = await api.call("get-user", { domain: domainName(), user_addr: address });
+      setSelectedNpoProfile(res || { address, is_npo: true });
+    } catch {
+      setSelectedNpoProfile({ address, is_npo: true });
     }
   }
 
@@ -138,6 +52,8 @@ export function useActor({ app, t }) {
       setNpoMemberships(list);
       return list;
     } catch (e) {
+      // use app.t if present; otherwise fall back silently
+      const t = app?.t || ((k) => k);
       pushErrorToast(e, { message: t("errors.loadFailed") });
       setNpoMemberships([]);
       return [];
@@ -147,8 +63,6 @@ export function useActor({ app, t }) {
   async function actAsSelf() {
     setActor({ mode: "self", address: "" });
     setSelectedNpoProfile(null);
-    const user = authorizedUser();
-    writePersisted({ domain: domainName(), user: user?.address || "", mode: "self" });
   }
 
   async function actAsNpo(addr) {
@@ -156,22 +70,51 @@ export function useActor({ app, t }) {
     if (!address) return;
     setActor({ mode: "npo", address });
     await refreshActorProfile(address);
-    const user = authorizedUser();
-    writePersisted({ domain: domainName(), user: user?.address || "", mode: "npo", address });
   }
 
-  // Fetch memberships once authorized
-  createEffect(() => {
+  // Reset on login/logout; load memberships on login
+  let prevUserAddr = null;
+  Solid.createEffect(() => {
+    const u = authorizedUser();
+    const current = u?.address || null;
+
+    const isLogin    = (prevUserAddr == null && current != null);
+    const isLogout   = (prevUserAddr != null && current == null);
+    const userChange = (prevUserAddr && current && prevUserAddr.toLowerCase() !== current.toLowerCase());
+
+    if (isLogin || userChange) {
+      actAsSelf();
+      void refreshNpoMemberships();
+    } else if (isLogout) {
+      actAsSelf();
+      setNpoMemberships([]);
+    }
+    prevUserAddr = current;
+  });
+
+  // Reset on domain change
+  let prevDomain = null;
+  Solid.createEffect(() => {
+    const dom = domainName();
+    if (prevDomain && dom && dom !== prevDomain) {
+      actAsSelf();
+      setNpoMemberships([]);
+    }
+    prevDomain = dom;
+  });
+
+  // Initial load after auth
+  Solid.createEffect(() => {
     if (authorizedUser()?.address) void refreshNpoMemberships();
   });
 
   return {
     // state
-    actor,               // { mode, address }
-    actorAddress,        // () => string
-    actorProfile,        // () => user or NPO profile
-    isActingAsNpo,       // () => boolean
-    npoMemberships,      // () => array
+    actor,                     // { mode, address }
+    actorAddress,              // () => string
+    actorProfile,              // () => user or NPO profile
+    isActingAsNpo,             // () => boolean
+    npoMemberships,            // () => array
 
     // actions
     actAsSelf,
