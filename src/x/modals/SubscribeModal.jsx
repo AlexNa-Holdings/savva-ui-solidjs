@@ -11,6 +11,8 @@ import AmountInput from "../ui/AmountInput.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 export default function SubscribeModal(props) {
   const app = useApp();
@@ -72,7 +74,7 @@ export default function SubscribeModal(props) {
 
     if (s.amountPerWeek && s.amountPerWeek > 0n) {
       const txt = formatAmountWithDecimals(s.amountPerWeek, dec, 6)
-        .replace(/(\.\d*?[1-9])0+$/,"$1")
+        .replace(/(\.\d*?[1-9])0+$/, "$1")
         .replace(/\.$/, "");
       setAmountText(txt);
       setAmountWei(s.amountPerWeek);
@@ -182,11 +184,12 @@ export default function SubscribeModal(props) {
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" onClick={() => !isBusy() && props.onClose?.()} />
+      <ModalBackdrop onClick={props.onClose} />
       <form
         onSubmit={submit}
         class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
       >
+        <ModalAutoCloser onClose={props.onClose} />
         <h3 class="text-lg font-semibold">{t("subscriptions.subscribe.title")}</h3>
 
         <p class="text-sm opacity-80">{t("subscriptions.info")}</p>

@@ -1,0 +1,11 @@
+/* src/styles/modal.css */
+:root {
+  --modal-overlay-alpha: 0.45;   /* tweak per-domain in domain.css if needed */
+  --modal-overlay-blur: 8px;
+}
+
+.sv-modal-overlay {
+  background-color: hsl(var(--background) / var(--modal-overlay-alpha));
+  backdrop-filter: blur(var(--modal-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--modal-overlay-blur));
+}

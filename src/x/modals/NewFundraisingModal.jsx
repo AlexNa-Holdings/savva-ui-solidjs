@@ -8,6 +8,8 @@ import { getConfigParam } from "../../blockchain/config.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 async function fetchStakeCheck({ app, actorAddress }) {
   if (!actorAddress) return { hasEnoughStake: false, minStakeWei: 0n };
@@ -86,9 +88,10 @@ export default function NewFundraisingModal(props) {
   return (
     <Show when={props.isOpen}>
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/40" onClick={handleClose} />
+        <ModalBackdrop onClick={props.onClose} />
         <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
           <form onSubmit={handleCreate} class="p-4 space-y-4">
+            <ModalAutoCloser onClose={props.onClose} />
             <h3 class="text-lg font-semibold">{t("fundraising.createModal.title")}</h3>
 
             <Show

@@ -7,6 +7,8 @@ import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 export default function UnstakeModal(props) {
   const app = useApp();
@@ -186,11 +188,12 @@ export default function UnstakeModal(props) {
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" onClick={close} />
+     <ModalBackdrop onClick={props.onClose} />
       <form
         onSubmit={submit}
         class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
       >
+        <ModalAutoCloser onClose={props.onClose} />
         <h3 class="text-lg font-semibold">{t("wallet.unstake.title")}</h3>
 
         <Show when={!actorMissing()}>

@@ -2,6 +2,8 @@
 import { createSignal, onCleanup, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import Spinner from "../ui/Spinner.jsx";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 const CROP_SIZE = 256;
 const HANDLE_VISUAL = 12;   // drawn handle square
@@ -237,8 +239,9 @@ export default function AvatarEditorModal(props) {
   return (
     <Show when={props.isOpen}>
       <div class="fixed inset-0 z-[60] flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+        <ModalBackdrop onClick={props.onClose} />
         <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-lg p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+           <ModalAutoCloser onClose={props.onClose} />
           <h3 class="text-lg font-semibold mb-4">{t("profile.edit.avatar.title")}</h3>
 
           <input

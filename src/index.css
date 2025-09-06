@@ -2,7 +2,9 @@
 @import "tailwindcss";
 @import "./styles/tabs.css";
 @import "./styles/themed-controls.css";
+@import "./styles/md-font.css";
 @import "./styles/layout.css";
+@import "./styles/modal.css";
 @import "../public/domain_default/domain.css";
 
 /* Custom utility for multi-line truncation */

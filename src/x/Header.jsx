@@ -12,6 +12,7 @@ import NewPostButton from "./main/NewPostButton.jsx";
 import TokenPrice from "./main/TokenPrice.jsx";
 import ActorBadge from "./actors/ActorBadge.jsx"; /* +++ */
 import { dbg } from "../utils/debug.js";
+import HeaderSearchButton from "../x/ui/HeaderSearchButton.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
@@ -102,6 +103,9 @@ export default function Header({ onTogglePane }) {
           </div>
 
           <div class="flex items-center gap-3">
+
+            <HeaderSearchButton />
+            
             <Show when={app.authorizedUser() && walletAccount()}>
               <NewPostButton />
             </Show>

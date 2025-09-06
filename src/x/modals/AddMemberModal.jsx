@@ -7,6 +7,8 @@ import AddressInput from "../ui/AddressInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { sendAsUser } from "../../blockchain/npoMulticall.js"; // actor-aware helpers (config must be "as user")
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 function bytes32ToString(hex) {
   if (!hex || typeof hex !== "string" || !hex.startsWith("0x")) return "";
@@ -94,9 +96,10 @@ export default function AddMemberModal(props) {
   return (
     <Show when={props.isOpen}>
       <div class="fixed inset-0 z-50" role="dialog" aria-modal="true">
-        <div class="absolute inset-0 bg-black/40" onClick={close} />
+        <ModalBackdrop onClick={props.onClose} />
         <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(560px,92vw)] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-xl">
           <div class="px-4 py-3 border-b border-[hsl(var(--border))] flex items-center justify-between">
+             <ModalAutoCloser onClose={props.onClose} />
             <h2 class="text-lg font-semibold">{t("npo.addMember.title")}</h2>
             <button class="w-8 h-8 rounded hover:bg-[hsl(var(--accent))]" onClick={close} aria-label={t("common.close")}>✕</button>
           </div>

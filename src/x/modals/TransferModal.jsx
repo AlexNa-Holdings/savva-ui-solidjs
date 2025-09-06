@@ -9,6 +9,8 @@ import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor, buildCall } from "../../blockchain/npoMulticall.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import { createPublicClient, http } from "viem";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
   const addr = tokenAddress ? String(tokenAddress) : "";
@@ -196,8 +198,9 @@ export default function TransferModal(props) {
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" onClick={() => !isProcessing() && props.onClose?.()} />
+      <ModalBackdrop onClick={props.onClose} />
       <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
+        <ModalAutoCloser onClose={props.onClose} />
         <form onSubmit={submit} class="p-4 space-y-4">
           <div class="text-lg font-semibold flex items-center gap-2">
             <TokenTitleIcon app={app} tokenAddress={tokenAddr()} />

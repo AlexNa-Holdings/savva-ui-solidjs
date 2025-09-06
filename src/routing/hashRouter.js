@@ -1,5 +1,6 @@
 // src/routing/hashRouter.js
 import { createSignal } from "solid-js";
+import { closeAllModals } from "../utils/modalBus.js";
 
 function readHashPath() {
   const raw = window.location.hash || "";
@@ -9,8 +10,9 @@ function readHashPath() {
 const [route, setRoute] = createSignal(readHashPath());
 
 function setFromHash() {
-  const newPath = readHashPath();
-  setRoute(newPath);
+  // Close modals on any hash change (e.g., plain anchors)
+  closeAllModals();
+  setRoute(readHashPath());
 }
 
 if (typeof window !== "undefined") {
@@ -18,6 +20,8 @@ if (typeof window !== "undefined") {
 }
 
 export function navigate(path, { replace = false } = {}) {
+  // Close modals on programmatic navigation too
+  closeAllModals();
   const target = path.startsWith("#") ? path : `#${path}`;
   if (replace) window.location.replace(target);
   else window.location.hash = path.startsWith("#") ? path.slice(1) : path;

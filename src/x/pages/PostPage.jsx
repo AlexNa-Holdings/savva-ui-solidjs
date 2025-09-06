@@ -29,7 +29,6 @@ import FundraisingCard from "../post/FundraisingCard.jsx";
 import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import PostRightPanel from "../post/PostRightPanel.jsx";
 
-
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
@@ -146,19 +145,19 @@ export default function PostPage() {
     }
   });
 
-createEffect(() => {
-  const update = app.postUpdate();
-  if (post && update && update.cid === post.savva_cid) {
-    if (update.type === 'reactionsChanged') {
-      setPost('reactions', reconcile(update.data.reactions));
-      if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
-        setPost('my_reaction', update.data.reaction);
+  createEffect(() => {
+    const update = app.postUpdate();
+    if (post && update && update.cid === post.savva_cid) {
+      if (update.type === 'reactionsChanged') {
+        setPost('reactions', reconcile(update.data.reactions));
+        if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
+          setPost('my_reaction', update.data.reaction);
+        }
+      } else if (update.type === 'fundChanged' && update.data.fund) {
+        setPost('fund', (prevFund) => reconcile({ ...prevFund, ...update.data.fund }));
       }
-    } else if (update.type === 'fundChanged' && update.data.fund) {
-      setPost('fund', (prevFund) => reconcile({ ...prevFund, ...update.data.fund }));
     }
-  }
-});
+  });
 
   createEffect(() => {
     if (post && !postLang()) {
@@ -173,32 +172,30 @@ createEffect(() => {
   });
 
   createEffect(() => {
-  const d = details();
-  if (!d?.descriptor) return;
-  const locales = d.descriptor.locales || {};
-  const available = Object.keys(locales);
-  if (available.length === 0) return;
-  // prefer current UI lang if available, else first
-  const ui = uiLang();
-  setPostLang(available.includes(ui) ? ui : available[0]);
-});
+    const d = details();
+    if (!d?.descriptor) return;
+    const locales = d.descriptor.locales || {};
+    const available = Object.keys(locales);
+    if (available.length === 0) return;
+    const ui = uiLang();
+    setPostLang(available.includes(ui) ? ui : available[0]);
+  });
 
-
-const postForTags = createMemo(() => {
-  const d = details();
-  const lang = postLang();
-  const loc = d?.descriptor?.locales?.[lang] || {};
-  return {
-    savva_content: {
-      locales: {
-        [lang || "en"]: {
-          categories: Array.isArray(loc.categories) ? loc.categories : [],
-          tags: Array.isArray(loc.tags) ? loc.tags : [],
+  const postForTags = createMemo(() => {
+    const d = details();
+    const lang = postLang();
+    const loc = d?.descriptor?.locales?.[lang] || {};
+    return {
+      savva_content: {
+        locales: {
+          [lang || "en"]: {
+            categories: Array.isArray(loc.categories) ? loc.categories : [],
+            tags: Array.isArray(loc.tags) ? loc.tags : [],
+          },
         },
       },
-    },
-  };
-});
+    };
+  });
 
   const contextMenuItems = createMemo(() => {
     if (!post) return [];
@@ -278,7 +275,6 @@ const postForTags = createMemo(() => {
                 <div class="flex-1 min-w-0 space-y-3">
                   <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t('common.loading')}</h1>
 
-                  {/* Author line with admin context menu aligned to the right */}
                   <div class="flex items-center justify-between gap-3">
                     <UserCard author={post.author} />
                     <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
@@ -289,7 +285,7 @@ const postForTags = createMemo(() => {
                       />
                     </Show>
                   </div>
-                    <PostTags postData={postForTags()} />
+                  <PostTags postData={postForTags()} />
                 </div>
 
                 <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
@@ -313,7 +309,8 @@ const postForTags = createMemo(() => {
               </header>
 
               <div class="pt-4 border-t border-[hsl(var(--border))]">
-                <div class="grid grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
+                {/* Responsive: 1 col on mobile, 2 cols on lg+ */}
+                <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
                   <div>
                     <Show when={(chapterList()?.length || 0) > 1}>
                       <div class="flex justify-end mb-4">
@@ -345,9 +342,26 @@ const postForTags = createMemo(() => {
                         </Show>
                       </Match>
                     </Switch>
+
                     <PostControls post={post} />
+
+                    {/* Mobile: Right panel content in-flow, before comments */}
+                    <div class="mt-6 block lg:hidden space-y-2">
+                      <Show when={details()?.descriptor?.fundraiser > 0}>
+                        <FundraisingCard
+                          campaignId={details().descriptor.fundraiser}
+                          onContribute={openContributeModal}
+                        />
+                      </Show>
+                      <Show when={post}>
+                        <PostFundCard post={post} />
+                      </Show>
+                    </div>
+
                     <PostComments post={post} />
                   </div>
+
+                  {/* Desktop right rail (sticky/clamped). Hidden on small screens */}
                   <PostRightPanel post={post} details={details} onOpenContributeModal={openContributeModal} />
                 </div>
               </div>

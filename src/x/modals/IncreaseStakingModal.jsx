@@ -8,6 +8,8 @@ import TokenValue from "../ui/TokenValue.jsx";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { parseUnits } from "viem";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 const MAX_UINT = (1n << 256n) - 1n;
 
@@ -194,9 +196,10 @@ export default function IncreaseStakingModal(props) {
 
   return (
     <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" onClick={close} />
+       <ModalBackdrop onClick={props.onClose} />
       <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
         <form onSubmit={submit} class="p-4 space-y-4">
+          <ModalAutoCloser onClose={props.onClose} />
           <h3 class="text-lg font-semibold">{t("wallet.stake.title")}</h3>
 
           <Show when={!stakingInfo.loading && stakingInfo() && !stakingInfo().error} fallback={<div class="flex justify-center"><Spinner /></div>}>

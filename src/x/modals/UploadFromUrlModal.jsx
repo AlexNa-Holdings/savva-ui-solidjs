@@ -1,6 +1,8 @@
 // src/x/editor/UploadFromUrlModal.jsx
 import { createSignal, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
+import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 
 export default function UploadFromUrlModal(props) {
   const { t } = useApp();
@@ -24,8 +26,9 @@ export default function UploadFromUrlModal(props) {
   return (
     <Show when={props.isOpen}>
       <div class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
+        <ModalBackdrop onClick={props.onClose} />
         <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-md p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+          <ModalAutoCloser onClose={props.onClose} />
           <h3 class="text-lg font-semibold mb-3">{t("editor.files.uploadModalTitle")}</h3>
           <input
             type="text"

@@ -1,0 +1,15 @@
+/* src/styles/md-font.css */
+
+/* Portable serif stack + adjustable size (override in domain.css if needed) */
+:root {
+  --md-font: "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L",
+             "Book Antiqua", Georgia, Cambria, "Times New Roman", Times,
+             "DejaVu Serif", "Liberation Serif", serif;
+  --md-font-size: 1.2rem; /* slightly larger than default */
+}
+
+/* Applied to MarkdownView root */
+.sv-docs {
+  font-family: var(--md-font);
+  font-size: var(--md-font-size);
+}

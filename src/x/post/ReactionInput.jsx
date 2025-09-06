@@ -102,6 +102,7 @@ export default function ReactionInput(props) {
         domain: app.selectedDomainName(),
         'obj-type': 0,
         'obj-id': postId,
+        'actor': app.actor().address,
         n: 0,
         reaction: reactionIndex,
       });
