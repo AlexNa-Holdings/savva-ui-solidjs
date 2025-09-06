@@ -4,8 +4,6 @@ import { useApp } from "../../context/AppContext.jsx";
 import MarkdownView from "../docs/MarkdownView.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import PostTags from "../post/PostTags.jsx";
-import IpfsImage from "../ui/IpfsImage.jsx";
-import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import { rehypeResolveDraftUrls } from "../../docs/rehype-resolve-draft-urls.js";
 import ChapterSelector from "../post/ChapterSelector.jsx";
 import ChapterPager from "../post/ChapterPager.jsx";
@@ -14,17 +12,18 @@ import LangSelector from "../ui/LangSelector.jsx";
 export default function EditorFullPreview(props) {
   const app = useApp();
   const { t } = app;
+
   const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
   const [previewLang, setPreviewLang] = createSignal(props.activeLang);
 
-  const author = () => app.authorizedUser();
+  // Show the current actor (me or selected NPO)
+  const author = () => (app.actorProfile?.() || app.authorizedUser?.());
   const lang = () => previewLang();
 
   const title = createMemo(() => props.postData?.[lang()]?.title || "");
 
   const chapterList = createMemo(() => {
     const prologue = { title: t("post.chapters.prologue") };
-    const currentChapters = props.chapters?.filter(c => props.postData[lang()]?.chapters.includes(c)) || [];
     return [prologue, ...(props.chapters || [])];
   });
 
@@ -32,9 +31,7 @@ export default function EditorFullPreview(props) {
     const data = props.postData?.[lang()];
     if (!data) return "";
     const index = selectedChapterIndex();
-    if (index === 0) {
-      return data.body || "";
-    }
+    if (index === 0) return data.body || "";
     return data.chapters?.[index - 1]?.body || "";
   });
 
@@ -44,31 +41,36 @@ export default function EditorFullPreview(props) {
         [lang()]: {
           categories: props.postParams?.locales?.[lang()]?.categories || [],
           tags: props.postParams?.locales?.[lang()]?.tags || [],
-        }
-      }
-    }
+        },
+      },
+    },
   }));
 
   const markdownPlugins = createMemo(() => [[rehypeResolveDraftUrls, { baseDir: props.baseDir }]]);
 
+  const handlePublishClick = () => (props.onContinue || props.onPublish)?.();
+
   return (
     <div class="max-w-5xl mx-auto space-y-4">
       <div class="p-3 pr-4 rounded-lg flex items-center justify-between" style={{ background: "var(--gradient)" }}>
-        <button onClick={props.onBack} class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90">
+        <button
+          onClick={props.onBack}
+          class="ml-5 px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+        >
           {t("editor.fullPreview.back")}
         </button>
         <div class="text-center text-[hsl(var(--card))]">
           <h2 class="font-bold">{t("editor.fullPreview.title")}</h2>
           <p class="text-xs opacity-90">{t("editor.fullPreview.help")}</p>
         </div>
-        <button 
-          onClick={props.onContinue}
-          class="mr-5 px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:opacity-90"
+        <button
+          onClick={handlePublishClick}
+          class="px-4 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
         >
           {t("editor.fullPreview.publish")}
         </button>
       </div>
-      
+
       <div class="bg-[hsl(var(--background))] p-4 rounded-lg border border-[hsl(var(--border))]">
         <article class="space-y-4">
           <header class="flex justify-between items-start gap-4">
@@ -79,38 +81,40 @@ export default function EditorFullPreview(props) {
             </div>
             <div class="w-48 flex-shrink-0 space-y-2">
               <Show when={props.thumbnailUrl}>
-                <img src={props.thumbnailUrl} alt="Thumbnail preview" class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]" />
+                <img
+                  src={props.thumbnailUrl}
+                  alt="Thumbnail preview"
+                  class="w-full aspect-video rounded-md object-cover border border-[hsl(var(--border))]"
+                />
               </Show>
               <Show when={(props.filledLangs || []).length > 1}>
                 <div class="flex justify-center">
-                    <LangSelector
-                        codes={props.filledLangs}
-                        value={previewLang()}
-                        onChange={setPreviewLang}
-                    />
+                  <LangSelector codes={props.filledLangs} value={previewLang()} onChange={setPreviewLang} />
                 </div>
               </Show>
             </div>
           </header>
 
           <div class="pt-4 border-t border-[hsl(var(--border))]">
-              <Show when={(chapterList()?.length || 0) > 1}>
-                  <div class="flex justify-end mb-4">
-                  <ChapterSelector 
-                      chapters={chapterList()} 
-                      selectedIndex={selectedChapterIndex()} 
-                      onSelect={setSelectedChapterIndex}
-                  />
-                  </div>
-              </Show>
-              <MarkdownView markdown={currentContent()} rehypePlugins={markdownPlugins()} />
-              <Show when={(chapterList()?.length || 0) > 1}>
-                  <ChapterPager 
-                      chapters={chapterList()}
-                      currentIndex={selectedChapterIndex()}
-                      onSelect={setSelectedChapterIndex}
-                  />
-              </Show>
+            <Show when={(chapterList()?.length || 0) > 1}>
+              <div class="flex justify-end mb-4">
+                <ChapterSelector
+                  chapters={chapterList()}
+                  selectedIndex={selectedChapterIndex()}
+                  onSelect={setSelectedChapterIndex}
+                />
+              </div>
+            </Show>
+
+            <MarkdownView markdown={currentContent()} rehypePlugins={markdownPlugins()} />
+
+            <Show when={(chapterList()?.length || 0) > 1}>
+              <ChapterPager
+                chapters={chapterList()}
+                currentIndex={selectedChapterIndex()}
+                onSelect={setSelectedChapterIndex}
+              />
+            </Show>
           </div>
         </article>
       </div>

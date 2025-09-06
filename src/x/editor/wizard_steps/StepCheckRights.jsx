@@ -14,7 +14,8 @@ export default function StepCheckRights(props) {
 
   const checkRights = async () => {
     const user = app.authorizedUser();
-    if (!user?.address) {
+    const actorAddr = app.actorAddress?.() || user?.address;
+    if (!actorAddr) {
       throw new Error(t("editor.publish.rights.errorNoAuth"));
     }
 
@@ -24,11 +25,11 @@ export default function StepCheckRights(props) {
     }
 
     const stakingContract = await getSavvaContract(app, "Staking");
-    const userStakeWei = await stakingContract.read.balanceOf([user.address]);
+    const stakeWei = await stakingContract.read.balanceOf([actorAddr]);
 
-    if (userStakeWei < minStakeWei) {
+    if (stakeWei < minStakeWei) {
       const required = parseFloat(formatUnits(minStakeWei, 18)).toLocaleString();
-      const actual = parseFloat(formatUnits(userStakeWei, 18)).toLocaleString();
+      const actual = parseFloat(formatUnits(stakeWei, 18)).toLocaleString();
       throw new Error(t("editor.publish.rights.errorInsufficientStake", { required, actual }));
     }
   };

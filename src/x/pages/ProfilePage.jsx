@@ -85,8 +85,9 @@ export default function ProfilePage() {
       { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
       { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
       { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+      // Wallet is visible for any profile; actions are gated inside WalletTab
+      { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> },
     ];
-    if (isMyProfile()) tabs.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
     return tabs;
   });
 
@@ -105,13 +106,12 @@ export default function ProfilePage() {
     if (valid.includes(tab)) setActiveTab(tab);
   });
 
-  // Guard: if active tab becomes invalid (e.g., wallet disappears), fallback to posts
+  // Guard: if active tab becomes invalid, fallback to posts
   createEffect(() => {
     const available = TABS();
     if (!available.some(t => t.id === activeTab())) setActiveTab('posts');
   });
 
-  // Keep URL in sync when switching tabs (replace state to avoid history spam)
   function onTabChange(nextId) {
     const hash = window.location.hash || "";
     const [path, qsRaw] = hash.split("?");
@@ -151,7 +151,6 @@ export default function ProfilePage() {
     return "";
   });
 
-  // Subscribe/Unsubscribe wiring
   const [showSub, setShowSub] = createSignal(false);
   const domainName = createMemo(() => app.selectedDomainName?.() || "");
 
@@ -169,7 +168,6 @@ export default function ProfilePage() {
       await refetchUser();
     } catch (e) {
       console.error("ProfilePage: stop() failed", e);
-      // optionally add toast here
     }
   }
 
@@ -291,7 +289,7 @@ export default function ProfilePage() {
                     <Match when={activeTab() === 'subscriptions'}>
                       <SubscriptionsTab user={user()} />
                     </Match>
-                    <Match when={activeTab() === 'wallet' && isMyProfile()}>
+                    <Match when={activeTab() === 'wallet'}>
                       <WalletTab user={user()} />
                     </Match>
                   </Switch>

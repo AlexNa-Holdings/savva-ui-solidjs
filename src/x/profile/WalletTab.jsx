@@ -14,11 +14,12 @@ import IncreaseStakingModal from "../modals/IncreaseStakingModal.jsx";
 import UnstakeModal from "../modals/UnstakeModal.jsx";
 import Countdown from "../ui/Countdown.jsx";
 
-export default function WalletTab() {
+export default function WalletTab(props) {
   const app = useApp();
   const { t } = app;
 
-  const user = () => app.authorizedUser();
+  // The profile whose wallet we show. Falls back to authorized user.
+  const viewedUser = () => props.user || app.authorizedUser();
   const [refreshKey, setRefreshKey] = createSignal(0);
 
   const RefreshButton = () => (
@@ -81,7 +82,7 @@ export default function WalletTab() {
   }
 
   const [walletData, { refetch }] = createResource(
-    () => ({ app, user: user(), refreshKey: refreshKey() }),
+    () => ({ app, user: viewedUser(), refreshKey: refreshKey() }),
     fetchWalletData
   );
 
@@ -91,7 +92,7 @@ export default function WalletTab() {
 
   function isOwnConnectedWallet() {
     const wa = walletAccount();
-    const u = user();
+    const u = viewedUser();
     return !!wa && !!u?.address && String(wa).toLowerCase() === String(u.address).toLowerCase();
   }
 
@@ -109,7 +110,7 @@ export default function WalletTab() {
         method: "wallet_watchAsset",
         params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
       });
-    } catch { }
+    } catch { /* ignore */ }
   }
 
   // ── actions ──────────────────────────────────────────────────────────────────
@@ -166,14 +167,14 @@ export default function WalletTab() {
     }
   }
 
-  // ── menus ────────────────────────────────────────────────────────────────────
+  // ── menus (hidden when viewing someone else) ─────────────────────────────────
   const savvaMenuItems = createMemo(() =>
     isOwnConnectedWallet()
       ? [
-        { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
-        { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-        { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
-      ]
+          { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
+          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
+        ]
       : []
   );
 
@@ -184,10 +185,10 @@ export default function WalletTab() {
   const stakedMenuItems = createMemo(() =>
     isOwnConnectedWallet()
       ? [
-        { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-        { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
-        { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
-      ]
+          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+          { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
+          { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
+        ]
       : []
   );
 
@@ -210,13 +211,12 @@ export default function WalletTab() {
   const rewardMenuItems = createMemo(() =>
     isOwnConnectedWallet() && hasStakingReward()
       ? [
-        { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
-        { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
-      ]
+          { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
+          { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
+        ]
       : []
   );
 
-  // NEW: available-unstaked menu (single item: Withdraw)
   const hasAvailableUnstaked = createMemo(() => {
     const v = walletData()?.availableUnstaked;
     return typeof v === "bigint" ? v > 0n : Number(v || 0) > 0;
@@ -327,7 +327,6 @@ export default function WalletTab() {
           </WalletSection>
 
           <WalletSection title={t("profile.wallet.staking.title")}>
-            {/* Staked and Reward rows */}
             <WalletRow
               title={t("profile.wallet.staked.title")}
               description={t("profile.wallet.staked.description")}
@@ -349,7 +348,6 @@ export default function WalletTab() {
               />
             </WalletRow>
 
-            {/* Available to withdraw — same pattern as other rows, before the table */}
             <WalletRow
               title={t("profile.wallet.unstaked.available.title")}
               description={t("profile.wallet.unstaked.available.desc")}
@@ -361,7 +359,6 @@ export default function WalletTab() {
               />
             </WalletRow>
 
-            {/* Current withdraw requests table */}
             <Show when={Array.isArray(unstakeRequests()) && unstakeRequests().length > 0}>
               <div class="pt-3">
                 <div class="font-semibold mb-2">{t("profile.wallet.unstaked.requests.title")}</div>
@@ -380,8 +377,7 @@ export default function WalletTab() {
                             <td class="px-3 py-2">
                               <Show when={isReqAvailable(r.timestamp)} fallback={
                                 <span class="opacity-80" data-countdown-ts={Number(r.timestamp)}>
-                                  <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" labelStyle="short"/>
-
+                                  <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" labelStyle="short" />
                                 </span>
                               }>
                                 <span class="text-emerald-600">{t("wallet.unstaked.availableNow")}</span>
@@ -415,7 +411,7 @@ export default function WalletTab() {
       {/* Base-token transfer */}
       <Show when={showBaseTransfer()}>
         <TransferModal
-          tokenAddress=""
+          tokenAddress=""   // native coin
           onClose={() => setShowBaseTransfer(false)}
           onSubmit={handleTransferSubmit}
           maxAmount={walletData()?.baseTokenBalance}

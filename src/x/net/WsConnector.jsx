@@ -5,6 +5,7 @@ import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "../..
 import { wsUrl } from "../../net/endpoints.js";
 import { pushToast } from "../../ui/toast.js";
 import { useI18n } from "../../i18n/useI18n.js";
+import { useActor } from "../../context/useActor.js"; // ← NEW
 
 let _mounted = false;
 
@@ -18,6 +19,7 @@ export default function WsConnector() {
   const ws = getWsClient();
   const api = getWsApi();
 
+  // Attach WS helpers (existing pattern)
   app.ws = ws;
   app.wsUrl = wsUrl;
   app.wsStatus = () => ws.status();
@@ -29,15 +31,23 @@ export default function WsConnector() {
   app.onAlert = onAlert;
   app.offAlert = offAlert;
 
+  // Attach ACTOR store (new)
+  const actor = useActor({ app, t });
+  app.actor = actor.actor;                         // () => { mode, address }
+  app.actorAddress = actor.actorAddress;           // () => string
+  app.actorProfile = actor.actorProfile;           // () => user/NPO profile
+  app.isActingAsNpo = actor.isActingAsNpo;         // () => boolean
+  app.npoMemberships = actor.npoMemberships;       // () => array
+  app.actAsSelf = actor.actAsSelf;                 // () => Promise<void>
+  app.actAsNpo = actor.actAsNpo;                   // (addr) => Promise<void>
+  app.refreshNpoMemberships = actor.refreshNpoMemberships;
+
   onMount(() => {
     ensureWsStarted("connector-mount");
 
     const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
 
-    const onOpen = () => {
-      setHasConnectedOnce(true);
-    };
-
+    const onOpen = () => { setHasConnectedOnce(true); };
     const onClose = () => {
       if (!hasConnectedOnce()) {
         pushToast({
@@ -48,10 +58,7 @@ export default function WsConnector() {
         });
       }
     };
-
-    const onAuthError = () => {
-      app.handleAuthError?.();
-    };
+    const onAuthError = () => { app.handleAuthError?.(); };
 
     ws.on("open", onOpen);
     ws.on("close", onClose);

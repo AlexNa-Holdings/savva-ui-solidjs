@@ -1,4 +1,4 @@
-// src/x/editor/wizard_steps/PostSubmissionWizard.jsx
+// src/x/editor/PostSubmissionWizard.jsx
 import { createSignal, createMemo, Show, For, Switch, Match, createEffect, on } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
@@ -40,8 +40,11 @@ export default function PostSubmissionWizard(props) {
   const [currentStepIndex, setCurrentStepIndex] = createSignal(0);
   const [publishedData, setPublishedData] = createSignal({});
 
-  createEffect(on(() => props.isOpen, (isOpen) => {
-    if (isOpen) {
+  // Accept either a boolean or an accessor
+  const isOpen = () => (typeof props.isOpen === "function" ? props.isOpen() : !!props.isOpen);
+
+  createEffect(on(isOpen, (open) => {
+    if (open) {
       setCurrentStepIndex(0);
       setPublishedData({});
     }
@@ -50,39 +53,18 @@ export default function PostSubmissionWizard(props) {
   const activeComponent = createMemo(() => STEPS[currentStepIndex()]?.component);
 
   const handleNextStep = (stepResult) => {
-    const currentStep = STEPS[currentStepIndex()];
-    dbg.log("Wizard:handleNextStep", `Completed step '${currentStep.id}'. Received result:`, stepResult);
-
-    if (currentStep.id === 'ipfs') {
-      setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
-    } else if (currentStep.id === 'ipfs_publish') {
-      setPublishedData(prev => ({ ...prev, descriptorCid: stepResult }));
-    }
-
-    if (currentStepIndex() < STEPS.length - 1) {
-      setCurrentStepIndex(currentStepIndex() + 1);
-    } else {
-      props.onSuccess?.();
-    }
-  };
-  
-  const handleRetry = () => {
-    setCurrentStepIndex(0);
-    setPublishedData({});
+    const current = STEPS[currentStepIndex()];
+    dbg.log("Wizard:handleNextStep", `Completed step '${current.id}'. Received result:`, stepResult);
+    if (current.id === "ipfs") setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
+    else if (current.id === "ipfs_publish") setPublishedData(prev => ({ ...prev, descriptorCid: stepResult }));
+    if (currentStepIndex() < STEPS.length - 1) setCurrentStepIndex(currentStepIndex() + 1);
+    else props.onSuccess?.();
   };
 
-  const getStepStatus = (index) => {
-    if (index < currentStepIndex()) return "completed";
-    if (index === currentStepIndex()) return "active";
-    return "pending";
-  };
-
-  const handleValidationBack = () => {
-    props.onClose?.();
-  };
+  const handleValidationBack = () => props.onClose?.();
 
   return (
-    <Show when={props.isOpen}>
+    <Show when={isOpen()}>
       <div class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/40" />
         <div class="relative themed-dialog rounded-lg shadow-lg w-full max-w-3xl p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
@@ -99,7 +81,13 @@ export default function PostSubmissionWizard(props) {
                 {(step, index) => (
                   <div class="flex items-start">
                     <div class="flex flex-col items-center mr-4">
-                      <StepIcon status={getStepStatus(index())} class={getStepStatus(index()) === "completed" ? "bg-green-500 border-green-500" : "border-gray-400"} />
+                      <StepIcon
+                        status={
+                          index() < currentStepIndex() ? "completed" :
+                          index() === currentStepIndex() ? "active" : "pending"
+                        }
+                        class={index() < currentStepIndex() ? "bg-green-500 border-green-500" : "border-gray-400"}
+                      />
                       <Show when={index() < STEPS.length - 1}>
                         <div class="w-px h-8 bg-gray-300" />
                       </Show>
@@ -123,7 +111,7 @@ export default function PostSubmissionWizard(props) {
                     publishedData={publishedData}
                     onComplete={handleNextStep}
                     onCancel={handleValidationBack}
-                    onRetry={handleRetry}
+                    onRetry={() => { setCurrentStepIndex(0); setPublishedData({}); }}
                     editorMode={props.editorMode}
                   />
                 </Match>

@@ -25,6 +25,7 @@ import EditorPage from "./pages/EditorPage.jsx";
 import ContributePage from "./pages/ContributePage.jsx";
 import NpoListPage from "./pages/NpoListPage.jsx";
 import NpoPage from "./pages/NpoPage.jsx";
+import ActorStore from "./actors/ActorStore.jsx"; 
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -101,6 +102,7 @@ export default function App() {
           <FaviconLoader />
           <GoogleAnalyticsLoader />
           <WsConnector />
+          <ActorStore /> 
           <AlertManager />
           
           <Show when={domainRevision()} keyed>

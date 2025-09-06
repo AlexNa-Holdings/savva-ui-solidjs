@@ -1,4 +1,4 @@
-// src/x/Header.jsx
+/* src/x/Header.jsx */
 import { Show, createSignal, onMount, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet.js";
@@ -10,6 +10,7 @@ import Container from "./layout/Container.jsx";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
 import NewPostButton from "./main/NewPostButton.jsx";
 import TokenPrice from "./main/TokenPrice.jsx";
+import ActorBadge from "./actors/ActorBadge.jsx"; /* +++ */
 import { dbg } from "../utils/debug.js";
 
 function shortAddr(addr) {
@@ -67,7 +68,7 @@ export default function Header({ onTogglePane }) {
       dbg.error("Header:onConnect", "Error during connection process:", e);
       const errorContext = { context: "Failed to connect wallet" };
       if (e?.message?.toLowerCase().includes("timed out")) {
-          errorContext.help = t("wallet.error.timeoutHelp");
+        errorContext.help = t("wallet.error.timeoutHelp");
       }
       pushErrorToast(e, errorContext);
     }
@@ -105,6 +106,11 @@ export default function Header({ onTogglePane }) {
               <NewPostButton />
             </Show>
 
+            {/* +++ actor badge lives to the left of the user menu */}
+            <Show when={app.authorizedUser()}>
+              <ActorBadge />
+            </Show>
+
             <Show when={app.authorizedUser()}>
               <AuthorizedUser />
             </Show>
@@ -113,7 +119,10 @@ export default function Header({ onTogglePane }) {
               when={walletAccount()}
               fallback={
                 <Show when={isWalletAvailable()}>
-                  <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90" onClick={onConnect}>
+                  <button
+                    class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                    onClick={onConnect}
+                  >
                     {t("wallet.connect")}
                   </button>
                 </Show>
@@ -121,40 +130,49 @@ export default function Header({ onTogglePane }) {
             >
               {/* This content renders when wallet IS connected */}
               <Show when={!app.authorizedUser()}>
-                <button class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70" onClick={handleLoginClick} disabled={isLoggingIn()}>
+                <button
+                  class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-70"
+                  onClick={handleLoginClick}
+                  disabled={isLoggingIn()}
+                >
                   {isLoggingIn() ? t("common.checking") : "Login"}
                 </button>
               </Show>
 
               <div class="flex items-center gap-2">
                 <button
-                    classList={{
-                        "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] whitespace-nowrap": true,
-                        "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
-                    }}
-                    onClick={copyAddress}
-                    title={t("wallet.copyAddress")}
+                  classList={{
+                    "px-2 py-1 rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))] whitespace-nowrap": true,
+                    "border-2 border-[hsl(var(--destructive))]": isAddressMismatched()
+                  }}
+                  onClick={copyAddress}
+                  title={t("wallet.copyAddress")}
                 >
-                    {shortAddr(walletAccount())}
+                  {shortAddr(walletAccount())}
                 </button>
                 <Show when={!mismatchedChain()} fallback={
-                    <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
-                        {t("wallet.changeChain")}
-                    </button>
+                  <button class="px-2 py-1 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90" onClick={onSwitchChain}>
+                    {t("wallet.changeChain")}
+                  </button>
                 }>
-                    <Show when={ChainLogo()}>
-                        {(Logo) => (
-                            <div class="flex items-center justify-center w-6 h-6 flex-shrink-0" title={t("wallet.onRequiredNetwork")}>
-                                <Logo class="w-full h-full" />
-                            </div>
-                        )}
-                    </Show>
+                  <Show when={ChainLogo()}>
+                    {(Logo) => (
+                      <div class="flex items-center justify-center w-6 h-6 flex-shrink-0" title={t("wallet.onRequiredNetwork")}>
+                        <Logo class="w-full h-full" />
+                      </div>
+                    )}
+                  </Show>
                 </Show>
               </div>
             </Show>
 
-            <button class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]" onClick={onTogglePane}>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            <button
+              class="p-1 rounded transition text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"
+              onClick={onTogglePane}
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
           </div>
         </div>

@@ -23,7 +23,7 @@ export function AppProvider(props) {
   const conn = useAppConnection();
   const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
   const [postUpdate, setPostUpdate] = Solid.createSignal(null);
-  
+
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
   const [walletDataNeedsRefresh, setWalletDataNeedsRefresh] = Solid.createSignal(0);
@@ -37,7 +37,7 @@ export function AppProvider(props) {
       setSavedScrollY(window.scrollY);
     }
   }, { defer: true }));
-  
+
   const [newFeedItems, setNewFeedItems] = Solid.createSignal([]);
   const [newContentAvailable, setNewContentAvailable] = Solid.createSignal(null);
   const [newTabRefreshKey, setNewTabRefreshKey] = Solid.createSignal(Date.now());
@@ -55,7 +55,7 @@ export function AppProvider(props) {
     }
     return supportedDomains()[0] || "";
   });
-  
+
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
   const prices = useTokenPrices({ info: conn.info });
@@ -67,7 +67,7 @@ export function AppProvider(props) {
 
     const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
     const currentLocale = locales.find(l => l.code === lang) || locales.find(l => l.code === 'en') || locales[0];
-    
+
     if (currentLocale?.title) {
       document.title = currentLocale.title;
     }
@@ -76,10 +76,10 @@ export function AppProvider(props) {
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
   async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
-  
+
   const remoteIpfsGateways = Solid.createMemo(() => (conn.info()?.ipfs_gateways || []).map(g => g.trim().endsWith("/") ? g : `${g}/`));
   const activeIpfsGateways = Solid.createMemo(() => (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) ? [ipfs.localIpfsGateway()] : remoteIpfsGateways());
-  
+
   Solid.createEffect(() => {
     if (auth.authorizedUser() && conn.config() && auth.authorizedUser().domain !== conn.config().domain) {
       auth.logout();
@@ -87,11 +87,10 @@ export function AppProvider(props) {
     }
   });
 
-  // NEW: Centralized language synchronization logic
+  // Language safety
   Solid.createEffect(() => {
     const cfg = assets.domainAssetsConfig();
-    if (!cfg) return; // Wait for config to load
-
+    if (!cfg) return;
     const availableCodes = (cfg.locales || []).map(l => l.code).filter(Boolean);
     if (availableCodes.length === 0) return;
 
@@ -103,6 +102,87 @@ export function AppProvider(props) {
     }
   });
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // ACTOR STATE (self vs NPO) — single source of truth exposed on app
+  // ────────────────────────────────────────────────────────────────────────────
+  const [actorType, setActorType] = Solid.createSignal("self"); // 'self' | 'npo'
+  const [actorNpoAddr, setActorNpoAddr] = Solid.createSignal("");
+  const [actorProfile, setActorProfile] = Solid.createSignal(null);
+  const actorIsNpo = () => actorType() === "npo" && !!actorNpoAddr();
+
+  const actorAddress = () => {
+    if (actorIsNpo()) return actorNpoAddr();
+    return auth.authorizedUser()?.address || "";
+  };
+
+  async function setActingAsSelf() {
+    setActorType("self");
+    setActorNpoAddr("");
+    setActorProfile(null);
+  }
+
+  async function setActingAsNpo(addr) {
+    const a = String(addr || "").trim();
+    if (!a) return setActingAsSelf();
+    setActorType("npo");
+    setActorNpoAddr(a);
+    // Lazy load NPO profile for header/preview cards
+    try {
+      const u = await conn.wsCall?.("get-user", { domain: selectedDomainName(), user_addr: a });
+      setActorProfile(u || { address: a, is_npo: true });
+    } catch {
+      setActorProfile({ address: a, is_npo: true });
+    }
+  }
+
+  // My confirmed NPO memberships
+  const [myNpos, setMyNpos] = Solid.createSignal([]);
+  async function reloadMyNpos() {
+    const me = auth.authorizedUser()?.address;
+    if (!me || !conn.wsCall) { setMyNpos([]); return; }
+    try {
+      const res = await conn.wsCall("list-npo", {
+        domain: selectedDomainName(),
+        user_addr: me,
+        confirmed_only: true,
+        limit: 500, offset: 0,
+      });
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.list) ? res.list : []);
+      setMyNpos(list);
+    } catch (e) {
+      console.warn("list-npo failed", e);
+      setMyNpos([]);
+    }
+  }
+
+  // Reset actor on login/logout and on domain change; refresh memberships after login
+  Solid.createEffect(Solid.on(() => auth.authorizedUser()?.address, (addr, prev) => {
+    if (addr && addr !== prev) { // login or account changed
+      setActingAsSelf();
+      reloadMyNpos();
+    }
+    if (!addr) { // logout
+      setActingAsSelf();
+      setMyNpos([]);
+    }
+  }, { defer: true }));
+
+  Solid.createEffect(Solid.on(selectedDomainName, () => {
+    setActingAsSelf();
+    setMyNpos([]);
+  }));
+
+  // Convenience: what to show as the "actor user" in UI
+  const currentActorUser = () => (actorIsNpo() ? actorProfile() : auth.authorizedUser());
+
+  // Legacy/synonym API so existing code continues to work
+  const isActingAsNpo = actorIsNpo; // alias
+  const setActorSelf = setActingAsSelf;
+  const setActorNpo = setActingAsNpo;
+  const npoList = myNpos;
+  const setNpoList = setMyNpos;
+
+  // ────────────────────────────────────────────────────────────────────────────
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
   const [requiredAccount, setRequiredAccount] = Solid.createSignal(null);
@@ -132,7 +212,7 @@ export function AppProvider(props) {
     const walletAcc = walletAccount();
     if (!isWalletAvailable()) throw new Error("Wallet is not available.");
     if (!walletAcc) throw new Error("Wallet is not connected.");
-    
+
     const chain = desiredChain();
     if (!chain) throw new Error("Target chain is not configured.");
 
@@ -142,11 +222,11 @@ export function AppProvider(props) {
       transport: custom(window.ethereum)
     });
   }
-  
+
   async function getGuardedWalletClient() {
     const authorizedAcc = auth.authorizedUser()?.address;
     if (!authorizedAcc) throw new Error("User is not authorized.");
-    
+
     const walletClient = getRawWalletClient();
     const walletAcc = walletClient.account.address;
 
@@ -158,7 +238,7 @@ export function AppProvider(props) {
         throw new Error(i18n.t("wallet.error.userCanceled"));
       }
     }
-    
+
     return walletClient;
   }
 
@@ -206,6 +286,20 @@ export function AppProvider(props) {
     userAvatars,
     setUserAvatar,
     dismissToast,
+
+    // ── Actor API exposed on app ──────────────────────────────────────────────
+    actorIsNpo,
+    isActingAsNpo,
+    actorAddress,
+    actorProfile: currentActorUser,
+    setActingAsSelf,
+    setActingAsNpo,
+    setActorSelf,
+    setActorNpo,
+    myNpos,
+    npoList,
+    setNpoList,
+    reloadMyNpos,
   };
 
   return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
