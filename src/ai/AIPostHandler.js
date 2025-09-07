@@ -21,45 +21,183 @@ function resolveSupportedLangs(opts, state) {
   return Array.from(set);
 }
 
-// ---------- AI tasks already in your flow (analyze, clean, title, chapter titles) ----------
-// (Unchanged from your latest version; included here only where relevant differences exist)
+// --- helpers for the new first-step normalization ---
+
+function _trimLen(s) { return typeof s === "string" ? s.trim().length : 0; }
+
+function _collectLocaleStats(state, key) {
+  const pd = state?.postData?.[key] || {};
+  const titleLen = _trimLen(pd.title);
+  const bodyLen = _trimLen(pd.body);
+
+  const chs = Array.isArray(pd.chapters) ? pd.chapters : [];
+  let chBodiesCount = 0;
+  let chBodiesChars = 0;
+  for (const ch of chs) {
+    const L = _trimLen(ch?.body);
+    if (L) { chBodiesCount++; chBodiesChars += L; }
+  }
+
+  const paramsChs = state?.postParams?.locales?.[key]?.chapters || [];
+  let chTitlesCount = 0;
+  let chTitlesChars = 0;
+  for (const cp of paramsChs) {
+    const L = _trimLen(cp?.title);
+    if (L) { chTitlesCount++; chTitlesChars += L; }
+  }
+
+  const totalChars = titleLen + bodyLen + chBodiesChars + chTitlesChars;
+  const fieldsCount =
+    (titleLen ? 1 : 0) +
+    (bodyLen ? 1 : 0) +
+    chBodiesCount +
+    chTitlesCount;
+
+  // Weighted score: prioritize substantial bodies & more chapters,
+  // then let sheer size break ties.
+  const score =
+    fieldsCount * 1000 +
+    (bodyLen ? 2000 : 0) +
+    chBodiesCount * 500 +
+    Math.floor(totalChars / 5);
+
+  return {
+    key,
+    titleLen,
+    bodyLen,
+    chBodiesCount,
+    chBodiesChars,
+    chTitlesCount,
+    chTitlesChars,
+    totalChars,
+    fieldsCount,
+    hasBody: !!bodyLen,
+    score,
+  };
+}
+
+function _aggregateTextsForLocale(state, key) {
+  const arr = [];
+  const pd = state?.postData?.[key] || {};
+  if (_trimLen(pd.title)) arr.push(pd.title);
+  if (_trimLen(pd.body)) arr.push(pd.body);
+  const chs = Array.isArray(pd.chapters) ? pd.chapters : [];
+  for (const ch of chs) if (_trimLen(ch?.body)) arr.push(ch.body);
+  const paramsChs = state?.postParams?.locales?.[key]?.chapters || [];
+  for (const cp of paramsChs) if (_trimLen(cp?.title)) arr.push(String(cp.title));
+  return arr;
+}
+
+function _pickBestLocale(stats, activeLang) {
+  if (!Array.isArray(stats) || stats.length === 0) return null;
+  const active = normCode(activeLang);
+
+  const maxScore = Math.max(...stats.map((s) => s.score));
+  let bests = stats.filter((s) => s.score === maxScore);
+
+  if (bests.length > 1) {
+    const withBody = bests.filter((s) => s.hasBody);
+    if (withBody.length) bests = withBody;
+  }
+  if (bests.length > 1 && active) {
+    const fromActive = bests.find((s) => normCode(s.key) === active);
+    if (fromActive) return fromActive;
+  }
+  // Final tie-breaker: largest total text
+  bests.sort((a, b) => b.totalChars - a.totalChars);
+  return bests[0];
+}
+
+// ---------- AI tasks ----------
 
 function makeAnalyzeAiTask(t, opts) {
   return {
     id: "analyze",
     label: t("editor.ai.progress.analyze"),
     run: async (state) => {
-      const supported = resolveSupportedLangs(opts, state);
       const pd = state?.postData || {};
-      const texts = [];
-      for (const k of Object.keys(pd)) {
+      const locKeys = Object.keys(pd);
+      const textsExist = locKeys.some((k) => {
         const v = pd[k] || {};
-        if (v.title?.trim()) texts.push(v.title);
-        if (v.body?.trim()) texts.push(v.body);
-        if (Array.isArray(v.chapters)) for (const ch of v.chapters) if (ch?.body?.trim()) texts.push(ch.body);
-      }
-      if (texts.length === 0) throw new Error(t("editor.ai.errors.empty"));
-
-      const ai = createAiClient();
-      let res;
-      try {
-        res = await ai.detectBaseLanguage(texts, { supportedLangs: supported, activeLang: state?.activeLang });
-      } catch (e) {
-        const msg = String(e?.message || "").toLowerCase();
-        if (msg.includes("ambig")) throw new Error(t("editor.ai.errors.ambiguous"));
-        if (msg.includes("unsupported")) throw new Error(t("editor.ai.errors.unsupported"));
-        throw new Error(t("editor.ai.errors.api"));
-      }
-
-      const baseLang = normCode(res.base);
-      if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
-
-      opts._setMeta?.({
-        ...(opts._getMeta?.() || {}),
-        analysis: { baseLang, confidence: res.confidence ?? 0, supported },
+        if (_trimLen(v.title)) return true;
+        if (_trimLen(v.body)) return true;
+        if (Array.isArray(v.chapters) && v.chapters.some((ch) => _trimLen(ch?.body))) return true;
+        const paramsChs = state?.postParams?.locales?.[k]?.chapters || [];
+        return paramsChs.some((cp) => _trimLen(cp?.title));
       });
 
-      return { state, modified: false };
+      if (!textsExist) throw new Error(t("editor.ai.errors.empty"));
+
+      // 1) Choose the "working" locale by content density
+      const stats = locKeys.map((k) => _collectLocaleStats(state, k))
+        .filter((s) => s.fieldsCount > 0 || s.totalChars > 0);
+
+      const best = _pickBestLocale(stats, state?.activeLang);
+      if (!best) throw new Error(t("editor.ai.errors.ambiguous"));
+
+      // 2) Detect the actual human language of that content (ignoring the key)
+      const ai = createAiClient();
+      let res;
+      const sampleTexts = _aggregateTextsForLocale(state, best.key).slice(0, 20); // cap size defensively
+      try {
+        res = await ai.detectBaseLanguage(sampleTexts, {
+          activeLang: state?.activeLang,
+          // Non-UI hint for your client; safe to ignore if unsupported:
+          instruction:
+            "Identify the single dominant language of the given content regardless of the locale key. " +
+            "Return ISO 639-1 two-letter code in `base` plus numeric `confidence` 0..1.",
+        });
+      } catch (e) {
+        // Don't hard-stop: we still can proceed with the best key if model is unsure.
+        res = null;
+      }
+
+      const detected = normCode(res?.base);
+      const baseLang = detected || normCode(best.key);
+      if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
+
+      // 3) Normalize state: keep only the chosen/real base language, move data if needed
+      const next = deepClone(state);
+
+      const chosenData = deepClone(state?.postData?.[best.key] || { title: "", body: "", chapters: [] });
+      const chosenParams = deepClone(state?.postParams?.locales?.[best.key] || { chapters: [] });
+
+      const prevSnapshot = JSON.stringify({
+        pd: state?.postData || {},
+        pp: state?.postParams?.locales || {},
+        act: state?.activeLang || "",
+      });
+
+      next.postData = { [baseLang]: chosenData };
+
+      const postParamsRest = { ...(state?.postParams || {}) };
+      next.postParams = {
+        ...postParamsRest,
+        locales: { [baseLang]: chosenParams },
+      };
+
+      next.activeLang = baseLang;
+
+      // 4) Meta for downstream tasks
+      const supported = resolveSupportedLangs(opts, next);
+      opts._setMeta?.({
+        ...(opts._getMeta?.() || {}),
+        analysis: {
+          baseLang,
+          confidence: res?.confidence ?? 0,
+          normalizedFrom: normCode(best.key),
+          supported,
+        },
+      });
+
+      const nextSnapshot = JSON.stringify({
+        pd: next?.postData || {},
+        pp: next?.postParams?.locales || {},
+        act: next?.activeLang || "",
+      });
+
+      const changed = prevSnapshot !== nextSnapshot;
+      return { state: changed ? next : state, modified: changed };
     },
   };
 }
@@ -353,7 +491,7 @@ export function createAIPostHandler(opts) {
   const tasksSupplier = () => {
     const tasks = [makeAnalyzeAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta })];
     if (isPostMode()) {
-      // Order: analyze → clean texts & titles → make post title → make chapter titles → translate all
+      // Order: analyze/normalize → clean texts & titles → make post title → make chapter titles → translate all
       tasks.push(makeCleanOriginalAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
       tasks.push(makeTitleAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
       tasks.push(makeChapterTitlesAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
