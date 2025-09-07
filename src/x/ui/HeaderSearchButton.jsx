@@ -12,7 +12,7 @@ export default function HeaderSearchButton() {
     <>
       <button
         type="button"
-        class="p-2 rounded-xl border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] transition-colors"
+        class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] transition-colors"
         aria-label={t("common.search")}
         title={t("common.search")}
         onClick={() => setOpen(true)}
