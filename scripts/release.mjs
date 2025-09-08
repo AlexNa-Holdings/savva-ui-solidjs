@@ -57,6 +57,19 @@ function gitCommitAndPush(version) {
   try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
 }
 
+// ensure we finish on MAIN_BRANCH (ff-only pull for freshness)
+function ensureMainBranch() {
+  try {
+    const current = execSync("git rev-parse --abbrev-ref HEAD").toString().trim();
+    if (current !== MAIN_BRANCH) {
+      sh(`git checkout ${MAIN_BRANCH}`);
+    }
+    sh(`git pull --ff-only origin ${MAIN_BRANCH}`);
+  } catch (e) {
+    console.warn(`Could not switch back to ${MAIN_BRANCH}:`, e?.message || e);
+  }
+}
+
 function deploy() {
   if (!DEPLOY_HOST || !DEPLOY_USER || !DEPLOY_PATH) {
     console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
@@ -79,6 +92,7 @@ function deploy() {
   build();
   gitCommitAndPush(nextVersion);
   deploy();
+  ensureMainBranch();
 
   console.log(`Done. Released v${nextVersion}.`);
 })().catch((err) => {
