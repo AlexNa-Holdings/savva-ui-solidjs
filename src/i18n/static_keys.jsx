@@ -52,5 +52,14 @@ t("tabs.title.comments")
 t("tabs.title.new") 
 t("tabs.title.for-you")
 
+t("settings.ai.providers.openai")
+t("settings.ai.providers.openaiCompatible")
+t("settings.ai.providers.groq")
+t("settings.ai.providers.together")
+t("settings.ai.providers.mistral")
+t("settings.ai.providers.anthropic")
+t("settings.ai.providers.gemini")
+t("settings.ai.providers.azure")
+
 
 */

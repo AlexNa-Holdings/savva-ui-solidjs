@@ -7,6 +7,58 @@ function deepClone(v) { try { return structuredClone(v); } catch (e) { return JS
 function normCode(c) { return c ? String(c).toLowerCase().slice(0, 2) : ""; }
 function langAlias(c) { const x = normCode(c); return x === "ua" ? "uk" : x; }
 
+// --- language utilities & preferred-key handling ---
+
+const RE_LATIN = /[A-Za-z\u00C0-\u024F]/g;
+const RE_CYR = /[\u0400-\u04FF]/g;
+const RE_UK_SPEC = /[іїєґІЇЄҐ]/g;
+const RE_RU_SPEC = /[ыэёЁЫЭ]/g;
+
+function _scriptStats(s = "") {
+  const text = String(s || "");
+  return {
+    latin: (text.match(RE_LATIN) || []).length,
+    cyr: (text.match(RE_CYR) || []).length,
+    ukSpec: (text.match(RE_UK_SPEC) || []).length,
+    ruSpec: (text.match(RE_RU_SPEC) || []).length,
+  };
+}
+
+function _looksLikeTargetScript(text, targetAliased) {
+  const { latin, cyr } = _scriptStats(text);
+  if (latin + cyr === 0) return false;
+  if (targetAliased === "ru" || targetAliased === "uk") return cyr > 0 && latin === 0;
+  return latin > 0 && cyr === 0;
+}
+
+function collectAllLocaleKeys(state) {
+  const keys = new Set([
+    ...Object.keys(state?.postData || {}),
+    ...Object.keys(state?.postParams?.locales || {}),
+  ].map(normCode).filter(Boolean));
+  return Array.from(keys);
+}
+
+function pickPreferredLocaleKeyFor(langAliased, state) {
+  const keys = collectAllLocaleKeys(state);
+  if (langAliased === "uk") {
+    if (keys.includes("ua")) return "ua";
+    if (keys.includes("uk")) return "uk";
+    return "ua";
+  }
+  return keys.includes(langAliased) ? langAliased : langAliased;
+}
+
+function guessLangByScript(texts = []) {
+  const joined = String((texts || []).join("\n")) || "";
+  const { latin, cyr, ukSpec, ruSpec } = _scriptStats(joined);
+  if (cyr > latin) return ukSpec > ruSpec ? "uk" : "ru";
+  if (latin > cyr) return "en";
+  return ""; // inconclusive
+}
+
+// --- supported languages resolution ---
+
 function resolveSupportedLangs(opts, state) {
   const fromOpts = Array.isArray(opts?.supportedLangs)
     ? opts.supportedLangs
@@ -20,14 +72,6 @@ function resolveSupportedLangs(opts, state) {
       .filter(Boolean)
   );
   return Array.from(set);
-}
-
-function collectAllLocaleKeys(state) {
-  const keys = new Set([
-    ...Object.keys(state?.postData || {}),
-    ...Object.keys(state?.postParams?.locales || {}),
-  ].map(normCode).filter(Boolean));
-  return Array.from(keys);
 }
 
 // --- helpers ---
@@ -248,27 +292,6 @@ function _eqLoose(a = "", b = "") {
   return norm(a) === norm(b);
 }
 
-const RE_LATIN = /[A-Za-z\u00C0-\u024F]/g;
-const RE_CYR = /[\u0400-\u04FF]/g;
-
-function _scriptStats(s = "") {
-  const text = String(s || "");
-  return {
-    latin: (text.match(RE_LATIN) || []).length,
-    cyr: (text.match(RE_CYR) || []).length,
-  };
-}
-
-function _looksLikeTargetScript(text, targetAliased) {
-  const { latin, cyr } = _scriptStats(text);
-  if (latin + cyr === 0) return false;
-  if (targetAliased === "ru" || targetAliased === "uk") {
-    return cyr > 0 && latin === 0;
-  }
-  return latin > 0 && cyr === 0;
-}
-
-// Ensure we end up with target-language text (or empty), never the source text.
 async function ensureTranslated(ai, t, base, target, sourceText, candidate) {
   const baseAliased = langAlias(base);
   const targetAliased = langAlias(target);
@@ -299,6 +322,7 @@ async function ensureTranslated(ai, t, base, target, sourceText, candidate) {
 // ---------- AI tasks ----------
 
 function makeAnalyzeAiTask(t, opts) {
+  const CONF_MIN = 0.7; // robust fallback if below this
   return {
     id: "analyze",
     label: t("editor.ai.progress.analyze"),
@@ -342,14 +366,26 @@ function makeAnalyzeAiTask(t, opts) {
         res = null;
       }
 
-      const detected = langAlias(res?.base);
-      const baseLang = detected || normCode(best?.key);
-      if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
+      const detectedRaw = langAlias(res?.base);
+      const conf = typeof res?.confidence === "number" ? res.confidence : 0;
+      const scriptGuess = guessLangByScript(topForDetection);
+      // prefer API when confident, otherwise use script; also fix obvious contradictions
+      let baseAliased = detectedRaw && conf >= CONF_MIN ? detectedRaw : (scriptGuess || detectedRaw || "");
+      if (detectedRaw === "en" && (scriptGuess === "ru" || scriptGuess === "uk")) baseAliased = scriptGuess;
+      if (!baseAliased) baseAliased = normCode(best?.key); // last resort
 
+      if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
+
+      // choose a storage key for the base language (ua vs uk)
+      const baseKey = pickPreferredLocaleKeyFor(baseAliased, state);
+
+      // pick where to copy the source data from
       const sourceKey =
-        (statsByKey.get(baseLang)?.totalChars || 0) > 0
-          ? statsByKey.get(baseLang).key
-          : stats.slice().sort((a, b) => b.totalChars - a.totalChars)[0]?.key || best.key;
+        (statsByKey.get(baseKey)?.totalChars || 0) > 0
+          ? baseKey
+          : (statsByKey.get(baseAliased)?.totalChars || 0) > 0
+            ? statsByKey.get(baseAliased).key
+            : stats.slice().sort((a, b) => b.totalChars - a.totalChars)[0]?.key || best.key;
 
       const next = deepClone(state);
 
@@ -362,10 +398,11 @@ function makeAnalyzeAiTask(t, opts) {
         act: state?.activeLang || "",
       });
 
-      next.postData = { [baseLang]: chosenData };
+      // rebase into the proper baseKey
+      next.postData = { [baseKey]: chosenData };
       const postParamsRest = { ...(state?.postParams || {}) };
-      next.postParams = { ...postParamsRest, locales: { [baseLang]: chosenParams } };
-      next.activeLang = baseLang;
+      next.postParams = { ...postParamsRest, locales: { [baseKey]: chosenParams } };
+      next.activeLang = baseKey;
 
       const supportedAfter = resolveSupportedLangs(opts, next);
       const supportedBefore = resolveSupportedLangs(opts, state);
@@ -373,14 +410,15 @@ function makeAnalyzeAiTask(t, opts) {
 
       const normalizedFrom = normCode(sourceKey);
       const targetsAtStart = Array.from(
-        new Set([...initialLocales, normalizedFrom].map(normCode).filter((x) => x && x !== baseLang))
+        new Set([...initialLocales, normalizedFrom].map(normCode).filter((x) => x && x !== baseKey))
       );
 
       opts._setMeta?.({
         ...(opts._getMeta?.() || {}),
         analysis: {
-          baseLang,
-          confidence: res?.confidence ?? 0,
+          baseLang: baseAliased,    // ru/uk/en
+          baseKey,                  // ru/en/fr/ua (preferred storage key)
+          confidence: conf ?? 0,
           normalizedFrom,
           supported: supportedAfter,
           initialLocales,
@@ -409,10 +447,12 @@ function makeCleanOriginalAiTask(t, opts) {
       if (mode === "new_comment" || mode === "edit_comment") return { state, modified: false };
 
       const meta = opts._getMeta?.() || {};
-      const baseLang = meta.analysis?.baseLang || normCode(state?.activeLang) || resolveSupportedLangs(opts, state)[0];
-      if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseAliased = meta.analysis?.baseLang || normCode(state?.activeLang) || resolveSupportedLangs(opts, state)[0];
+      if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
 
-      const langData = state?.postData?.[baseLang];
+      const baseKey = meta.analysis?.baseKey || normCode(state?.activeLang) || baseAliased;
+
+      const langData = state?.postData?.[baseKey];
       if (!langData) throw new Error(t("editor.ai.errors.nothingToClean"));
 
       const items = [];
@@ -422,7 +462,7 @@ function makeCleanOriginalAiTask(t, opts) {
         langData.chapters.forEach((ch, i) => { if (ch?.body?.trim()) items.push({ id: `ch_${i}`, text: ch.body }); });
       }
 
-      const paramsChs = state?.postParams?.locales?.[baseLang]?.chapters || [];
+      const paramsChs = state?.postParams?.locales?.[baseKey]?.chapters || [];
       paramsChs.forEach((cp, i) => {
         if (cp?.title && String(cp.title).trim()) items.push({ id: `cht_${i}`, text: String(cp.title) });
       });
@@ -431,14 +471,14 @@ function makeCleanOriginalAiTask(t, opts) {
 
       const ai = createAiClient();
       let cleaned;
-      try { cleaned = await ai.cleanTextBatch(items, { languageHint: baseLang }); }
-      catch (e) { throw makeApiError(t, e, { op: "cleanTextBatch", base: baseLang }); }
+      try { cleaned = await ai.cleanTextBatch(items, { languageHint: baseAliased }); }
+      catch (e) { throw makeApiError(t, e, { op: "cleanTextBatch", base: baseAliased }); }
 
       const map = new Map(cleaned.map((x) => [x.id, x.text]));
       let changed = false;
       const next = deepClone(state);
 
-      const nextLD = { ...(next.postData?.[baseLang] || {}) };
+      const nextLD = { ...(next.postData?.[baseKey] || {}) };
 
       if (langData.body?.trim() && map.has("body")) {
         const newBody = String(map.get("body") ?? "");
@@ -462,10 +502,10 @@ function makeCleanOriginalAiTask(t, opts) {
         nextLD.chapters = chs;
       }
 
-      next.postData = { ...(next.postData || {}), [baseLang]: nextLD };
+      next.postData = { ...(next.postData || {}), [baseKey]: nextLD };
 
       const locales = { ...(next.postParams?.locales || {}) };
-      const langParams = { ...(locales[baseLang] || {}) };
+      const langParams = { ...(locales[baseKey] || {}) };
       const chParams = Array.isArray(langParams.chapters) ? [...langParams.chapters] : [];
       const totalCh = Array.isArray(nextLD.chapters) ? nextLD.chapters.length : chParams.length;
       while (chParams.length < totalCh) chParams.push({});
@@ -480,7 +520,7 @@ function makeCleanOriginalAiTask(t, opts) {
         }
       }
       langParams.chapters = chParams;
-      next.postParams = { ...(next.postParams || {}), locales: { ...locales, [baseLang]: langParams } };
+      next.postParams = { ...(next.postParams || {}), locales: { ...locales, [baseKey]: langParams } };
 
       if (!changed) return { state, modified: false };
       return { state: next, modified: true };
@@ -497,10 +537,11 @@ function makeTitleAiTask(t, opts) {
       if (mode === "new_comment" || mode === "edit_comment") return { state, modified: false };
 
       const meta = opts._getMeta?.() || {};
-      const baseLang = meta.analysis?.baseLang || normCode(state?.activeLang) || resolveSupportedLangs(opts, state)[0];
-      if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseAliased = meta.analysis?.baseLang || normCode(state?.activeLang) || resolveSupportedLangs(opts, state)[0];
+      if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseKey = meta.analysis?.baseKey || normCode(state?.activeLang) || baseAliased;
 
-      const langData = state?.postData?.[baseLang] || { title: "", body: "", chapters: [] };
+      const langData = state?.postData?.[baseKey] || { title: "", body: "", chapters: [] };
       const currentTitle = (langData.title || "").trim();
       if (currentTitle) return { state, modified: false };
 
@@ -509,16 +550,16 @@ function makeTitleAiTask(t, opts) {
 
       const ai = createAiClient();
       let title;
-      try { title = await ai.proposeTitle(baseLang, { body: langData.body || "", chapters: langData.chapters || [] }); }
-      catch (e) { throw makeApiError(t, e, { op: "proposeTitle", base: baseLang }); }
+      try { title = await ai.proposeTitle(baseAliased, { body: langData.body || "", chapters: langData.chapters || [] }); }
+      catch (e) { throw makeApiError(t, e, { op: "proposeTitle", base: baseAliased }); }
 
       let final = String(title || "").replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
       if (!final) throw new Error(t("editor.ai.errors.noContentForTitle"));
       if (final.length > 90) final = final.slice(0, 87).trimEnd() + "…";
 
       const next = deepClone(state);
-      const nextLD = { ...(next.postData?.[baseLang] || {}), title: final };
-      next.postData = { ...(next.postData || {}), [baseLang]: nextLD };
+      const nextLD = { ...(next.postData?.[baseKey] || {}), title: final };
+      next.postData = { ...(next.postData || {}), [baseKey]: nextLD };
       return { state: next, modified: true };
     },
   };
@@ -533,14 +574,15 @@ function makeChapterTitlesAiTask(t, opts) {
       if (mode === "new_comment" || mode === "edit_comment") return { state, modified: false };
 
       const meta = opts._getMeta?.() || {};
-      const baseLang = meta.analysis?.baseLang || normCode(state?.activeLang) || resolveSupportedLangs(opts, state)[0];
-      if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseAliased = meta.analysis?.baseLang || normCode(state?.activeLang) || resolveSupportedLangs(opts, state)[0];
+      if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseKey = meta.analysis?.baseKey || normCode(state?.activeLang) || baseAliased;
 
-      const langData = state?.postData?.[baseLang];
+      const langData = state?.postData?.[baseKey];
       const chs = Array.isArray(langData?.chapters) ? langData.chapters : [];
       if (chs.length === 0) return { state, modified: false };
 
-      const curParamsChapters = state?.postParams?.locales?.[baseLang]?.chapters || [];
+      const curParamsChapters = state?.postParams?.locales?.[baseKey]?.chapters || [];
       const targets = [];
       for (let i = 0; i < chs.length; i++) {
         const hasBody = !!(chs[i]?.body && chs[i].body.trim());
@@ -553,19 +595,19 @@ function makeChapterTitlesAiTask(t, opts) {
       const proposals = new Map();
       try {
         for (const i of targets) {
-          const tt = await ai.proposeChapterTitle(baseLang, { body: chs[i].body, index: i });
+          const tt = await ai.proposeChapterTitle(baseAliased, { body: chs[i].body, index: i });
           let final = String(tt || "").replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
           if (final.length > 60) final = final.slice(0, 57).trimEnd() + "…";
           if (!final) continue;
           proposals.set(i, final);
         }
-      } catch (e) { throw makeApiError(t, e, { op: "proposeChapterTitle", base: baseLang }); }
+      } catch (e) { throw makeApiError(t, e, { op: "proposeChapterTitle", base: baseAliased }); }
 
       if (proposals.size === 0) return { state, modified: false };
 
       const next = deepClone(state);
       const locales = { ...(next.postParams?.locales || {}) };
-      const langParams = { ...(locales[baseLang] || {}) };
+      const langParams = { ...(locales[baseKey] || {}) };
       const chParams = Array.isArray(langParams.chapters) ? [...langParams.chapters] : [];
       while (chParams.length < chs.length) chParams.push({});
       let changed = false;
@@ -577,13 +619,12 @@ function makeChapterTitlesAiTask(t, opts) {
       }
       if (!changed) return { state, modified: false };
       langParams.chapters = chParams;
-      next.postParams = { ...(next.postParams || {}), locales: { ...locales, [baseLang]: langParams } };
+      next.postParams = { ...(next.postParams || {}), locales: { ...locales, [baseKey]: langParams } };
       return { state: next, modified: true };
     },
   };
 }
 
-// ---------- translation task with verification/retry ----------
 function makeTranslateAiTask(t, opts) {
   return {
     id: "translateAll",
@@ -595,17 +636,18 @@ function makeTranslateAiTask(t, opts) {
       const meta = opts._getMeta?.() || {};
       const supportedNow = resolveSupportedLangs(opts, state);
 
-      const base = meta.analysis?.baseLang || normCode(state?.activeLang) || supportedNow[0];
-      if (!base) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseAliased = meta.analysis?.baseLang || normCode(state?.activeLang) || supportedNow[0];
+      if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
+      const baseKey = meta.analysis?.baseKey || normCode(state?.activeLang) || baseAliased;
 
       const targetsFromMeta = Array.isArray(meta.analysis?.targetsAtStart) ? meta.analysis.targetsAtStart : [];
       const targets = Array.from(new Set(
-        [...targetsFromMeta, ...supportedNow].map(normCode).filter((x) => x && x !== base)
+        [...targetsFromMeta, ...supportedNow].map(normCode).filter((x) => x && x !== baseKey)
       ));
       if (targets.length === 0) return { state, modified: false };
 
-      const srcLD = state?.postData?.[base] || {};
-      const srcChParams = state?.postParams?.locales?.[base]?.chapters || [];
+      const srcLD = state?.postData?.[baseKey] || {};
+      const srcChParams = state?.postParams?.locales?.[baseKey]?.chapters || [];
       const chapters = Array.isArray(srcLD.chapters) ? srcLD.chapters : [];
       const sourceStruct = {
         title: String(srcLD.title || ""),
@@ -621,13 +663,13 @@ function makeTranslateAiTask(t, opts) {
       const ai = createAiClient();
       let translations;
       try {
-        translations = await ai.translateStructure(base, targets, sourceStruct, {
+        translations = await ai.translateStructure(baseAliased, targets, sourceStruct, {
           preserveMarkdown: true,
           instruction:
             "Translate all text fields into the target locale. Keep markdown images/links/code unchanged. Do not drop content.",
         });
       } catch (e) {
-        throw makeApiError(t, e, { op: "translateStructure", base, targets });
+        throw makeApiError(t, e, { op: "translateStructure", base: baseAliased, targets });
       }
 
       const next = deepClone(state);
@@ -639,11 +681,11 @@ function makeTranslateAiTask(t, opts) {
         const targetAliased = langAlias(target);
 
         // BODY
-        let newBody = await ensureTranslated(ai, t, base, targetAliased, sourceStruct.body, tdata.body);
+        let newBody = await ensureTranslated(ai, t, baseAliased, targetAliased, sourceStruct.body, tdata.body);
         newBody = ensureImages(newBody, baseImages);
 
         // TITLE
-        let newTitle = await ensureTranslated(ai, t, base, targetAliased, sourceStruct.title, tdata.title);
+        let newTitle = await ensureTranslated(ai, t, baseAliased, targetAliased, sourceStruct.title, tdata.title);
 
         // CHAPTERS
         const srcChLen = sourceStruct.chapters.length;
@@ -655,14 +697,14 @@ function makeTranslateAiTask(t, opts) {
           const srcChBody = sourceStruct.chapters[i]?.body || "";
           const srcChTitle = sourceStruct.chapters[i]?.title || "";
 
-          let cb = await ensureTranslated(ai, t, base, targetAliased, srcChBody, tdChapters[i]?.body);
-          let ct = await ensureTranslated(ai, t, base, targetAliased, srcChTitle, tdChapters[i]?.title);
+          let cb = await ensureTranslated(ai, t, baseAliased, targetAliased, srcChBody, tdChapters[i]?.body);
+          let ct = await ensureTranslated(ai, t, baseAliased, targetAliased, srcChTitle, tdChapters[i]?.title);
 
           mergedBodies[i] = { ...(next.postData?.[target]?.chapters?.[i] || {}), body: cb };
           mergedChParams[i] = { title: ct };
         }
 
-        // Apply to postData (no fallback to previous target content)
+        // Apply to postData
         const nextContent = {
           title: newTitle,
           body: newBody,
@@ -689,6 +731,52 @@ function makeTranslateAiTask(t, opts) {
         }
         lp.chapters = curChParams;
         next.postParams = { ...(next.postParams || {}), locales: { ...locales, [target]: lp } };
+      }
+
+      // Final verification pass: fix any locale that still carries base-language text
+      try {
+        const locales = Object.keys(next.postData || {});
+        const ai2 = ai;
+        for (const key of locales) {
+          if (key === baseKey) continue;
+          const targetAliased = langAlias(key);
+          const cur = next.postData[key] || {};
+          const fixField = async (srcText, cand, assign) => {
+            const fixed = await ensureTranslated(ai2, t, baseAliased, targetAliased, srcText, cand);
+            if (fixed && fixed !== cand) { assign(fixed); changed = true; }
+          };
+          await fixField(sourceStruct.body, cur.body || "", (v) => {
+            next.postData[key] = { ...(next.postData[key] || {}), body: ensureImages(v, baseImages) };
+          });
+          await fixField(sourceStruct.title, cur.title || "", (v) => {
+            next.postData[key] = { ...(next.postData[key] || {}), title: v };
+          });
+          const chs = Array.isArray(sourceStruct.chapters) ? sourceStruct.chapters : [];
+          const curChs = Array.isArray(cur.chapters) ? cur.chapters : [];
+          const newChs = curChs.map((c) => ({ ...(c || {}) }));
+          for (let i = 0; i < chs.length; i++) {
+            const srcB = chs[i]?.body || "";
+            const srcT = chs[i]?.title || "";
+            const candB = newChs[i]?.body || "";
+            const candT = (next.postParams?.locales?.[key]?.chapters?.[i]?.title) || "";
+            const fixedBody = await ensureTranslated(ai2, t, baseAliased, targetAliased, srcB, candB);
+            if (fixedBody && fixedBody !== candB) { newChs[i] = { ...(newChs[i] || {}), body: fixedBody }; changed = true; }
+            const fixedTitle = await ensureTranslated(ai2, t, baseAliased, targetAliased, srcT, candT);
+            if (fixedTitle && fixedTitle !== candT) {
+              const localesMap = { ...(next.postParams?.locales || {}) };
+              const lp = { ...(localesMap[key] || {}) };
+              const chParams = Array.isArray(lp.chapters) ? [...lp.chapters] : [];
+              while (chParams.length <= i) chParams.push({});
+              chParams[i] = { ...(chParams[i] || {}), title: fixedTitle };
+              lp.chapters = chParams;
+              next.postParams = { ...(next.postParams || {}), locales: { ...localesMap, [key]: lp } };
+              changed = true;
+            }
+          }
+          next.postData[key] = { ...(next.postData[key] || {}), chapters: newChs };
+        }
+      } catch {
+        // ignore verification errors – better to return partial than fail
       }
 
       if (!changed) return { state, modified: false };
@@ -799,5 +887,3 @@ export function createAIPostHandler(opts) {
 
   return { pending, running, progress, run, undo, confirm, meta };
 }
-
-
