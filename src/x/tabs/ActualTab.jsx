@@ -59,7 +59,6 @@ export default function ActualTab(props) {
         limit,
         offset,
         lang: lang(),
-        // MODIFICATION: Added new sort order for this tab.
         order_by: 'fund_amount'
       };
       
@@ -87,23 +86,30 @@ export default function ActualTab(props) {
 
   return (
     <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-2 min-w-[220px]">
-          <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-          <select
-            class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-            value={category()}
-            onInput={(e) => setCategory(e.currentTarget.value)}
-            aria-label={app.t("newTab.category")}
-          >
-            <For each={categoriesWithAll()}>
-              {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-            </For>
-          </select>
-          <Show when={categoriesRes.loading}>
-            <div class="text-xs opacity-70">{app.t("common.loading")}</div>
-          </Show>
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-2 tab-header-icon">
+          <span class="text-[hsl(var(--muted-foreground))]">{props.icon}</span>
+          <h2 class="text-xl font-semibold">{props.title}</h2>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <ViewModeToggle size="md" />
+          <div class="flex items-center gap-2 min-w-[220px]">
+            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
+            <select
+              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+              value={category()}
+              onInput={(e) => setCategory(e.currentTarget.value)}
+              aria-label={app.t("newTab.category")}
+            >
+              <For each={categoriesWithAll()}>
+                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
+              </For>
+            </select>
+            <Show when={categoriesRes.loading}>
+              <div class="text-xs opacity-70">{app.t("common.loading")}</div>
+            </Show>
+          </div>
         </div>
       </div>
       <ContentFeed
@@ -117,3 +123,4 @@ export default function ActualTab(props) {
     </section>
   );
 }
+

@@ -87,7 +87,7 @@
   }
   
   html.sv-leftnav-pinned .main-content-wrapper {
-    padding-left: var(--sv-leftnav-w);
+   padding-left: calc(var(--sv-leftnav-w) + 1rem);
   }
 }
 

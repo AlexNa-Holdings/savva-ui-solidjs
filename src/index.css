@@ -83,3 +83,9 @@
 .reverse-animation {
   animation: default-update-animation-reverse 0.4s ease-in-out;
 }
+
+/* Enlarge icons within tab headers */
+.tab-header-icon svg {
+  width: 2rem; /* 32px */
+  height: 2rem; /* 32px */
+}

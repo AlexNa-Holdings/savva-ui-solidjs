@@ -586,7 +586,7 @@ export default {
   "subscriptions.subscribe.title": "Subscribe",
   "tabs.aria": "Section tabs",
   "tabs.title.${slug(tab.type)}": "Tab: {tab.type}",
-  "tabs.title.actual": "Current",
+  "tabs.title.actual": "!Active Funds",
   "tabs.title.comments": "Comments",
   "tabs.title.for-you": "For You",
   "tabs.title.leaders": "Leaders",
