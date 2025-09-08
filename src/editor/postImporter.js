@@ -5,6 +5,7 @@ import { parse, stringify } from "yaml";
 import { DRAFT_DIRS, clearDraft, writeFile } from "./storage.js";
 import { createTextPreview } from "./preview-utils.js";
 import { getPostDescriptorPath, getPostContentBaseCid } from "../ipfs/utils.js";
+import { fetchDescriptorWithFallback } from "../ipfs/fetchDescriptorWithFallback.js";
 
 async function fetchFile(app, post, descriptor, relativePath) {
   const contentBaseCid = getPostContentBaseCid(post);
@@ -38,8 +39,15 @@ async function importReferencedFiles(app, sourcePost, targetDirHandle) {
   const descriptorPath = getPostDescriptorPath(sourcePost);
   if (!descriptorPath) return;
 
-  const { res: descriptorRes } = await ipfs.fetchBest(app, descriptorPath);
-  const descriptor = parse(await descriptorRes.text());
+  // Use fallback-aware descriptor fetch (handles legacy folder CIDs returning HTML)
+  const { text: descriptorText, finalPath, usedFallback } = await fetchDescriptorWithFallback(
+    app,
+    sourcePost,
+    (path) => ipfs.fetchBest(app, path).then((r) => r.res)
+  );
+  dbg.log("Importer", "Descriptor loaded", { finalPath, usedFallback });
+
+  const descriptor = parse(descriptorText);
   if (!descriptor) return;
 
   const contentBaseCid = getPostContentBaseCid(sourcePost);
@@ -56,24 +64,32 @@ async function importReferencedFiles(app, sourcePost, targetDirHandle) {
       const locale = descriptor.locales[langCode];
       if (locale.data_path) {
         try {
-          const content = await ipfs.fetchBest(app, `${contentBaseCid}/${locale.data_path}`).then(r => r.res.text());
+          const content = await ipfs
+            .fetchBest(app, `${contentBaseCid}/${locale.data_path}`)
+            .then((r) => r.res.text());
           markdownStrings.push(content);
-        } catch (e) { dbg.warn("Importer", `Could not fetch markdown for file scan: ${locale.data_path}`, e); }
+        } catch (e) {
+          dbg.warn("Importer", `Could not fetch markdown for file scan: ${locale.data_path}`, e);
+        }
       }
       if (Array.isArray(locale.chapters)) {
         for (const chapter of locale.chapters) {
           if (chapter.data_path) {
             try {
-              const content = await ipfs.fetchBest(app, `${contentBaseCid}/${chapter.data_path}`).then(r => r.res.text());
+              const content = await ipfs
+                .fetchBest(app, `${contentBaseCid}/${chapter.data_path}`)
+                .then((r) => r.res.text());
               markdownStrings.push(content);
-            } catch (e) { dbg.warn("Importer", `Could not fetch chapter for file scan: ${chapter.data_path}`, e); }
+            } catch (e) {
+              dbg.warn("Importer", `Could not fetch chapter for file scan: ${chapter.data_path}`, e);
+            }
           }
         }
       }
     }
   }
 
-  const combinedMarkdown = markdownStrings.join('\n');
+  const combinedMarkdown = markdownStrings.join("\n");
   const pathRegex = /(?:src=["']|url\(|href=["']|\()(?<path>uploads\/[^"')]+)/g;
   let match;
   while ((match = pathRegex.exec(combinedMarkdown)) !== null) {
@@ -84,13 +100,13 @@ async function importReferencedFiles(app, sourcePost, targetDirHandle) {
 
   dbg.log("Importer", "Found relative file paths to import:", Array.from(relativePaths));
   if (relativePaths.size === 0) return;
-  
+
   const uploadsDirHandle = await targetDirHandle.getDirectoryHandle(DRAFT_DIRS.UPLOADS, { create: true });
   for (const relPath of relativePaths) {
     try {
       const blob = await fetchFile(app, sourcePost, descriptor, relPath);
       if (blob) {
-        const fileName = relPath.split('/').pop();
+        const fileName = relPath.split("/").pop();
         await writeFile(uploadsDirHandle, fileName, blob);
         dbg.log("Importer", `Imported file: ${fileName}`);
       }
@@ -115,7 +131,7 @@ export async function preparePostForEditing(post, app) {
   const dirHandle = await navigator.storage
     .getDirectory()
     .then((root) => root.getDirectoryHandle(baseDir, { create: true }));
-  
+
   const isComment = !!post.parent_savva_cid;
   let fileSourceObject = post;
 
@@ -134,16 +150,20 @@ export async function preparePostForEditing(post, app) {
 
   await importReferencedFiles(app, fileSourceObject, dirHandle);
 
-  const descriptorPath = getPostDescriptorPath(post);
-  const { res: descriptorRes } = await ipfs.fetchBest(app, descriptorPath);
-  const descriptorText = await descriptorRes.text();
+  // Fallback-aware descriptor fetch for the post we’re editing
+  const { text: descriptorText, finalPath, usedFallback } = await fetchDescriptorWithFallback(
+    app,
+    post,
+    (path) => ipfs.fetchBest(app, path).then((r) => r.res)
+  );
+  dbg.log("Importer", "Descriptor (edit) loaded", { finalPath, usedFallback });
+
   const descriptor = parse(descriptorText);
-  if (!descriptor) throw new Error("Could not parse post descriptor.");
+  if (!descriptor) throw new Error(app.t("editor.import.parseDescriptorFailed"));
+
   dbg.log("Importer", "Parsed descriptor:", descriptor);
 
-  const supportedLangs = (app.domainAssetsConfig()?.locales || []).map(
-    (l) => l.code
-  );
+  const supportedLangs = (app.domainAssetsConfig()?.locales || []).map((l) => l.code);
   const finalParams = {
     guid: post.guid,
     originalSavvaCid: post.savva_cid,
@@ -184,18 +204,10 @@ export async function preparePostForEditing(post, app) {
       chapters: [],
     };
 
-    const bodyBlob = await fetchFile(
-      app,
-      post,
-      descriptor,
-      localeDesc.data_path
-    );
+    const bodyBlob = await fetchFile(app, post, descriptor, localeDesc.data_path);
     if (bodyBlob) {
       await writeFile(dirHandle, `${lang}/data.md`, bodyBlob);
-      dbg.log(
-        "Importer",
-        `Wrote file: ${lang}/data.md, size: ${bodyBlob.size}`
-      );
+      dbg.log("Importer", `Wrote file: ${lang}/data.md, size: ${bodyBlob.size}`);
     }
 
     if (Array.isArray(localeDesc.chapters)) {
@@ -204,49 +216,29 @@ export async function preparePostForEditing(post, app) {
         finalParams.locales[lang].chapters.push({ title: chapter.title });
         const chapterPath = `${lang}/chapters/${i + 1}.md`;
         finalDescriptor.locales[lang].chapters.push({ data_path: chapterPath });
-        const chapterBlob = await fetchFile(
-          app,
-          post,
-          descriptor,
-          chapter.data_path
-        );
+        const chapterBlob = await fetchFile(app, post, descriptor, chapter.data_path);
         if (chapterBlob) {
           await writeFile(dirHandle, chapterPath, chapterBlob);
-          dbg.log(
-            "Importer",
-            `Wrote file: ${chapterPath}, size: ${chapterBlob.size}`
-          );
+          dbg.log("Importer", `Wrote file: ${chapterPath}, size: ${chapterBlob.size}`);
         }
       }
     }
   }
 
   if (finalParams.thumbnail) {
-    const thumbBlob = await fetchFile(
-      app,
-      post,
-      descriptor,
-      finalParams.thumbnail
-    );
+    const thumbBlob = await fetchFile(app, post, descriptor, finalParams.thumbnail);
     if (thumbBlob) {
       const thumbName = finalParams.thumbnail.split("/").pop();
       const newThumbPath = `${DRAFT_DIRS.UPLOADS}/${thumbName}`;
       await writeFile(dirHandle, newThumbPath, thumbBlob);
       finalParams.thumbnail = newThumbPath;
-      dbg.log(
-        "Importer",
-        `Wrote thumbnail: ${newThumbPath}, size: ${thumbBlob.size}`
-      );
+      dbg.log("Importer", `Wrote thumbnail: ${newThumbPath}, size: ${thumbBlob.size}`);
     }
   }
 
   dbg.log("Importer:finalParams", "Params being saved to draft:", finalParams);
   await writeFile(dirHandle, "info.yaml", stringify(finalDescriptor));
-  await writeFile(
-    dirHandle,
-    "params.json",
-    JSON.stringify(finalParams, null, 2)
-  );
+  await writeFile(dirHandle, "params.json", JSON.stringify(finalParams, null, 2));
 
   dbg.log("Importer", "Post successfully imported for editing.");
 }

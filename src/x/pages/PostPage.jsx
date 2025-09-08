@@ -28,6 +28,7 @@ import PostFundCard from "../post/PostFundCard.jsx";
 import FundraisingCard from "../post/FundraisingCard.jsx";
 import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import PostRightPanel from "../post/PostRightPanel.jsx";
+import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
 
 const getIdentifier = (route) => route().split('/')[2] || "";
 
@@ -54,19 +55,26 @@ async function fetchPostDetails(mainPost, app) {
   const descriptorPath = getPostDescriptorPath(mainPost);
   const dataCidForContent = getPostContentBaseCid(mainPost);
 
-  dbg.log('PostPage', 'Determined paths', { descriptorPath, dataCidForContent });
+  dbg.log("PostPage", "Determined paths", { descriptorPath, dataCidForContent });
 
   if (!descriptorPath) {
     return { descriptor: null, dataCidForContent };
   }
 
   try {
-    const { res } = await ipfs.fetchBest(app, descriptorPath);
-    const text = await res.text();
+    // Uses runtime fallback: primary path, then <cid>/info.yaml> if HTML/dir index.
+    const { text, finalPath, usedFallback } = await fetchDescriptorWithFallback(
+      app,
+      mainPost,
+      (path) => ipfs.fetchBest(app, path).then(x => x.res)
+    );
+
+    dbg.log("PostPage", "descriptor loaded", { finalPath, usedFallback });
+
     const descriptor = parse(text) || null;
     return { descriptor, dataCidForContent };
   } catch (error) {
-    dbg.error('PostPage', 'Failed to fetch or parse descriptor', { path: descriptorPath, error });
+    dbg.error("PostPage", "Failed to fetch or parse descriptor", { path: descriptorPath, error });
     return { descriptor: { error: error.message }, dataCidForContent };
   }
 }

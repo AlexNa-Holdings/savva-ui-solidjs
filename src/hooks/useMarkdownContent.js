@@ -5,16 +5,25 @@ import { parse } from "yaml";
 import { dbg } from "../utils/debug.js";
 import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
+import { fetchDescriptorWithFallback } from "../ipfs/fetchDescriptorWithFallback.js";
+
 
 async function fetchDetails(app, contentObject) {
   if (!contentObject) return null;
+
   const descriptorPath = getPostDescriptorPath(contentObject);
   const dataCidForContent = getPostContentBaseCid(contentObject);
   if (!descriptorPath) return { descriptor: null, dataCidForContent };
 
   try {
-    const { res } = await ipfs.fetchBest(app, descriptorPath);
-    const descriptor = parse(await res.text()) || null;
+    const { text, finalPath, usedFallback } = await fetchDescriptorWithFallback(
+      app,
+      contentObject,
+      (path) => ipfs.fetchBest(app, path).then((x) => x.res)
+    );
+    dbg.log("useMarkdownContent", "descriptor loaded", { finalPath, usedFallback });
+
+    const descriptor = parse(text) || null;
     return { descriptor, dataCidForContent };
   } catch (error) {
     dbg.error("useMarkdownContent", "Failed to fetch descriptor", { path: descriptorPath, error });

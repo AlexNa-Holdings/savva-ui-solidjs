@@ -7,7 +7,6 @@ import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
 import { createTextPreview } from "../../../editor/preview-utils.js";
 import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
-import { fetchWithTimeout } from "../../../utils/net.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
@@ -49,25 +48,16 @@ export default function StepUploadDescriptor(props) {
     return out;
   }
 
-  async function buildAuthHeaders() {
-    const h = { Accept: "application/json" };
-    try {
-      const tok = await app?.auth?.getToken?.();
-      if (tok) h["Authorization"] = `Bearer ${tok}`;
-    } catch {}
-    return h;
-  }
-
   function xhrPostForm(url, formData) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", url);
-      xhr.withCredentials = true;
+      xhr.withCredentials = true; // << important for cookie-based auth
       xhr.onreadystatechange = () => {
         if (xhr.readyState !== 4) return;
         if (xhr.status >= 200 && xhr.status < 300) {
           try { resolve(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error("Invalid JSON from store-dir")); }
+          catch { reject(new Error("Invalid JSON response")); }
         } else {
           reject(new Error(`XHR ${xhr.status} ${xhr.responseText || ""}`));
         }
@@ -136,59 +126,24 @@ export default function StepUploadDescriptor(props) {
 
     L("descriptor composed", { languages: langs, gateways });
 
-    // Build file
     let yamlStr;
     try { yamlStr = toYaml(descriptor); }
     catch (e) { E("yaml stringify error", e); throw new Error(t("editor.publish.descriptor.errorTitle")); }
 
     const descriptorFile = new File([yamlStr], "info.yaml", { type: "application/x-yaml" });
 
-    // Try /store (Bearer + cookies)
     const urlStore = `${httpBase()}store`;
-    const form1 = new FormData();
-    form1.append("file", descriptorFile);
-    L("POST /store (fetch)", { url: urlStore });
+    const form = new FormData();
+    form.append("file", descriptorFile, "info.yaml");
 
-    const res = await fetchWithTimeout(
-      urlStore,
-      {
-        method: "POST",
-        body: form1,
-        credentials: "include",
-        headers: await buildAuthHeaders(),
-      },
-      30000
-    ).catch((e) => {
-      E("fetch /store error", e);
-      throw e;
-    });
+    // XHR (cookies only, no custom headers to dodge preflight)
+    L("POST /store via XHR", { url: urlStore });
+    const json = await xhrPostForm(urlStore, form);
 
-    L("store response", { ok: res.ok, status: res.status });
-
-    if (res.status === 401 || res.status === 403) {
-      // Fallback: /store-dir (XHR + cookies), same as data step
-      const urlDir = `${httpBase()}store-dir`;
-      const form2 = new FormData();
-      form2.append("file", descriptorFile, "info.yaml");
-      L("FALLBACK POST /store-dir (XHR)", { url: urlDir });
-
-      const json = await xhrPostForm(urlDir, form2);
-      if (!json?.cid) throw new Error("store-dir: no cid in response");
-      L("fallback success", { cid: json.cid });
-      return json.cid;
-    }
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Descriptor upload failed: ${res.status} ${errText}`);
-    }
-
-    const json = await res.json().catch(() => {
-      throw new Error("Descriptor upload failed: invalid JSON response");
-    });
-    if (!json?.cid) throw new Error("API did not return a 'cid' for the uploaded descriptor.");
-    L("success", { cid: json.cid });
-    return json.cid;
+    const cid = extractCid(json);
+    if (!cid) throw new Error("API did not return a 'cid' for the uploaded descriptor.");
+    L("success", { cid });
+    return cid;
   }
 
   function tryStart() {
