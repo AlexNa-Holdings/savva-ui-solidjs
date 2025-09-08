@@ -20,7 +20,7 @@ export default function StepUploadIPFS(props) {
   const getFilesFromDraft = async () => {
     const { postData, editorMode } = props;
     const files = [];
-    
+
     const baseDir = (() => {
       if (editorMode === "new_post") return DRAFT_DIRS.NEW_POST;
       if (editorMode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
@@ -32,12 +32,12 @@ export default function StepUploadIPFS(props) {
     for (const lang in content) {
       const data = content[lang];
       const path = `${lang}/data.md`;
-      files.push({ file: new File([data.body || ""], path, { type: 'text/markdown' }), path });
+      files.push({ file: new File([data.body || ""], path, { type: "text/markdown" }), path });
 
       if (Array.isArray(data.chapters)) {
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          files.push({ file: new File([data.chapters[i].body || ""], chapterPath, { type: 'text/markdown' }), path: chapterPath });
+          files.push({ file: new File([data.chapters[i].body || ""], chapterPath, { type: "text/markdown" }), path: chapterPath });
         }
       }
     }
@@ -45,9 +45,7 @@ export default function StepUploadIPFS(props) {
     const assetNames = await getAllUploadedFileNames(baseDir);
     for (const name of assetNames) {
       const file = await getUploadedFileAsFileObject(baseDir, name);
-      if (file) {
-        files.push({ file, path: `uploads/${name}` });
-      }
+      if (file) files.push({ file, path: `uploads/${name}` });
     }
     return files;
   };
@@ -55,80 +53,102 @@ export default function StepUploadIPFS(props) {
   const uploadToPinningServices = async () => {
     setUploadMessage(t("editor.publish.uploadingToPinServices"));
     const services = getPinningServices();
-    if (services.length === 0) {
-      throw new Error(t("editor.publish.ipfs.errorNoServices"));
-    }
+    if (services.length === 0) throw new Error(t("editor.publish.ipfs.errorNoServices"));
 
     const filesToUpload = await getFilesFromDraft();
-    const progressMap = new Map(services.map(s => [s.id, 0]));
-
+    const progressMap = new Map(services.map((s) => [s.id, 0]));
     const updateTotalProgress = () => {
       const sum = Array.from(progressMap.values()).reduce((a, b) => a + b, 0);
       setUploadProgress(Math.round(sum / services.length));
     };
 
-    const cids = await Promise.all(services.map(async (service) => {
-      try {
-        const cid = await pinDirectory(service, filesToUpload, {
-          onProgress: (p) => {
-            progressMap.set(service.id, p);
-            updateTotalProgress();
-          }
-        });
+    const cids = await Promise.all(
+      services.map(async (service) => {
+        try {
+          const cid = await pinDirectory(service, filesToUpload, {
+            onProgress: (p) => {
+              progressMap.set(service.id, p);
+              updateTotalProgress();
+            },
+          });
 
-        // Verification
-        const firstLangWithContent = Object.keys(props.postData())[0];
-        const verificationPath = `${firstLangWithContent}/data.md`;
-        const gatewayUrl = service.gatewayUrl.trim().replace(/\/+$/, "");
-        const verifyUrl = `${gatewayUrl}/ipfs/${cid}/${verificationPath}`;
-        
-        // Add a delay before verifying
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
+          const firstLangWithContent = Object.keys(props.postData())[0];
+          const verificationPath = `${firstLangWithContent}/data.md`;
+          const gatewayUrl = service.gatewayUrl.trim().replace(/\/+$/, "");
+          const verifyUrl = `${gatewayUrl}/ipfs/${cid}/${verificationPath}`;
 
-        return cid;
-      } catch (e) {
-        throw new Error(`Failed on service '${service.name}': ${e.message}`);
-      }
-    }));
-    
+          await new Promise((r) => setTimeout(r, 3000));
+          await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
+          return cid;
+        } catch (e) {
+          throw new Error(`Failed on service '${service.name}': ${e.message}`);
+        }
+      })
+    );
+
     const firstCid = cids[0];
-    if (!cids.every(cid => cid === firstCid)) {
-      throw new Error("Inconsistent CIDs returned from pinning services.");
-    }
-    
+    if (!cids.every((cid) => cid === firstCid)) throw new Error("Inconsistent CIDs returned from pinning services.");
     return firstCid;
   };
 
   const uploadToBackend = async () => {
     const { postData, editorMode } = props;
     const baseDir = editorMode === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
-    
+
     const formData = new FormData();
     const content = postData();
-    // (This part remains the same as your existing implementation)
     for (const lang in content) {
-      // ... same logic to append markdown files
+      const data = content[lang];
+      formData.append("file", new File([data.body || ""], `${lang}/data.md`, { type: "text/markdown" }));
+      if (Array.isArray(data.chapters)) {
+        for (let i = 0; i < data.chapters.length; i++) {
+          formData.append("file", new File([data.chapters[i].body || ""], `${lang}/chapters/${i + 1}.md`, { type: "text/markdown" }));
+        }
+      }
     }
     const assetFileNames = await getAllUploadedFileNames(baseDir);
     for (const fileName of assetFileNames) {
       const file = await getUploadedFileAsFileObject(baseDir, fileName);
-      if (file) formData.append('file', file, `uploads/${fileName}`);
+      if (file) formData.append("file", file, `uploads/${fileName}`);
     }
-    
+
     return await uploadWithProgress(`${httpBase()}store-dir`, formData);
   };
-  
+
   const uploadWithProgress = (url, formData) => {
-    // (This remains the same as your existing implementation)
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.withCredentials = true;
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const json = JSON.parse(xhr.responseText);
+            resolve(json.cid);
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+          }
+        } catch {
+          reject(new Error("Upload failed: invalid JSON response"));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.send(formData);
+    });
   };
-  
+
   onMount(() => {
     setTimeout(async () => {
       try {
         const usePinners = isPinningEnabled();
         const cid = usePinners ? await uploadToPinningServices() : await uploadToBackend();
-        props.onComplete?.(cid);
+        dbg.log("StepUploadIPFS", "CID ready:", cid);
+        // IMPORTANT: return a structured payload (wizard expects an object downstream)
+        props.onComplete?.({ ipfsCid: cid });
       } catch (e) {
         dbg.error("StepUploadIPFS", "An error occurred in the upload process:", e);
         setError(e.message);

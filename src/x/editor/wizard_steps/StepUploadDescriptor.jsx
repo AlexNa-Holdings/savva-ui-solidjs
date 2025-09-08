@@ -1,5 +1,5 @@
 // src/x/editor/wizard_steps/StepUploadDescriptor.jsx
-import { createSignal, createEffect, on, Show } from "solid-js";
+import { createSignal, createEffect, onMount, Show } from "solid-js";
 import { useApp } from "../../../context/AppContext.jsx";
 import Spinner from "../../ui/Spinner.jsx";
 import { stringify as toYaml } from "yaml";
@@ -7,28 +7,90 @@ import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
 import { createTextPreview } from "../../../editor/preview-utils.js";
 import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
+import { fetchWithTimeout } from "../../../utils/net.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
   const { t } = app;
+
   const [error, setError] = createSignal(null);
   const [isUploading, setIsUploading] = createSignal(true);
   const [hasStarted, setHasStarted] = createSignal(false);
 
-  const uploadDescriptor = async (data_cid) => {
+  const trace = globalThis.crypto?.randomUUID?.() ?? `trace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const L = (...a) => dbg.log("StepUploadDescriptor", trace, ...a);
+  const E = (...a) => dbg.error("StepUploadDescriptor", trace, ...a);
+
+  function extractCid(v) {
+    if (!v) return undefined;
+    if (typeof v === "string") return v.trim() || undefined;
+    if (typeof v === "object") {
+      try {
+        const s = String(v.toString?.() ?? "");
+        if (s && s !== "[object Object]") return s.trim() || undefined;
+      } catch {}
+      const candidates = [v.ipfsCid, v.cid, v.data_cid, v.dataCid, v.value, v["/"], v.result, v.payload, v.data];
+      for (const c of candidates) {
+        const s = extractCid(c);
+        if (s) return s;
+      }
+    }
+    return undefined;
+  }
+  const summarize = (o) => {
+    try { return JSON.parse(JSON.stringify(o, (k, v) => (typeof v === "string" && v.length > 120 ? v.slice(0, 117) + "…" : v))); }
+    catch { return o; }
+  };
+
+  function getDataCid() {
+    const pd = props.publishedData?.();
+    const out = extractCid(pd);
+    L("getDataCid()", { publishedData: summarize(pd), resolved: out });
+    return out;
+  }
+
+  async function buildAuthHeaders() {
+    const h = { Accept: "application/json" };
+    try {
+      const tok = await app?.auth?.getToken?.();
+      if (tok) h["Authorization"] = `Bearer ${tok}`;
+    } catch {}
+    return h;
+  }
+
+  function xhrPostForm(url, formData) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.withCredentials = true;
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState !== 4) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error("Invalid JSON from store-dir")); }
+        } else {
+          reject(new Error(`XHR ${xhr.status} ${xhr.responseText || ""}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error (XHR)"));
+      xhr.send(formData);
+    });
+  }
+
+  async function uploadDescriptor(data_cid) {
     const { postData, postParams, editorMode } = props;
-    dbg.log("StepUploadDescriptor:init", "Received postParams:", postParams());
+    L("start uploadDescriptor()", { data_cid, editorMode, httpBase: httpBase() });
 
-    const contentType = (editorMode === 'new_comment' || editorMode === 'edit_comment') ? 'comment' : 'post';
     const params = postParams();
+    const content = postData();
 
+    const contentType = (editorMode === "new_comment" || editorMode === "edit_comment") ? "comment" : "post";
     const descriptor = {
       savva_spec_version: "2.0",
-      data_cid: data_cid,
-      locales: {}
+      data_cid,
+      locales: {},
     };
 
-    // Explicitly copy required top-level fields from params to the descriptor
     if (params.guid) descriptor.guid = params.guid;
     if (params.parent_savva_cid) descriptor.parent_savva_cid = params.parent_savva_cid;
     if (params.root_savva_cid) descriptor.root_savva_cid = params.root_savva_cid;
@@ -36,102 +98,134 @@ export default function StepUploadDescriptor(props) {
     if (params.fundraiser) descriptor.fundraiser = params.fundraiser;
     if (params.thumbnail) descriptor.thumbnail = params.thumbnail;
 
-    // Conditionally add gateways based on user settings
-    if (isPinningEnabled()) {
-      const userServices = getPinningServices();
-      const userGateways = userServices.map(s => s.gatewayUrl).filter(Boolean);
-      if (userGateways.length > 0) {
-        descriptor.gateways = userGateways;
-      }
-    } else {
-      const systemGateways = app.info()?.ipfs_gateways || [];
-      if (systemGateways.length > 0) {
-        descriptor.gateways = systemGateways;
-      }
-    }
-    
-    const content = postData();
+    const gateways = isPinningEnabled()
+      ? (getPinningServices().map((s) => s.gatewayUrl).filter(Boolean) || [])
+      : (app.info()?.ipfs_gateways || []);
+    if (gateways.length) descriptor.gateways = gateways;
 
+    const langs = [];
     for (const lang in content) {
-      const data = content[lang];
-      const hasTitle = data.title?.trim().length > 0;
-      const hasBody = data.body?.trim().length > 0;
-      const hasChapters = data.chapters?.some(c => c.body?.trim().length > 0);
+      const data = content[lang] || {};
+      const hasTitle = !!data.title?.trim();
+      const hasBody = !!data.body?.trim();
+      const hasChapters = Array.isArray(data.chapters) && data.chapters.some((c) => !!c?.body?.trim());
+      if (!hasTitle && !hasBody && !hasChapters) continue;
 
-      if (!hasTitle && !hasBody && !hasChapters) {
-        continue;
-      }
-      
+      langs.push(lang);
       const langParams = params.locales?.[lang] || {};
-      
-      const localeObject = {
+      const locale = {
         title: data.title || "",
         text_preview: createTextPreview(data.body || "", contentType),
         tags: langParams.tags || [],
         categories: langParams.categories || [],
         data_path: `${lang}/data.md`,
-        chapters: []
+        chapters: [],
       };
 
       if (Array.isArray(data.chapters)) {
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterParams = langParams.chapters?.[i] || {};
-          localeObject.chapters.push({
+          locale.chapters.push({
             title: chapterParams.title || `Chapter ${i + 1}`,
-            data_path: `${lang}/chapters/${i + 1}.md`
+            data_path: `${lang}/chapters/${i + 1}.md`,
           });
         }
       }
-      
-      descriptor.locales[lang] = localeObject;
+      descriptor.locales[lang] = locale;
     }
-    
-    dbg.log("StepUploadDescriptor", "Final descriptor object:", descriptor);
 
-    const yamlStr = toYaml(descriptor);
-    const descriptorFile = new File([yamlStr], "info.yaml", { type: 'application/x-yaml' });
-    const formData = new FormData();
-    formData.append('file', descriptorFile);
+    L("descriptor composed", { languages: langs, gateways });
 
-    const url = `${httpBase()}store`;
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
+    // Build file
+    let yamlStr;
+    try { yamlStr = toYaml(descriptor); }
+    catch (e) { E("yaml stringify error", e); throw new Error(t("editor.publish.descriptor.errorTitle")); }
+
+    const descriptorFile = new File([yamlStr], "info.yaml", { type: "application/x-yaml" });
+
+    // Try /store (Bearer + cookies)
+    const urlStore = `${httpBase()}store`;
+    const form1 = new FormData();
+    form1.append("file", descriptorFile);
+    L("POST /store (fetch)", { url: urlStore });
+
+    const res = await fetchWithTimeout(
+      urlStore,
+      {
+        method: "POST",
+        body: form1,
+        credentials: "include",
+        headers: await buildAuthHeaders(),
+      },
+      30000
+    ).catch((e) => {
+      E("fetch /store error", e);
+      throw e;
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Descriptor upload failed: ${response.status} ${errText}`);
+    L("store response", { ok: res.ok, status: res.status });
+
+    if (res.status === 401 || res.status === 403) {
+      // Fallback: /store-dir (XHR + cookies), same as data step
+      const urlDir = `${httpBase()}store-dir`;
+      const form2 = new FormData();
+      form2.append("file", descriptorFile, "info.yaml");
+      L("FALLBACK POST /store-dir (XHR)", { url: urlDir });
+
+      const json = await xhrPostForm(urlDir, form2);
+      if (!json?.cid) throw new Error("store-dir: no cid in response");
+      L("fallback success", { cid: json.cid });
+      return json.cid;
     }
 
-    const result = await response.json();
-    if (!result?.cid) {
-      throw new Error("API did not return a 'cid' for the uploaded descriptor.");
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Descriptor upload failed: ${res.status} ${errText}`);
     }
 
-    return result.cid;
-  };
+    const json = await res.json().catch(() => {
+      throw new Error("Descriptor upload failed: invalid JSON response");
+    });
+    if (!json?.cid) throw new Error("API did not return a 'cid' for the uploaded descriptor.");
+    L("success", { cid: json.cid });
+    return json.cid;
+  }
 
-  createEffect(() => {
-    const dataCid = props.publishedData().ipfsCid;
-    if (dataCid && !hasStarted()) {
-      setHasStarted(true);
-      
-      setTimeout(async () => {
-        try {
-          const descriptorCid = await uploadDescriptor(dataCid);
-          props.onComplete?.(descriptorCid);
-        } catch (e) {
-          dbg.error("StepUploadDescriptor", "An error occurred:", e);
-          setError(e.message);
-        } finally {
-          setIsUploading(false);
-        }
-      }, 500);
-    }
+  function tryStart() {
+    const dataCid = getDataCid();
+    L("tryStart()", { hasStarted: hasStarted(), dataCid });
+    if (!dataCid || hasStarted()) return;
+
+    setHasStarted(true);
+    setIsUploading(true);
+
+    setTimeout(async () => {
+      L("kickoff");
+      try {
+        const descriptorCid = await uploadDescriptor(dataCid);
+        L("onComplete()", { descriptorCid });
+        props.onComplete?.(descriptorCid);
+      } catch (e) {
+        E("error", e);
+        setError(e?.message || t("editor.publish.descriptor.errorTitle"));
+      } finally {
+        setIsUploading(false);
+        L("done");
+      }
+    }, 250);
+  }
+
+  onMount(() => {
+    L("mounted");
+    tryStart();
   });
 
+  createEffect(() => {
+    const pd = props.publishedData?.();
+    const cid = extractCid(pd);
+    L("effect", { pd: summarize(pd), resolved: cid, hasStarted: hasStarted() });
+    tryStart();
+  });
 
   return (
     <div class="flex flex-col items-center justify-center h-full">
@@ -139,11 +233,15 @@ export default function StepUploadDescriptor(props) {
         <Spinner />
         <p class="mt-2 text-sm">{t("editor.publish.uploadingDescriptor")}...</p>
       </Show>
+
       <Show when={error()}>
         <div class="text-center p-4">
           <h4 class="font-bold text-red-600">{t("editor.publish.descriptor.errorTitle")}</h4>
-          <p class="mt-2 text-sm">{error()}</p>
-          <button onClick={props.onCancel} class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]">
+          <p class="mt-2 text-sm whitespace-pre-wrap">{error()}</p>
+          <button
+            onClick={props.onCancel}
+            class="mt-4 px-4 py-2 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+          >
             {t("editor.publish.validation.backToEditor")}
           </button>
         </div>
