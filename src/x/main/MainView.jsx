@@ -1,5 +1,5 @@
 // src/x/main/MainView.jsx
-import { createResource, Show, createMemo, For, Switch, Match } from "solid-js";
+import { createResource, Show, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import Container from "../layout/Container.jsx";
 import ToTopButton from "../ui/ToTopButton.jsx";
@@ -10,9 +10,19 @@ import { getTabComponent } from "../tabs/index.js";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";
 import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
 import { tabIconFor } from "../ui/icons/TabIcons.jsx";
-import { tabKeyFromRoute } from "../../routing/tabRoutes.js";
 
 const slug = (s) => String(s || "").trim().toLowerCase();
+
+function getActiveTabKeyFromRoute(path) {
+  const r = String(path || "");
+  if (r.startsWith("/t/")) {
+    const key = r.slice(3).split(/[?#]/)[0];
+    return key;
+  }
+  // Fallback for paths without /t/ prefix like /new
+  const s = r.startsWith("/") ? r.slice(1) : r;
+  return s.split(/[?#]/, 1)[0] || "";
+}
 
 export default function MainView() {
   const app = useApp();
@@ -38,15 +48,9 @@ export default function MainView() {
   const activeTab = createMemo(() => {
     const list = tabsRaw();
     if (!list || list.length === 0) return null;
-    
-    const key = tabKeyFromRoute(route());
-    
-    if (key) {
-      return list.find(t => slug(t.id) === key || slug(t.type) === key) || list[0];
-    }
-    
-    // Default to the first tab on the root path or other non-tab main view paths
-    return list[0]; 
+    const key = getActiveTabKeyFromRoute(route());
+    if (!key && route() === "/") return list[0];
+    return list.find(t => slug(t.id) === key || slug(t.type) === key) || list[0];
   });
 
   return (

@@ -1,31 +1,11 @@
 // src/x/tabs/LeadersTab.jsx
-import { createMemo, createResource, createSignal, Show, For, createEffect } from "solid-js";
+import { createMemo, createSignal, For, createEffect } from "solid-js";
 import ContentFeed from "../feed/ContentFeed.jsx";
 import { useApp } from "../../context/AppContext.jsx";
-import { loadAssetResource } from "../../utils/assetLoader.js";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { useHashRouter } from "../../routing/hashRouter.js";
-
-function useDomainCategories(app) {
-  const cfg = () => app.domainAssetsConfig?.();
-  const relPath = createMemo(() => cfg()?.modules?.categories || null);
-  const lang = () => (app.lang?.() || "en").toLowerCase();
-  const params = createMemo(() => ({ rel: relPath(), lang: lang() }));
-  const [cats] = createResource(params, async ({ rel, lang }) => {
-    if (!rel) return [];
-    try {
-      const data = await loadAssetResource(app, rel, { type: "yaml" });
-      const listByLang = data?.locales?.[lang] || data?.locales?.en || [];
-      return (Array.isArray(listByLang) ? listByLang : []).map(String);
-    } catch (err) {
-      console.error(`Failed to load categories from ${rel}:`, err);
-      return [];
-    }
-  });
-  return cats;
-}
 
 const TIME_FRAMES = ["month", "week", "year", "all"];
 
@@ -35,33 +15,18 @@ export default function LeadersTab(props) {
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
   const [timeFrame, setTimeFrame] = createSignal("month");
-  const categoriesRes = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
 
   createEffect(() => {
     if (!props.isActivated) return;
     const path = route() || "";
-    const activeTabType = path.split('/')[1];
-
-    if (activeTabType === 'leaders') {
-      const params = new URLSearchParams(path.split("?")[1] || "");
-      const catFromUrl = params.get("category");
-      const categoryName = catFromUrl ? (catFromUrl.includes(":") ? catFromUrl.split(":")[1] : catFromUrl) : "ALL";
-      
-      if (category() !== categoryName) {
-        setCategory(categoryName);
-      }
+    const params = new URLSearchParams(path.split("?")[1] || "");
+    const catFromUrl = params.get("category");
+    const categoryName = catFromUrl ? (catFromUrl.includes(":") ? catFromUrl.split(":")[1] : catFromUrl) : "ALL";
+    if (category() !== categoryName) {
+      setCategory(categoryName);
     }
   });
   
-  createEffect(() => {
-    const newList = categoriesRes();
-    const currentSelection = category();
-    if (newList && currentSelection !== "ALL" && !newList.includes(currentSelection)) {
-      setCategory("ALL");
-    }
-  });
-
   const domainName = () => {
     const d = app.selectedDomain?.();
     return typeof d === "string" ? d : d?.name || "";
@@ -69,6 +34,16 @@ export default function LeadersTab(props) {
   const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
 
   const feedResetKey = createMemo(() => `${domainName()}|${category()}|${timeFrame()}`);
+
+  const title = createMemo(() => {
+    const cat = category();
+    const baseTitle = props.title;
+    if (cat && cat !== "ALL") {
+      const leafName = cat.split('/').pop();
+      return `${baseTitle}: ${leafName}`;
+    }
+    return baseTitle;
+  });
 
   async function fetchPage(page, pageSize) {
     const limit = pageSize;
@@ -122,23 +97,10 @@ export default function LeadersTab(props) {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-2 tab-header-icon">
           <span class="text-[hsl(var(--muted-foreground))]">{props.icon}</span>
-          <h2 class="text-xl font-semibold">{props.title}</h2>
+          <h2 class="text-xl font-semibold">{title()}</h2>
         </div>
         <div class="flex items-center gap-3">
           <ViewModeToggle size="md" />
-          <div class="flex items-center gap-2 min-w-[220px]">
-            <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
-            <select
-              class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={category()}
-              onInput={(e) => setCategory(e.currentTarget.value)}
-              aria-label={app.t("newTab.category")}
-            >
-              <For each={categoriesWithAll()}>
-                {(c) => <option value={c}>{c === "ALL" ? app.t("categories.all") : c}</option>}
-              </For>
-            </select>
-          </div>
           <div class="flex items-center gap-2">
             <select
               class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
