@@ -666,5 +666,11 @@ export default {
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
   "wallet.unstaked.availableNow": "Available Now",
-  "nav.section.resources": "Resources"
+  "nav.section.resources": "Resources",
+    "nav.section.categories": "Categories",
+  "nav.section.main": "Main",
+  "nav.unpin": "Unpin",
+  "nav.pin": "Pin",
+  "nav.left.label": "Main navigation",
+  "nav.open": "Open navigation",
 };

@@ -6,6 +6,7 @@ import { loadAssetResource } from "../../utils/assetLoader.js";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
+import { useHashRouter } from "../../routing/hashRouter.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -30,12 +31,29 @@ const TIME_FRAMES = ["month", "week", "year", "all"];
 
 export default function LeadersTab(props) {
   const app = useApp();
+  const { route } = useHashRouter();
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
   const [timeFrame, setTimeFrame] = createSignal("month");
   const categoriesRes = useDomainCategories(app);
   const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
 
+  createEffect(() => {
+    if (!props.isActivated) return;
+    const path = route() || "";
+    const activeTabType = path.split('/')[1];
+
+    if (activeTabType === 'leaders') {
+      const params = new URLSearchParams(path.split("?")[1] || "");
+      const catFromUrl = params.get("category");
+      const categoryName = catFromUrl ? (catFromUrl.includes(":") ? catFromUrl.split(":")[1] : catFromUrl) : "ALL";
+      
+      if (category() !== categoryName) {
+        setCategory(categoryName);
+      }
+    }
+  });
+  
   createEffect(() => {
     const newList = categoriesRes();
     const currentSelection = category();
@@ -84,9 +102,6 @@ export default function LeadersTab(props) {
         if (selectedTime === 'week') pastDate.setDate(now.getDate() - 7);
         if (selectedTime === 'month') pastDate.setMonth(now.getMonth() - 1);
         if (selectedTime === 'year') pastDate.setFullYear(now.getFullYear() - 1);
-
-
-        // MODIFICATION: Changed to standard ISO string format.
         params.min_time = pastDate.toISOString();
       }
 
@@ -104,9 +119,13 @@ export default function LeadersTab(props) {
 
   return (
     <section class="w-full">
-      <div class="mb-3 flex items-center gap-3">
-        <ViewModeToggle size="md" />
-        <div class="ml-auto flex items-center gap-4">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-2 tab-header-icon">
+          <span class="text-[hsl(var(--muted-foreground))]">{props.icon}</span>
+          <h2 class="text-xl font-semibold">{props.title}</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <ViewModeToggle size="md" />
           <div class="flex items-center gap-2 min-w-[220px]">
             <span class="text-xs opacity-70">{app.t("newTab.category")}</span>
             <select

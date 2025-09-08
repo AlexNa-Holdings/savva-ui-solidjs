@@ -1,5 +1,4 @@
 // src/routing/tabRoutes.js
-// Tiny helpers for tab <-> URL
 export const TAB_PREFIX = "/t";
 
 function slug(s) {
@@ -12,10 +11,10 @@ export function tabPath(idOrType) {
   return `${TAB_PREFIX}/${encodeURIComponent(key)}`;
 }
 
-/** If route is "/t/<key>" returns "<key>", else "" */
+/** If route is "/t/<key>?..." returns "<key>", else "" */
 export function tabKeyFromRoute(route) {
   const r = String(route || "");
   if (!r.startsWith(TAB_PREFIX + "/")) return "";
   const key = r.slice((TAB_PREFIX + "/").length);
-  return decodeURIComponent(key || "");
+  return decodeURIComponent((key || "").split(/[?#]/)[0]);
 }

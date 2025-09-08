@@ -10,13 +10,9 @@ import { getTabComponent } from "../tabs/index.js";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";
 import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
 import { tabIconFor } from "../ui/icons/TabIcons.jsx";
+import { tabKeyFromRoute } from "../../routing/tabRoutes.js";
 
 const slug = (s) => String(s || "").trim().toLowerCase();
-const firstSeg = (path) => {
-  const p = String(path || "/");
-  const s = p.startsWith("/") ? p.slice(1) : p;
-  return s.split(/[?#/]/, 1)[0] || "";
-};
 
 export default function MainView() {
   const app = useApp();
@@ -42,9 +38,15 @@ export default function MainView() {
   const activeTab = createMemo(() => {
     const list = tabsRaw();
     if (!list || list.length === 0) return null;
-    const key = firstSeg(route());
-    if (!key) return list[0]; // Default to the first tab on the root path
-    return list.find(t => slug(t.id) === key || slug(t.type) === key) || list[0];
+    
+    const key = tabKeyFromRoute(route());
+    
+    if (key) {
+      return list.find(t => slug(t.id) === key || slug(t.type) === key) || list[0];
+    }
+    
+    // Default to the first tab on the root path or other non-tab main view paths
+    return list[0]; 
   });
 
   return (
@@ -81,4 +83,3 @@ export default function MainView() {
     </Container>
   );
 }
-

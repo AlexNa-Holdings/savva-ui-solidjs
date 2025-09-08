@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
+import { useHashRouter } from "../../routing/hashRouter.js";
 
 function useDomainCategories(app) {
   const cfg = () => app.domainAssetsConfig?.();
@@ -27,10 +28,27 @@ function useDomainCategories(app) {
 
 export default function ActualTab(props) {
   const app = useApp();
+  const { route } = useHashRouter();
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
   const categoriesRes = useDomainCategories(app);
   const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesRes() || [])]);
+
+  createEffect(() => {
+    if (!props.isActivated) return;
+    const path = route() || "";
+    const activeTabType = path.split('/')[1];
+
+    if (activeTabType === 'actual') {
+      const params = new URLSearchParams(path.split("?")[1] || "");
+      const catFromUrl = params.get("category");
+      const categoryName = catFromUrl ? (catFromUrl.includes(":") ? catFromUrl.split(":")[1] : catFromUrl) : "ALL";
+      
+      if (category() !== categoryName) {
+        setCategory(categoryName);
+      }
+    }
+  });
 
   createEffect(() => {
     const newList = categoriesRes();
@@ -123,4 +141,3 @@ export default function ActualTab(props) {
     </section>
   );
 }
-

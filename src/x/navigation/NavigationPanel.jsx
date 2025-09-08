@@ -6,6 +6,7 @@ import { navigate, useHashRouter } from "../../routing/hashRouter.js";
 import LibraryIcon from "../ui/icons/LibraryIcon.jsx";
 import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import { tabIconFor } from "../ui/icons/TabIcons.jsx";
+import CategoryBrowser from "./CategoryBrowser.jsx";
 
 const STORAGE_KEY = "sv:leftnav:pinned";
 const HEADER_H = 48; // keep in sync with header
@@ -140,6 +141,7 @@ export default function NavigationPanel(props) {
               </Show>
             </ul>
           </div>
+          <CategoryBrowser onNavigate={!isDesktop() ? props.onMobileNavClose : undefined} />
         </nav>
       </aside>
       <Show when={props.isMobileOpen}>
@@ -148,4 +150,3 @@ export default function NavigationPanel(props) {
     </Show>
   );
 }
-

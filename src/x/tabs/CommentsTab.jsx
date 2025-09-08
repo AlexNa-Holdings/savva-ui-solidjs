@@ -84,6 +84,11 @@ export default function CommentsTab(props) {
 
   return (
     <section class="w-full space-y-4">
+      <div class="flex items-center gap-2 tab-header-icon">
+        <span class="text-[hsl(var(--muted-foreground))]">{props.icon}</span>
+        <h2 class="text-xl font-semibold">{props.title}</h2>
+      </div>
+
       <For each={items()}>
         {(item) => <CommentThread thread={item} />}
       </For>
