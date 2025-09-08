@@ -3,8 +3,9 @@ import { createSignal } from "solid-js";
 import { snapshotBeforeAi, undoLastAi, dropLastAiSnapshot } from "./aiHistory.js";
 import { createAiClient } from "./client.js";
 
-function deepClone(v) { try { return structuredClone(v); } catch { return JSON.parse(JSON.stringify(v)); } }
+function deepClone(v) { try { return structuredClone(v); } catch (e) { return JSON.parse(JSON.stringify(v)); } }
 function normCode(c) { return c ? String(c).toLowerCase().slice(0, 2) : ""; }
+function langAlias(c) { const x = normCode(c); return x === "ua" ? "uk" : x; }
 
 function resolveSupportedLangs(opts, state) {
   const fromOpts = Array.isArray(opts?.supportedLangs)
@@ -21,7 +22,15 @@ function resolveSupportedLangs(opts, state) {
   return Array.from(set);
 }
 
-// --- helpers for the new first-step normalization ---
+function collectAllLocaleKeys(state) {
+  const keys = new Set([
+    ...Object.keys(state?.postData || {}),
+    ...Object.keys(state?.postParams?.locales || {}),
+  ].map(normCode).filter(Boolean));
+  return Array.from(keys);
+}
+
+// --- helpers ---
 
 function _trimLen(s) { return typeof s === "string" ? s.trim().length : 0; }
 
@@ -53,8 +62,6 @@ function _collectLocaleStats(state, key) {
     chBodiesCount +
     chTitlesCount;
 
-  // Weighted score: prioritize substantial bodies & more chapters,
-  // then let sheer size break ties.
   const score =
     fieldsCount * 1000 +
     (bodyLen ? 2000 : 0) +
@@ -90,11 +97,9 @@ function _aggregateTextsForLocale(state, key) {
 
 function _pickBestLocale(stats, activeLang) {
   if (!Array.isArray(stats) || stats.length === 0) return null;
-  const active = normCode(activeLang);
-
   const maxScore = Math.max(...stats.map((s) => s.score));
+  const active = normCode(activeLang);
   let bests = stats.filter((s) => s.score === maxScore);
-
   if (bests.length > 1) {
     const withBody = bests.filter((s) => s.hasBody);
     if (withBody.length) bests = withBody;
@@ -103,9 +108,192 @@ function _pickBestLocale(stats, activeLang) {
     const fromActive = bests.find((s) => normCode(s.key) === active);
     if (fromActive) return fromActive;
   }
-  // Final tie-breaker: largest total text
   bests.sort((a, b) => b.totalChars - a.totalChars);
   return bests[0];
+}
+
+// Markdown image handling (preserve attachments)
+const IMG_MD_RE = /!\[[^\]]*]\([^)]+\)/g;
+function extractImages(md = "") {
+  return (md.match(IMG_MD_RE) || []).filter(Boolean);
+}
+function ensureImages(md = "", images = []) {
+  let out = md || "";
+  for (const tag of images) {
+    if (!out.includes(tag)) out = (out ? out + "\n\n" : "") + tag;
+  }
+  return out;
+}
+
+// --- error plumbing for richer toasts ---
+
+function sanitizeUrl(u) {
+  if (!u) return "";
+  try {
+    const url = new URL(u, window.location.origin);
+    return url.pathname + (url.search || "");
+  } catch (e) {
+    return String(u).replace(/^https?:\/\/[^/]+/, "");
+  }
+}
+
+function extractErrorInfo(e) {
+  try {
+    const status = e?.status ?? e?.response?.status ?? e?.cause?.status;
+    const code = e?.code ?? e?.cause?.code ?? e?.error?.code;
+    const endpoint = e?.endpoint ?? e?.url ?? e?.config?.url ?? e?.response?.url;
+    const requestId =
+      e?.requestId ??
+      e?.response?.headers?.get?.("x-request-id") ??
+      e?.headers?.["x-request-id"] ??
+      e?.cause?.requestId;
+    return {
+      status: typeof status === "number" ? status : undefined,
+      code: code ? String(code) : undefined,
+      endpoint: endpoint ? sanitizeUrl(endpoint) : undefined,
+      requestId: requestId ? String(requestId) : undefined,
+      rawMessage: e?.message ? String(e.message) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function makeApiError(t, original, ctx = {}) {
+  const err = new Error(t("editor.ai.errors.api"));
+  const info = extractErrorInfo(original || {});
+  err._ai = {
+    op: ctx.op,
+    base: ctx.base,
+    targets: Array.isArray(ctx.targets) ? ctx.targets : undefined,
+    ...info,
+  };
+  return err;
+}
+
+function buildErrorDetails(t, err, ctx = {}) {
+  const parts = [t("editor.ai.errors.api")];
+  const step = ctx.taskLabel;
+  if (step) parts.push(`${t("editor.ai.errors.atStep")}: ${step}`);
+
+  const ai = err?._ai || {};
+  const base = ai.base || ctx.base;
+  const targets = ai.targets || ctx.targets;
+
+  if (ai.op) parts.push(`${t("editor.ai.errors.operation")}: ${ai.op}`);
+  if (base) parts.push(`${t("editor.ai.errors.base")}: ${String(base).toUpperCase()}`);
+  if (Array.isArray(targets) && targets.length) {
+    parts.push(`${t("editor.ai.errors.targets")}: ${targets.map((x) => String(x).toUpperCase()).join(", ")}`);
+  }
+
+  if (ai.status) parts.push(`${t("editor.ai.errors.status")}: ${ai.status}`);
+  if (ai.code) parts.push(`${t("editor.ai.errors.code")}: ${ai.code}`);
+  if (ai.endpoint) parts.push(`${t("editor.ai.errors.endpoint")}: ${ai.endpoint}`);
+  if (ai.requestId) parts.push(`${t("editor.ai.errors.requestId")}: ${ai.requestId}`);
+
+  const reason = ai.rawMessage || (err && err.message);
+  if (reason && reason !== t("editor.ai.errors.api")) {
+    parts.push(`${t("editor.ai.errors.reason")}: ${String(reason).slice(0, 300)}`);
+  }
+
+  return parts.join("\n");
+}
+
+// --- language detection / translation guards ---
+
+async function detectLang(ai, text) {
+  try {
+    const res = await ai.detectBaseLanguage([String(text || "")], {
+      instruction: "Return ISO 639-1 two-letter code in `base` plus numeric `confidence` 0..1.",
+    });
+    const base = langAlias(res?.base);
+    const confidence = typeof res?.confidence === "number" ? res.confidence : 0;
+    return { base, confidence };
+  } catch {
+    return { base: "", confidence: 0 };
+  }
+}
+
+async function translateOne(ai, t, base, target, text) {
+  try {
+    if (typeof ai.translateText === "function") {
+      return await ai.translateText(base, target, String(text || ""), {
+        preserveMarkdown: true,
+        instruction:
+          "Translate to target language. Keep markdown images/links/code unchanged. Do not drop content.",
+      });
+    }
+    const r = await ai.translateStructure(base, [target], {
+      title: "",
+      body: String(text || ""),
+      chapters: [],
+    }, {
+      preserveMarkdown: true,
+      instruction:
+        "Translate to target language. Keep markdown images/links/code unchanged. Do not drop content.",
+    });
+    return r?.[target]?.body ?? "";
+  } catch (e) {
+    throw makeApiError(t, e, { op: "translateText", base, targets: [target] });
+  }
+}
+
+function _eqLoose(a = "", b = "") {
+  const norm = (x) =>
+    String(x || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[.,;:!?…'"“”‘’`]+$/g, "")
+      .replace(/\s+/g, " ");
+  return norm(a) === norm(b);
+}
+
+const RE_LATIN = /[A-Za-z\u00C0-\u024F]/g;
+const RE_CYR = /[\u0400-\u04FF]/g;
+
+function _scriptStats(s = "") {
+  const text = String(s || "");
+  return {
+    latin: (text.match(RE_LATIN) || []).length,
+    cyr: (text.match(RE_CYR) || []).length,
+  };
+}
+
+function _looksLikeTargetScript(text, targetAliased) {
+  const { latin, cyr } = _scriptStats(text);
+  if (latin + cyr === 0) return false;
+  if (targetAliased === "ru" || targetAliased === "uk") {
+    return cyr > 0 && latin === 0;
+  }
+  return latin > 0 && cyr === 0;
+}
+
+// Ensure we end up with target-language text (or empty), never the source text.
+async function ensureTranslated(ai, t, base, target, sourceText, candidate) {
+  const baseAliased = langAlias(base);
+  const targetAliased = langAlias(target);
+  const src = String(sourceText || "").trim();
+
+  async function acceptIfLooksRight(text) {
+    const val = String(text || "").trim();
+    if (!val) return null;
+    if (_eqLoose(val, src)) return null;
+    const det = await detectLang(ai, val);
+    if (det.base && det.base === targetAliased) return val;
+    if (det.base && det.base !== targetAliased) return null;
+    return _looksLikeTargetScript(val, targetAliased) ? val : null;
+  }
+
+  let ok = await acceptIfLooksRight(candidate);
+  if (ok) return ok;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const tx = await translateOne(ai, t, baseAliased, targetAliased, src);
+    ok = await acceptIfLooksRight(tx);
+    if (ok) return ok;
+  }
+
+  return "";
 }
 
 // ---------- AI tasks ----------
@@ -128,39 +316,45 @@ function makeAnalyzeAiTask(t, opts) {
 
       if (!textsExist) throw new Error(t("editor.ai.errors.empty"));
 
-      // 1) Choose the "working" locale by content density
+      const originalLocales = collectAllLocaleKeys(state);
+
       const stats = locKeys.map((k) => _collectLocaleStats(state, k))
         .filter((s) => s.fieldsCount > 0 || s.totalChars > 0);
-
+      const statsByKey = new Map(stats.map((s) => [normCode(s.key), s]));
       const best = _pickBestLocale(stats, state?.activeLang);
-      if (!best) throw new Error(t("editor.ai.errors.ambiguous"));
 
-      // 2) Detect the actual human language of that content (ignoring the key)
+      const topForDetection = stats
+        .slice().sort((a, b) => b.totalChars - a.totalChars)
+        .slice(0, 3)
+        .flatMap((s) => _aggregateTextsForLocale(state, s.key))
+        .slice(0, 40);
+
       const ai = createAiClient();
       let res;
-      const sampleTexts = _aggregateTextsForLocale(state, best.key).slice(0, 20); // cap size defensively
       try {
-        res = await ai.detectBaseLanguage(sampleTexts, {
+        res = await ai.detectBaseLanguage(topForDetection, {
           activeLang: state?.activeLang,
-          // Non-UI hint for your client; safe to ignore if unsupported:
           instruction:
             "Identify the single dominant language of the given content regardless of the locale key. " +
-            "Return ISO 639-1 two-letter code in `base` plus numeric `confidence` 0..1.",
+            "Return ISO 639-1 code in `base` plus numeric `confidence` 0..1.",
         });
-      } catch (e) {
-        // Don't hard-stop: we still can proceed with the best key if model is unsure.
+      } catch {
         res = null;
       }
 
-      const detected = normCode(res?.base);
-      const baseLang = detected || normCode(best.key);
+      const detected = langAlias(res?.base);
+      const baseLang = detected || normCode(best?.key);
       if (!baseLang) throw new Error(t("editor.ai.errors.ambiguous"));
 
-      // 3) Normalize state: keep only the chosen/real base language, move data if needed
+      const sourceKey =
+        (statsByKey.get(baseLang)?.totalChars || 0) > 0
+          ? statsByKey.get(baseLang).key
+          : stats.slice().sort((a, b) => b.totalChars - a.totalChars)[0]?.key || best.key;
+
       const next = deepClone(state);
 
-      const chosenData = deepClone(state?.postData?.[best.key] || { title: "", body: "", chapters: [] });
-      const chosenParams = deepClone(state?.postParams?.locales?.[best.key] || { chapters: [] });
+      const chosenData = deepClone(state?.postData?.[sourceKey] || { title: "", body: "", chapters: [] });
+      const chosenParams = deepClone(state?.postParams?.locales?.[sourceKey] || { chapters: [] });
 
       const prevSnapshot = JSON.stringify({
         pd: state?.postData || {},
@@ -169,24 +363,28 @@ function makeAnalyzeAiTask(t, opts) {
       });
 
       next.postData = { [baseLang]: chosenData };
-
       const postParamsRest = { ...(state?.postParams || {}) };
-      next.postParams = {
-        ...postParamsRest,
-        locales: { [baseLang]: chosenParams },
-      };
-
+      next.postParams = { ...postParamsRest, locales: { [baseLang]: chosenParams } };
       next.activeLang = baseLang;
 
-      // 4) Meta for downstream tasks
-      const supported = resolveSupportedLangs(opts, next);
+      const supportedAfter = resolveSupportedLangs(opts, next);
+      const supportedBefore = resolveSupportedLangs(opts, state);
+      const initialLocales = supportedBefore.length ? supportedBefore : originalLocales;
+
+      const normalizedFrom = normCode(sourceKey);
+      const targetsAtStart = Array.from(
+        new Set([...initialLocales, normalizedFrom].map(normCode).filter((x) => x && x !== baseLang))
+      );
+
       opts._setMeta?.({
         ...(opts._getMeta?.() || {}),
         analysis: {
           baseLang,
           confidence: res?.confidence ?? 0,
-          normalizedFrom: normCode(best.key),
-          supported,
+          normalizedFrom,
+          supported: supportedAfter,
+          initialLocales,
+          targetsAtStart,
         },
       });
 
@@ -234,30 +432,38 @@ function makeCleanOriginalAiTask(t, opts) {
       const ai = createAiClient();
       let cleaned;
       try { cleaned = await ai.cleanTextBatch(items, { languageHint: baseLang }); }
-      catch { throw new Error(t("editor.ai.errors.api")); }
+      catch (e) { throw makeApiError(t, e, { op: "cleanTextBatch", base: baseLang }); }
 
       const map = new Map(cleaned.map((x) => [x.id, x.text]));
       let changed = false;
       const next = deepClone(state);
 
-      // postData content
       const nextLD = { ...(next.postData?.[baseLang] || {}) };
-      if (langData.body?.trim() && map.has("body") && map.get("body") !== langData.body) { nextLD.body = map.get("body"); changed = true; }
-      if (typeof langData.title === "string" && langData.title.trim() && map.has("title") && map.get("title") !== langData.title) {
-        nextLD.title = map.get("title"); changed = true;
+
+      if (langData.body?.trim() && map.has("body")) {
+        const newBody = String(map.get("body") ?? "");
+        if (newBody.trim() && newBody !== langData.body) { nextLD.body = newBody; changed = true; }
       }
+
+      if (typeof langData.title === "string" && langData.title.trim() && map.has("title")) {
+        const newTitle = String(map.get("title") ?? "");
+        if (newTitle.trim() && newTitle !== langData.title) { nextLD.title = newTitle; changed = true; }
+      }
+
       if (Array.isArray(langData.chapters)) {
         const chs = (langData.chapters || []).map((c) => ({ ...(c || {}) }));
         for (let i = 0; i < chs.length; i++) {
-          if (chs[i]?.body?.trim() && map.has(`ch_${i}`) && map.get(`ch_${i}`) !== chs[i].body) {
-            chs[i].body = map.get(`ch_${i}`); changed = true;
+          const key = `ch_${i}`;
+          if (chs[i]?.body?.trim() && map.has(key)) {
+            const nb = String(map.get(key) ?? "");
+            if (nb.trim() && nb !== chs[i].body) { chs[i].body = nb; changed = true; }
           }
         }
         nextLD.chapters = chs;
       }
+
       next.postData = { ...(next.postData || {}), [baseLang]: nextLD };
 
-      // chapter titles -> postParams
       const locales = { ...(next.postParams?.locales || {}) };
       const langParams = { ...(locales[baseLang] || {}) };
       const chParams = Array.isArray(langParams.chapters) ? [...langParams.chapters] : [];
@@ -266,8 +472,8 @@ function makeCleanOriginalAiTask(t, opts) {
       for (let i = 0; i < totalCh; i++) {
         const key = `cht_${i}`;
         if (map.has(key)) {
-          const newTitle = map.get(key);
-          if (typeof newTitle === "string" && newTitle !== (chParams[i]?.title || "")) {
+          const newTitle = String(map.get(key) ?? "");
+          if (newTitle.trim() && newTitle !== (chParams[i]?.title || "")) {
             chParams[i] = { ...(chParams[i] || {}), title: newTitle };
             changed = true;
           }
@@ -304,9 +510,9 @@ function makeTitleAiTask(t, opts) {
       const ai = createAiClient();
       let title;
       try { title = await ai.proposeTitle(baseLang, { body: langData.body || "", chapters: langData.chapters || [] }); }
-      catch (e) { throw new Error(t("editor.ai.errors.api")); }
+      catch (e) { throw makeApiError(t, e, { op: "proposeTitle", base: baseLang }); }
 
-      let final = title.replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
+      let final = String(title || "").replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
       if (!final) throw new Error(t("editor.ai.errors.noContentForTitle"));
       if (final.length > 90) final = final.slice(0, 87).trimEnd() + "…";
 
@@ -353,7 +559,7 @@ function makeChapterTitlesAiTask(t, opts) {
           if (!final) continue;
           proposals.set(i, final);
         }
-      } catch { throw new Error(t("editor.ai.errors.api")); }
+      } catch (e) { throw makeApiError(t, e, { op: "proposeChapterTitle", base: baseLang }); }
 
       if (proposals.size === 0) return { state, modified: false };
 
@@ -377,7 +583,7 @@ function makeChapterTitlesAiTask(t, opts) {
   };
 }
 
-// ---------- NEW: one-shot translation task ----------
+// ---------- translation task with verification/retry ----------
 function makeTranslateAiTask(t, opts) {
   return {
     id: "translateAll",
@@ -386,15 +592,18 @@ function makeTranslateAiTask(t, opts) {
       const mode = typeof opts.editorMode === "function" ? opts.editorMode() : opts.editorMode;
       if (mode === "new_comment" || mode === "edit_comment") return { state, modified: false };
 
-      const supported = resolveSupportedLangs(opts, state);
       const meta = opts._getMeta?.() || {};
-      const base = meta.analysis?.baseLang || normCode(state?.activeLang) || supported[0];
+      const supportedNow = resolveSupportedLangs(opts, state);
+
+      const base = meta.analysis?.baseLang || normCode(state?.activeLang) || supportedNow[0];
       if (!base) throw new Error(t("editor.ai.errors.ambiguous"));
 
-      const targets = supported.filter((x) => x !== base);
+      const targetsFromMeta = Array.isArray(meta.analysis?.targetsAtStart) ? meta.analysis.targetsAtStart : [];
+      const targets = Array.from(new Set(
+        [...targetsFromMeta, ...supportedNow].map(normCode).filter((x) => x && x !== base)
+      ));
       if (targets.length === 0) return { state, modified: false };
 
-      // Build source structure from base language
       const srcLD = state?.postData?.[base] || {};
       const srcChParams = state?.postParams?.locales?.[base]?.chapters || [];
       const chapters = Array.isArray(srcLD.chapters) ? srcLD.chapters : [];
@@ -407,58 +616,79 @@ function makeTranslateAiTask(t, opts) {
         }))
       };
 
+      const baseImages = extractImages(sourceStruct.body);
+
       const ai = createAiClient();
       let translations;
       try {
-        translations = await ai.translateStructure(base, targets, sourceStruct);
-      } catch {
-        throw new Error(t("editor.ai.errors.api"));
+        translations = await ai.translateStructure(base, targets, sourceStruct, {
+          preserveMarkdown: true,
+          instruction:
+            "Translate all text fields into the target locale. Keep markdown images/links/code unchanged. Do not drop content.",
+        });
+      } catch (e) {
+        throw makeApiError(t, e, { op: "translateStructure", base, targets });
       }
 
-      // Apply atomically
       const next = deepClone(state);
       let changed = false;
 
       for (const lang of targets) {
-        const tdata = translations?.[lang];
-        if (!tdata) continue;
+        const tdata = translations?.[lang] || {};
+        const target = normCode(lang);
+        const targetAliased = langAlias(target);
 
-        // postData (title + body + chapter bodies)
-        const cur = next.postData?.[lang] || {};
-        const newTitle = typeof tdata.title === "string" ? tdata.title : cur.title || "";
-        const newBody = typeof tdata.body === "string" ? tdata.body : cur.body || "";
+        // BODY
+        let newBody = await ensureTranslated(ai, t, base, targetAliased, sourceStruct.body, tdata.body);
+        newBody = ensureImages(newBody, baseImages);
 
+        // TITLE
+        let newTitle = await ensureTranslated(ai, t, base, targetAliased, sourceStruct.title, tdata.title);
+
+        // CHAPTERS
         const srcChLen = sourceStruct.chapters.length;
         const tdChapters = Array.isArray(tdata.chapters) ? tdata.chapters : [];
         const mergedBodies = [];
+        const mergedChParams = [];
+
         for (let i = 0; i < srcChLen; i++) {
-          const tb = tdChapters[i]?.body;
-          const curBody = cur.chapters?.[i]?.body || "";
-          mergedBodies[i] = { ...(cur.chapters?.[i] || {}), body: typeof tb === "string" ? tb : curBody };
+          const srcChBody = sourceStruct.chapters[i]?.body || "";
+          const srcChTitle = sourceStruct.chapters[i]?.title || "";
+
+          let cb = await ensureTranslated(ai, t, base, targetAliased, srcChBody, tdChapters[i]?.body);
+          let ct = await ensureTranslated(ai, t, base, targetAliased, srcChTitle, tdChapters[i]?.title);
+
+          mergedBodies[i] = { ...(next.postData?.[target]?.chapters?.[i] || {}), body: cb };
+          mergedChParams[i] = { title: ct };
         }
 
-        const nextContent = { ...cur, title: newTitle, body: newBody, chapters: mergedBodies };
-        const prevSerialized = JSON.stringify(next.postData?.[lang] || {});
+        // Apply to postData (no fallback to previous target content)
+        const nextContent = {
+          title: newTitle,
+          body: newBody,
+          chapters: mergedBodies,
+        };
+        const prevSerialized = JSON.stringify(next.postData?.[target] || {});
         const nextSerialized = JSON.stringify(nextContent);
         if (prevSerialized !== nextSerialized) {
-          next.postData = { ...(next.postData || {}), [lang]: nextContent };
+          next.postData = { ...(next.postData || {}), [target]: nextContent };
           changed = true;
         }
 
-        // postParams.locales (chapter titles)
+        // Apply chapter titles to postParams
         const locales = { ...(next.postParams?.locales || {}) };
-        const lp = { ...(locales[lang] || {}) };
+        const lp = { ...(locales[target] || {}) };
         const curChParams = Array.isArray(lp.chapters) ? [...lp.chapters] : [];
-        while (curChParams.length < srcChLen) curChParams.push({});
-        for (let i = 0; i < srcChLen; i++) {
-          const tt = tdChapters[i]?.title;
-          if (typeof tt === "string" && tt !== (curChParams[i]?.title || "")) {
+        while (curChParams.length < mergedChParams.length) curChParams.push({});
+        for (let i = 0; i < mergedChParams.length; i++) {
+          const tt = mergedChParams[i]?.title || "";
+          if (tt !== (curChParams[i]?.title || "")) {
             curChParams[i] = { ...(curChParams[i] || {}), title: tt };
             changed = true;
           }
         }
         lp.chapters = curChParams;
-        next.postParams = { ...(next.postParams || {}), locales: { ...locales, [lang]: lp } };
+        next.postParams = { ...(next.postParams || {}), locales: { ...locales, [target]: lp } };
       }
 
       if (!changed) return { state, modified: false };
@@ -491,7 +721,6 @@ export function createAIPostHandler(opts) {
   const tasksSupplier = () => {
     const tasks = [makeAnalyzeAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta })];
     if (isPostMode()) {
-      // Order: analyze/normalize → clean texts & titles → make post title → make chapter titles → translate all
       tasks.push(makeCleanOriginalAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
       tasks.push(makeTitleAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
       tasks.push(makeChapterTitlesAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }));
@@ -511,10 +740,12 @@ export function createAIPostHandler(opts) {
 
     let state = before;
     let modified = false;
+    let lastTaskLabel = "";
 
     try {
       for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
+        lastTaskLabel = task.label;
         setProgress({ i, total: tasks.length, label: task.label });
         // eslint-disable-next-line no-await-in-loop
         const res = await task.run(state, { t, getMeta: meta, setMeta });
@@ -541,7 +772,17 @@ export function createAIPostHandler(opts) {
       setRunning(false);
       setPending(false);
       dropLastAiSnapshot(draftKey);
-      opts.onToast?.({ type: "error", message: err?.message || t("editor.ai.errors.unknown") });
+
+      const m = meta() || {};
+      const base = m?.analysis?.baseLang;
+      const targets = Array.isArray(m?.analysis?.targetsAtStart) ? m.analysis.targetsAtStart : undefined;
+
+      const brief = lastTaskLabel ? `${t("editor.ai.errors.api")} — ${lastTaskLabel}` : t("editor.ai.errors.api");
+      const details = err?._ai
+        ? buildErrorDetails(t, err, { taskLabel: lastTaskLabel, base, targets })
+        : (err?.message || t("editor.ai.errors.unknown"));
+
+      opts.onToast?.({ type: "error", message: brief, details });
     }
   }
 
@@ -558,3 +799,5 @@ export function createAIPostHandler(opts) {
 
   return { pending, running, progress, run, undo, confirm, meta };
 }
+
+

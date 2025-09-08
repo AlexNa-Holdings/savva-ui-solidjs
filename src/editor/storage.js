@@ -84,7 +84,9 @@ export async function listUploadedFiles(baseDir) {
 
 export async function addUploadedFile(baseDir, file) {
   const uploadsDirHandle = await getDirectoryHandle(`${baseDir}/${DRAFT_DIRS.UPLOADS}`);
-  await writeFile(uploadsDirHandle, file.name, file);
+  let filename = file.name
+  filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  await writeFile(uploadsDirHandle, filename, file);
 }
 
 export async function addUploadedFileFromUrl(baseDir, url) {

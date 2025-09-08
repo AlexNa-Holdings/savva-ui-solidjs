@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { AI_PROVIDERS, findProvider, testConnection } from "../../ai/registry.js";
 import { loadAiConfig, saveAiConfig } from "../../ai/storage.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
+import { createAiClient } from "../../ai/client.js";
 
 export default function AISettingsSection() {
   const app = useApp();
@@ -14,7 +15,6 @@ export default function AISettingsSection() {
   const [showAdvanced, setShowAdvanced] = createSignal(false);
   const provider = createMemo(() => findProvider(cfg().providerId));
 
-  // Track provider defaults for baseUrl/apiVersion
   createEffect(() => {
     const p = provider();
     if (!p) return;
@@ -28,12 +28,8 @@ export default function AISettingsSection() {
     });
   });
 
-  function update(field, value) {
-    setCfg((prev) => ({ ...prev, [field]: value }));
-  }
-  function updateExtra(field, value) {
-    setCfg((prev) => ({ ...prev, extra: { ...(prev.extra || {}), [field]: value } }));
-  }
+  function update(field, value) { setCfg((prev) => ({ ...prev, [field]: value })); }
+  function updateExtra(field, value) { setCfg((prev) => ({ ...prev, extra: { ...(prev.extra || {}), [field]: value } })); }
 
   function handleSave() {
     saveAiConfig(cfg());
@@ -42,16 +38,74 @@ export default function AISettingsSection() {
 
   async function handleTest() {
     setBusyTest(true);
+    const prevCfg = loadAiConfig();
+    let restored = false;
+    const restore = () => { if (!restored) { saveAiConfig(prevCfg); restored = true; } };
+
     try {
-      const result = await testConnection(cfg());
-      if (result.ok) {
-        pushToast({ type: "success", message: t("settings.ai.testSuccess") });
-      } else {
-        pushErrorToast(Object.assign(new Error(t("settings.ai.testFailed")), { details: result }));
+      // Apply on-screen config so the client uses it
+      saveAiConfig(cfg());
+
+      const ai = createAiClient();
+      const probes = [];
+
+      if (typeof ai.detectBaseLanguage === "function") {
+        probes.push(async () =>
+          ai.detectBaseLanguage(
+            ["This is an English health check sentence used to validate the SAVVA AI integration."],
+            { instruction: "healthcheck" }
+          )
+        );
       }
+      if (typeof ai.translateText === "function") {
+        probes.push(async () => ai.translateText("en", "en", "healthcheck", { preserveMarkdown: true, instruction: "healthcheck" }));
+      }
+      if (typeof ai.translateStructure === "function") {
+        probes.push(async () =>
+          ai.translateStructure(
+            "en",
+            ["en"],
+            { title: "", body: "healthcheck", chapters: [] },
+            { preserveMarkdown: true, instruction: "healthcheck" }
+          )
+        );
+      }
+
+      let ok = false;
+      let firstErr = null;
+
+      for (const p of probes) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await p();
+          ok = true;
+          break;
+        } catch (e) {
+          if (!firstErr) firstErr = e;
+          const msg = String(e?.message || "").toLowerCase();
+          if (msg.includes("ambiguous")) { ok = true; break; } // network/auth OK, semantics irrelevant for test
+        }
+      }
+
+      if (!probes.length) {
+        // Fallback: connectivity-only probe
+        const probe = await testConnection(cfg());
+        ok = !!probe?.ok;
+        if (!ok) firstErr = Object.assign(new Error("probe"), { status: probe?.status, code: probe?.code, endpoint: probe?.endpoint });
+      }
+
+      if (ok) {
+        pushToast({ type: "success", message: t("settings.ai.testSuccess") });
+        return;
+      }
+
+      const details = await buildTestErrorDetails(t, firstErr, cfg(), app);
+      pushErrorToast(new Error(t("settings.ai.testFailed")), { context: "ai-test", details });
     } catch (err) {
-      pushErrorToast(err, { context: "ai-test" });
+      const details = await buildTestErrorDetails(t, err, cfg(), app);
+      pushErrorToast(new Error(t("settings.ai.testFailed")), { context: "ai-test", details });
     } finally {
+      restore();
       setBusyTest(false);
     }
   }
@@ -117,14 +171,9 @@ export default function AISettingsSection() {
         </label>
       </div>
 
-      {/* Auto-use toggle */}
       <div class="flex items-center gap-2">
         <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={!!cfg().auto}
-            onInput={(e) => update("auto", e.currentTarget.checked)}
-          />
+          <input type="checkbox" checked={!!cfg().auto} onInput={(e) => update("auto", e.currentTarget.checked)} />
           <span>{t("settings.ai.auto")}</span>
         </label>
         <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.autoHint")}</span>
@@ -132,11 +181,7 @@ export default function AISettingsSection() {
 
       <div class="flex items-center gap-2">
         <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={showAdvanced()}
-            onInput={(e) => setShowAdvanced(e.currentTarget.checked)}
-          />
+          <input type="checkbox" checked={showAdvanced()} onInput={(e) => setShowAdvanced(e.currentTarget.checked)} />
           <span>{t("settings.ai.advanced")}</span>
         </label>
         <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.advancedHint")}</span>
@@ -170,9 +215,80 @@ export default function AISettingsSection() {
         </div>
       </Show>
 
-      <p class="text-xs text-[hsl(var(--muted-foreground))]">
-        {t("settings.ai.privacyNote")}
-      </p>
+      <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.privacyNote")}</p>
     </section>
   );
 }
+
+// ---- local helpers ----
+
+function sanitizeUrl(u) {
+  if (!u) return "";
+  try {
+    const url = new URL(u, window.location.origin);
+    return url.pathname + (url.search || "");
+  } catch {
+    return String(u).replace(/^https?:\/\/[^/]+/, "");
+  }
+}
+
+function extractErrorInfo(e) {
+  try {
+    const status = e?.status ?? e?.response?.status ?? e?.cause?.status;
+    const code = e?.code ?? e?.cause?.code ?? e?.error?.code;
+    const endpoint = e?.endpoint ?? e?.url ?? e?.config?.url ?? e?.response?.url;
+    const requestId =
+      e?.requestId ??
+      e?.response?.headers?.get?.("x-request-id") ??
+      e?.headers?.["x-request-id"] ??
+      e?.cause?.requestId;
+    return {
+      status: typeof status === "number" ? status : undefined,
+      code: code ? String(code) : undefined,
+      endpoint: endpoint ? sanitizeUrl(endpoint) : undefined,
+      requestId: requestId ? String(requestId) : undefined,
+      rawMessage: e?.message ? String(e.message) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+async function getAuthDebug(app) {
+  try {
+    const tok = await app?.auth?.getToken?.();
+    if (!tok) return { hasToken: false };
+    const payload = JSON.parse(atob((tok.split(".")[1] || "").replace(/-/g, "+").replace(/_/g, "/")));
+    return { hasToken: true, iss: payload?.iss, aud: payload?.aud, exp: payload?.exp };
+  } catch {
+    return { hasToken: true };
+  }
+}
+
+async function buildTestErrorDetails(t, err, cfg, app) {
+  const info = extractErrorInfo(err);
+  const auth = await getAuthDebug(app);
+  const parts = [t("editor.ai.errors.api")];
+
+  if (info.status) parts.push(`${t("editor.ai.errors.status")}: ${info.status}`);
+  if (info.code) parts.push(`${t("editor.ai.errors.code")}: ${info.code}`);
+  if (info.endpoint) parts.push(`${t("editor.ai.errors.endpoint")}: ${info.endpoint}`);
+  if (info.requestId) parts.push(`${t("editor.ai.errors.requestId")}: ${info.requestId}`);
+
+  parts.push(`${t("settings.ai.details.provider")}: ${cfg.providerId || "-"}`);
+  parts.push(`${t("settings.ai.details.model")}: ${cfg.model || "-"}`);
+  parts.push(`${t("settings.ai.details.baseUrl")}: ${cfg.baseUrl || "-"}`);
+  parts.push(`${t("settings.ai.details.tokenIssuer")}: ${auth.iss || (auth.hasToken ? "-" : "none")}`);
+  parts.push(`${t("settings.ai.details.tokenAudience")}: ${Array.isArray(auth.aud) ? auth.aud.join(",") : (auth.aud || "-")}`);
+  if (auth.exp) {
+    const expDate = new Date(auth.exp * 1000);
+    parts.push(`${t("settings.ai.details.tokenExpiry")}: ${expDate.toISOString()}`);
+  }
+
+  const reason = info.rawMessage || err?.message;
+  if (reason && reason !== t("settings.ai.testFailed") && reason !== t("editor.ai.errors.api")) {
+    parts.push(`${t("editor.ai.errors.reason")}: ${String(reason).slice(0, 300)}`);
+  }
+  return parts.join("\n");
+}
+
