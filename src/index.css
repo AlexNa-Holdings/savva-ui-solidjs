@@ -5,6 +5,7 @@
 @import "./styles/md-font.css";
 @import "./styles/layout.css";
 @import "./styles/modal.css";
+@import "./styles/navigation-panel.css";
 @import "../public/domain_default/domain.css";
 
 /* Custom utility for multi-line truncation */

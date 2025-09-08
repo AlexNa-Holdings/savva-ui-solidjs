@@ -26,9 +26,11 @@ import ContributePage from "./pages/ContributePage.jsx";
 import NpoListPage from "./pages/NpoListPage.jsx";
 import NpoPage from "./pages/NpoPage.jsx";
 import { closeAllModals } from "../utils/modalBus.js";
+import NavigationPanel from "./navigation/NavigationPanel.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = createSignal(false);
   const { route } = useHashRouter();
   const app = useApp();
 
@@ -57,8 +59,6 @@ export default function App() {
     return `${domainName}|${source}|${cid}|${tabsPath}`;
   });
 
-  // Detect any modal by presence of our shared overlay or ARIA dialog.
-  // TransferModal + others include <ModalBackdrop/> => .sv-modal-overlay. :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4}
   const isAnyModalOpen = () =>
     !!document.querySelector('.sv-modal-overlay, [aria-modal="true"], [role="dialog"]:not([aria-hidden="true"])');
 
@@ -67,16 +67,20 @@ export default function App() {
       if (e.key !== "Escape") return;
       if (e.defaultPrevented) return;
 
-      // If a modal is open, close it via the modal bus and stop page-level ESC.
       if (isAnyModalOpen()) {
         e.preventDefault();
-        closeAllModals(); // ModalAutoCloser listens and invokes onClose on each modal. :contentReference[oaicite:5]{index=5}
+        closeAllModals();
+        return;
+      }
+
+      if (isMobileNavOpen()) {
+        setIsMobileNavOpen(false);
         return;
       }
 
       const view = currentView();
       if (view !== "main") {
-        navigate(app.lastTabRoute() || "/"); // navigate() already closes modals defensively. :contentReference[oaicite:6]{index=6}
+        navigate(app.lastTabRoute() || "/");
         return;
       }
 
@@ -119,22 +123,25 @@ export default function App() {
           
           <Show when={domainRevision()} keyed>
             <>
-              <Header onTogglePane={togglePane} />
+              <Header onTogglePane={togglePane} onToggleMobileNav={() => setIsMobileNavOpen(p => !p)} />
+              <NavigationPanel isMobileOpen={isMobileNavOpen()} onMobileNavClose={() => setIsMobileNavOpen(false)} /> 
               
-              <div hidden={currentView() !== 'main'}>
-                <MainView />
-              </div>
+              <main class="main-content-wrapper">
+                <div hidden={currentView() !== 'main'}>
+                  <MainView />
+                </div>
 
-              <Show when={currentView() === 'post'}><PostPage /></Show>
-              <Show when={currentView() === 'profile'}><ProfilePage /></Show>
-              <Show when={currentView() === 'settings'}><Settings /></Show>
-              <Show when={currentView() === 'docs'}><Docs /></Show>
-              <Show when={currentView() === 'editor'}><EditorPage /></Show>
-              <Show when={currentView() === 'npo-list'}><NpoListPage /></Show>
-              <Show when={currentView() === 'npo'}><NpoPage /></Show>
-              <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
-              <Show when={currentView() === 'fundraising'}><FundraisingPage /></Show>
-              <Show when={currentView() === 'contribute'}><ContributePage /></Show>
+                <Show when={currentView() === 'post'}><PostPage /></Show>
+                <Show when={currentView() === 'profile'}><ProfilePage /></Show>
+                <Show when={currentView() === 'settings'}><Settings /></Show>
+                <Show when={currentView() === 'docs'}><Docs /></Show>
+                <Show when={currentView() === 'editor'}><EditorPage /></Show>
+                <Show when={currentView() === 'npo-list'}><NpoListPage /></Show>
+                <Show when={currentView() === 'npo'}><NpoPage /></Show>
+                <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
+                <Show when={currentView() === 'fundraising'}><FundraisingPage /></Show>
+                <Show when={currentView() === 'contribute'}><ContributePage /></Show>
+              </main>
             </>
           </Show>
           

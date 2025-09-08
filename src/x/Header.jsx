@@ -10,19 +10,22 @@ import Container from "./layout/Container.jsx";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
 import NewPostButton from "./main/NewPostButton.jsx";
 import TokenPrice from "./main/TokenPrice.jsx";
-import ActorBadge from "./actors/ActorBadge.jsx"; /* +++ */
+import ActorBadge from "./actors/ActorBadge.jsx";
 import { dbg } from "../utils/debug.js";
 import HeaderSearchButton from "../x/ui/HeaderSearchButton.jsx";
+import { useMediaQuery } from "../hooks/useMediaQuery.js";
+import LibraryIcon from "./ui/icons/LibraryIcon.jsx";
 
 function shortAddr(addr) {
   if (!addr) return "";
   return addr.slice(0, 6) + "…" + addr.slice(-4);
 }
 
-export default function Header({ onTogglePane }) {
+export default function Header({ onTogglePane, onToggleMobileNav }) {
   const app = useApp();
   const { t } = app;
   const [isLoggingIn, setIsLoggingIn] = createSignal(false);
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
 
   const desiredId = () => app.desiredChainId();
   const mismatchedChain = () =>
@@ -98,6 +101,17 @@ export default function Header({ onTogglePane }) {
       <Container>
         <div class="h-12 px-2 flex items-center justify-between">
           <div class="flex items-center gap-4">
+            <Show when={!isDesktop()}>
+              <button
+                type="button"
+                class="p-1.5 rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] transition-colors"
+                aria-label={t("nav.open")}
+                title={t("nav.open")}
+                onClick={onToggleMobileNav}
+              >
+                <LibraryIcon class="w-5 h-5" />
+              </button>
+            </Show>
             <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
             <TokenPrice />
           </div>
