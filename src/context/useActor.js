@@ -4,20 +4,13 @@ import { getWsApi } from "../net/wsRuntime.js";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { pushErrorToast } from "../ui/toast.js";
 
-export function useActor(input = {}) {
-  // Support both signatures: { app } or { auth, conn, selectedDomainName }
-  const app  = input.app || null;
-  const auth = input.auth || app || {};
-  const domSig = input.selectedDomainName;
+export function useActor(props) {
+  const { auth, loading, selectedDomainName, t } = props;
 
-  const domainName = () =>
-    app?.selectedDomainName?.() ??
-    (typeof domSig === "function" ? domSig() : (domSig || ""));
+  const domainName = () => (typeof selectedDomainName === "function" ? selectedDomainName() : selectedDomainName || "");
+  const authorizedUser = () => (typeof auth.authorizedUser === "function" ? auth.authorizedUser() : null) || null;
 
-  const authorizedUser = () =>
-    (typeof auth.authorizedUser === "function" ? auth.authorizedUser() : null) || null;
-
-  const [actor, setActor] = Solid.createSignal({ mode: "self", address: "" }); // 'self' | 'npo'
+  const [actor, setActor] = Solid.createSignal({ mode: "self", address: "" });
   const [npoMemberships, setNpoMemberships] = Solid.createSignal([]);
   const [selectedNpoProfile, setSelectedNpoProfile] = Solid.createSignal(null);
 
@@ -52,8 +45,6 @@ export function useActor(input = {}) {
       setNpoMemberships(list);
       return list;
     } catch (e) {
-      // use app.t if present; otherwise fall back silently
-      const t = app?.t || ((k) => k);
       pushErrorToast(e, { message: t("errors.loadFailed") });
       setNpoMemberships([]);
       return [];
@@ -72,7 +63,6 @@ export function useActor(input = {}) {
     await refreshActorProfile(address);
   }
 
-  // Reset on login/logout; load memberships on login
   let prevUserAddr = null;
   Solid.createEffect(() => {
     const u = authorizedUser();
@@ -84,7 +74,7 @@ export function useActor(input = {}) {
 
     if (isLogin || userChange) {
       actAsSelf();
-      void refreshNpoMemberships();
+      if (typeof loading === 'function' && !loading()) void refreshNpoMemberships();
     } else if (isLogout) {
       actAsSelf();
       setNpoMemberships([]);
@@ -92,7 +82,6 @@ export function useActor(input = {}) {
     prevUserAddr = current;
   });
 
-  // Reset on domain change
   let prevDomain = null;
   Solid.createEffect(() => {
     const dom = domainName();
@@ -103,20 +92,19 @@ export function useActor(input = {}) {
     prevDomain = dom;
   });
 
-  // Initial load after auth
+  // Initial load after auth and connection is ready
   Solid.createEffect(() => {
-    if (authorizedUser()?.address) void refreshNpoMemberships();
+    if (authorizedUser()?.address && typeof loading === 'function' && !loading()) {
+      void refreshNpoMemberships();
+    }
   });
 
   return {
-    // state
-    actor,                     // { mode, address }
-    actorAddress,              // () => string
-    actorProfile,              // () => user or NPO profile
-    isActingAsNpo,             // () => boolean
-    npoMemberships,            // () => array
-
-    // actions
+    actor,
+    actorAddress,
+    actorProfile,
+    isActingAsNpo,
+    npoMemberships,
     actAsSelf,
     actAsNpo,
     refreshNpoMemberships,

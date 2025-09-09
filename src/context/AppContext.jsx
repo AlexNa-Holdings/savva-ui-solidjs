@@ -5,8 +5,7 @@ import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchai
 import { useI18n } from "../i18n/useI18n.js";
 import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
-import { useAppConnection } from "./useAppConnection.js";
-import { useDomainAssets } from "./useDomainAssets.js";
+import { useAppOrchestrator } from "./useAppOrchestrator.js";
 import { pushToast, pushErrorToast, dismissToast } from "../ui/toast.js";
 import { useHashRouter } from "../routing/hashRouter.js";
 import { createWalletClient, custom } from "viem";
@@ -21,15 +20,16 @@ const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").tr
 export function AppProvider(props) {
   const i18n = useI18n();
   const auth = useAppAuth();
-  const conn = useAppConnection();
   const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
-  const [postUpdate, setPostUpdate] = Solid.createSignal(null);
 
+  const orchestrator = useAppOrchestrator({ auth, i18n });
+
+  const [postUpdate, setPostUpdate] = Solid.createSignal(null);
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
   const [walletDataNeedsRefresh, setWalletDataNeedsRefresh] = Solid.createSignal(0);
-
   const { route } = useHashRouter();
+
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
     const isCurrentlyOnMainFeed = !/^\/(post|settings|docs|editor)/.test(prevRoute);
@@ -44,74 +44,67 @@ export function AppProvider(props) {
   const [newTabRefreshKey, setNewTabRefreshKey] = Solid.createSignal(Date.now());
 
   const supportedDomains = Solid.createMemo(() => {
-    const list = conn.info()?.domains || [];
+    const list = orchestrator.info()?.domains || [];
     return [...new Set(list.map(d => (typeof d === "string" ? d : d?.name)).filter(Boolean))]
       .map(name => ({ name, website: list.find(d => d.name === name)?.website || "" }));
   });
 
   const selectedDomain = Solid.createMemo(() => {
-    const explicit = String(conn.config()?.domain || "").trim();
+    const explicit = String(orchestrator.config()?.domain || "").trim();
     if (explicit) {
       return supportedDomains().find(d => eq(d.name, explicit)) || explicit;
     }
     return supportedDomains()[0] || "";
   });
-
+  
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
-  const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
-  const prices = useTokenPrices({ info: conn.info });
 
-Solid.createEffect(() => {
-  const cfg = assets.domainAssetsConfig?.();
-  if (!cfg) return;
+  const prices = useTokenPrices({ info: orchestrator.info });
 
-  const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
-  const lang = norm(i18n.lang?.());
-  const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
-  const current =
-    locales.find((l) => norm(l.code) === lang) ||
-    locales.find((l) => norm(l.code) === "en") ||
-    locales[0];
+  Solid.createEffect(() => {
+    const cfg = orchestrator.domainAssetsConfig?.();
+    if (!cfg) return;
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    const lang = norm(i18n.lang?.());
+    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+    const current = locales.find((l) => norm(l.code) === lang) || locales.find((l) => norm(l.code) === "en") || locales[0];
+    if (current?.title) document.title = current.title;
+  });
 
-  if (current?.title) document.title = current.title;
-});
-
-  const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
+  const desiredChainId = Solid.createMemo(() => orchestrator.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
   async function ensureWalletOnDesiredChain() { const meta = desiredChain(); if (!meta) throw new Error("Unknown target chain"); await switchOrAddChain(meta); }
-
-  const remoteIpfsGateways = Solid.createMemo(() => (conn.info()?.ipfs_gateways || []).map(g => g.trim().endsWith("/") ? g : `${g}/`));
+  const remoteIpfsGateways = Solid.createMemo(() => (orchestrator.info()?.ipfs_gateways || []).map(g => g.trim().endsWith("/") ? g : `${g}/`));
   const activeIpfsGateways = Solid.createMemo(() => (ipfs.localIpfsEnabled() && ipfs.localIpfsGateway()) ? [ipfs.localIpfsGateway()] : remoteIpfsGateways());
 
   Solid.createEffect(() => {
-    if (auth.authorizedUser() && conn.config() && auth.authorizedUser().domain !== conn.config().domain) {
+    if (auth.authorizedUser() && orchestrator.config() && auth.authorizedUser().domain !== orchestrator.config().domain) {
       auth.logout();
       pushToast({ type: 'info', message: 'Logged out due to domain change.' });
     }
   });
 
-Solid.createEffect(() => {
-  const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+  Solid.createEffect(() => {
+    const cfg = orchestrator.domainAssetsConfig();
+    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
+    const codes = locales.map(l => String(l?.code || "").trim().toLowerCase().split(/[-_]/)[0]).filter(Boolean);
+    if (codes.length > 0 && i18n?.setDomainLangCodes) i18n.setDomainLangCodes(codes);
+  });
 
-  // Wait until languages are published by useDomainAssets
-  const available = (i18n.available?.() || []).map(norm);
-  if (available.length === 0) return;
-
-  const cfg = assets.domainAssetsConfig?.();
-  const current = norm(i18n.lang?.());
-  if (available.includes(current)) return;
-
-  const def = norm(cfg?.default_locale);
-  const next =
-    (def && available.includes(def) && def) ||
-    (available.includes("en") && "en") ||
-    available[0];
-
-  dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${available.join(", ")}] → '${next}' (guarded)`);
-  i18n.setLang(next);
-});
-
-  const actor = useActor({ auth, conn, selectedDomainName });
+  Solid.createEffect(() => {
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    const available = (i18n.available?.() || []).map(norm);
+    if (available.length === 0) return;
+    const cfg = orchestrator.domainAssetsConfig?.();
+    const current = norm(i18n.lang?.());
+    if (available.includes(current)) return;
+    const def = norm(cfg?.default_locale);
+    const next = (def && available.includes(def) && def) || (available.includes("en") && "en") || available[0];
+    dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${available.join(", ")}] → '${next}' (guarded)`);
+    i18n.setLang(next);
+  });
+  
+  const actor = useActor({ auth, selectedDomainName });
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
   const [requiredAccount, setRequiredAccount] = Solid.createSignal(null);
@@ -131,7 +124,6 @@ Solid.createEffect(() => {
     setIsSwitchAccountModalOpen(false);
     if (switchAccountResolver) switchAccountResolver();
   };
-
   const rejectSwitchAccountPrompt = () => {
     setIsSwitchAccountModalOpen(false);
     if (switchAccountRejecter) switchAccountRejecter(new Error("User canceled the action."));
@@ -161,7 +153,7 @@ Solid.createEffect(() => {
     }
     return walletClient;
   }
-
+  
   const [userDisplayNames, _setUserDisplayNames] = Solid.createSignal({});
   function setUserDisplayNames(address, namesMap) {
     if (!address || !namesMap || typeof namesMap !== "object") return;
@@ -176,8 +168,15 @@ Solid.createEffect(() => {
     _setUserAvatars((prev) => ({ ...prev, [key]: avatarCid }));
   }
 
+  const assetUrl = (relPath) => {
+    const prefix = orchestrator.domainAssetsPrefix();
+    const rel = String(relPath || "").replace(/^\/+/, "");
+    return prefix + rel;
+  };
+
   const value = {
-    ...conn, ...auth, ...assets, ...ipfs, ...prices,
+    ...orchestrator, ...auth, ...ipfs, ...prices,
+    assetUrl,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
     showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,
@@ -193,8 +192,6 @@ Solid.createEffect(() => {
     walletDataNeedsRefresh,
     triggerWalletDataRefresh: () => setWalletDataNeedsRefresh(c => c + 1),
     route,
-    setDomain: (d) => { conn.setDomain(d); auth.logout(); },
-    clearConnectOverride: () => { conn.clearConnectOverride(); auth.logout(); },
     getGuardedWalletClient,
     getRawWalletClient,
     isSwitchAccountModalOpen,

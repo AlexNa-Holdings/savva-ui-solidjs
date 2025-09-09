@@ -8,9 +8,8 @@ import { dbg } from "../utils/debug";
 let _client = null;
 let _bus = null;
 let _api = null;
-let _started = false;
 
-export function ensureWsStarted(reason = "init") {
+export function ensureWsStarted() {
   if (!_client) {
     _client = new WsClient();
     _bus = createWsBus({ replay: 32 });
@@ -20,46 +19,27 @@ export function ensureWsStarted(reason = "init") {
       if (t) _bus.emit(String(t), obj);
     });
   }
-  _client.setUrl();
-  const url = _client.url();
-  if (!url) {
-    dbg.warn("ws", "No WS URL configured");
-    return { client: _client, bus: _bus, api: _api };
-  }
-  if (_client.status() !== "open" && !_started) {
-    _client.connect();
-    _started = true;
-    dbg.log("ws", "singleton connect", { url, reason });
-  }
   return { client: _client, bus: _bus, api: _api };
 }
 
 function onEndpointsUpdate() {
   if (!_client) return;
   const prev = _client.url();
-  _client.setUrl();
+  _client.setUrl(); // Gets the latest from endpoints.js
   const next = _client.url();
   if (next && next !== prev) {
-    dbg.log("ws", "singleton endpoints changed → reconnect", { prev, next });
-    _client.reconnect("endpoints-updated");
-  } else if (next && _client.status() !== "open") {
-    _client.connect();
+    dbg.log("ws", "URL updated via listener", { prev, next });
+    // The orchestrator is now responsible for initiating connections.
   }
 }
 
 if (typeof window !== "undefined") {
   window.addEventListener("savva:endpoints-updated", onEndpointsUpdate);
   window.__ws = {
-    get client() {
-      return _client;
-    },
-    get bus() {
-      return _bus;
-    },
-    get api() {
-      return _api;
-    },
-    start: ensureWsStarted,
+    get client() { return _client; },
+    get bus() { return _bus; },
+    get api() { return _api; },
+    start: () => getWsClient().connect(),
   };
 }
 
@@ -79,6 +59,14 @@ export function offAlert(type, fn) {
 export function whenWsOpen({ timeoutMs = 12000 } = {}) {
   const ws = getWsClient();
   if (ws.status() === "open") return Promise.resolve();
+
+  // If not open and not connecting, try to connect.
+  // This is a safeguard for components that need data while the orchestrator might still be running.
+  if (ws.status() === "idle" || ws.status() === "closed") {
+    if (ws.url()) { // Only try to connect if a URL is set
+        ws.connect();
+    }
+  }
 
   return new Promise((resolve, reject) => {
     let timer;

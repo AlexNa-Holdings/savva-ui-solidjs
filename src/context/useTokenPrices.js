@@ -1,9 +1,9 @@
 // src/context/useTokenPrices.js
-import { createSignal, onMount, createMemo } from "solid-js";
+import { createSignal, createEffect, createMemo } from "solid-js";
 import { whenWsOpen, getWsApi } from "../net/wsRuntime";
 import { dbg } from "../utils/debug";
 
-export function useTokenPrices(app) {
+export function useTokenPrices(props) {
   const [prices, setPrices] = createSignal({});
 
   const updatePrices = (data) => {
@@ -16,12 +16,11 @@ export function useTokenPrices(app) {
         }
     }
 
-    // Also handle legacy flat structure for backward compatibility
     if (data.base_token_price) {
         normalizedTokens[""] = { price: data.base_token_price, gain: data.base_token_gain };
     }
     if (data.savva_token_price) {
-        const savvaAddr = app.info()?.savva_contracts?.SavvaToken?.address;
+        const savvaAddr = props.info()?.savva_contracts?.SavvaToken?.address;
         if (savvaAddr) {
             normalizedTokens[savvaAddr.toLowerCase()] = { price: data.savva_token_price, gain: data.savva_token_gain };
         }
@@ -44,13 +43,16 @@ export function useTokenPrices(app) {
     }
   };
 
-  onMount(() => {
-    fetchInitialPrices();
+  createEffect(() => {
+    // Wait until the main app orchestrator is done loading.
+    if (typeof props.loading === 'function' && !props.loading()) {
+      fetchInitialPrices();
+    }
   });
 
   const savvaTokenPrice = createMemo(() => {
-    const savvaTokenAddress = app.info()?.savva_contracts?.SavvaToken?.address;
-    const stakingAddress = app.info()?.savva_contracts?.Staking?.address;
+    const savvaTokenAddress = props.info()?.savva_contracts?.SavvaToken?.address;
+    const stakingAddress = props.info()?.savva_contracts?.Staking?.address;
     if (!savvaTokenAddress && !stakingAddress) return null;
 
     const p = prices();
@@ -62,7 +64,6 @@ export function useTokenPrices(app) {
   });
 
   const baseTokenPrice = createMemo(() => {
-    // The key for the base/native token is an empty string
     return prices()[""] || null;
   });
 

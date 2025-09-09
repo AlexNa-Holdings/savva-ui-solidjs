@@ -6,16 +6,28 @@ import { navigate } from "../../routing/hashRouter.js";
 
 export default function BrandLogo(props) {
   const app = useApp();
-  const { t, domainAssetsConfig, assetUrl } = app;
+  const { t, domainAssetsConfig } = app;
 
-  // Single source of truth for the domain name (falls back to i18n brand name)
+  // Resolve asset URL function defensively
+  const urlFor = (rel) => {
+    const fn = app.assetUrl;
+    if (typeof fn === "function") return fn(rel);
+    const prefix = typeof app.domainAssetsPrefix === "function" ? (app.domainAssetsPrefix() || "") : "";
+    const relClean = String(rel || "").replace(/^\/+/, "");
+    dbg.warn("BrandLogo", "app.assetUrl is not a function; using prefix fallback", {
+      typeof_assetUrl: typeof fn,
+      prefix,
+      rel: relClean,
+    });
+    return prefix + relClean;
+  };
+
   const domainTitle = createMemo(() => {
     const fromCfg = app.config?.()?.domain?.trim();
     const fallback = t("brand.name");
     return fromCfg || (fallback && !/^\[.+\]$/.test(fallback) ? fallback : "SAVVA");
   });
 
-  // Theme + mobile detection
   const [isDark, setIsDark] = createSignal(false);
   const [isMobile, setIsMobile] = createSignal(false);
   onMount(() => {
@@ -36,7 +48,6 @@ export default function BrandLogo(props) {
     });
   });
 
-  // logos from active domain assets config
   const logos = createMemo(() => {
     const cfg = domainAssetsConfig?.();
     const raw = cfg?.logos ?? cfg?.logo ?? null;
@@ -63,9 +74,8 @@ export default function BrandLogo(props) {
     return order.find(Boolean) || "";
   });
 
-  const src = createMemo(() => (relPath() ? assetUrl(relPath()) : ""));
+  const src = createMemo(() => (relPath() ? urlFor(relPath()) : ""));
 
-  // 🔎 Debug: log whenever the chosen logo src changes
   createEffect(() => {
     const s = src();
     if (!s) return;
@@ -75,39 +85,23 @@ export default function BrandLogo(props) {
       dark: isDark(),
       mobile: isMobile(),
       domain: app.config?.()?.domain,
-      activePrefix: app.domainAssetsPrefix?.(),
-      source: app.domainAssetsSource?.(),
+      activePrefix: typeof app.domainAssetsPrefix === "function" ? app.domainAssetsPrefix() : undefined,
+      source: typeof app.domainAssetsSource === "function" ? app.domainAssetsSource() : undefined,
     });
   });
 
-  const [imgBroken, setImgBroken] = createSignal(false);
-  // reset broken flag whenever src changes
-  createMemo(() => { src(); setImgBroken(false); });
-
-  const handleLogoClick = (e) => {
-    e.preventDefault();
-    navigate("/");
-  };
-
   return (
-    <a href="/#/" onClick={handleLogoClick} class="cursor-pointer">
-      <div class="flex items-center">
-        <Show when={src() && !imgBroken()} fallback={
-          <span class={props.classTitle || "text-xl font-bold"}>{domainTitle()}</span>
-        }>
-          <img
-            src={src()}
-            alt={t("brand.logoAlt", { domain: domainTitle() })}
-            class={props.class || "h-8 w-auto"}
-            decoding="async"
-            loading="eager"
-            onError={() => {
-              dbg.log("logo", "BrandLogo image failed to load", { src: src(), relPath: relPath() });
-              setImgBroken(true);
-            }}
-          />
-        </Show>
-      </div>
+    <a href="#" aria-label={t("brand.logoAlt")} onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+      <Show when={src()} fallback={<div class="text-xl font-bold select-none">SAVVA</div>}>
+        <img
+          src={src()}
+          alt={domainTitle()}
+          class={props.class || "h-8 w-auto"}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+        />
+      </Show>
     </a>
   );
 }

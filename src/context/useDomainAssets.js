@@ -1,146 +1,92 @@
 // src/context/useDomainAssets.js
-import { createSignal, createMemo, createResource, createEffect, on } from "solid-js";
+import { createSignal, createEffect, on } from "solid-js";
 import { parse } from "yaml";
-import { fetchWithTimeout } from "../utils/net.js";
-import { loadAssetResource } from "../utils/assetLoader.js";
 import { dbg } from "../utils/debug.js";
 
-const ASSETS_ENV_KEY = "domain_assets_env";
-const DEFAULT_DOMAIN_ASSETS_PREFIX = "/domain_default/";
+function ensureSlash(s) { return s ? (s.endsWith("/") ? s : s + "/") : ""; }
+const dn = (d) => String(d || "").trim().toLowerCase();
 
-export function useDomainAssets(app) {
-  const [assetsEnv, setAssetsEnvState] = createSignal(localStorage.getItem(ASSETS_ENV_KEY) || "prod");
+export function useDomainAssets({ info, selectedDomainName, i18n }) {
+  const [assetsEnv, setAssetsEnv] = createSignal("prod");
+  const [assetsBaseUrl, setAssetsBaseUrl] = createSignal("");
+  const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal("/domain_default/");
+  const [domainAssetsSource, setDomainAssetsSource] = createSignal(null); // 'domain' | 'default' | null
   const [domainAssetsConfig, setDomainAssetsConfig] = createSignal(null);
-  const [domainAssetsSource, setDomainAssetsSource] = createSignal(null);
-  const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
   const [loadingConfig, setLoadingConfig] = createSignal(false);
+  const [error, setError] = createSignal(null);
 
-  // sticky cache per domain
-  let stickyDomain = "";
-  let stickyConfig = null;  // last-good config.yaml
-  let stickyPrefix = "";
-  let stickySource = null;  // "domain" | "default" | null
-
-  function setAssetsEnv(next) {
-    const v = next === "test" ? "test" : "prod";
-    localStorage.setItem(ASSETS_ENV_KEY, v);
-    setAssetsEnvState(v);
-  }
-
-  const assetsBaseUrl = createMemo(() => {
-    const info = app.info();
-    if (!info) return "";
-    const base = assetsEnv() === "test" ? info.temp_assets_url : info.assets_url;
-    return base?.endsWith("/") ? base : (base || "") + "/";
+  // 1) assets base depends on /info + env (prod/test)
+  createEffect(() => {
+    const i = info?.();
+    const env = assetsEnv();
+    const base = env === "test" ? (i?.temp_assets_url || "/temp_assets/") : (i?.assets_url || "/domain_assets/");
+    const next = ensureSlash(base);
+    const prev = assetsBaseUrl();
+    if (prev !== next) {
+      dbg.log("assets", "assetsBaseUrl changed", { prev, next });
+      setAssetsBaseUrl(next);
+    }
   });
 
-  const domainAssetsPrefixActive = createMemo(() => domainAssetsPrefix() || DEFAULT_DOMAIN_ASSETS_PREFIX);
-
-  function assetUrl(relPath) {
-    const rel = String(relPath || "").replace(/^\/+/, "");
-    return (domainAssetsPrefixActive() || "") + rel;
-  }
-
-  async function refreshDomainAssets() {
-    setLoadingConfig(true);
-
+  // 2) Load domain config ONCE per (assetsBaseUrl, selectedDomainName).
+  createEffect(on([assetsBaseUrl, selectedDomainName], async () => {
     const base = assetsBaseUrl();
-    const domain = app.selectedDomainName();
-    const computed = base && domain ? `${base}${domain}/` : "";
+    const dom = dn(selectedDomainName?.());
+    if (!base) return;
 
-    if (domain && domain !== stickyDomain) {
-      dbg.log("assets", "domain changed → reset sticky cache", { prev: stickyDomain, next: domain });
-      stickyDomain = domain;
-      stickyConfig = null;
-      stickyPrefix = "";
-      stickySource = null;
-    }
+    const tryUrl = `${base}${dom}/config.yaml`;
+    const fallbackUrl = "/domain_default/config.yaml";
 
-    // 1) Try remote domain pack
-    async function tryLoad(prefix) {
-      if (!prefix) return null;
-      try {
-        const res = await fetchWithTimeout(`${prefix}config.yaml`, { timeoutMs: 8000, cache: "no-store" });
-        return res.ok ? (parse(await res.text()) || {}) : null;
-      } catch { return null; }
-    }
+    setLoadingConfig(true);
+    setError(null);
 
-    const remoteCfg = await tryLoad(computed);
-    if (remoteCfg) {
-      setDomainAssetsPrefix(computed);
-      setDomainAssetsSource("domain");
-      setDomainAssetsConfig(remoteCfg);
-      stickyConfig = remoteCfg;
-      stickyPrefix = computed;
-      stickySource = "domain";
+    try {
+      dbg.log("assets", "loading config.yaml", { tryUrl });
+      const r = await fetch(tryUrl, { cache: "no-store" });
+      if (r.ok) {
+        const cfg = parse(await r.text()) || {};
+        setDomainAssetsConfig(cfg);
+        setDomainAssetsPrefix(`${base}${dom}/`);
+        setDomainAssetsSource("domain");
+        dbg.log("assets", "domainAssetsPrefix (ACTIVE) changed", { next: `${base}${dom}/` });
+      } else {
+        throw new Error(`domain pack 404`);
+      }
+    } catch {
+      dbg.log("assets", "loaded default config.yaml", { url: fallbackUrl });
+      const r = await fetch(fallbackUrl, { cache: "no-store" });
+      const cfg = parse(await r.text()) || {};
+      setDomainAssetsConfig(cfg);
+      setDomainAssetsPrefix("/domain_default/");
+      setDomainAssetsSource("default");
+      dbg.log("assets", "domainAssetsPrefix (ACTIVE) changed", { next: "/domain_default/" });
+    } finally {
       setLoadingConfig(false);
-      return;
+      dbg.log("assets", "domainAssetsConfig loaded/changed");
     }
+  }));
 
-    // 2) Remote failed → keep last-good if we have one
-    if (stickyConfig) {
-      setDomainAssetsPrefix(stickyPrefix || DEFAULT_DOMAIN_ASSETS_PREFIX);
-      setDomainAssetsSource(stickySource);
-      setDomainAssetsConfig(stickyConfig);
-      setLoadingConfig(false);
-      return;
-    }
-
-    // 3) No last-good → use default pack
-    const defaultCfg = await tryLoad(DEFAULT_DOMAIN_ASSETS_PREFIX);
-    setDomainAssetsPrefix(DEFAULT_DOMAIN_ASSETS_PREFIX);
-    setDomainAssetsSource(defaultCfg ? "default" : null);
-    setDomainAssetsConfig(defaultCfg || null);
-    stickyConfig = defaultCfg || null;
-    stickyPrefix = DEFAULT_DOMAIN_ASSETS_PREFIX;
-    stickySource = defaultCfg ? "default" : null;
-    setLoadingConfig(false);
-  }
-
-  // Load dictionaries from the active pack (stable; not keyed to UI lang)
-  const [domainDictionaries] = createResource(() => {
-    const cfg = domainAssetsConfig();
-    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
-    const items = locales
-      .map((l) => ({ code: (l?.code || "").toLowerCase(), path: l?.dictionary || l?.file }))
-      .filter((l) => l.code && l.path);
-    if (items.length === 0) return null;
-    return { items, rev: `${domainAssetsPrefixActive()}|${cfg.assets_cid || cfg.cid || ""}` };
-  }, async (key) => {
-    if (!key) return {};
-    const dicts = {};
-    for (const { code, path } of key.items) {
-      try {
-        dicts[code] = await loadAssetResource({ assetUrl }, path, { type: "yaml" });
-      } catch {}
-    }
-    return dicts;
-  });
-
-  // Publish dictionaries + normalized codes to i18n (single source for UI)
-  createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
+  // 3) Publish domain language codes once per config load.
   createEffect(() => {
     const cfg = domainAssetsConfig();
-    const codes = Array.isArray(cfg?.locales)
-      ? cfg.locales.map((l) => String(l?.code || "").toLowerCase()).filter(Boolean)
-      : [];
-    app.i18n.setDomainLangCodes(codes);
-    if (codes.length) dbg.log("assets", "i18n domain language codes updated", codes);
-  });
+    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
+    const codes = locales
+      .map((l) => String(l?.code || "").trim().toLowerCase().split(/[-_]/)[0])
+      .filter(Boolean);
 
-  // Only (re)load when /info, domain, or env change — never on lang change.
-  createEffect(on([app.info, app.selectedDomainName, assetsEnv], () => {
-    if (app.info()) refreshDomainAssets();
-  }));
+    if (codes.length > 0 && i18n?.setDomainLangCodes) {
+      i18n.setDomainLangCodes(codes);
+      dbg.log("assets", "i18n domain language codes updated", codes);
+    }
+  });
 
   return {
     assetsEnv, setAssetsEnv,
     assetsBaseUrl,
-    domainAssetsConfig,
+    domainAssetsPrefix,
     domainAssetsSource,
-    domainAssetsPrefix: domainAssetsPrefixActive,
-    refreshDomainAssets,
-    assetUrl,
+    domainAssetsConfig,
     loadingConfig,
+    error,
   };
 }
