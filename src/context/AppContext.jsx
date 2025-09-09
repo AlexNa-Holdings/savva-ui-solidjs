@@ -1,7 +1,7 @@
 // src/context/AppContext.jsx
 import * as Solid from "solid-js";
 import { getChainMeta } from "../blockchain/chains";
-import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet";
+import { switchOrAddChain, walletAccount, isWalletAvailable } from "../blockchain/wallet.js";
 import { useI18n } from "../i18n/useI18n.js";
 import { useLocalIpfs } from "../hooks/useLocalIpfs.js";
 import { useAppAuth } from "./useAppAuth.js";
@@ -85,19 +85,19 @@ export function AppProvider(props) {
   });
 
   Solid.createEffect(() => {
+    if (assets.loadingConfig()) return;
     const cfg = assets.domainAssetsConfig();
     if (!cfg) return;
     const availableCodes = (cfg.locales || []).map(l => l.code).filter(Boolean);
     if (availableCodes.length === 0) return;
     const currentLang = i18n.lang();
     if (!availableCodes.includes(currentLang)) {
-      const newLang = availableCodes[0];
+      const newLang = cfg.default_locale && availableCodes.includes(cfg.default_locale) ? cfg.default_locale : availableCodes[0];
       dbg.warn("AppContext", `Language mismatch! UI lang '${currentLang}' not in domain's [${availableCodes.join(", ")}]. Forcing to '${newLang}'.`);
       i18n.setLang(newLang);
     }
   });
 
-  // ── Actor system (no WS coupling) ────────────────────────────────────────────
   const actor = useActor({ auth, conn, selectedDomainName });
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
@@ -193,8 +193,6 @@ export function AppProvider(props) {
     userAvatars,
     setUserAvatar,
     dismissToast,
-
-    // Actor API (now owned by AppContext)
     actorIsNpo: actor.actorIsNpo,
     isActingAsNpo: actor.isActingAsNpo,
     actorAddress: actor.actorAddress,
