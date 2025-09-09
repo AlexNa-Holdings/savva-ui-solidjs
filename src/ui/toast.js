@@ -1,16 +1,15 @@
-// src/x/ui/toast.js
+// src/ui/toast.js
 import { createSignal } from "solid-js";
 
-export const [toasts, setToasts] = createSignal([]); // {id, type, message, details, expanded}
+export const [toasts, setToasts] = createSignal([]);
 
 let counter = 0;
 
-export function pushToast({ type = "info", message = "", details = null, autohideMs = 5000 }) {
+export function pushToast({ type = "info", message = "", details = null, autohideMs = 15000, bodyComponent = null, bodyProps = {} }) {
   const id = ++counter;
-  const item = { id, type, message: String(message || ""), details, expanded: false };
+  const item = { id, type, message: String(message || ""), details, expanded: false, bodyComponent, bodyProps };
   setToasts((curr) => [...curr, item]);
 
-  // MODIFICATION: Removed '&& type !== "error"' to allow the timer to apply to all toast types.
   if (autohideMs > 0) {
     setTimeout(() => dismissToast(id), autohideMs);
   }
@@ -27,7 +26,6 @@ export function toggleToast(id) {
   );
 }
 
-/** Convenience: turn any Error (or unknown) into a compact, useful details object */
 export function errorDetails(err, extra = {}) {
   if (!err) return extra || {};
   const base = {
@@ -58,7 +56,6 @@ export function errorDetails(err, extra = {}) {
   return { ...base, ...extra };
 }
 
-/** push an error toast with extracted details */
 export function pushErrorToast(err, context = {}) {
   return pushToast({
     type: "error",

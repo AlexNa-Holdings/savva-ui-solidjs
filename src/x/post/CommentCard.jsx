@@ -2,7 +2,7 @@
 import { For, Show, createMemo, createSignal, createResource, Switch, Match, createEffect } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
-import PostInfo from "../feed/PostInfo.jsx";
+import PostInfo from "./PostInfo.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import MarkdownView from "../docs/MarkdownView.jsx";
 import { ipfs } from "../../ipfs/index.js";

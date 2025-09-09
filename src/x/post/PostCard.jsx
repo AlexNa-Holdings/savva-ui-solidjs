@@ -5,7 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import PostInfo from "./PostInfo.jsx";
+import PostInfo from "../post/PostInfo.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
 import { navigate } from "../../routing/hashRouter.js";
@@ -53,8 +53,8 @@ export default function PostCard(props) {
       }
     } else if (update.type === 'commentCountChanged') {
       setItem("_raw", "total_childs", update.data.newTotal);
-    } else if (update.type === 'fundChanged') {
-        setItem("_raw", "fund", "amount", reconcile(update.data.amount));
+    } else if (update.type === 'fundChanged' && update.data.fund) {
+      setItem("_raw", "fund", (prev) => ({ ...prev, ...update.data.fund }));
     }
   });
 

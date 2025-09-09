@@ -323,7 +323,7 @@ export default {
   "post.fund.expectingRound": "Expected Round",
   "post.fund.explanation": "Contribute to boost this post and support the author. A share goes to the author, the rest is pooled and raffled among contributors—your chance to win!",
   "post.fund.predefinedAmounts": "Select a predefined amount",
-  "post.fund.roundAmount": "Round Amount",
+  "post.fund.nextPrize": "Next Prize",
   "post.fund.title": "Post Fund",
   "post.fund.toast.approving": "Approving your contribution...",
   "post.fund.toast.contributing": "Contributing funds...",
@@ -671,5 +671,18 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now"
+  "wallet.unstaked.availableNow": "Available Now",
+    "alerts.fund_contributed.actionText": "{contributorName} contributed to",
+  "alerts.fund_contributed.message": "New contribution to {title} from {contributorName}.",
+  "alerts.fund_contributed.title": "New Contribution",
+  "alerts.fund_prize.message": "Congratulations! You've won a prize from the fund.",
+    "alerts.fund_contributed.actionText": "{contributorName} contributed to",
+  "alerts.fund_contributed.message": "New contribution to {title} from {contributorName}.",
+  "alerts.fund_contributed.title": "New Contribution",
+  "alerts.fund_prize.message": "Congratulations! You've won a prize from the fund.",
+  "alerts.fund_contributed.title": "New Contribution!",
+"alerts.fund_contributed.text": "{contributor} contributed to",
+"post.fund.nextPrize": "Next Prize",
+
+
 };

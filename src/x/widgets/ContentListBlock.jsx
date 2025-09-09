@@ -2,7 +2,7 @@
 import { createMemo, createResource, For, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
-import PostCard from "../feed/PostCard.jsx";
+import PostCard from "../post/PostCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 

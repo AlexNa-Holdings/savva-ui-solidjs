@@ -1,5 +1,6 @@
 // src/x/Toaster.jsx
 import { For, Show } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { useApp } from "../context/AppContext.jsx";
 import { toasts, dismissToast, toggleToast } from "../ui/toast.js";
 
@@ -34,60 +35,34 @@ export default function Toaster() {
                 class={`pointer-events-auto w-full ${toast.expanded ? "" : "sm:w-[28rem] max-w-[96vw]"}`}
               >
                 <div class="rounded shadow overflow-hidden text-[hsl(var(--card-foreground))]">
-                  {/* Header */}
                   <div class={`flex items-center gap-2 px-3 py-2 ${headerColor} text-white`}>
-                    {/* Message — clamp to one line, never push buttons offscreen */}
-                    <span
-                      class="text-sm font-medium min-w-0 flex-1 truncate"
-                      title={String(toast.message || "")}
-                    >
+                    <span class="text-sm font-medium min-w-0 flex-1 truncate" title={String(toast.message || "")}>
                       {toast.message}
                     </span>
-
-                    {/* Actions stay visible */}
                     <div class="flex items-center gap-1 shrink-0">
                       <Show when={toast.details}>
-                        <button
-                          type="button"
-                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                          onClick={() => toggleToast(toast.id)}
-                          aria-expanded={toast.expanded}
-                          title={toast.expanded ? t("ui.toast.hideDetails") : t("ui.toast.showDetails")}
-                        >
+                        <button type="button" class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs" onClick={() => toggleToast(toast.id)} aria-expanded={toast.expanded} title={toast.expanded ? t("ui.toast.hideDetails") : t("ui.toast.showDetails")}>
                           {toast.expanded ? t("ui.toast.hide") : t("ui.toast.details")}
                         </button>
-                        <button
-                          type="button"
-                          class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                          onClick={() => copy(pretty(toast.details))}
-                          title={t("ui.toast.copyDetails")}
-                        >
+                        <button type="button" class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs" onClick={() => copy(pretty(toast.details))} title={t("ui.toast.copyDetails")}>
                           {t("common.copy")}
                         </button>
                       </Show>
-                      <button
-                        type="button"
-                        class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs"
-                        onClick={() => dismissToast(toast.id)}
-                        title={t("common.close")}
-                        aria-label={t("common.close")}
-                      >
+                      <button type="button" class="px-2 py-1 rounded bg-black/20 hover:bg-black/30 text-xs" onClick={() => dismissToast(toast.id)} title={t("common.close")} aria-label={t("common.close")}>
                         ×
                       </button>
                     </div>
                   </div>
-
-                  {/* Details (scrollable, safe height) */}
-                  <Show when={toast.expanded && toast.details}>
-                    <div
-                      class="bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] px-3 py-2 text-xs"
-                      style={{ "max-height": "40vh", "overflow": "auto" }}
-                    >
-                      <pre class="whitespace-pre-wrap leading-snug">
-                        {pretty(toast.details)}
-                      </pre>
-                    </div>
-                  </Show>
+                  <div class="bg-[hsl(var(--card))]">
+                    <Show when={toast.bodyComponent}>
+                      <Dynamic component={toast.bodyComponent} {...toast.bodyProps} toast={toast} />
+                    </Show>
+                    <Show when={!toast.bodyComponent && toast.expanded && toast.details}>
+                      <div class="px-3 py-2 text-xs" style={{ "max-height": "40vh", "overflow": "auto" }}>
+                        <pre class="whitespace-pre-wrap leading-snug">{pretty(toast.details)}</pre>
+                      </div>
+                    </Show>
+                  </div>
                 </div>
               </div>
             );
@@ -97,3 +72,4 @@ export default function Toaster() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 // src/x/post/ContentCard.jsx
 import { Switch, Match, Show, createMemo } from "solid-js";
-import PostCard from "../feed/PostCard.jsx";
+import PostCard from "./PostCard.jsx";
 import CommentCard from "./CommentCard.jsx";
 
 /**

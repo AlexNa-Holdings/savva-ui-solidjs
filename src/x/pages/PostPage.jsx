@@ -12,7 +12,7 @@ import { toChecksumAddress } from "../../blockchain/utils.js";
 import LangSelector from "../ui/LangSelector.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
-import PostInfo from "../feed/PostInfo.jsx";
+import PostInfo from "../post/PostInfo.jsx";
 import MarkdownView from "../docs/MarkdownView.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import ChapterSelector from "../post/ChapterSelector.jsx";
@@ -62,7 +62,6 @@ async function fetchPostDetails(mainPost, app) {
   }
 
   try {
-    // Uses runtime fallback: primary path, then <cid>/info.yaml> if HTML/dir index.
     const { text, finalPath, usedFallback } = await fetchDescriptorWithFallback(
       app,
       mainPost,
@@ -162,7 +161,7 @@ export default function PostPage() {
           setPost('my_reaction', update.data.reaction);
         }
       } else if (update.type === 'fundChanged' && update.data.fund) {
-        setPost('fund', (prevFund) => reconcile({ ...prevFund, ...update.data.fund }));
+        setPost('fund', (prevFund) => ({ ...prevFund, ...update.data.fund }));
       }
     }
   });
@@ -265,7 +264,7 @@ export default function PostPage() {
           <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
         </Match>
         <Match when={postResource.error || details()?.descriptor?.error}>
-          <div class="p-4 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
+          <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
             <h3 class="font-semibold text-[hsl(var(--destructive))]">{t("common.error")}</h3>
             <p class="text-sm mt-1">{postResource.error?.message || details()?.descriptor?.error}</p>
           </div>

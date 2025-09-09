@@ -1,6 +1,6 @@
 // src/x/feed/PostListView.jsx
 import { For, createMemo } from "solid-js";
-import PostCard from "./PostCard.jsx";
+import PostCard from "../post/PostCard.jsx";
 
 export default function PostListView(props) {
   const mode = () => (props.mode === "grid" ? "grid" : "list");

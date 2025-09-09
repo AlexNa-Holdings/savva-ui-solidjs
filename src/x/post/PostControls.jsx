@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/hashRouter.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
-import PostInfo from "../feed/PostInfo.jsx";
+import PostInfo from "./PostInfo.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import ConfirmModal from "../modals/ConfirmModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
