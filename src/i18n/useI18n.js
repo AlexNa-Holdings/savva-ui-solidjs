@@ -20,6 +20,7 @@ const DEFAULT_LANG = "en";
 const LANG_KEY = "lang";
 const SHOW_KEYS_KEY = "i18n_show_keys";
 let i18nSingleton;
+let setLangCallCounter = 0; // Add a counter here
 
 function normalizeLang(code) {
   const s = String(code || "").trim().toLowerCase();
@@ -49,16 +50,21 @@ export function useI18n() {
     const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
 
     function setLang(next) {
+      setLangCallCounter++;
+      const callId = setLangCallCounter;
       const v = normalizeLang(next);
       const current = lang();
 
-      const dCodes = domainLangCodes();
-      const fCodes = Object.keys(APP_DICTS);
-      const cAvailable = dCodes.length > 0 ? dCodes : fCodes;
-      dbg.log("useI18n", `setLang called. Request: '${next}', Normalized: '${v}', Current: '${current}'. Domain codes: [${dCodes.join(', ')}]. Effective available: [${cAvailable.join(', ')}]`);
+      dbg.log("useI18n", `[Call #${callId}] setLang called with '${next}'. Normalized: '${v}', Current: '${current}'.`);
+      
+      // This will print a full stack trace to the console for every call
+      if (v !== current) {
+        console.groupCollapsed(`[i18n-trace] Call #${callId}: setLang('${v}')`);
+        console.trace("Stack trace:");
+        console.groupEnd();
+      }
 
       if (current === v) {
-        dbg.log("useI18n", "-> SKIPPING: Language is already set to this value.");
         return;
       }
       setLangSignal(v);

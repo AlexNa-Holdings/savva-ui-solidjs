@@ -11,9 +11,7 @@ export default function LangSelector(props) {
   const id = ++_LS_COUNTER;
 
   const codes = createMemo(() => props.codes || []);
-  const value = () => (
-    dbg.log("LangSelector", `[#${id}] resolving active value`, { prop: props.value, appLang: app.lang?.() }),
-    props.value || app.lang?.() || "").toLowerCase();
+  const value = () => (props.value || app.lang?.() || "").toLowerCase();
 
   onMount(() => {
     dbg.log("LangSelector", `[#${id}] mount`, { codes: codes(), value: value() });
