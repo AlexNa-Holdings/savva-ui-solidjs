@@ -96,7 +96,7 @@ export function AppProvider(props) {
     i18n.setDomainLangCodes(codes);
     dbg.log("DomainLangs", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
   });
-
+  
   const actor = useActor({ auth, loading: orchestrator.loading, selectedDomainName, t: i18n.t });
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);

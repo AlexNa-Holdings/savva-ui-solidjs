@@ -30,7 +30,7 @@ export default function LangSelector(props) {
   });
 
   createEffect(() => {
-    dbg.log("LangSelector", `[#${id}] active value → '${value()}'`);
+    dbg.log("LangSelector", `[#${id}] (!)active value → '${value()}'`);
   });
 
   const onChange = (code) => {
