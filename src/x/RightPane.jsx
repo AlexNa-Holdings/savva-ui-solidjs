@@ -15,16 +15,7 @@ export default function RightPane({ isOpen, onClose }) {
 
   const handlePanelClick = (e) => { if (e.target === e.currentTarget) onClose(); };
 
-  const domainLangCodes = createMemo(() => {
-    const config = app.domainAssetsConfig?.();
-    if (!config || !Array.isArray(config.locales)) {
-      dbg.log("RightPane", "domainLangCodes is EMPTY because config is missing or invalid.");
-      return [];
-    }
-    const codes = config.locales.map((l) => l.code).filter(Boolean);
-    dbg.log("RightPane", "domainLangCodes calculated:", codes);
-    return codes;
-  });
+  const domainLangCodes = createMemo(() => app.i18nAvailable?.()?.map((c) => c.toLowerCase()) || []);
 
   const showLangSelector = createMemo(() => domainLangCodes().length > 1);
 

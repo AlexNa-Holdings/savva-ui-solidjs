@@ -61,19 +61,20 @@ export function AppProvider(props) {
   const assets = useDomainAssets({ info: conn.info, selectedDomainName, i18n });
   const prices = useTokenPrices({ info: conn.info });
 
-  Solid.createEffect(() => {
-    const cfg = assets.domainAssetsConfig();
-    const uiLang = i18n.lang();
-    if (!cfg) return;
-    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+Solid.createEffect(() => {
+  const cfg = assets.domainAssetsConfig?.();
+  if (!cfg) return;
 
-    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
-    const current = locales.find(l => norm(l.code) === norm(uiLang))
-      || locales.find(l => norm(l.code) === "en")
-      || locales[0];
+  const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+  const lang = norm(i18n.lang?.());
+  const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+  const current =
+    locales.find((l) => norm(l.code) === lang) ||
+    locales.find((l) => norm(l.code) === "en") ||
+    locales[0];
 
-    if (current?.title) document.title = current.title;
-  });
+  if (current?.title) document.title = current.title;
+});
 
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
   const desiredChain = Solid.createMemo(() => { const id = desiredChainId(); return id ? getChainMeta(id) : null; });
@@ -89,30 +90,26 @@ export function AppProvider(props) {
     }
   });
 
-  Solid.createEffect(() => {
-    if (assets.loadingConfig()) return;
-    const cfg = assets.domainAssetsConfig();
-    if (!cfg) return;
+Solid.createEffect(() => {
+  const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
 
-    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
-    const availableCodes = (cfg.locales || [])
-      .map(l => norm(l.code))
-      .filter(Boolean);
+  // Wait until languages are published by useDomainAssets
+  const available = (i18n.available?.() || []).map(norm);
+  if (available.length === 0) return;
 
-    if (availableCodes.length === 0) return;
+  const cfg = assets.domainAssetsConfig?.();
+  const current = norm(i18n.lang?.());
+  if (available.includes(current)) return;
 
-    const currentLang = norm(i18n.lang());
-    const defaultLocale = norm(cfg.default_locale);
+  const def = norm(cfg?.default_locale);
+  const next =
+    (def && available.includes(def) && def) ||
+    (available.includes("en") && "en") ||
+    available[0];
 
-    if (!availableCodes.includes(currentLang)) {
-      const newLang = availableCodes.includes(defaultLocale) ? defaultLocale : availableCodes[0];
-      dbg.warn(
-        "AppContext",
-        `Language mismatch! UI lang '${currentLang}' not in domain's [${availableCodes.join(", ")}]. Forcing to '${newLang}'.`
-      );
-      i18n.setLang(newLang);
-    }
-  });
+  dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${available.join(", ")}] → '${next}' (guarded)`);
+  i18n.setLang(next);
+});
 
   const actor = useActor({ auth, conn, selectedDomainName });
 

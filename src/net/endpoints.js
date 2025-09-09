@@ -1,4 +1,4 @@
-// File: src/net/endpoints.js
+// src/net/endpoints.js
 // Single source of truth. Configure once, zero-arg getters. Emits a CustomEvent on changes.
 
 function ensureSlash(s) { return s.endsWith("/") ? s : s + "/"; }
@@ -22,7 +22,7 @@ function buildWsUrl(backendBase, domain) {
   u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
   u.pathname = ensureSlash(u.pathname || "/") + wsPath;
 
-  // Only domain as query (per your request) — no lang.
+  // Only domain as query — no lang.
   const q = new URLSearchParams(u.search);
   if (domain) q.set("domain", String(domain));
   u.search = q.toString() ? `?${q.toString()}` : "";
@@ -39,14 +39,23 @@ function notify() {
   }
 }
 
-/** Configure once per backend/domain switch */
+/** Configure once per backend/domain switch (idempotent) */
 export function configureEndpoints({ backendLink, domain }) {
-  _domain = domain || "";
-  _backendHttpBase = buildHttpBase(backendLink || "");
-  _wsUrl = buildWsUrl(_backendHttpBase, _domain);
+  const nextDomain = domain || "";
+  const nextHttpBase = buildHttpBase(backendLink || "");
+  const nextWsUrl   = buildWsUrl(nextHttpBase, nextDomain);
+
+  const noChange = (nextDomain === _domain) &&
+                   (nextHttpBase === _backendHttpBase) &&
+                   (nextWsUrl === _wsUrl);
+  if (noChange) return; // prevent unnecessary reconnects
+
+  _domain = nextDomain;
+  _backendHttpBase = nextHttpBase;
+  _wsUrl = nextWsUrl;
   notify();
 }
 
-export function httpBase() { return _backendHttpBase; }
-export function wsUrl()    { return _wsUrl; }
-export function currentDomain() { return _domain; }
+export function httpBase()        { return _backendHttpBase; }
+export function wsUrl()           { return _wsUrl; }
+export function currentDomain()   { return _domain; }

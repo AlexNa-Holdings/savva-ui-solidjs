@@ -1,5 +1,4 @@
 // src/x/net/WsConnector.jsx
-// src/x/net/WsConnector.jsx
 import { onMount, onCleanup, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { ensureWsStarted, getWsClient, getWsApi, onAlert, offAlert } from "../../net/wsRuntime.js";
@@ -19,7 +18,6 @@ export default function WsConnector() {
   const ws = getWsClient();
   const api = getWsApi();
 
-  // attach WS helpers only
   app.ws = ws;
   app.wsUrl = wsUrl;
   app.wsStatus = () => ws.status();
@@ -37,12 +35,19 @@ export default function WsConnector() {
     const [hasConnectedOnce, setHasConnectedOnce] = createSignal(false);
 
     const onOpen = () => { setHasConnectedOnce(true); };
-    const onClose = () => {
+    const onClose = (ev) => {
       if (!hasConnectedOnce()) {
+        // Add useful debugging details into the toast.
         pushToast({
           type: "warning",
           message: t("error.ws.title"),
-          details: t("error.ws.message"),
+          details: {
+            message: t("error.ws.message"),
+            code: ev?.code,
+            reason: ev?.reason,
+            attempt: ws.attempt?.(),
+            url: ws.url?.()
+          },
           autohideMs: 15000,
         });
       }

@@ -16,7 +16,7 @@ export function useAppConnection() {
   const [info, setInfo] = createSignal(null);
   const [error, setError] = createSignal(null);
   const [loading, setLoading] = createSignal(true);
-  
+
   async function fetchInfo(cfg) {
     const res = await fetch(cfg.backendLink + "info", { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`/info failed: ${res.status}`);
@@ -25,9 +25,13 @@ export function useAppConnection() {
 
   async function applyConfig(nextCfg) {
     setConfig(nextCfg);
+
+    // 1) Establish single source of truth first (HTTP base + WS URL).
+    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
+
+    // 2) Then fetch /info to drive the rest of the app.
     const data = await fetchInfo(nextCfg);
     setInfo(data);
-    configureEndpoints({ backendLink: nextCfg.backendLink, domain: nextCfg.domain || "" });
   }
 
   async function init() {
@@ -56,9 +60,12 @@ export function useAppConnection() {
       setLoading(true); setError(null);
       const cur = config() || {};
       const next = { ...cur, ...partial, backendLink: ensureSlash(partial?.backendLink ?? cur.backendLink) };
+
+      // If backend changes, fully apply (endpoints first -> /info).
       if (next.backendLink !== cur.backendLink) {
         await applyConfig(next);
       } else {
+        // Domain-only change: set state and (idempotent) reconfigure endpoints.
         setConfig(next);
         configureEndpoints({ backendLink: next.backendLink, domain: next.domain || "" });
       }
@@ -66,7 +73,9 @@ export function useAppConnection() {
     } catch (e) {
       setError(e);
       pushErrorToast(e, { op: "updateConnect" });
-    } finally { setLoading(false); }
+    } finally {wsCon
+      setLoading(false);
+    }
   }
 
   function setDomain(nextDomain) {

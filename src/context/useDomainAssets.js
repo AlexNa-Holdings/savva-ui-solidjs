@@ -15,10 +15,10 @@ export function useDomainAssets(app) {
   const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
   const [loadingConfig, setLoadingConfig] = createSignal(false);
 
-  // --- sticky cache for the current domain ---
+  // sticky cache per domain
   let stickyDomain = "";
-  let stickyConfig = null;  // last-good parsed config.yaml for <domain>
-  let stickyPrefix = "";    // last-good prefix, e.g. "https://.../domain/"
+  let stickyConfig = null;  // last-good config.yaml
+  let stickyPrefix = "";
   let stickySource = null;  // "domain" | "default" | null
 
   function setAssetsEnv(next) {
@@ -48,7 +48,6 @@ export function useDomainAssets(app) {
     const domain = app.selectedDomainName();
     const computed = base && domain ? `${base}${domain}/` : "";
 
-    // Reset sticky cache if domain actually changed
     if (domain && domain !== stickyDomain) {
       dbg.log("assets", "domain changed → reset sticky cache", { prev: stickyDomain, next: domain });
       stickyDomain = domain;
@@ -57,55 +56,37 @@ export function useDomainAssets(app) {
       stickySource = null;
     }
 
+    // 1) Try remote domain pack
     async function tryLoad(prefix) {
       if (!prefix) return null;
       try {
-        const url = `${prefix}config.yaml`;
-        const res = await fetchWithTimeout(url, { timeoutMs: 8000, cache: "no-store" });
-        if (!res.ok) return null;
-        const text = await res.text();
-        const cfg = parse(text) || {};
-        dbg.group(`assets: loaded config.yaml from ${prefix}`);
-        dbg.log("assets", "summary:", {
-          hasLocales: !!(cfg.locales && cfg.locales.length),
-          locales: (cfg.locales || []).map((l) => l?.code).filter(Boolean),
-          assets_cid: cfg.assets_cid || cfg.cid || null,
-        });
-        dbg.groupEnd();
-        return cfg;
-      } catch {
-        return null;
-      }
+        const res = await fetchWithTimeout(`${prefix}config.yaml`, { timeoutMs: 8000, cache: "no-store" });
+        return res.ok ? (parse(await res.text()) || {}) : null;
+      } catch { return null; }
     }
 
-    // 1) Try the domain pack
-    const domainCfg = await tryLoad(computed);
-
-    if (domainCfg) {
-      // Successful domain config → promote to active and update sticky cache
+    const remoteCfg = await tryLoad(computed);
+    if (remoteCfg) {
       setDomainAssetsPrefix(computed);
       setDomainAssetsSource("domain");
-      setDomainAssetsConfig(domainCfg);
-      stickyConfig = domainCfg;
+      setDomainAssetsConfig(remoteCfg);
+      stickyConfig = remoteCfg;
       stickyPrefix = computed;
       stickySource = "domain";
       setLoadingConfig(false);
       return;
     }
 
-    // 2) Domain pack failed. If we already have a good domain config, STAY on it.
-    if (stickyConfig && stickySource === "domain" && stickyPrefix) {
-      dbg.warn("assets", "domain config reload failed — keeping last-good domain config (no fallback)", {
-        domain,
-        computed,
-        stickyPrefix,
-      });
-      // keep existing signals as-is
+    // 2) Remote failed → keep last-good if we have one
+    if (stickyConfig) {
+      setDomainAssetsPrefix(stickyPrefix || DEFAULT_DOMAIN_ASSETS_PREFIX);
+      setDomainAssetsSource(stickySource);
+      setDomainAssetsConfig(stickyConfig);
       setLoadingConfig(false);
       return;
     }
 
-    // 3) No last-good domain config → try default pack once.
+    // 3) No last-good → use default pack
     const defaultCfg = await tryLoad(DEFAULT_DOMAIN_ASSETS_PREFIX);
     setDomainAssetsPrefix(DEFAULT_DOMAIN_ASSETS_PREFIX);
     setDomainAssetsSource(defaultCfg ? "default" : null);
@@ -116,7 +97,7 @@ export function useDomainAssets(app) {
     setLoadingConfig(false);
   }
 
-  // Load per-locale dictionaries from the active pack
+  // Load dictionaries from the active pack (stable; not keyed to UI lang)
   const [domainDictionaries] = createResource(() => {
     const cfg = domainAssetsConfig();
     const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
@@ -131,24 +112,20 @@ export function useDomainAssets(app) {
     for (const { code, path } of key.items) {
       try {
         dicts[code] = await loadAssetResource({ assetUrl }, path, { type: "yaml" });
-      } catch { /* ignore */ }
+      } catch {}
     }
     return dicts;
   });
 
-  // Publish dictionaries to i18n
+  // Publish dictionaries + normalized codes to i18n (single source for UI)
   createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
-
-  // Publish normalized domain language codes to i18n (so all consumers see a stable set)
   createEffect(() => {
     const cfg = domainAssetsConfig();
     const codes = Array.isArray(cfg?.locales)
       ? cfg.locales.map((l) => String(l?.code || "").toLowerCase()).filter(Boolean)
       : [];
     app.i18n.setDomainLangCodes(codes);
-    if (codes.length) {
-      dbg.log("assets", "i18n domain language codes updated", codes);
-    }
+    if (codes.length) dbg.log("assets", "i18n domain language codes updated", codes);
   });
 
   // Only (re)load when /info, domain, or env change — never on lang change.
@@ -157,8 +134,7 @@ export function useDomainAssets(app) {
   }));
 
   return {
-    assetsEnv,
-    setAssetsEnv,
+    assetsEnv, setAssetsEnv,
     assetsBaseUrl,
     domainAssetsConfig,
     domainAssetsSource,
