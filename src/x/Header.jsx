@@ -1,4 +1,4 @@
-/* src/x/Header.jsx */
+// src/x/Header.jsx
 import { Show, createSignal, onMount, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet.js";
@@ -12,7 +12,7 @@ import NewPostButton from "./main/NewPostButton.jsx";
 import TokenPrice from "./main/TokenPrice.jsx";
 import ActorBadge from "./actors/ActorBadge.jsx";
 import { dbg } from "../utils/debug.js";
-import HeaderSearchButton from "../x/ui/HeaderSearchButton.jsx";
+import HeaderSearchButton from "./ui/HeaderSearchButton.jsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import LibraryIcon from "./ui/icons/LibraryIcon.jsx";
 
@@ -112,7 +112,7 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
                 <LibraryIcon class="w-5 h-5" />
               </button>
             </Show>
-            <BrandLogo class="h-6 sm:h-7" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
+            <BrandLogo class="h-9" classTitle="text-xl font-bold text-[hsl(var(--card-foreground))]" />
             <TokenPrice />
           </div>
 

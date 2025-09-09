@@ -1,5 +1,5 @@
 // src/x/main/TokenPrice.jsx
-import { createSignal, createEffect, on, Show, createResource } from "solid-js";
+import { createSignal, createEffect, on, Show, createResource, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 
@@ -24,44 +24,33 @@ export default function TokenPrice() {
   const [isAnimating, setIsAnimating] = createSignal(false);
   const sourceData = () => app.savvaTokenPrice();
 
-  // Fetch SAVVA token meta to render its icon via the single source of truth
   const savvaAddr = () => app.info()?.savva_contracts?.SavvaToken?.address || "";
+
+  // Fetch SAVVA token meta, but only when the address is available.
   const [savvaMeta] = createResource(
-    () => ({ app, addr: savvaAddr() }),
+    () => (savvaAddr() ? { app, addr: savvaAddr() } : null),
     ({ app, addr }) => getTokenInfo(app, addr)
   );
+
   const Icon = () => {
     const I = savvaMeta()?.Icon;
     return I ? <I class="w-5 h-5" /> : null;
   };
 
-  // This signal holds the price data that is currently visible on screen.
   const [displayData, setDisplayData] = createSignal(sourceData());
 
-  // Effect to handle the animation logic.
   createEffect(
     on(
       sourceData,
       (newValue, prevValue) => {
-        // Don't animate on initial render
         if (prevValue === undefined || prevValue === null) {
           setDisplayData(newValue);
           return;
         }
-
-        // 1. Start the animation, showing the OLD value first.
         setDisplayData(prevValue);
         setIsAnimating(true);
-
-        // 2. Halfway through the 400ms animation, swap to the NEW value.
-        setTimeout(() => {
-          setDisplayData(newValue);
-        }, 200);
-
-        // 3. After the animation is complete, remove the animation class.
-        setTimeout(() => {
-          setIsAnimating(false);
-        }, 400);
+        setTimeout(() => setDisplayData(newValue), 200);
+        setTimeout(() => setIsAnimating(false), 400);
       },
       { defer: true }
     )
@@ -77,22 +66,23 @@ export default function TokenPrice() {
     return `${gain.toFixed(2)}%`;
   };
 
+  // Wait for both price data AND icon metadata to be ready.
+  const isReady = createMemo(() => displayData() && savvaMeta() && !savvaMeta.loading);
+
   return (
-    <Show when={displayData()}>
-      {(data) => (
-        <div class="flex items-center gap-2">
-          <Icon />
-          <div classList={{ "default-animation": isAnimating() }} class="flex items-center gap-2 text-sm">
-            <span class="font-semibold">{formatPrice(data().price)}</span>
-            <div classList={{ "text-emerald-500": data().gain >= 0, "text-red-500": data().gain < 0 }} class="flex items-center gap-1 text-xs">
-              <Show when={data().gain >= 0} fallback={<DownArrow />}>
-                <UpArrow />
-              </Show>
-              <span>{formatGain(data().gain)}</span>
-            </div>
+    <Show when={isReady()}>
+      <div class="flex items-center gap-2">
+        <Icon />
+        <div classList={{ "default-animation": isAnimating() }} class="flex items-center gap-2 text-sm">
+          <span class="font-semibold">{formatPrice(displayData().price)}</span>
+          <div classList={{ "text-emerald-500": displayData().gain >= 0, "text-red-500": displayData().gain < 0 }} class="flex items-center gap-1 text-xs">
+            <Show when={displayData().gain >= 0} fallback={<DownArrow />}>
+              <UpArrow />
+            </Show>
+            <span>{formatGain(displayData().gain)}</span>
           </div>
         </div>
-      )}
+      </div>
     </Show>
   );
 }

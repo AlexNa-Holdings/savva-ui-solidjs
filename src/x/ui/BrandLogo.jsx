@@ -1,24 +1,18 @@
 // src/x/ui/BrandLogo.jsx
-import { createMemo, createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
+import { createMemo, createSignal, onMount, onCleanup, Show, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { dbg } from "../../utils/debug.js";
 import { navigate } from "../../routing/hashRouter.js";
+import SvgImage from "./SvgImage.jsx";
 
 export default function BrandLogo(props) {
   const app = useApp();
   const { t, domainAssetsConfig } = app;
 
-  // Resolve asset URL function defensively
   const urlFor = (rel) => {
     const fn = app.assetUrl;
     if (typeof fn === "function") return fn(rel);
     const prefix = typeof app.domainAssetsPrefix === "function" ? (app.domainAssetsPrefix() || "") : "";
     const relClean = String(rel || "").replace(/^\/+/, "");
-    dbg.warn("BrandLogo", "app.assetUrl is not a function; using prefix fallback", {
-      typeof_assetUrl: typeof fn,
-      prefix,
-      rel: relClean,
-    });
     return prefix + relClean;
   };
 
@@ -30,6 +24,7 @@ export default function BrandLogo(props) {
 
   const [isDark, setIsDark] = createSignal(false);
   const [isMobile, setIsMobile] = createSignal(false);
+  
   onMount(() => {
     const el = document.documentElement;
     const updateDark = () => setIsDark(el.classList.contains("dark"));
@@ -76,31 +71,35 @@ export default function BrandLogo(props) {
 
   const src = createMemo(() => (relPath() ? urlFor(relPath()) : ""));
 
-  createEffect(() => {
-    const s = src();
-    if (!s) return;
-    dbg.log("logo", "BrandLogo src picked", {
-      src: s,
-      relPath: relPath(),
-      dark: isDark(),
-      mobile: isMobile(),
-      domain: app.config?.()?.domain,
-      activePrefix: typeof app.domainAssetsPrefix === "function" ? app.domainAssetsPrefix() : undefined,
-      source: typeof app.domainAssetsSource === "function" ? app.domainAssetsSource() : undefined,
-    });
-  });
+  const isSvg = createMemo(() => src().toLowerCase().endsWith(".svg"));
 
   return (
-    <a href="#" aria-label={t("brand.logoAlt")} onClick={(e) => { e.preventDefault(); navigate("/"); }}>
-      <Show when={src()} fallback={<div class="text-xl font-bold select-none">SAVVA</div>}>
-        <img
-          src={src()}
-          alt={domainTitle()}
-          class={props.class || "h-8 w-auto"}
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-        />
+    <a href="#" class="inline-flex items-center" aria-label={t("brand.logoAlt")} onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+      <Show 
+        when={src()} 
+        fallback={<div class={props.classTitle || "text-xl font-bold select-none"}>{domainTitle()}</div>}
+      >
+        <Switch>
+          <Match when={isSvg()}>
+            <SvgImage
+              src={src()}
+              alt={domainTitle()}
+              class={props.class || "h-8 w-auto"}
+            />
+          </Match>
+          <Match when={!isSvg()}>
+            <div class={`flex items-center justify-center overflow-hidden ${props.class || "h-8"}`}>
+              <img
+                src={src()}
+                alt={domainTitle()}
+                class="max-w-none max-h-none flex-shrink-0"
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+              />
+            </div>
+          </Match>
+        </Switch>
       </Show>
     </a>
   );
