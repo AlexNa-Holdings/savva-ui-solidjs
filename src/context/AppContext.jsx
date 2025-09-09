@@ -99,7 +99,6 @@ export function AppProvider(props) {
     i18n.setDomainLangCodes(codes);
     dbg.log("DomainLangs", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
 
-    // NEW: Validate current language against the new domain's supported codes
     if (codes.length > 0) {
         const currentLang = norm(i18n.lang());
         if (!codes.includes(currentLang)) {
@@ -107,7 +106,7 @@ export function AppProvider(props) {
             const nextLang = 
                 (defaultLang && codes.includes(defaultLang)) ? defaultLang :
                 codes.includes('en') ? 'en' :
-                codes[0]; // Fallback to the first available lang for the domain
+                codes[0];
             
             dbg.warn("LangValidator", `Current lang '${currentLang}' not supported by new domain. Switching to '${nextLang}'.`);
             i18n.setLang(nextLang);

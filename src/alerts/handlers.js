@@ -3,6 +3,7 @@ import { dbg } from "../utils/debug";
 import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
 import { pushToast } from "../ui/toast";
 import ContributionToast from "../x/ui/toasts/ContributionToast.jsx";
+import { formatUnits } from "viem";
 
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
@@ -125,70 +126,74 @@ export function handleUserInfoChanged(app, payload) {
 }
 
 function getLocalizedTitle(multiString, lang) {
-    if (!multiString) return "";
-    return multiString[lang] || multiString.en || Object.values(multiString)[0] || "";
+  if (!multiString) return "";
+  return (
+    multiString[lang] || multiString.en || Object.values(multiString)[0] || ""
+  );
 }
 
 export function handleFundContributed(app, payload) {
-    const data = payload.data;
-    dbg.log("Alerts:fund_contributed", data);
+  const data = payload.data;
+  dbg.log("Alerts:fund_contributed", data);
 
-    if (!data || !data.content_id) return;
+  if (!data || !data.content_id) return;
 
-    app.setPostUpdate?.({
-        cid: data.content_id,
-        type: "fundChanged",
-        data: { 
-            fund: {
-                amount: data.amount,
-                round_time: data.round_time,
-                round_value: data.round_value,
-            }
-        },
-    });
+  app.setPostUpdate?.({
+    cid: data.content_id,
+    type: "fundChanged",
+    data: {
+      fund: {
+        amount: data.amount,
+        round_time: data.round_time,
+        round_value: data.round_value,
+      },
+    },
+  });
 
-    pushToast({
-        type: "info",
-        message: app.t("alerts.fund_contributed.title"),
-        autohideMs: 10000,
-        bodyComponent: ContributionToast,
-        bodyProps: { data }
-    });
+  pushToast({
+    type: "info",
+    message: app.t("alerts.fund_contributed.title"),
+    autohideMs: 10000,
+    bodyComponent: ContributionToast,
+    bodyProps: { data },
+  });
 }
 
 export function handleFundPrize(app, payload) {
-    const { t, lang } = app;
-    const data = payload.data;
-    dbg.log("Alerts:fund_prize", data);
+  const { t, lang } = app;
+  const data = payload.data;
+  dbg.log("Alerts:fund_prize", data);
 
-    if (!data || !data.content_id) return;
+  if (!data || !data.content_id) return;
 
-    app.setPostUpdate?.({
-        cid: data.content_id,
-        type: "fundChanged",
-        data: { 
-            fund: {
-                amount: data.amount,
-                round_time: data.round_time,
-                round_value: data.prize,
-            }
-        },
-    });
-    
-    const title = getLocalizedTitle(data.title, lang());
-    const winner = data.winner?.name || "An anonymous user";
-    let formattedPrize = "";
-    try {
-        formattedPrize = parseFloat(formatUnits(BigInt(data.prize), 18)).toLocaleString();
-    } catch {}
+  app.setPostUpdate?.({
+    cid: data.content_id,
+    type: "fundChanged",
+    data: {
+      fund: {
+        amount: data.amount,
+        round_time: data.round_time,
+        round_value: data.round_value,
+      },
+    },
+  });
 
-    pushToast({
-        type: "success",
-        message: t("alerts.fund_prize.message", {
-            title: title,
-            winner: winner,
-            prize: formattedPrize,
-            token: "SAVVA",
-        }),
-    });
+  const title = getLocalizedTitle(data.title, lang());
+  const winner = data.winner?.name || "An anonymous user";
+  let formattedPrize = "";
+  try {
+    formattedPrize = parseFloat(
+      formatUnits(BigInt(data.prize), 18)
+    ).toLocaleString();
+  } catch {}
+
+  pushToast({
+    type: "success",
+    message: t("alerts.fund_prize.message", {
+      title: title,
+      winner: winner,
+      prize: formattedPrize,
+      token: "SAVVA",
+    }),
+  });
 }

@@ -5,10 +5,10 @@ import UserCard from "../../ui/UserCard.jsx";
 import TokenValue from "../../ui/TokenValue.jsx";
 import { navigate } from "../../../routing/hashRouter.js";
 
-function getLocalizedTitle(locales, lang) {
-  if (!locales) return "";
-  const l = locales[lang] || locales.en || locales[Object.keys(locales)[0]];
-  return l?.title || "";
+// This helper now correctly handles the multi-language title object from the alert.
+function getLocalizedTitle(multiString, lang) {
+  if (!multiString || typeof multiString !== 'object') return "";
+  return multiString[lang] || multiString.en || Object.values(multiString)[0] || "";
 }
 
 export default function ContributionToast(props) {
@@ -54,3 +54,4 @@ export default function ContributionToast(props) {
     </div>
   );
 }
+

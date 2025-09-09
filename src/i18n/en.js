@@ -683,6 +683,9 @@ export default {
   "alerts.fund_contributed.title": "New Contribution!",
 "alerts.fund_contributed.text": "{contributor} contributed to",
 "post.fund.nextPrize": "Next Prize",
+"alerts.fund_contributed.title": "New Contribution!",
+"alerts.fund_contributed.actionText": "{contributorName} contributed to",
+"post.fund.nextPrize": "Next Prize",
 
 
 };
