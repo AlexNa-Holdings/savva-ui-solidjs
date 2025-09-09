@@ -46,9 +46,10 @@ export function useI18n() {
     const readInitialLang = () => { try { const v = localStorage.getItem(LANG_KEY); return normalizeLang(v || DEFAULT_LANG); } catch { return DEFAULT_LANG; } };
     const readInitialShowKeys = () => { try { return localStorage.getItem(SHOW_KEYS_KEY) === "1"; } catch { return false; } };
 
-    const [lang, _setLangSignal] = createSignal(readInitialLang()); // Renamed original setter
+    const [lang, _setLangSignal] = createSignal(readInitialLang());
+    const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
     
-    // Create our own wrapped setter with a trace
+    // Create our own wrapped setter with a trace for debugging the reset issue
     const setLangSignal = (val) => {
         console.groupCollapsed(`[signal-trace] setLangSignal('${val}')`);
         console.trace("Stack trace:");
@@ -63,7 +64,7 @@ export function useI18n() {
       const current = lang();
 
       dbg.log("useI18n", `[Call #${callId}] setLang called with '${next}'. Normalized: '${v}', Current: '${current}'.`);
-
+      
       if (current === v) return;
       
       setLangSignal(v); // Use our wrapped setter
