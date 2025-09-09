@@ -64,7 +64,10 @@ export function useDomainAssets(app) {
   const [domainDictionaries] = createResource(() => {
     const cfg = domainAssetsConfig();
     const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
-    const items = locales.map(l => ({ code: (l?.code || "").toLowerCase(), path: l?.dictionary || l?.file })).filter(l => l.code && l.path);
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    const items = locales
+      .map(l => ({ code: norm(l?.code), path: l?.dictionary || l?.file }))
+      .filter(l => l.code && l.path);
     if (items.length === 0) return null;
     return { items, rev: `${domainAssetsPrefixActive()}|${cfg.assets_cid || cfg.cid || ""}` };
   }, async (key) => {
@@ -78,13 +81,32 @@ export function useDomainAssets(app) {
     return dicts;
   });
 
+  // Send dictionaries to i18n
   createEffect(() => app.i18n.setDomainDictionaries(domainDictionaries() || {}));
-  
+
+  // Publish normalized domain codes to i18n.available()
+  createEffect(() => {
+    const cfg = domainAssetsConfig();
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    const codes = (cfg?.locales || []).map(l => norm(l.code)).filter(Boolean);
+    app.i18n.setDomainLangCodes?.(codes);
+  });
+
   createEffect(on([app.info, app.selectedDomainName, assetsEnv], () => {
     if (app.info()) {
       refreshDomainAssets();
     }
   }));
 
-  return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl, loadingConfig };
+  return {
+    assetsEnv,
+    setAssetsEnv,
+    assetsBaseUrl,
+    domainAssetsConfig,
+    domainAssetsSource,
+    domainAssetsPrefix: domainAssetsPrefixActive,
+    refreshDomainAssets,
+    assetUrl,
+    loadingConfig,
+  };
 }

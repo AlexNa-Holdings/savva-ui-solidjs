@@ -63,11 +63,16 @@ export function AppProvider(props) {
 
   Solid.createEffect(() => {
     const cfg = assets.domainAssetsConfig();
-    const lang = i18n.lang();
+    const uiLang = i18n.lang();
     if (!cfg) return;
     const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
-    const currentLocale = locales.find(l => l.code === lang) || locales.find(l => l.code === 'en') || locales[0];
-    if (currentLocale?.title) document.title = currentLocale.title;
+
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    const current = locales.find(l => norm(l.code) === norm(uiLang))
+      || locales.find(l => norm(l.code) === "en")
+      || locales[0];
+
+    if (current?.title) document.title = current.title;
   });
 
   const desiredChainId = Solid.createMemo(() => conn.info()?.blockchain_id ?? null);
@@ -88,12 +93,23 @@ export function AppProvider(props) {
     if (assets.loadingConfig()) return;
     const cfg = assets.domainAssetsConfig();
     if (!cfg) return;
-    const availableCodes = (cfg.locales || []).map(l => l.code).filter(Boolean);
+
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    const availableCodes = (cfg.locales || [])
+      .map(l => norm(l.code))
+      .filter(Boolean);
+
     if (availableCodes.length === 0) return;
-    const currentLang = i18n.lang();
+
+    const currentLang = norm(i18n.lang());
+    const defaultLocale = norm(cfg.default_locale);
+
     if (!availableCodes.includes(currentLang)) {
-      const newLang = cfg.default_locale && availableCodes.includes(cfg.default_locale) ? cfg.default_locale : availableCodes[0];
-      dbg.warn("AppContext", `Language mismatch! UI lang '${currentLang}' not in domain's [${availableCodes.join(", ")}]. Forcing to '${newLang}'.`);
+      const newLang = availableCodes.includes(defaultLocale) ? defaultLocale : availableCodes[0];
+      dbg.warn(
+        "AppContext",
+        `Language mismatch! UI lang '${currentLang}' not in domain's [${availableCodes.join(", ")}]. Forcing to '${newLang}'.`
+      );
       i18n.setLang(newLang);
     }
   });
