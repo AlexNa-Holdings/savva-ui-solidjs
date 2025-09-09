@@ -7,7 +7,6 @@ import ua from "./ua";
 import fr from "./fr";
 import { dbg } from "../utils/debug";
 
-// Used by the Lang selector for labels
 export const LANG_INFO = {
   en: { code: "EN", name: "English" },
   ru: { code: "RU", name: "Русский" },
@@ -16,23 +15,15 @@ export const LANG_INFO = {
   sr: { code: "SR", name: "Српски" },
 };
 
-// All built-in application dictionaries. The keys must match LANG_INFO.
 const APP_DICTS = { en, ru, fr, ua, sr };
-
 const DEFAULT_LANG = "en";
 const LANG_KEY = "lang";
 const SHOW_KEYS_KEY = "i18n_show_keys";
-
 let i18nSingleton;
-
-// !!!!! special comment to include the keys generated automatically
-// !!!!! Do not edit this section manually
-// t("tabs.title.leaders") t("tabs.title.actual") t("tabs.title.comments")
-// t("tabs.title.new") t("tabs.title.for-you")
 
 function normalizeLang(code) {
   const s = String(code || "").trim().toLowerCase();
-  const [base] = s.split(/[-_]/); // "en-US" -> "en"
+  const [base] = s.split(/[-_]/);
   return base || DEFAULT_LANG;
 }
 
@@ -45,29 +36,14 @@ export function useI18n() {
       const d = domainDicts();
       const fromDomain = d[lang]?.[key];
       if (fromDomain != null) return fromDomain;
-
       const fromApp = APP_DICTS[lang]?.[key];
       if (fromApp != null) return fromApp;
-
       if (APP_DICTS[DEFAULT_LANG]?.[key] != null) return APP_DICTS[DEFAULT_LANG][key];
       return `[${key}]`;
     }
 
-    const readInitialLang = () => {
-      try {
-        const v = localStorage.getItem(LANG_KEY);
-        return normalizeLang(v || DEFAULT_LANG);
-      } catch {
-        return DEFAULT_LANG;
-      }
-    };
-    const readInitialShowKeys = () => {
-      try {
-        return localStorage.getItem(SHOW_KEYS_KEY) === "1";
-      } catch {
-        return false;
-      }
-    };
+    const readInitialLang = () => { try { const v = localStorage.getItem(LANG_KEY); return normalizeLang(v || DEFAULT_LANG); } catch { return DEFAULT_LANG; } };
+    const readInitialShowKeys = () => { try { return localStorage.getItem(SHOW_KEYS_KEY) === "1"; } catch { return false; } };
 
     const [lang, setLangSignal] = createSignal(readInitialLang());
     const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
@@ -76,12 +52,15 @@ export function useI18n() {
       const v = normalizeLang(next);
       const current = lang();
 
-      dbg.log("useI18n", `setLang called. Request: '${next}', Normalized: '${v}', Current: '${current}'.`);
+      const dCodes = domainLangCodes();
+      const fCodes = Object.keys(APP_DICTS);
+      const cAvailable = dCodes.length > 0 ? dCodes : fCodes;
+      dbg.log("useI18n", `setLang called. Request: '${next}', Normalized: '${v}', Current: '${current}'. Domain codes: [${dCodes.join(', ')}]. Effective available: [${cAvailable.join(', ')}]`);
+
       if (current === v) {
         dbg.log("useI18n", "-> SKIPPING: Language is already set to this value.");
         return;
       }
-
       setLangSignal(v);
       try { localStorage.setItem(LANG_KEY, v); } catch {}
       if (typeof document !== "undefined") {
@@ -122,12 +101,7 @@ export function useI18n() {
     };
 
     i18nSingleton = {
-      t,
-      lang,
-      setLang,
-      showKeys,
-      setShowKeys,
-      available,
+      t, lang, setLang, showKeys, setShowKeys, available,
       setDomainDictionaries: (d) => setDomainDicts(d || {}),
       setDomainLangCodes: (codes) => setDomainLangCodes(codes || []),
     };

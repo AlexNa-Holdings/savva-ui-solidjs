@@ -83,26 +83,41 @@ export function AppProvider(props) {
     }
   });
 
-  // Effect to sync domain languages with i18n service
   Solid.createEffect(() => {
     const cfg = orchestrator.domainAssetsConfig();
-    const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
+    dbg.log("DomainLangs", "Effect running. Config loaded:", !!cfg);
+    if (!cfg) {
+      i18n.setDomainLangCodes([]);
+      dbg.log("DomainLangs", "Config not present, setting available codes to empty (will use fallback).");
+      return;
+    }
+    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
     const codes = locales.map(l => String(l?.code || "").trim().toLowerCase().split(/[-_]/)[0]).filter(Boolean);
     i18n.setDomainLangCodes(codes);
-    dbg.log("assets", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
+    dbg.log("DomainLangs", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
   });
 
-  // Effect to validate and correct language selection
-  Solid.createEffect(Solid.on([() => i18n.available(), () => orchestrator.domainAssetsConfig()], ([available, cfg]) => {
-    if (orchestrator.loading()) return;
+  Solid.createEffect(Solid.on([() => i18n.available(), () => orchestrator.domainAssetsConfig()], ([available, cfg], prev) => {
+    const isFirstRun = prev === undefined;
+    if (orchestrator.loading()) {
+        dbg.log("LangValidator", "SKIP: Orchestrator is loading.");
+        return;
+    }
     const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
     const normAvailable = (available || []).map(norm);
-    if (normAvailable.length === 0) return;
     const current = norm(i18n.lang?.());
-    if (normAvailable.includes(current)) return;
+    dbg.log("LangValidator", `Running. First run: ${isFirstRun}. Current lang: '${current}'. Available: [${normAvailable.join(", ")}]`);
+    if (normAvailable.length === 0) {
+        dbg.log("LangValidator", "SKIP: No available languages from domain config yet.");
+        return;
+    }
+    if (normAvailable.includes(current)) {
+        dbg.log("LangValidator", `OK: Current lang '${current}' is in the available list.`);
+        return;
+    }
     const def = norm(cfg?.default_locale);
     const next = (def && normAvailable.includes(def) && def) || (normAvailable.includes("en") && "en") || normAvailable[0];
-    dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${normAvailable.join(", ")}] → '${next}' (guarded)`);
+    dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${normAvailable.join(", ")}] → resetting to '${next}'`);
     i18n.setLang(next);
   }, { defer: true }));
   
