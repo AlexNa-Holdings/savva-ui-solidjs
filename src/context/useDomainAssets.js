@@ -12,6 +12,7 @@ export function useDomainAssets(app) {
   const [domainAssetsConfig, setDomainAssetsConfig] = createSignal(null);
   const [domainAssetsSource, setDomainAssetsSource] = createSignal(null);
   const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal(DEFAULT_DOMAIN_ASSETS_PREFIX);
+  const [loadingConfig, setLoadingConfig] = createSignal(false);
 
   function setAssetsEnv(next) {
     const v = next === "test" ? "test" : "prod";
@@ -34,6 +35,7 @@ export function useDomainAssets(app) {
   }
 
   async function refreshDomainAssets() {
+    setLoadingConfig(true);
     const base = assetsBaseUrl();
     const domain = app.selectedDomainName();
     const computed = base && domain ? `${base}${domain}/` : "";
@@ -56,6 +58,7 @@ export function useDomainAssets(app) {
       setDomainAssetsSource(cfg ? "default" : null);
     }
     setDomainAssetsConfig(cfg || null);
+    setLoadingConfig(false);
   }
 
   const [domainDictionaries] = createResource(() => {
@@ -83,5 +86,5 @@ export function useDomainAssets(app) {
     }
   }));
 
-  return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl };
+  return { assetsEnv, setAssetsEnv, assetsBaseUrl, domainAssetsConfig, domainAssetsSource, domainAssetsPrefix: domainAssetsPrefixActive, refreshDomainAssets, assetUrl, loadingConfig };
 }

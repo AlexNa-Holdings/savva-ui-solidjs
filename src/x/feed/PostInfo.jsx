@@ -1,5 +1,5 @@
 // src/x/feed/PostInfo.jsx
-import { Show, createMemo, createSignal, createEffect, on } from "solid-js";
+import { Show, createMemo, createSignal, createEffect, on, onMount, onCleanup } from "solid-js";
 import { formatUnits } from "viem";
 import { useApp } from "../../context/AppContext.jsx";
 import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";
@@ -65,22 +65,49 @@ function PostRewards(props) {
 export default function PostInfo(props) {
   const app = useApp();
   const { lang } = app;
-  const isListMode = () => props.mode === 'list';
   const postData = createMemo(() => props.item?._raw || props.item || {});
+  
+  const [width, setWidth] = createSignal(0);
+  let containerRef;
+
+  // Responsive visibility thresholds
+  const showReactionInput = createMemo(() => width() > 350);
+  const showPostReactions = createMemo(() => width() > 260);
+  const showPostRewards = createMemo(() => width() > 200);
+  const useShortTimeFormat = createMemo(() => width() < 240);
+
+  onMount(() => {
+    if (!containerRef) return;
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (entry) {
+        setWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef);
+    onCleanup(() => observer.disconnect());
+  });
 
   return (
-    <div class={`flex w-full items-center justify-between ${isListMode() ? 'gap-2' : 'gap-4'} ${props.hideTopBorder ? '' : 'pt-0.5 border-t border-[hsl(var(--border))]'}`}>
-      <div class="flex items-center gap-2">
+    <div
+      ref={containerRef}
+      class={`flex w-full items-center justify-between gap-2 ${props.hideTopBorder ? '' : 'pt-0.5 border-t border-[hsl(var(--border))]'}`}
+    >
+      <div class="flex items-center gap-2 min-w-0 whitespace-nowrap">
         <PostTime 
           timestamp={postData().effective_time} 
-          format={props.timeFormat || "short"} 
+          format={useShortTimeFormat() ? 'short' : (props.timeFormat || "long")} 
         />
-        <PostReactions item={props.item} />
-        <PostRewards item={props.item} lang={lang} />
+        <Show when={showPostReactions()}>
+          <PostReactions item={props.item} />
+        </Show>
+        <Show when={showPostRewards()}>
+          <PostRewards item={props.item} lang={lang} />
+        </Show>
         <PostComments item={props.item} />
       </div>
       
-      <Show when={!props.hideActions}>
+      <Show when={!props.hideActions && showReactionInput()}>
         <div class="flex-shrink-0">
           <Show when={app.authorizedUser()}>
             <ReactionInput post={props.item} />

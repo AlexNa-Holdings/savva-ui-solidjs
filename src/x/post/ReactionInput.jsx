@@ -62,10 +62,8 @@ export default function ReactionInput(props) {
     if (graceTimerId) clearTimeout(graceTimerId);
   });
 
-  // Resolve current actor address across different app shapes
   const getActorAddress = () => {
     try {
-      // actor as signal returning object
       if (typeof app.actor === "function") {
         const a = app.actor();
         if (a?.address) return a.address;
@@ -74,7 +72,6 @@ export default function ReactionInput(props) {
           if (v) return v;
         }
       }
-      // actor as object with signal/address
       if (app.actor && typeof app.actor === "object") {
         if (typeof app.actor.addr === "function") {
           const v = app.actor.addr();
@@ -82,7 +79,6 @@ export default function ReactionInput(props) {
         }
         if (app.actor.address) return app.actor.address;
       }
-      // fallback to authorized user
       const au = app.authorizedUser?.();
       if (au?.address) return au.address;
     } catch {}
@@ -133,7 +129,6 @@ export default function ReactionInput(props) {
         n: 0,
         reaction: reactionIndex,
       });
-      // Optimistic update; server WS will reconcile
       setMyReactionIndex(reactionIndex);
     } catch (e) {
       pushErrorToast(e, { context: t("reactions.submitFailed") });
@@ -156,7 +151,6 @@ export default function ReactionInput(props) {
   const reactionType = createMemo(() => {
     const index = myReactionIndex();
     return index >= 0 ? REACTION_TYPES[index] : "like";
-    // note: index -1 means "remove reaction" – icon defaults to like
   });
   const reactionLabel = createMemo(() => t(`reactions.${reactionType()}`));
 
@@ -200,7 +194,7 @@ export default function ReactionInput(props) {
         title={hasReacted() ? t("reactions.removeReaction") : t("reactions.addReaction")}
       >
         <ReactionIcon type={reactionType()} class={`text-sm ${!hasReacted() ? "grayscale" : ""}`} />
-        <Show when={hasReacted()}>
+        <Show when={hasReacted() && !props.compact}>
           <span>{reactionLabel()}</span>
         </Show>
       </button>
