@@ -97,30 +97,6 @@ export function AppProvider(props) {
     dbg.log("DomainLangs", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
   });
 
-  Solid.createEffect(Solid.on([() => i18n.available(), () => orchestrator.domainAssetsConfig()], ([available, cfg], prev) => {
-    const isFirstRun = prev === undefined;
-    if (orchestrator.loading()) {
-        dbg.log("LangValidator", "SKIP: Orchestrator is loading.");
-        return;
-    }
-    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
-    const normAvailable = (available || []).map(norm);
-    const current = norm(i18n.lang?.());
-    dbg.log("LangValidator", `Running. First run: ${isFirstRun}. Current lang: '${current}'. Available: [${normAvailable.join(", ")}]`);
-    if (normAvailable.length === 0) {
-        dbg.log("LangValidator", "SKIP: No available languages from domain config yet.");
-        return;
-    }
-    if (normAvailable.includes(current)) {
-        dbg.log("LangValidator", `OK: Current lang '${current}' is in the available list.`);
-        return;
-    }
-    const def = norm(cfg?.default_locale);
-    const next = (def && normAvailable.includes(def) && def) || (normAvailable.includes("en") && "en") || normAvailable[0];
-    dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${normAvailable.join(", ")}] → resetting to '${next}'`);
-    i18n.setLang(next);
-  }, { defer: true }));
-  
   const actor = useActor({ auth, loading: orchestrator.loading, selectedDomainName, t: i18n.t });
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
