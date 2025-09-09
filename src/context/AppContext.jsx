@@ -20,9 +20,8 @@ const eq = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").tr
 export function AppProvider(props) {
   const i18n = useI18n();
   const auth = useAppAuth();
-  const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
-
   const orchestrator = useAppOrchestrator({ auth, i18n });
+  const ipfs = useLocalIpfs({ pushToast, pushErrorToast, t: i18n.t });
 
   const [postUpdate, setPostUpdate] = Solid.createSignal(null);
   const [lastTabRoute, setLastTabRoute] = Solid.createSignal("/");
@@ -59,8 +58,8 @@ export function AppProvider(props) {
   
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
 
-  const prices = useTokenPrices({ info: orchestrator.info });
-
+  const prices = useTokenPrices({ loading: orchestrator.loading, info: orchestrator.info });
+  
   Solid.createEffect(() => {
     const cfg = orchestrator.domainAssetsConfig?.();
     if (!cfg) return;
@@ -84,27 +83,30 @@ export function AppProvider(props) {
     }
   });
 
+  // Effect to sync domain languages with i18n service
   Solid.createEffect(() => {
     const cfg = orchestrator.domainAssetsConfig();
     const locales = Array.isArray(cfg?.locales) ? cfg.locales : [];
     const codes = locales.map(l => String(l?.code || "").trim().toLowerCase().split(/[-_]/)[0]).filter(Boolean);
-    if (codes.length > 0 && i18n?.setDomainLangCodes) i18n.setDomainLangCodes(codes);
+    i18n.setDomainLangCodes(codes);
+    dbg.log("assets", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
   });
 
-  Solid.createEffect(() => {
+  // Effect to validate and correct language selection
+  Solid.createEffect(Solid.on([() => i18n.available(), () => orchestrator.domainAssetsConfig()], ([available, cfg]) => {
+    if (orchestrator.loading()) return;
     const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
-    const available = (i18n.available?.() || []).map(norm);
-    if (available.length === 0) return;
-    const cfg = orchestrator.domainAssetsConfig?.();
+    const normAvailable = (available || []).map(norm);
+    if (normAvailable.length === 0) return;
     const current = norm(i18n.lang?.());
-    if (available.includes(current)) return;
+    if (normAvailable.includes(current)) return;
     const def = norm(cfg?.default_locale);
-    const next = (def && available.includes(def) && def) || (available.includes("en") && "en") || available[0];
-    dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${available.join(", ")}] → '${next}' (guarded)`);
+    const next = (def && normAvailable.includes(def) && def) || (normAvailable.includes("en") && "en") || normAvailable[0];
+    dbg.warn("AppContext", `Language mismatch: '${current}' ∉ [${normAvailable.join(", ")}] → '${next}' (guarded)`);
     i18n.setLang(next);
-  });
+  }, { defer: true }));
   
-  const actor = useActor({ auth, selectedDomainName });
+  const actor = useActor({ auth, loading: orchestrator.loading, selectedDomainName, t: i18n.t });
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
   const [requiredAccount, setRequiredAccount] = Solid.createSignal(null);
