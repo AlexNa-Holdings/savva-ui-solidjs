@@ -83,18 +83,36 @@ export function AppProvider(props) {
     }
   });
 
+  // Effect to sync domain languages AND validate current selection
   Solid.createEffect(() => {
     const cfg = orchestrator.domainAssetsConfig();
-    dbg.log("DomainLangs", "Effect running. Config loaded:", !!cfg);
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+    
     if (!cfg) {
       i18n.setDomainLangCodes([]);
-      dbg.log("DomainLangs", "Config not present, setting available codes to empty (will use fallback).");
       return;
     }
+    
     const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
-    const codes = locales.map(l => String(l?.code || "").trim().toLowerCase().split(/[-_]/)[0]).filter(Boolean);
+    const codes = locales.map(l => norm(l.code)).filter(Boolean);
+
     i18n.setDomainLangCodes(codes);
     dbg.log("DomainLangs", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
+
+    // NEW: Validate current language against the new domain's supported codes
+    if (codes.length > 0) {
+        const currentLang = norm(i18n.lang());
+        if (!codes.includes(currentLang)) {
+            const defaultLang = norm(cfg.default_locale);
+            const nextLang = 
+                (defaultLang && codes.includes(defaultLang)) ? defaultLang :
+                codes.includes('en') ? 'en' :
+                codes[0]; // Fallback to the first available lang for the domain
+            
+            dbg.warn("LangValidator", `Current lang '${currentLang}' not supported by new domain. Switching to '${nextLang}'.`);
+            i18n.setLang(nextLang);
+        }
+    }
   });
   
   const actor = useActor({ auth, loading: orchestrator.loading, selectedDomainName, t: i18n.t });
