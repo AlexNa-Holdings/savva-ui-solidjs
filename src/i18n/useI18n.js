@@ -20,7 +20,7 @@ const DEFAULT_LANG = "en";
 const LANG_KEY = "lang";
 const SHOW_KEYS_KEY = "i18n_show_keys";
 let i18nSingleton;
-let setLangCallCounter = 0; // Add a counter here
+let setLangCallCounter = 0;
 
 function normalizeLang(code) {
   const s = String(code || "").trim().toLowerCase();
@@ -46,8 +46,15 @@ export function useI18n() {
     const readInitialLang = () => { try { const v = localStorage.getItem(LANG_KEY); return normalizeLang(v || DEFAULT_LANG); } catch { return DEFAULT_LANG; } };
     const readInitialShowKeys = () => { try { return localStorage.getItem(SHOW_KEYS_KEY) === "1"; } catch { return false; } };
 
-    const [lang, setLangSignal] = createSignal(readInitialLang());
-    const [showKeys, setShowKeysSignal] = createSignal(readInitialShowKeys());
+    const [lang, _setLangSignal] = createSignal(readInitialLang()); // Renamed original setter
+    
+    // Create our own wrapped setter with a trace
+    const setLangSignal = (val) => {
+        console.groupCollapsed(`[signal-trace] setLangSignal('${val}')`);
+        console.trace("Stack trace:");
+        console.groupEnd();
+        _setLangSignal(val);
+    }
 
     function setLang(next) {
       setLangCallCounter++;
@@ -56,18 +63,10 @@ export function useI18n() {
       const current = lang();
 
       dbg.log("useI18n", `[Call #${callId}] setLang called with '${next}'. Normalized: '${v}', Current: '${current}'.`);
-      
-      // This will print a full stack trace to the console for every call
-      if (v !== current) {
-        console.groupCollapsed(`[i18n-trace] Call #${callId}: setLang('${v}')`);
-        console.trace("Stack trace:");
-        console.groupEnd();
-      }
 
-      if (current === v) {
-        return;
-      }
-      setLangSignal(v);
+      if (current === v) return;
+      
+      setLangSignal(v); // Use our wrapped setter
       try { localStorage.setItem(LANG_KEY, v); } catch {}
       if (typeof document !== "undefined") {
         document.documentElement.setAttribute("lang", v);
@@ -95,7 +94,10 @@ export function useI18n() {
 
     if (typeof window !== "undefined") {
       window.addEventListener("storage", (e) => {
-        if (e.key === LANG_KEY && e.newValue) setLangSignal(normalizeLang(e.newValue));
+        if (e.key === LANG_KEY && e.newValue) {
+          dbg.log("useI18n:storageEvent", `Applying value from storage event: ${e.newValue}`);
+          setLangSignal(normalizeLang(e.newValue)); // Use our wrapped setter
+        }
         if (e.key === SHOW_KEYS_KEY) setShowKeysSignal(e.newValue === "1");
       });
     }
