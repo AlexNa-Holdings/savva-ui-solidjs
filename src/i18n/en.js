@@ -7,7 +7,10 @@ export default {
   "addressInput.placeholder": "0x... / name",
   "alerts.fund_contributed.actionText": "{contributorName} contributed to",
   "alerts.fund_contributed.title": "New Contribution!",
-  "alerts.fund_prize.message": "Congratulations! You've won a prize from the fund.",
+  "alerts.fund_prize.actionText": "won a prize on",
+  "alerts.fund_prize.title": "Congratulations! You've won a prize!",
+  "alerts.fundraiser_contribution.actionText": "Contributed to",
+  "alerts.fundraiser_contribution.title": "New Contribution!",
   "app.versionLabel": "Version",
   "brand.logoAlt": "Brand Logo",
   "brand.name": "SAVVA",
@@ -320,6 +323,7 @@ export default {
   "post.comments": "Comments",
   "post.fund.confirmation": "By contributing, I confirm that {n}% of my contribution goes to the post’s author and NFT owner.",
   "post.fund.confirmation_no_nft": "By contributing, I confirm that {n}% of my contribution goes to the post’s author.",
+  "post.fund.connectWallet": "Please connect wallet to contribute",
   "post.fund.contribute": "Contribute",
   "post.fund.expectingRound": "Expected Round",
   "post.fund.explanation": "Contribute to boost this post and support the author. A share goes to the author, the rest is pooled and raffled among contributors—your chance to win!",
@@ -675,9 +679,5 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now",
-   "alerts.fund_prize.actionText": "won a prize on",
-   "post.fund.connectWallet": "Please connect wallet to contribute",
-     "alerts.fundraiser_contribution.title": "New Contribution!",
-  "alerts.fundraiser_contribution.actionText": "Contributed to"
+  "wallet.unstaked.availableNow": "Available Now"
 };
