@@ -1,7 +1,6 @@
 // src/x/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
-import { httpBase } from "../net/endpoints";
 
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
@@ -41,46 +40,56 @@ export default function SwitchConnectDialog(props) {
     aborter = new AbortController();
 
     try {
-        const u = new URL(url);
-        if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
-        if (!u.pathname.endsWith("/")) u.pathname += "/";
-        
-        const res = await fetch(u.toString() + "info", {
-            headers: { Accept: "application/json" },
-            signal: aborter.signal,
-            cache: "no-store",
-        });
+      const u = new URL(url);
+      if (!/^https?:$/.test(u.protocol)) throw new Error(t("rightPane.switch.validation.protocol"));
+      if (!u.pathname.endsWith("/")) u.pathname += "/";
 
-        if (!res.ok) throw new Error(`/info failed: ${res.status}`);
-        const info = await res.json();
-        const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-            .filter(Boolean)
-            .map((d) => (typeof d === "string" ? { name: d } : d))
-            .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0)
-            .sort((a, b) => (a.name > b.name ? 1 : -1));
+      const res = await fetch(u.toString() + "info", {
+        headers: { Accept: "application/json" },
+        signal: aborter.signal,
+        cache: "no-store",
+      });
 
-        setDomains(normalized);
+      if (!res.ok) throw new Error(`/info failed: ${res.status}`);
+      const info = await res.json();
+      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
+        .filter(Boolean)
+        .map((d) => (typeof d === "string" ? { name: d } : d))
+        .filter((d) => typeof d?.name === "string" && d.name.trim().length > 0)
+        .sort((a, b) => (a.name > b.name ? 1 : -1));
 
-        if (normalized.length > 0) {
-            const prefer = domain();
-            const keep = normalized.find((d) => eq(d.name, prefer));
-            setDomain(keep?.name || normalized[0].name);
-        } else {
-            setLocalError(t("rightPane.switch.noDomains"));
-        }
+      setDomains(normalized);
+
+      if (normalized.length > 0) {
+        const prefer = domain();
+        const keep = normalized.find((d) => eq(d.name, prefer));
+        setDomain(keep?.name || normalized[0].name);
+      } else {
+        setLocalError(t("rightPane.switch.noDomains"));
+      }
     } catch (e) {
-        if (!isAbortError(e)) setLocalError(e.message || String(e));
+      if (!isAbortError(e)) setLocalError(e.message || String(e));
     } finally {
-        setFetching(false);
+      setFetching(false);
     }
   };
 
+  // Run ONLY when dialog transitions from closed → open.
+  let wasOpen = false;
   createEffect(() => {
-    if (props.open) {
+    const isOpen = !!props.open;
+    if (isOpen && !wasOpen) {
       setBackendUrl(props.backendLink ?? app.config?.()?.backendLink ?? "");
       setDomain(dn(props.domain) || (app.config?.()?.domain || ""));
-      fetchDomains(backendUrl());
+      setDomains([]);
+      setLocalError("");
+      // No auto-fetch here; user must click "Load Domains".
     }
+    if (!isOpen && wasOpen) {
+      // Cancel any in-flight request when closing.
+      aborter?.abort();
+    }
+    wasOpen = isOpen;
   });
 
   onCleanup(() => aborter?.abort());
@@ -90,7 +99,7 @@ export default function SwitchConnectDialog(props) {
     try {
       await app.initializeOrSwitch({
         backendLink: backendUrl(),
-        domain: domain()
+        domain: domain(),
       });
       props.onClose?.();
     } catch (e) {
@@ -139,9 +148,7 @@ export default function SwitchConnectDialog(props) {
             disabled={fetching() || domains().length === 0}
           >
             {domains().map((d) => (
-              <option value={d.name} selected={eq(d.name, domain())}>
-                {d.name}
-              </option>
+              <option value={d.name}>{d.name}</option>
             ))}
           </select>
 
@@ -165,7 +172,10 @@ export default function SwitchConnectDialog(props) {
           </Show>
 
           <div class="mt-4 flex gap-2 justify-end">
-            <button class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90" onClick={props.onClose}>
+            <button
+              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+              onClick={props.onClose}
+            >
               {t("common.cancel")}
             </button>
             <button
