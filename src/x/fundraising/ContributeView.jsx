@@ -1,4 +1,3 @@
-// src/x/fundraising/ContributeView.jsx
 import { createSignal, Show, createResource, createMemo, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
@@ -136,7 +135,7 @@ export default function ContributeView(props) {
         if (amountWei() <= 0n || !selectedToken()) return;
         
         setIsProcessing(true);
-        const toastId = "contrib_toast";
+        let approveToastId, sendingToastId;
 
         try {
             const walletClient = await app.getGuardedWalletClient();
@@ -146,24 +145,25 @@ export default function ContributeView(props) {
             const isBase = selectedToken() === "0";
             
             if (isBase) {
-                pushToast({ type: "info", message: t("fundraising.contribute.toast.sending"), id: toastId, autohideMs: 0 });
+                sendingToastId = pushToast({ type: "info", message: t("fundraising.contribute.toast.sending"), autohideMs: 0 });
                 txHash = await fundraiserContract.write.contribute([props.campaignId, "0x0000000000000000000000000000000000000000", amountWei()], { value: amountWei() });
             } else {
                 const tokenContract = getContract({ address: selectedToken(), abi: ERC20_MIN_ABI, client: walletClient });
                 const allowance = await tokenContract.read.allowance([user().address, fundraiserContract.address]);
 
                 if (allowance < amountWei()) {
-                    pushToast({ type: "info", message: t("fundraising.contribute.toast.approving"), id: toastId, autohideMs: 0 });
+                    approveToastId = pushToast({ type: "info", message: t("fundraising.contribute.toast.approving"), autohideMs: 0 });
                     const approveHash = await tokenContract.write.approve([fundraiserContract.address, MAX_UINT]);
                     await publicClient.waitForTransactionReceipt({ hash: approveHash });
+                    app.dismissToast(approveToastId);
                 }
                 
-                pushToast({ type: "info", message: t("fundraising.contribute.toast.sending"), id: toastId, autohideMs: 0 });
+                sendingToastId = pushToast({ type: "info", message: t("fundraising.contribute.toast.sending"), autohideMs: 0 });
                 txHash = await fundraiserContract.write.contribute([props.campaignId, selectedToken(), amountWei()]);
             }
             
             await publicClient.waitForTransactionReceipt({ hash: txHash });
-            app.dismissToast(toastId);
+            app.dismissToast(sendingToastId);
             pushToast({ type: "success", message: t("fundraising.contribute.toast.success") });
             
             refetch();
@@ -172,7 +172,8 @@ export default function ContributeView(props) {
             setErr(error.shortMessage || error.message);
             pushErrorToast(error, { context: t("fundraising.contribute.toast.error") });
         } finally {
-            app.dismissToast(toastId);
+            if (approveToastId) app.dismissToast(approveToastId);
+            if (sendingToastId) app.dismissToast(sendingToastId);
             setIsProcessing(false);
         }
     };
@@ -274,3 +275,4 @@ export default function ContributeView(props) {
         </Show>
     );
 }
+

@@ -107,21 +107,29 @@ export async function switchOrAddChain(meta) {
       params: [{ chainId: chainIdHexVal }],
     });
   } catch (e) {
-    // 4902 = Unrecognized chain
     const code = e?.code ?? e?.data?.originalError?.code;
-    if (code === 4902) {
-      await eth.request({
-        method: "wallet_addEthereumChain",
-        params: [
-          {
-            chainId: chainIdHexVal,
-            chainName: meta.name || `Chain ${meta.chainId}`,
-            nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
-            rpcUrls: meta.rpcUrls || [],
-            blockExplorerUrls: meta.blockExplorers || [],
-          },
-        ],
-      });
+    const isUnrecognizedChainError =
+      code === 4902 ||
+      String(e.message).includes("Unrecognized chain ID");
+
+    if (isUnrecognizedChainError) {
+      try {
+        await eth.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: chainIdHexVal,
+              chainName: meta.name || `Chain ${meta.chainId}`,
+              nativeCurrency: meta.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: meta.rpcUrls || [],
+              blockExplorerUrls: meta.blockExplorers || [],
+            },
+          ],
+        });
+      } catch (addError) {
+        console.error("Failed to add chain:", addError);
+        throw addError;
+      }
     } else {
       throw e;
     }
