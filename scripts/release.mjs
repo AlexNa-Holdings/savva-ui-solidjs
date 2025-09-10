@@ -8,6 +8,7 @@ const ROOT = process.cwd();
 dotenv.config({ path: path.join(ROOT, ".env") });
 
 const VERSION_FILE = path.join(ROOT, "src", "version.js");
+const DIST_DIR = path.join(ROOT, "dist");
 const MAIN_BRANCH = process.env.GIT_MAIN_BRANCH || "main";
 const PROD_BRANCH = process.env.PROD_BRANCH || "Prod";
 
@@ -44,6 +45,16 @@ function runI18nScripts() {
 
 function build() {
   sh("npm run build");
+}
+
+function copyVersionFile() {
+  if (!fs.existsSync(DIST_DIR)) {
+    console.error(`Error: dist directory does not exist at ${DIST_DIR}. Build might have failed.`);
+    process.exit(1);
+  }
+  const dest = path.join(DIST_DIR, "version.js");
+  console.log(`Copying ${VERSION_FILE} to ${dest}`);
+  fs.copyFileSync(VERSION_FILE, dest);
 }
 
 function gitCommitAndPush(version) {
@@ -90,6 +101,7 @@ function deploy() {
 
   runI18nScripts();
   build();
+  copyVersionFile();
   gitCommitAndPush(nextVersion);
   deploy();
   ensureMainBranch();

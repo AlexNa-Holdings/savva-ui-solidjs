@@ -27,6 +27,7 @@ import NpoListPage from "./pages/NpoListPage.jsx";
 import NpoPage from "./pages/NpoPage.jsx";
 import { closeAllModals } from "../utils/modalBus.js";
 import NavigationPanel from "./navigation/NavigationPanel.jsx";
+import VersionChecker from "./main/VersionChecker.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -120,6 +121,7 @@ export default function App() {
           <GoogleAnalyticsLoader />
           <WsConnector />
           <AlertManager />
+          <VersionChecker />
           
           <Show when={domainRevision()} keyed>
             <>
