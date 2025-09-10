@@ -317,6 +317,8 @@ export default {
   "npo.page.title": "NPO",
   "npo.page.tokens.placeholder": "Panneau des jetons (à venir bientôt).",
   "npo.short": "NPO",
+  "nsfw.cover.show": "Afficher",
+  "nsfw.cover.warning": "Ce post peut être sensible. La discrétion du spectateur est conseillée.",
   "post.addComment": "Ajouter un commentaire...",
   "post.chapters.prologue": "Prologue",
   "post.chapters.title": "Table des matières",

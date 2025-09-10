@@ -317,6 +317,8 @@ export default {
   "npo.page.title": "НПО",
   "npo.page.tokens.placeholder": "Панель токенів (незабаром).",
   "npo.short": "НПО",
+  "nsfw.cover.show": "Показати",
+  "nsfw.cover.warning": "Цей пост може містити чутливу інформацію. Рекомендуємо обережність.",
   "post.addComment": "Додати коментар...",
   "post.chapters.prologue": "Пролог",
   "post.chapters.title": "Зміст",

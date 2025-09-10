@@ -317,6 +317,8 @@ export default {
   "npo.page.title": "NPO",
   "npo.page.tokens.placeholder": "Tokens panel (coming soon).",
   "npo.short": "NPO",
+  "nsfw.cover.show": "Show",
+  "nsfw.cover.warning": "This post may be sensitive in nature. Viewer discretion is advised.",
   "post.addComment": "Add a comment...",
   "post.chapters.prologue": "Prologue",
   "post.chapters.title": "Table of Contents",
@@ -679,7 +681,5 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now",
-  "nsfw.cover.warning": "This post may be sensitive in nature. Viewer discretion is advised.",
-  "nsfw.cover.show": "Show",
-}
+  "wallet.unstaked.availableNow": "Available Now"
+};

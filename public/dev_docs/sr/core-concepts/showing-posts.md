@@ -1,15 +1,15 @@
-# Prikaz Postova
+# Prikazivanje Postova
 
-Prikaz SAVVA posta je proces u dva koraka.
+Prikazivanje SAVVA posta je proces u dva koraka.
 
 1. Preuzmite listu objekata metapodataka postova sa SAVVA backend-a.
-2. Iskoristite IPFS informacije iz tih metapodataka da preuzmete stvarni sadržaj (naslov, tekst, slike, itd.) sa decentralizovane mreže.
+2. Iskoristite IPFS informacije iz tih metapodataka da preuzmete stvarni sadržaj (naslov, tekst, slike, itd.) iz decentralizovane mreže.
 
 ---
 
 ## Korak 1: Preuzimanje Metapodataka Postova sa Backend-a
 
-Primarni način za dobijanje liste postova je putem **`content-list`** WebSocket metode. 
+Primarni način da dobijete listu postova je putem **`content-list`** WebSocket metode. 
 Podržava paginaciju, sortiranje i filtriranje.
 
 ### Pozivanje `content-list`
@@ -17,14 +17,15 @@ Podržava paginaciju, sortiranje i filtriranje.
 Pozivate metodu sa parametrima koji specificiraju koji sadržaj vam je potreban. Primer:
 
 ```js
-// Primer poziva koristeći wsMethod pomoćnika aplikacije
+// Primer poziva koristeći wsMethod pomoćnu funkciju aplikacije
 const posts = await app.wsMethod("content-list")({
-  domain: "savva.app",      // Domen sa kojeg se preuzimaju postovi
+  domain: "savva.app",      // Domen za preuzimanje postova
   limit: 12,                // Broj stavki po stranici
   offset: 0,                // Početni indeks (za paginaciju)
   lang: "en",               // Preferirani jezik za metapodatke
   order_by: "fund_amount",  // Sortiraj po ukupnim primljenim sredstvima
   content_type: "post",     // Želimo samo postove
+  show_nsfw: true,          // true ako korisničke postavke dozvoljavaju, inače false
   category: "en:SAVVA Talk" // Opcionalno: filtriraj po kategoriji
 });
 ```
@@ -79,18 +80,18 @@ Primer:
 
 ### Objašnjenje Ključnih Polja
 
-* **author** — profil informacije autora (uključujući iznos koji je uložio).
+* **author** — informacije o profilu autora (uključujući iznos uloženih sredstava).
 * **savva\_cid / short\_cid** — jedinstveni ID-ovi. Koristite ih za izgradnju URL-ova (`/post/<short_cid>`).
 * **ipfs / savva\_content.data\_cid** — pokazivači na IPFS sadržaj.
-* **savva\_content** — metapodaci keširani na backend-u (naslovi, pregledi, sličice). Odlično za prikazivanje feed-a bez preuzimanja sa IPFS-a.
+* **savva\_content** — metapodaci keširani na backend-u (naslovi, pregledi, sličice). Odlično za renderovanje feed-a bez preuzimanja sa IPFS-a.
 * **fund** — informacije o fondu postova.
 * **reactions** — niz brojeva za svaki tip reakcije.
 
 ---
 
-## Korak 2: Rešavanje Celokupnog Sadržaja sa IPFS-a
+## Korak 2: Rešavanje Celokupnog Sadržaja iz IPFS-a
 
-Dok je `savva_content` koristan za preglede, celokupan sadržaj mora biti preuzet sa IPFS-a (telo posta, poglavlja, resursi).
+Dok je `savva_content` koristan za preglede, celokupan sadržaj mora biti preuzet iz IPFS-a (telo posta, poglavlja, resursi).
 
 ### Rešavanje Putanja Sadržaja
 
@@ -100,14 +101,14 @@ Lokacija `info.yaml` zavisi od formata:
 
   * `savva_content.data_cid` = osnovni CID za resurse.
   * `ipfs` = direktna putanja do `info.yaml`.
-* **Legacijski format**
+* **Legacy format**
 
   * Nema `data_cid`.
   * `ipfs` = osnovni CID. Pretpostavlja se da je deskriptor na `<ipfs>/info.yaml`.
 
-### Funkcije Pomoći
+### Pomoćne Funkcije
 
-Koristite pomoćnike iz `src/ipfs/utils.js`:
+Koristite pomoćne funkcije iz `src/ipfs/utils.js`:
 
 ```js
 import {
@@ -118,7 +119,7 @@ import {
 
 const post = { ... };
 
-// 1. Putanja do deskriptorskog fajla
+// 1. Putanja do deskriptor fajla
 const descriptorPath = getPostDescriptorPath(post);
 
 // 2. Osnovni CID za resurse
@@ -135,7 +136,7 @@ const fullThumbnailPath = resolvePostCidPath(post, post.savva_content.thumbnail)
 Redosled preuzimanja:
 
 1. **Lokalni čvor** (ako je omogućen).
-2. **Specifični gateway-evi za postove** (navedeni u deskriptoru).
+2. **Specifični gateway-evi za post** (navedeni u deskriptoru).
 3. **Sistemski gateway-evi** (backend `/info`).
 
 Ovo osigurava najbolju brzinu i dostupnost.
@@ -144,7 +145,7 @@ Ovo osigurava najbolju brzinu i dostupnost.
 
 ## Deskriptor Posta (`info.yaml`)
 
-YAML fajl koji definiše celokupnu strukturu: jezici, poglavlja, metapodaci.
+YAML fajl koji definiše celokupnu strukturu: jezike, poglavlja, metapodatke.
 
 ### Primer `info.yaml`
 
@@ -155,15 +156,15 @@ gateways:
 
 locales:
   en:
-    title: "Razumevanje Decentralizovanih Sistema"
-    text_preview: "Dubinsko istraživanje osnovnih koncepata decentralizacije..."
+    title: "Understanding Decentralized Systems"
+    text_preview: "A deep dive into the core concepts of decentralization..."
     tags: ["blockchain", "systems", "web3"]
-    categories: ["Tehnologija"]
+    categories: ["Technology"]
     data_path: content/en/main.md
     chapters:
-      - title: "Šta je Blockchain?"
+      - title: "What is a Blockchain?"
         data_path: content/en/chapter1.md
-      - title: "IPFS i Adresiranje Sadržaja"
+      - title: "IPFS and Content Addressing"
         data_path: content/en/chapter2.md
   
   ru:
@@ -189,7 +190,7 @@ locales:
   * **data\_path** — glavni Markdown sadržaj za taj jezik.
   * **chapters** — niz poglavlja, svako sa `title` i `data_path`.
 
-Da preuzmete celokupan sadržaj poglavlja:
+Da biste preuzeli celokupan sadržaj poglavlja:
 
 ```txt
 <content_base_cid>/content/en/chapter1.md

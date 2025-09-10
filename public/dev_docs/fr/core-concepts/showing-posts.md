@@ -2,14 +2,14 @@
 
 Afficher un post SAVVA est un processus en deux étapes.
 
-1. Récupérer une liste d'objets de métadonnées de post depuis le backend SAVVA.
+1. Récupérer une liste d'objets de métadonnées de publication depuis le backend SAVVA.
 2. Utiliser les informations IPFS de ces métadonnées pour récupérer le contenu réel (titre, texte, images, etc.) depuis le réseau décentralisé.
 
 ---
 
-## Étape 1 : Récupérer les Métadonnées des Posts depuis le Backend
+## Étape 1 : Récupérer les Métadonnées des Publications depuis le Backend
 
-La principale façon d'obtenir une liste de posts est via la méthode WebSocket **`content-list`**. Elle prend en charge la pagination, le tri et le filtrage.
+La principale façon d'obtenir une liste de publications est via la méthode WebSocket **`content-list`**. Elle prend en charge la pagination, le tri et le filtrage.
 
 ### Appel de `content-list`
 
@@ -18,21 +18,22 @@ Vous appelez la méthode avec des paramètres spécifiant quel contenu vous avez
 ```js
 // Exemple d'appel utilisant l'assistant wsMethod de l'application
 const posts = await app.wsMethod("content-list")({
-  domain: "savva.app",      // Domaine pour récupérer les posts
+  domain: "savva.app",      // Domaine pour récupérer les publications
   limit: 12,                // Nombre d'éléments par page
   offset: 0,                // Index de départ (pour la pagination)
   lang: "en",               // Langue préférée pour les métadonnées
   order_by: "fund_amount",  // Trier par le montant total des fonds reçus
-  content_type: "post",     // Nous voulons uniquement des posts
+  content_type: "post",     // Nous voulons uniquement des publications
+  show_nsfw: true,          // true si les paramètres de l'utilisateur le permettent, sinon false
   category: "en:SAVVA Talk" // Optionnel : filtrer par catégorie
 });
 ```
 
 ---
 
-## La Structure de l'Objet Post
+## La Structure de l'Objet Publication
 
-La méthode `content-list` retourne un tableau d'**objets de post**. Chacun contient des métadonnées et des pointeurs nécessaires pour récupérer le contenu complet.
+La méthode `content-list` retourne un tableau d'**objets de publication**. Chacun contient des métadonnées et des pointeurs nécessaires pour récupérer le contenu complet.
 
 Exemple :
 
@@ -80,9 +81,9 @@ Exemple :
 * **author** — informations de profil de l'auteur (y compris le montant misé).
 * **savva\_cid / short\_cid** — identifiants uniques. Utilisez-les pour construire des URLs (`/post/<short_cid>`).
 * **ipfs / savva\_content.data\_cid** — pointeurs vers le contenu IPFS.
-* **savva\_content** — métadonnées mises en cache par le backend (titres, aperçus, vignettes). Idéal pour le rendu du fil sans récupération IPFS.
+* **savva\_content** — métadonnées mises en cache par le backend (titres, aperçus, vignettes). Idéal pour le rendu du fil d'actualités sans récupération IPFS.
 * **fund** — informations sur le pool de financement du post.
-* **reactions** — tableau des comptes pour chaque type de réaction.
+* **reactions** — tableau de comptes pour chaque type de réaction.
 
 ---
 
@@ -122,7 +123,7 @@ const descriptorPath = getPostDescriptorPath(post);
 // 2. CID de base pour les actifs
 const contentBaseCid = getPostContentBaseCid(post);
 
-// 3. Résoudre le chemin relatif (par exemple, vignette)
+// 3. Résoudre le chemin relatif (ex. vignette)
 const fullThumbnailPath = resolvePostCidPath(post, post.savva_content.thumbnail);
 ```
 
@@ -133,14 +134,14 @@ const fullThumbnailPath = resolvePostCidPath(post, post.savva_content.thumbnail)
 Ordre de récupération :
 
 1. **Nœud local** (si activé).
-2. **Passerelles spécifiques au post** (listées dans le descripteur).
+2. **Passerelles spécifiques aux posts** (listées dans le descripteur).
 3. **Passerelles système** (backend `/info`).
 
 Cela garantit la meilleure vitesse et disponibilité.
 
 ---
 
-## Le Descripteur de Post (`info.yaml`)
+## Le Descripteur de Publication (`info.yaml`)
 
 Un fichier YAML définissant la structure complète : langues, chapitres, métadonnées.
 

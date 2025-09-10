@@ -317,6 +317,8 @@ export default {
   "npo.page.title": "NPO",
   "npo.page.tokens.placeholder": "Panel tokena (uskoro).",
   "npo.short": "NPO",
+  "nsfw.cover.show": "Prikaži",
+  "nsfw.cover.warning": "Ova objava može biti osetljiva. Preporučuje se oprez pri gledanju.",
   "post.addComment": "Dodaj komentar...",
   "post.chapters.prologue": "Prolog",
   "post.chapters.title": "Sadržaj",
