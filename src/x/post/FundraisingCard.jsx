@@ -47,68 +47,50 @@ function percentOf(raisedWei, targetWei) {
     return Number(p100) / 100;
 }
 
-// --- Data Fetchers ---
-
-// Fetches details for a single campaign from the backend API
-async function fetchCampaignFromApi(params) {
-    const { app, campaignId } = params;
-    if (!app.wsMethod || !campaignId) return null;
-
-    try {
-        await whenWsOpen();
-        const listFundraisers = app.wsMethod("list-fundraisers");
-        const res = await listFundraisers({
-            id: campaignId,
-            limit: 1,
-            offset: 0,
-            user: ''
-        });
-
-        const list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-        return list[0] || null;
-    } catch (e) {
-        console.error(`Failed to fetch campaign #${campaignId} from API`, e);
-        return { error: e.message };
-    }
-}
-
-// Fetches live details for a single campaign from the smart contract
-async function fetchCampaignFromContract(params) {
-    const { app, campaignId, walletConnected } = params;
-    // Only run if the wallet is connected.
-    if (!app || !campaignId || !walletConnected) return null;
-
-    try {
-        const fundraiserContract = await getSavvaContract(app, "Fundraiser");
-        const data = await fundraiserContract.read.campaigns([campaignId]);
-        return {
-            title: data[0],
-            creator: data[1],
-            targetAmount: data[2],
-            totalContributed: data[3],
-        };
-    } catch (e) {
-        console.error(`Failed to fetch campaign #${campaignId} from contract`, e);
-        return { error: e.message };
-    }
-}
-
-
 export default function FundraisingCard(props) {
   const app = useApp();
   const { t } = app;
   const campaignId = () => props.campaignId;
 
-  // Resource 1: Fetch from API (always runs)
+  // Resource 1: Fetch from API (always runs, listens for fundraiser updates)
   const [apiData] = createResource(
-    () => ({ app, campaignId: campaignId() }), 
-    fetchCampaignFromApi
+    () => ({ app, campaignId: campaignId(), refreshKey: app.fundraiserUpdateKey() }), 
+    async (params) => {
+        const { app, campaignId } = params;
+        if (!app.wsMethod || !campaignId) return null;
+        try {
+            await whenWsOpen();
+            const listFundraisers = app.wsMethod("list-fundraisers");
+            const res = await listFundraisers({ id: campaignId, limit: 1, offset: 0, user: '' });
+            const list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+            return list[0] || null;
+        } catch (e) {
+            console.error(`Failed to fetch campaign #${campaignId} from API`, e);
+            return { error: e.message };
+        }
+    }
   );
   
-  // Resource 2: Fetch from Contract (runs only when wallet is connected)
+  // Resource 2: Fetch from Contract (runs only when wallet is connected, listens for fundraiser updates)
   const [contractData] = createResource(
-    () => ({ app, campaignId: campaignId(), walletConnected: !!walletAccount() }),
-    fetchCampaignFromContract
+    () => ({ app, campaignId: campaignId(), walletConnected: !!walletAccount(), refreshKey: app.fundraiserUpdateKey() }),
+    async (params) => {
+        const { app, campaignId, walletConnected } = params;
+        if (!app || !campaignId || !walletConnected) return null;
+        try {
+            const fundraiserContract = await getSavvaContract(app, "Fundraiser");
+            const data = await fundraiserContract.read.campaigns([campaignId]);
+            return {
+                title: data[0],
+                creator: data[1],
+                targetAmount: data[2],
+                totalContributed: data[3],
+            };
+        } catch (e) {
+            console.error(`Failed to fetch campaign #${campaignId} from contract`, e);
+            return { error: e.message };
+        }
+    }
   );
 
   // Memo to merge API and Contract data

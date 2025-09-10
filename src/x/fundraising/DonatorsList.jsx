@@ -60,6 +60,12 @@ export default function DonatorsList(props) {
         setLoading(false);
     };
 
+    createEffect(on(() => app.fundraiserUpdateKey(), () => {
+        if (app.fundraiserUpdateKey() > 0) {
+            refresh();
+        }
+    }, { defer: true }));
+
     onMount(() => {
         loadMore();
         const handleScroll = () => {

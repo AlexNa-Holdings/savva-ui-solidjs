@@ -4,6 +4,8 @@ import { getDraftParams, clearDraft, DRAFT_DIRS } from "../editor/storage.js";
 import { pushToast } from "../ui/toast";
 import ContributionToast from "../x/ui/toasts/ContributionToast.jsx";
 import { formatUnits } from "viem";
+import FundraiserContributionToast from "../x/ui/toasts/FundraiserContributionToast.jsx";
+
 
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
@@ -182,6 +184,25 @@ export function handleFundPrize(app, payload) {
     message: app.t("alerts.fund_prize.title"),
     autohideMs: 15000,
     bodyComponent: PrizeToast,
+    bodyProps: { data },
+  });
+}
+
+export function handleFundraiserContribution(app, payload) {
+  const data = payload.data;
+  dbg.log("Alerts:fundraiser_contribution", data);
+
+  if (!data || !data.id) return;
+  
+  // Trigger UI updates for fundraising components
+  app.triggerFundraiserUpdate?.();
+
+  // Show a toast
+  pushToast({
+    type: "info",
+    message: app.t("alerts.fundraiser_contribution.title"),
+    autohideMs: 10000,
+    bodyComponent: FundraiserContributionToast,
     bodyProps: { data },
   });
 }

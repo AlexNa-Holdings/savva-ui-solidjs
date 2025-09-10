@@ -28,6 +28,7 @@ export function AppProvider(props) {
   const [savedScrollY, setSavedScrollY] = Solid.createSignal(0);
   const [walletDataNeedsRefresh, setWalletDataNeedsRefresh] = Solid.createSignal(0);
   const { route } = useHashRouter();
+  const [fundraiserUpdateKey, setFundraiserUpdateKey] = Solid.createSignal(0);
 
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
@@ -55,11 +56,11 @@ export function AppProvider(props) {
     }
     return supportedDomains()[0] || "";
   });
-  
+
   const selectedDomainName = Solid.createMemo(() => dn(selectedDomain()));
 
   const prices = useTokenPrices({ loading: orchestrator.loading, info: orchestrator.info });
-  
+
   Solid.createEffect(() => {
     const cfg = orchestrator.domainAssetsConfig?.();
     if (!cfg) return;
@@ -87,12 +88,12 @@ export function AppProvider(props) {
   Solid.createEffect(() => {
     const cfg = orchestrator.domainAssetsConfig();
     const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
-    
+
     if (!cfg) {
       i18n.setDomainLangCodes([]);
       return;
     }
-    
+
     const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
     const codes = locales.map(l => norm(l.code)).filter(Boolean);
 
@@ -100,20 +101,20 @@ export function AppProvider(props) {
     dbg.log("DomainLangs", "i18n domain language codes updated", codes.length > 0 ? codes : "[using app fallback]");
 
     if (codes.length > 0) {
-        const currentLang = norm(i18n.lang());
-        if (!codes.includes(currentLang)) {
-            const defaultLang = norm(cfg.default_locale);
-            const nextLang = 
-                (defaultLang && codes.includes(defaultLang)) ? defaultLang :
-                codes.includes('en') ? 'en' :
-                codes[0];
-            
-            dbg.warn("LangValidator", `Current lang '${currentLang}' not supported by new domain. Switching to '${nextLang}'.`);
-            i18n.setLang(nextLang);
-        }
+      const currentLang = norm(i18n.lang());
+      if (!codes.includes(currentLang)) {
+        const defaultLang = norm(cfg.default_locale);
+        const nextLang =
+          (defaultLang && codes.includes(defaultLang)) ? defaultLang :
+            codes.includes('en') ? 'en' :
+              codes[0];
+
+        dbg.warn("LangValidator", `Current lang '${currentLang}' not supported by new domain. Switching to '${nextLang}'.`);
+        i18n.setLang(nextLang);
+      }
     }
   });
-  
+
   const actor = useActor({ auth, loading: orchestrator.loading, selectedDomainName, t: i18n.t });
 
   const [isSwitchAccountModalOpen, setIsSwitchAccountModalOpen] = Solid.createSignal(false);
@@ -163,7 +164,7 @@ export function AppProvider(props) {
     }
     return walletClient;
   }
-  
+
   const [userDisplayNames, _setUserDisplayNames] = Solid.createSignal({});
   function setUserDisplayNames(address, namesMap) {
     if (!address || !namesMap || typeof namesMap !== "object") return;
@@ -213,6 +214,8 @@ export function AppProvider(props) {
     userAvatars,
     setUserAvatar,
     dismissToast,
+    fundraiserUpdateKey,
+    triggerFundraiserUpdate: () => setFundraiserUpdateKey(k => k + 1),
     actorIsNpo: actor.actorIsNpo,
     isActingAsNpo: actor.isActingAsNpo,
     actorAddress: actor.actorAddress,

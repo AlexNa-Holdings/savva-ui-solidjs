@@ -32,7 +32,7 @@ function percentOf(raisedWei, targetWei) {
     return Number(p100) / 100;
 }
 
-async function fetchCampaignData({ app, campaignId }) {
+async function fetchCampaignData({ app, campaignId, refreshKey }) {
     if (!app || !campaignId) return null;
     try {
         const fundraiserContract = await getSavvaContract(app, "Fundraiser");
@@ -90,15 +90,15 @@ export default function ContributeView(props) {
     const { t } = app;
     const user = () => app.authorizedUser();
 
-    const [data, { refetch }] = createResource(
-        () => ({ app, campaignId: props.campaignId }), 
+    const [campaignResource, { refetch }] = createResource(
+        () => ({ app, campaignId: props.campaignId, refreshKey: app.fundraiserUpdateKey() }), 
         fetchCampaignData
     );
 
-    const campaign = createMemo(() => data()?.details);
-    const campaignError = createMemo(() => data()?.error);
-    const acceptedTokens = createMemo(() => data()?.acceptedTokens || []);
-    const feePercent = createMemo(() => Number(data()?.fee || 0n) / 100);
+    const campaign = createMemo(() => campaignResource()?.details);
+    const campaignError = createMemo(() => campaignResource()?.error);
+    const acceptedTokens = createMemo(() => campaignResource()?.acceptedTokens || []);
+    const feePercent = createMemo(() => Number(campaignResource()?.fee || 0n) / 100);
 
     const [selectedToken, setSelectedToken] = createSignal("0");
     const [amountText, setAmountText] = createSignal("");
@@ -193,7 +193,7 @@ export default function ContributeView(props) {
                     classList={{ "md:grid-cols-3": showDonators() }}
                 >
                     <div classList={{ "md:col-span-2": showDonators() }}>
-                        <Show when={!data.loading && !campaignError()} fallback={
+                        <Show when={!campaignResource.loading && !campaignError()} fallback={
                             <div class="flex justify-center p-8 h-full items-center">
                                 <Show when={!campaignError()} fallback={<p class="text-sm text-[hsl(var(--destructive))]">{campaignError().message}</p>}>
                                     <Spinner />
@@ -274,4 +274,3 @@ export default function ContributeView(props) {
         </Show>
     );
 }
-

@@ -677,5 +677,7 @@ export default {
   "wallet.unstake.title": "Unstake Funds",
   "wallet.unstaked.availableNow": "Available Now",
    "alerts.fund_prize.actionText": "won a prize on",
-   "post.fund.connectWallet": "Please connect wallet to contribute"
+   "post.fund.connectWallet": "Please connect wallet to contribute",
+     "alerts.fundraiser_contribution.title": "New Contribution!",
+  "alerts.fundraiser_contribution.actionText": "Contributed to"
 };

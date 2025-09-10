@@ -15,4 +15,5 @@ export const alertRegistry = {
   user_info_changed: h.handleUserInfoChanged,
   fund_contributed: h.handleFundContributed,
   fund_prize: h.handleFundPrize,
+  fundraiser_contribution: h.handleFundraiserContribution,
 };

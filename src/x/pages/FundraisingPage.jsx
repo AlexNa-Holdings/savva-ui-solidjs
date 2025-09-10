@@ -117,6 +117,12 @@ export default function FundraisingPage() {
 
   createEffect(on([onlyMy, showFinished, actorAddr], refreshList, { defer: true }));
 
+  createEffect(on(() => app.fundraiserUpdateKey(), () => {
+    if (app.fundraiserUpdateKey() > 0) {
+      refreshList();
+    }
+  }, { defer: true }));
+
   onMount(() => {
     loadMore();
     const handleScroll = () => {
