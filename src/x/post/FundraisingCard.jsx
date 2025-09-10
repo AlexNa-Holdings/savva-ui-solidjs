@@ -3,6 +3,7 @@ import { createMemo, createResource, Show, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { walletAccount } from "../../blockchain/wallet.js";
+import { getSavvaContract } from "../../blockchain/contracts.js";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import ProgressBar from "../ui/ProgressBar.jsx";
@@ -46,8 +47,10 @@ function percentOf(raisedWei, targetWei) {
     return Number(p100) / 100;
 }
 
-// Fetches details for a single campaign
-async function fetchCampaignDetails(params) {
+// --- Data Fetchers ---
+
+// Fetches details for a single campaign from the backend API
+async function fetchCampaignFromApi(params) {
     const { app, campaignId } = params;
     if (!app.wsMethod || !campaignId) return null;
 
@@ -64,31 +67,87 @@ async function fetchCampaignDetails(params) {
         const list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
         return list[0] || null;
     } catch (e) {
-        console.error(`Failed to fetch campaign #${campaignId}`, e);
+        console.error(`Failed to fetch campaign #${campaignId} from API`, e);
         return { error: e.message };
     }
 }
+
+// Fetches live details for a single campaign from the smart contract
+async function fetchCampaignFromContract(params) {
+    const { app, campaignId, walletConnected } = params;
+    // Only run if the wallet is connected.
+    if (!app || !campaignId || !walletConnected) return null;
+
+    try {
+        const fundraiserContract = await getSavvaContract(app, "Fundraiser");
+        const data = await fundraiserContract.read.campaigns([campaignId]);
+        return {
+            title: data[0],
+            creator: data[1],
+            targetAmount: data[2],
+            totalContributed: data[3],
+        };
+    } catch (e) {
+        console.error(`Failed to fetch campaign #${campaignId} from contract`, e);
+        return { error: e.message };
+    }
+}
+
 
 export default function FundraisingCard(props) {
   const app = useApp();
   const { t } = app;
   const campaignId = () => props.campaignId;
 
-  const [campaignData] = createResource(
+  // Resource 1: Fetch from API (always runs)
+  const [apiData] = createResource(
     () => ({ app, campaignId: campaignId() }), 
-    fetchCampaignDetails
+    fetchCampaignFromApi
   );
   
-  const campaign = createMemo(() => campaignData());
+  // Resource 2: Fetch from Contract (runs only when wallet is connected)
+  const [contractData] = createResource(
+    () => ({ app, campaignId: campaignId(), walletConnected: !!walletAccount() }),
+    fetchCampaignFromContract
+  );
+
+  // Memo to merge API and Contract data
+  const campaign = createMemo(() => {
+    const api = apiData();
+    const contract = contractData();
+
+    if (!api) return null; // If API hasn't loaded, we have nothing to show.
+    if (api.error) return api; // Propagate API error
+
+    // Start with the API data as the base
+    let merged = {
+        id: api.id,
+        user: api.user,
+        title: api.title,
+        target_amount: api.target_amount,
+        raised: api.raised,
+        finished: api.finished
+    };
+    
+    // If contract data is available, it overrides the amounts
+    if (contract && !contract.error) {
+        merged.target_amount = contract.targetAmount;
+        merged.raised = contract.totalContributed;
+    }
+    
+    return merged;
+  });
+  
   const targetWei = createMemo(() => toWeiBigInt(campaign()?.target_amount));
   const raisedWei = createMemo(() => toWeiBigInt(campaign()?.raised));
   const percentage = createMemo(() => percentOf(raisedWei(), targetWei()));
-
   const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
   
   const handleContribute = () => {
     props.onContribute?.(campaignId());
   };
+
+  const loading = createMemo(() => apiData.loading || (walletAccount() && contractData.loading));
 
   return (
     <div
@@ -98,9 +157,9 @@ export default function FundraisingCard(props) {
     >
       <h4 class="font-semibold uppercase text-center">{t("fundraising.title")} #{campaignId()}</h4>
       
-      <Show when={!campaignData.loading} fallback={<div class="flex justify-center p-4"><Spinner /></div>}>
+      <Show when={!loading()} fallback={<div class="flex justify-center p-4"><Spinner /></div>}>
         <Switch>
-          <Match when={campaignData.error || !campaign()}>
+          <Match when={apiData.error || !campaign()}>
             <p class="text-sm text-center text-[hsl(var(--card))] opacity-80">
               {t("fundraising.card.notFound", { id: campaignId() })}
             </p>

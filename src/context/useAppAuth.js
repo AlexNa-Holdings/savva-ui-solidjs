@@ -1,6 +1,6 @@
 // src/context/useAppAuth.js
 import { createSignal, onMount } from "solid-js";
-import { getWsClient, getWsApi } from "../net/wsRuntime.js";
+import { getWsClient, getWsApi, whenWsOpen } from "../net/wsRuntime.js";
 import { toChecksumAddress } from "../blockchain/utils.js";
 import { httpBase } from "../net/endpoints.js";
 import { pushErrorToast } from "../ui/toast.js";
@@ -29,6 +29,9 @@ export function useAppAuth() {
       // This explicitly closes the old connection and opens a new one,
       // which will attach the new authentication cookie.
       getWsClient()?.reconnect('user-logged-in');
+      
+      // Wait for the new WebSocket connection to be fully established.
+      await whenWsOpen();
 
       const checksummedAccount = toChecksumAddress(coreUserData.address);
       const userProfile = await getWsApi().call('get-user', {

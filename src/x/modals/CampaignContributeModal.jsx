@@ -17,15 +17,20 @@ export default function CampaignContributeModal(props) {
 
     return (
         <Show when={props.isOpen}>
-            <portal>
+            <Portal>
             <div class="fixed inset-0 z-60 flex items-center justify-center p-4">
                 <ModalBackdrop onClick={props.onClose} />
                 <div class="relative z-70 w-full max-w-4xl rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
                     <ModalAutoCloser onClose={props.onClose} />
-                    <ContributeView campaignId={props.campaignId} onSuccess={handleSuccess} />
+                    <ContributeView
+                        campaignId={props.campaignId}
+                        onSuccess={handleSuccess}
+                        showCancel={true}
+                        onCancel={handleClose}
+                    />
                 </div>
             </div>
-            </portal>
+            </Portal>
         </Show>
     );
 }

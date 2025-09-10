@@ -160,7 +160,6 @@ export function handleFundContributed(app, payload) {
 }
 
 export function handleFundPrize(app, payload) {
-  const { t, lang } = app;
   const data = payload.data;
   dbg.log("Alerts:fund_prize", data);
 
@@ -178,22 +177,11 @@ export function handleFundPrize(app, payload) {
     },
   });
 
-  const title = getLocalizedTitle(data.title, lang());
-  const winner = data.winner?.name || "An anonymous user";
-  let formattedPrize = "";
-  try {
-    formattedPrize = parseFloat(
-      formatUnits(BigInt(data.prize), 18)
-    ).toLocaleString();
-  } catch {}
-
   pushToast({
     type: "success",
-    message: t("alerts.fund_prize.message", {
-      title: title,
-      winner: winner,
-      prize: formattedPrize,
-      token: "SAVVA",
-    }),
+    message: app.t("alerts.fund_prize.title"),
+    autohideMs: 15000,
+    bodyComponent: PrizeToast,
+    bodyProps: { data },
   });
 }

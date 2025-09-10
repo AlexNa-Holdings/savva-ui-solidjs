@@ -12,7 +12,8 @@ export default function ContributePage() {
     
     const campaignId = createMemo(() => {
         const path = route();
-        return path.split('/')[2] || null;
+        const idStr = path.split('/')[2] || null;
+        return idStr ? Number(idStr) : null;
     });
 
     const handleSuccess = () => {

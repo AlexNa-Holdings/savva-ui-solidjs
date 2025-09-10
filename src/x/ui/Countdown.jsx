@@ -18,7 +18,7 @@ export default function Countdown(props) {
   const size = () => (props.size === "lg" ? "lg" : "sm");
   const labelPosition = () => props.labelPosition || 'side';
   const labelStyle = () => props.labelStyle || 'full';
-  const anim = () => (props.anim === "reverse" ? "reverse-animation" : "default-animation");
+  const anim = () => (props.anim === "forward" ? "default-animation" : "reverse-animation");
 
   const boxWidth = () => (size() === "lg" ? "7.5ch" : "4.5ch");
   const boxPad   = () => (size() === "lg" ? "px-4 py-3" : "px-2 py-1.5");
