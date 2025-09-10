@@ -12,48 +12,46 @@ import { navigate } from "../../routing/hashRouter.js";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import { resolvePostCidPath } from "../../ipfs/utils.js";
+import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 
 function PinIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
-      <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-      <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-      <g id="SVGRepo_iconCarrier">
-        <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
-      </g>
+      <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
     </svg>
   );
 }
 
 function getLocalizedField(locales, fieldName, currentLang) {
-  if (!locales || typeof locales !== 'object') return "";
+  if (!locales || typeof locales !== "object") return "";
   if (locales[currentLang]?.[fieldName]) return locales[currentLang][fieldName];
   if (locales.en?.[fieldName]) return locales.en[fieldName];
   const firstLocaleKey = Object.keys(locales)[0];
-  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) {
-    return locales[firstLocaleKey][fieldName];
-  }
+  if (firstLocaleKey && locales[firstLocaleKey]?.[fieldName]) return locales[firstLocaleKey][fieldName];
   return "";
 }
 
 export default function PostCard(props) {
   const app = useApp();
   const { t } = app;
+  const { dataStable: profile } = useUserProfile();
+
   const [isHovered, setIsHovered] = createSignal(false);
   const [item, setItem] = createStore(props.item);
+  const [revealed, setRevealed] = createSignal(false);
 
   createEffect(() => {
     const update = app.postUpdate();
     if (!update || update.cid !== item.id) return;
 
-    if (update.type === 'reactionsChanged') {
+    if (update.type === "reactionsChanged") {
       setItem("_raw", "reactions", reconcile(update.data.reactions));
       if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
         setItem("_raw", "my_reaction", update.data.reaction);
       }
-    } else if (update.type === 'commentCountChanged') {
+    } else if (update.type === "commentCountChanged") {
       setItem("_raw", "total_childs", update.data.newTotal);
-    } else if (update.type === 'fundChanged' && update.data.fund) {
+    } else if (update.type === "fundChanged" && update.data.fund) {
       setItem("_raw", "fund", (prev) => ({ ...prev, ...update.data.fund }));
     }
   });
@@ -61,20 +59,39 @@ export default function PostCard(props) {
   const author = () => item._raw?.author;
   const content = () => item._raw?.savva_content;
   const fund = () => item._raw?.fund;
-  const isListMode = () => props.mode === 'list';
+  const isListMode = () => props.mode === "list";
 
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
-    if (thumbnailPath) {
-      return resolvePostCidPath(item._raw, thumbnailPath);
-    }
+    if (thumbnailPath) return resolvePostCidPath(item._raw, thumbnailPath);
     return author()?.avatar;
   });
 
   const title = createMemo(() => getLocalizedField(content()?.locales, "title", app.lang()));
   const textPreview = createMemo(() => getLocalizedField(content()?.locales, "text_preview", app.lang()));
 
+  // Sensitive flag on post
+  const isSensitive = createMemo(() => {
+    const raw = item._raw || {};
+    const c = content() || {};
+    return !!(raw.nsfw || raw.nsft || c.nsfw || c.nsft);
+  });
+
+  // User preference (default 'h')
+  const nsfwPref = createMemo(() => {
+    const p = profile();
+    return selectField(p, "nsfw") ?? selectField(p, "prefs.nsfw") ?? "h";
+  });
+
+  // Cover when warn-pref and not revealed yet
+  const shouldCover = createMemo(() => isSensitive() && nsfwPref() === "w" && !revealed());
+
   const handleCardClick = (e) => {
+    if (shouldCover()) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (item.id) {
       app.setSavedScrollY(window.scrollY);
       navigate(`/post/${item.id}`);
@@ -91,10 +108,7 @@ export default function PostCard(props) {
 
   const articleClasses = createMemo(() => {
     const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
-    if (isListMode()) {
-      return `${base} flex-row ${props.compact ? 'h-20' : 'h-40'}`;
-    }
-    return `${base} flex-col`;
+    return isListMode() ? `${base} flex-row ${props.compact ? "h-20" : "h-40"}` : `${base} flex-col`;
   });
 
   const imageContainerClasses = createMemo(() => {
@@ -117,36 +131,72 @@ export default function PostCard(props) {
             <PostFundBadge amount={fund()?.amount} />
           </div>
         </Show>
+
+        {/* Image-centered warning UI */}
+        <Show when={shouldCover()}>
+          <div
+            class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <div class="absolute inset-0 rounded-[inherit] bg-[hsl(var(--card))]/80 backdrop-blur-md" />
+            <div class="relative z-10 flex flex-col items-center gap-3 text-center px-4">
+              <div class="text-sm text-[hsl(var(--muted-foreground))]">{t("nsfw.cover.warning")}</div>
+              <button
+                class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setRevealed(true);
+                }}
+              >
+                {t("nsfw.cover.show")}
+              </button>
+            </div>
+          </div>
+        </Show>
       </div>
     );
   };
 
-  const contentContainerClasses = createMemo(() => (
-    isListMode() ? "px-3 py-2 flex-1 flex flex-col min-w-0" : "p-3 flex-1 flex flex-col"
-  ));
+  const contentContainerClasses = createMemo(() => (isListMode() ? "px-3 py-2 flex-1 flex flex-col min-w-0" : "p-3 flex-1 flex flex-col"));
 
   const textPreviewClasses = createMemo(() => {
     const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
-    if (isListMode()) {
-      return `${base} ${props.compact ? 'line-clamp-1' : 'line-clamp-2'}`;
-    }
-    return `${base} line-clamp-3`;
+    return isListMode() ? `${base} ${props.compact ? "line-clamp-1" : "line-clamp-2"}` : `${base} line-clamp-3`;
   });
+
+  // Title + preview (mask only, no button/text here)
+  const TitlePreviewBlock = () => (
+    <div class="relative">
+      <div>
+        <Show when={title()}>
+          <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? "text-xs" : "text-sm"}`}>{title()}</h4>
+        </Show>
+        <Show when={textPreview() && !props.compact}>
+          <p class={textPreviewClasses()}>{textPreview()}</p>
+        </Show>
+      </div>
+
+      <Show when={shouldCover()}>
+        <div
+          class="absolute inset-0 z-10 rounded-md bg-[hsl(var(--card))]/70 backdrop-blur-[2px]"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        />
+      </Show>
+    </div>
+  );
 
   const ContentBlock = () => (
     <div class={contentContainerClasses()}>
       <div class="flex-1 flex flex-col space-y-1 min-h-0">
         <div class="flex-1">
-          <Show when={title()}>
-            <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? 'text-xs' : 'text-sm'}`}>
-              {title()}
-            </h4>
-          </Show>
-          <Show when={textPreview() && !props.compact}>
-            <p class={textPreviewClasses()}>
-              {textPreview()}
-            </p>
-          </Show>
+          <TitlePreviewBlock />
         </div>
         <div class="pt-1">
           <UserCard author={author()} compact={props.compact} />
@@ -163,7 +213,7 @@ export default function PostCard(props) {
     <article
       class={articleClasses()}
       onClick={handleCardClick}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: "pointer" }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -179,7 +229,6 @@ export default function PostCard(props) {
         </div>
       </Show>
 
-      {/* Context menu toggle: fixed overlay in bottom-right, no layout shift */}
       <Show when={app.authorizedUser()?.isAdmin && finalContextMenuItems().length > 0}>
         <div class="pointer-events-none absolute top-2 right-2 z-20">
           <div class="pointer-events-auto">

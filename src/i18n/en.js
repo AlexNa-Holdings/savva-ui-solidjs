@@ -679,5 +679,7 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now"
-};
+  "wallet.unstaked.availableNow": "Available Now",
+  "nsfw.cover.warning": "This post may be sensitive in nature. Viewer discretion is advised.",
+  "nsfw.cover.show": "Show",
+}
