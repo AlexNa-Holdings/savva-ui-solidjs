@@ -1,6 +1,8 @@
 // src/x/SwitchConnectDialog.jsx
 import { createSignal, createEffect, Show, createMemo, onCleanup } from "solid-js";
 import { useApp } from "../context/AppContext";
+import { Portal } from "solid-js/web";
+import ModalBackdrop from "./modals/ModalBackdrop";
 
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const eq = (a, b) => (String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase());
@@ -111,90 +113,92 @@ export default function SwitchConnectDialog(props) {
 
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-40 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
-        <div class="relative themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-          <h3 class="text-lg font-semibold mb-3">{t("rightPane.switch.title")}</h3>
+      <Portal>
+        <div class="fixed inset-0 z-60 flex items-center justify-center">
+          <ModalBackdrop onClick={props.onClose} />
+          <div class="relative z-70 themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+            <h3 class="text-lg font-semibold mb-3">{t("rightPane.switch.title")}</h3>
 
-          <label class="block mb-3">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
-            <div class="mt-1 flex gap-2">
-              <input
-                class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                value={backendUrl()}
-                onInput={(e) => setBackendUrl(e.currentTarget.value)}
-                placeholder={t("rightPane.switch.backend.placeholder")}
-                spellcheck={false}
-              />
+            <label class="block mb-3">
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.backend.label")}</span>
+              <div class="mt-1 flex gap-2">
+                <input
+                  class="flex-1 px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+                  value={backendUrl()}
+                  onInput={(e) => setBackendUrl(e.currentTarget.value)}
+                  placeholder={t("rightPane.switch.backend.placeholder")}
+                  spellcheck={false}
+                />
+                <button
+                  class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                  onClick={() => fetchDomains(backendUrl())}
+                  disabled={fetching()}
+                  title={t("rightPane.switch.reload.title")}
+                >
+                  {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+                </button>
+              </div>
+              <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
+            </label>
+
+            <label class="block mb-1">
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
+            </label>
+            <select
+              class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
+              value={domain()}
+              onChange={(e) => setDomain(e.currentTarget.value)}
+              disabled={fetching() || domains().length === 0}
+            >
+              {domains().map((d) => (
+                <option value={d.name}>{d.name}</option>
+              ))}
+            </select>
+
+            <Show when={selectedDomainObj()}>
+              <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+                <Show when={selectedDomainObj().website}>
+                  <div>
+                    {t("rightPane.switch.domain.website")}:{" "}
+                    <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
+                      {selectedDomainObj().website}
+                    </a>
+                  </div>
+                </Show>
+              </div>
+            </Show>
+
+            <Show when={localError() || props.error}>
+              <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
+                {t("common.error")}: {localError() || props.error?.message}
+              </p>
+            </Show>
+
+            <div class="mt-4 flex gap-2 justify-end">
               <button
-                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
-                onClick={() => fetchDomains(backendUrl())}
-                disabled={fetching()}
-                title={t("rightPane.switch.reload.title")}
+                class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+                onClick={props.onClose}
               >
-                {fetching() ? t("common.loading") : t("rightPane.switch.reload")}
+                {t("common.cancel")}
+              </button>
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+                onClick={app.clearConnectOverride}
+                title={t("rightPane.switch.reset.title")}
+              >
+                {t("rightPane.switch.reset")}
+              </button>
+              <button
+                class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                onClick={onApply}
+                disabled={props.loading || fetching() || applying()}
+              >
+                {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
               </button>
             </div>
-            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{t("rightPane.switch.backend.help")}</p>
-          </label>
-
-          <label class="block mb-1">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("rightPane.switch.domain.label")}</span>
-          </label>
-          <select
-            class="w-full px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))] disabled:opacity-60"
-            value={domain()}
-            onChange={(e) => setDomain(e.currentTarget.value)}
-            disabled={fetching() || domains().length === 0}
-          >
-            {domains().map((d) => (
-              <option value={d.name}>{d.name}</option>
-            ))}
-          </select>
-
-          <Show when={selectedDomainObj()}>
-            <div class="mt-2 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
-              <Show when={selectedDomainObj().website}>
-                <div>
-                  {t("rightPane.switch.domain.website")}:{" "}
-                  <a class="underline" href={selectedDomainObj().website} target="_blank" rel="noreferrer">
-                    {selectedDomainObj().website}
-                  </a>
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={localError() || props.error}>
-            <p class="mt-2 text-sm text-[hsl(var(--destructive))]">
-              {t("common.error")}: {localError() || props.error?.message}
-            </p>
-          </Show>
-
-          <div class="mt-4 flex gap-2 justify-end">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
-              onClick={app.clearConnectOverride}
-              title={t("rightPane.switch.reset.title")}
-            >
-              {t("rightPane.switch.reset")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onApply}
-              disabled={props.loading || fetching() || applying()}
-            >
-              {props.loading || fetching() || applying() ? t("common.applying") : t("common.apply")}
-            </button>
           </div>
         </div>
-      </div>
+      </Portal>
     </Show>
   );
 }
