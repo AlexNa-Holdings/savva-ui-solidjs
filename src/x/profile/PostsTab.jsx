@@ -6,6 +6,7 @@ import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import TagList from "./TagList.jsx";
 import { useDomainCategories } from "../../hooks/useDomainCategories.js";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 async function fetchUserTags(params) {
   const { app, user_addr, lang } = params;
@@ -33,6 +34,13 @@ export default function PostsTab(props) {
   const [selectedTags, setSelectedTags] = createSignal([]);
   const [selectedCategory, setSelectedCategory] = createSignal("ALL");
 
+  const { dataStable: profile } = useUserProfile();
+
+  const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
+
   const [tagsResource] = createResource(() => ({
     app,
     user_addr: user()?.address,
@@ -47,7 +55,7 @@ export default function PostsTab(props) {
 
   async function fetchPage(page, pageSize) {
     if (!contentList || !user()?.address) return [];
-    
+
     const params = {
       domain: app.selectedDomainName(),
       author_addr: toChecksumAddress(user().address),
@@ -56,11 +64,12 @@ export default function PostsTab(props) {
       limit: pageSize,
       offset: (page - 1) * pageSize,
       lang: lang(),
+      show_nsfw: showNsfw()
     };
 
     const cat = selectedCategory();
     if (cat && cat !== "ALL") params.category = `${lang()}:${cat}`;
-    
+
     const tags = selectedTags();
     if (tags.length > 0) params.tags = tags.map(tag => `${lang()}:${tag}`);
 
@@ -117,11 +126,11 @@ export default function PostsTab(props) {
         <div class="grid grid-cols-[180px_minmax(0,1fr)] gap-6 items-start">
           <aside class="sticky top-[120px]">
             <h4 class="text-sm font-semibold mb-2">{t("profile.tabs.tags")}</h4>
-            <TagList 
-              tags={tagsResource()} 
+            <TagList
+              tags={tagsResource()}
               loading={tagsResource.loading}
-              selectedTags={selectedTags()} 
-              onTagToggle={handleTagToggle} 
+              selectedTags={selectedTags()}
+              onTagToggle={handleTagToggle}
             />
           </aside>
           <RightPanel />

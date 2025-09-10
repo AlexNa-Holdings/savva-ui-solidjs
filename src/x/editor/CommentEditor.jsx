@@ -6,10 +6,17 @@ import Spinner from "../ui/Spinner.jsx";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { useHashRouter } from "../../routing/hashRouter.js";
 import ContentCard from "../post/ContentCard.jsx";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 async function fetchPost(params) {
   const { app, savva_cid } = params;
   if (!app.wsMethod || !savva_cid) return null;
+  const { dataStable: profile } = useUserProfile();
+
+  const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
 
   await whenWsOpen();
   const getList = app.wsMethod("content-list");
@@ -18,6 +25,7 @@ async function fetchPost(params) {
     domain: app.selectedDomainName(),
     savva_cid: savva_cid,
     limit: 1,
+    show_nsfw: showNsfw(),
   };
 
   const user = app.authorizedUser();

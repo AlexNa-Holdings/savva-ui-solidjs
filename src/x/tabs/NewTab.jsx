@@ -9,12 +9,19 @@ import { whenWsOpen } from "../../net/wsRuntime.js";
 import { getDraftParams, clearDraft, DRAFT_DIRS } from "../../editor/storage.js";
 import { pushToast } from "../../ui/toast.js";
 import { useHashRouter } from "../../routing/hashRouter.js";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 export default function NewTab(props) {
   const app = useApp();
   const { route } = useHashRouter();
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
+  const { dataStable: profile } = useUserProfile();
+
+  const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
 
   createEffect(() => {
     if (!props.isActivated) return;
@@ -34,7 +41,7 @@ export default function NewTab(props) {
   const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
 
   const feedResetKey = createMemo(() => `${domainName()}|${category()}|${app.newTabRefreshKey()}`);
-  
+
   const title = createMemo(() => {
     const cat = category();
     const baseTitle = props.title;
@@ -57,7 +64,7 @@ export default function NewTab(props) {
         dbg.warn('NewTab', 'wsMethod("content-list") is not available at fetch time.');
         return [];
       }
-      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang() };
+      const params = { domain: domainName(), content_type: "post", limit, offset, lang: lang(), show_nsfw: showNsfw() };
       const cat = category();
       if (cat && cat !== "ALL") {
         params.category = `${lang()}:${cat}`;

@@ -25,6 +25,7 @@ const posts = await app.wsMethod("content-list")({
   lang: "en",               // Preferred language for metadata
   order_by: "fund_amount",  // Sort by total funds received
   content_type: "post",     // We only want posts
+  show_nsfw: true,          // true if user settings allow, otherwise false
   category: "en:SAVVA Talk" // Optional: filter by category
 });
 ```

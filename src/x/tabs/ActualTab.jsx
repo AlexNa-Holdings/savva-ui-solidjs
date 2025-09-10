@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { useHashRouter } from "../../routing/hashRouter.js";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 export default function ActualTab(props) {
   const app = useApp();
@@ -22,6 +23,12 @@ export default function ActualTab(props) {
       setCategory(categoryName);
     }
   });
+  const { dataStable: profile } = useUserProfile();
+
+  const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
 
   const domainName = () => {
     const d = app.selectedDomain?.();
@@ -52,14 +59,15 @@ export default function ActualTab(props) {
         limit,
         offset,
         lang: lang(),
-        order_by: 'fund_amount'
+        order_by: 'fund_amount',
+        show_nsfw: showNsfw()
       };
-      
+
       const cat = category();
       if (cat && cat !== "ALL") {
         params.category = `${lang()}:${cat}`;
       }
-      
+
       const user = app.authorizedUser();
       if (user?.address) {
         params.my_addr = toChecksumAddress(user.address);

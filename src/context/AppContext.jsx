@@ -29,7 +29,7 @@ export function AppProvider(props) {
   const [walletDataNeedsRefresh, setWalletDataNeedsRefresh] = Solid.createSignal(0);
   const { route } = useHashRouter();
   const [fundraiserUpdateKey, setFundraiserUpdateKey] = Solid.createSignal(0);
-
+  
   Solid.createEffect(Solid.on(route, (nextRoute, prevRoute) => {
     if (!prevRoute) return;
     const isCurrentlyOnMainFeed = !/^\/(post|settings|docs|editor)/.test(prevRoute);
@@ -216,7 +216,6 @@ export function AppProvider(props) {
     dismissToast,
     fundraiserUpdateKey,
     triggerFundraiserUpdate: () => setFundraiserUpdateKey(k => k + 1),
-    actorIsNpo: actor.actorIsNpo,
     isActingAsNpo: actor.isActingAsNpo,
     actorAddress: actor.actorAddress,
     actorProfile: actor.actorProfile,

@@ -7,7 +7,7 @@ import { pushToast, pushErrorToast } from "../ui/toast.js";
 const toBigInt = (v) => (typeof v === "bigint" ? v : v == null || v === "" ? 0n : BigInt(v));
 
 function requireActor(app) {
-  const isNpo = (app.isActingAsNpo?.() ?? app.actorIsNpo?.() ?? app.actorProfile?.()?.is_npo ?? false) === true;
+  const isNpo = (app.isActingAsNpo?.() ?? app.actorProfile?.()?.is_npo ?? false) === true;
   const address = app.actorAddress?.() || app.authorizedUser?.()?.address || "";
   if (!address) throw new Error("Actor address is not available");
   return { isNpo, address };

@@ -6,6 +6,7 @@ import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { useHashRouter } from "../../routing/hashRouter.js";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 const TIME_FRAMES = ["month", "week", "year", "all"];
 
@@ -15,6 +16,12 @@ export default function LeadersTab(props) {
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
   const [timeFrame, setTimeFrame] = createSignal("month");
+  const { dataStable: profile } = useUserProfile();
+
+  const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
 
   createEffect(() => {
     if (!props.isActivated) return;
@@ -26,7 +33,7 @@ export default function LeadersTab(props) {
       setCategory(categoryName);
     }
   });
-  
+
   const domainName = () => {
     const d = app.selectedDomain?.();
     return typeof d === "string" ? d : d?.name || "";
@@ -57,9 +64,10 @@ export default function LeadersTab(props) {
         limit,
         offset,
         lang: lang(),
-        order_by: 'total_author_share'
+        order_by: 'total_author_share',
+        show_nsfw: showNsfw()
       };
-      
+
       const cat = category();
       if (cat && cat !== "ALL") {
         params.category = `${lang()}:${cat}`;

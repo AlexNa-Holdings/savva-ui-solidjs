@@ -1,9 +1,9 @@
-// src/pages/ProfileEditPage.jsx
+// src/x/pages/ProfileEditPage.jsx
 import { createMemo, createResource, Show, createSignal, Switch, Match, createEffect, For } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/hashRouter.js";
 import { walletAccount } from "../../blockchain/wallet.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { toChecksumAddress, toHexBytes32 } from "../../blockchain/utils.js";
@@ -19,6 +19,8 @@ import { pushErrorToast, pushToast } from "../../ui/toast.js";
 import ConfirmModal from "../modals/ConfirmModal.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+// ✅ import the shared profile store utilities
+import useUserProfile, { applyProfileEditResult } from "../profile/userProfileStore.js";
 
 async function fetchProfileForEdit(params) {
   const { app, identifier } = params;
@@ -80,7 +82,6 @@ function copyToClipboard(text, label, t) {
     });
 }
 
-// Helper to filter out empty string values from an object
 function filterEmptyValues(obj) {
   const newObj = {};
   for (const key in obj) {
@@ -91,8 +92,24 @@ function filterEmptyValues(obj) {
   return newObj;
 }
 
+// Best-effort: get current actor address for the “actor==auth user” check.
+function getActorAddress(app) {
+  try {
+    const a = app.actor?.();
+    if (typeof a === "string") return a;
+    if (a && typeof a === "object" && a.address) return a.address;
+  } catch (_) {}
+  try {
+    if (typeof app.actorAddress === "function") return app.actorAddress();
+    if (app.actorAddress) return app.actorAddress;
+  } catch (_) {}
+  // fallback: use auth address
+  return app.authorizedUser?.()?.address;
+}
+
 export default function ProfileEditPage() {
   const app = useApp();
+  const { cid } = useUserProfile(); // self profile hook (reactive)
   const { t, lang: uiLang, domainAssetsConfig } = app;
   const { route } = useHashRouter();
   let debounceTimer;
@@ -125,6 +142,16 @@ export default function ProfileEditPage() {
   const [activeLang, setActiveLang] = createSignal(uiLang());
 
   const profileCid = createMemo(() => profileData()?.profile_cid);
+  const subjectAddress = createMemo(() => (profileData()?.address || "").toLowerCase());
+  const authAddress = createMemo(() => (app.authorizedUser?.()?.address || "").toLowerCase());
+  const actorAddress = createMemo(() => (getActorAddress(app) || "").toLowerCase());
+
+  // true only if we’re editing the auth user and we’re acting as the auth user
+  const isSelfActorEditingSelf = createMemo(
+    () => subjectAddress() && authAddress() && actorAddress()
+      ? subjectAddress() === authAddress() && actorAddress() === authAddress()
+      : false
+  );
 
   createEffect(() => {
     const data = profileData();
@@ -166,10 +193,10 @@ export default function ProfileEditPage() {
   });
 
   createEffect(() => {
-    const authorized = app.authorizedUser();
+    const authorized = app.authorizedUser?.();
     const profile = profileData();
 
-    if (authorized && profile && !profile.error && authorized.address?.toLowerCase() === profile.address?.toLowerCase()) {
+    if (authorized && profile && !profile.error && (authorized.address || "").toLowerCase() === (profile.address || "").toLowerCase()) {
       if (authorized.avatar !== avatar()) {
         setAvatar(authorized.avatar);
       }
@@ -280,8 +307,8 @@ export default function ProfileEditPage() {
     }
   };
 
-  // Actor-aware: Avatar save (onSave now passes (blob, subjectAddr) but we can ignore the second arg)
-  const handleAvatarSave = async (blob /*, subjectAddrOptional */) => {
+  // Actor-aware: Avatar save
+  const handleAvatarSave = async (blob) => {
     try {
       const formData = new FormData();
       formData.append("file", blob, "avatar.png");
@@ -341,6 +368,16 @@ export default function ProfileEditPage() {
         contractName: "UserProfile",
         functionName: "setString",
         args: [toHexBytes32(app.selectedDomainName()), toHexBytes32("profile_cid"), newProfileCid],
+      });
+
+      // ⚙️ Update caches ONLY if actor==auth user AND subject==auth user.
+      await applyProfileEditResult(app, {
+        ownerAddress: profileData()?.address,          // subject we just edited
+        oldCid: profileCid(),
+        newCid: newProfileCid,
+        profileJson,
+        actorAddress: getActorAddress(app),            // enforce actor==auth user for self-update
+        ensureAuthRefresh: true,
       });
 
       pushToast({ type: "success", message: t("profile.edit.saveSuccess") });
