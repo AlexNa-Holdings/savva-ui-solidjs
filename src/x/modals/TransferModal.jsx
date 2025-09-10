@@ -11,6 +11,7 @@ import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import { createPublicClient, http } from "viem";
 import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
 import ModalBackdrop from "../modals/ModalBackdrop.jsx";
+import { Portal } from "solid-js/web";
 
 function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
   const addr = tokenAddress ? String(tokenAddress) : "";
@@ -197,62 +198,64 @@ export default function TransferModal(props) {
   }
 
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <ModalBackdrop onClick={props.onClose} />
-      <div class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
-        <ModalAutoCloser onClose={props.onClose} />
-        <form onSubmit={submit} class="p-4 space-y-4">
-          <div class="text-lg font-semibold flex items-center gap-2">
-            <TokenTitleIcon app={app} tokenAddress={tokenAddr()} />
-            <span>{t("wallet.transfer.titleToken", { token: meta()?.symbol || (tokenAddr() ? "ERC-20" : t("wallet.nativeToken")) })}</span>
-          </div>
+    < Portal>
+      <div class="fixed inset-0 z-60 flex items-center justify-center">
+        <ModalBackdrop onClick={props.onClose} />
+        <div class="relative z-70 w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
+          <ModalAutoCloser onClose={props.onClose} />
+          <form onSubmit={submit} class="p-4 space-y-4">
+            <div class="text-lg font-semibold flex items-center gap-2">
+              <TokenTitleIcon app={app} tokenAddress={tokenAddr()} />
+              <span>{t("wallet.transfer.titleToken", { token: meta()?.symbol || (tokenAddr() ? "ERC-20" : t("wallet.nativeToken")) })}</span>
+            </div>
 
-          <AddressInput
-            label={t("wallet.transfer.to")}
-            value={to()}
-            onChange={setTo}
-            onUserSelect={(u) => setTo(u?.address || "")}
-          />
-
-          <div ref={el => (amountWrapRef = el)}>
-            <AmountInput
-              label={t("wallet.transfer.amount")}
-              tokenAddress={tokenAddr()}
-              balance={props.maxAmount}
-              value={amountText()}
-              onInput={handleAmountChange}
-              onChange={handleAmountChange}
+            <AddressInput
+              label={t("wallet.transfer.to")}
+              value={to()}
+              onChange={setTo}
+              onUserSelect={(u) => setTo(u?.address || "")}
             />
-          </div>
 
-          <Show when={err()}>
-            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
-          </Show>
+            <div ref={el => (amountWrapRef = el)}>
+              <AmountInput
+                label={t("wallet.transfer.amount")}
+                tokenAddress={tokenAddr()}
+                balance={props.maxAmount}
+                value={amountText()}
+                onInput={handleAmountChange}
+                onChange={handleAmountChange}
+              />
+            </div>
 
-          <div class="pt-1 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => !isProcessing() && props.onClose?.()}
-              disabled={isProcessing()}
-              class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              type="submit"
-              disabled={isProcessing()}
-              class="px-3 py-1.5 min-w-[120px] rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60 flex items-center justify-center"
-            >
-              <Show when={isProcessing()} fallback={t("wallet.transfer.transferButton")}>
-                <div class="flex items-center gap-2">
-                  <Spinner class="w-4 h-4" />
-                  <span>{t("wallet.transfer.sending")}</span>
-                </div>
-              </Show>
-            </button>
-          </div>
-        </form>
+            <Show when={err()}>
+              <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+            </Show>
+
+            <div class="pt-1 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => !isProcessing() && props.onClose?.()}
+                disabled={isProcessing()}
+                class="px-3 py-1.5 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={isProcessing()}
+                class="px-3 py-1.5 min-w-[120px] rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60 flex items-center justify-center"
+              >
+                <Show when={isProcessing()} fallback={t("wallet.transfer.transferButton")}>
+                  <div class="flex items-center gap-2">
+                    <Spinner class="w-4 h-4" />
+                    <span>{t("wallet.transfer.sending")}</span>
+                  </div>
+                </Show>
+              </button>
+            </div>
+          </form>
+        </div>'
       </div>
-    </div>
+    </Portal>
   );
 }

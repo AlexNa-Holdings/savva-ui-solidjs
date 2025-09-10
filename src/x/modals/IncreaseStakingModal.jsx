@@ -1,5 +1,5 @@
 // src/x/profile/IncreaseStakingModal.jsx
-import { createSignal, Show, createResource, createMemo, createEffect } from "solid-js";
+import { createSignal, Show, createResource, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
@@ -33,7 +33,6 @@ export default function IncreaseStakingModal(props) {
   const { t } = app;
   const log = (...a) => (window?.dbg?.log ? window.dbg.log(...a) : console.debug(...a));
 
-  // actor-aware subject (self or selected NPO)
   const subjectAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
   const [amountText, setAmountText] = createSignal("");
@@ -46,7 +45,6 @@ export default function IncreaseStakingModal(props) {
     fetchStakingInfo
   );
 
-  // Resolve SAVVA token meta for decimals (we’re staking SAVVA)
   const savvaAddr = () => String(props.savvaTokenAddress || "");
   const [savvaMeta] = createResource(
     () => ({ app, addr: savvaAddr() }),
@@ -54,16 +52,15 @@ export default function IncreaseStakingModal(props) {
   );
   const tokenDecimals = () => Number(savvaMeta()?.decimals ?? 18);
 
-  const myShare = createMemo(() => {
+  const myShare = () => {
     const info = stakingInfo();
     if (!info || info.error || !info.totalSupply || info.totalSupply === 0n) return "0.00";
     const myStake = info.myStake || 0n;
     const total = info.totalSupply;
     const percentage = (Number(myStake) / Number(total)) * 100;
     return percentage.toFixed(2);
-  });
+  };
 
-  // Normalize and parse helpers
   function normalizeDecimalInput(text) {
     if (text == null) return "";
     let s = String(text).trim();
@@ -73,7 +70,6 @@ export default function IncreaseStakingModal(props) {
     return s;
   }
 
-  // Re-parse current text once decimals arrive
   createEffect(() => {
     const dec = tokenDecimals();
     const txt = amountText();
@@ -82,13 +78,9 @@ export default function IncreaseStakingModal(props) {
       const w = parseUnits(normalizeDecimalInput(txt), isNaN(dec) ? 18 : dec);
       setAmountWei(w);
       setErr("");
-      log("Stake: reparse after decimals", { txt, dec, wei: w.toString() });
-    } catch (e) {
-      log("Stake: reparse failed", { txt, dec, err: e?.message });
-    }
+    } catch (e) {}
   });
 
-  // Accept both AmountInput event shapes
   const handleAmountChange = (a, b) => {
     const dec = tokenDecimals();
     let txt = "", weiMaybe = null;
@@ -100,26 +92,20 @@ export default function IncreaseStakingModal(props) {
       weiMaybe = b;
     }
     setAmountText(txt);
-
     if (typeof weiMaybe === "bigint" && weiMaybe >= 0n) {
       setAmountWei(weiMaybe);
       setErr("");
-      log("Stake: change uses provided wei", { txt, wei: weiMaybe.toString() });
       return;
     }
-
     try {
       const w = parseUnits(normalizeDecimalInput(txt), isNaN(dec) ? 18 : dec);
       setAmountWei(w);
       setErr("");
-      log("Stake: change parsed", { txt, dec, wei: w.toString() });
     } catch (eParse) {
       setAmountWei(0n);
-      log("Stake: change parse pending/failed", { txt, dec, err: eParse?.message });
     }
   };
 
-  // Fallback: read inner <input> if our handlers didn’t fire
   let amountWrapRef;
 
   const close = () => {
@@ -129,18 +115,14 @@ export default function IncreaseStakingModal(props) {
 
   function validate(v) {
     const val = typeof v === "bigint" ? v : amountWei();
-    log("Stake: validate", { text: amountText(), wei: val?.toString?.(), max: props.savvaBalance?.toString?.() });
     if (!val || val <= 0n) return t("wallet.transfer.errors.badAmount");
     if (props.savvaBalance != null && val > props.savvaBalance) return t("wallet.stake.errors.insufficientBalance");
     return "";
   }
 
-  // Actor-aware approve + stake
   async function submit(e) {
     e.preventDefault();
     setErr("");
-
-    // Ensure wei even if handlers didn't run
     let v = amountWei();
     if ((!v || v <= 0n)) {
       const inputEl = amountWrapRef?.querySelector("input");
@@ -150,26 +132,25 @@ export default function IncreaseStakingModal(props) {
         v = parseUnits(normalizeDecimalInput(liveTxt), isNaN(dec) ? 18 : dec);
         setAmountWei(v);
         setAmountText(liveTxt);
-        log("Stake: submit reparsed from DOM", { text: liveTxt, wei: v.toString() });
-      } catch (e2) {
-        log("Stake: submit parse failed", { text: liveTxt, err: e2?.message });
-      }
+      } catch (e2) {}
     }
 
     const msg = validate(v);
     if (msg) { setErr(msg); return; }
 
     setIsProcessing(true);
+    let pendingToastId, approveToastId, stakeToastId;
     try {
+      pendingToastId = pushToast({ type: "info", message: t("wallet.stake.toast.pending"), autohideMs: 0 });
+      
       const staking = await getSavvaContract(app, "Staking");
       const token = await getSavvaContract(app, "SavvaToken");
-
-      // Check allowance for the ACTOR
       const owner = subjectAddr();
       const spender = staking.address;
       const current = await token.read.allowance([owner, spender]);
 
       if (current < v) {
+        approveToastId = pushToast({ type: "info", message: t("wallet.stake.toast.approving"), autohideMs: 0 });
         await sendAsActor(app, {
           contractName: "SavvaToken",
           functionName: "approve",
@@ -177,20 +158,23 @@ export default function IncreaseStakingModal(props) {
         });
       }
 
-      // Stake via actor (NPO => NPO.multicall)
+      stakeToastId = pushToast({ type: "info", message: t("wallet.stake.toast.staking"), autohideMs: 0 });
       await sendAsActor(app, {
         contractName: "Staking",
         functionName: "stake",
         args: [v],
       });
 
+      pushToast({ type: "success", message: t("wallet.stake.toast.success") });
       props.onSubmit?.();
-      setIsProcessing(false);
       close();
     } catch (eTx) {
-      setIsProcessing(false);
-      // optionally surface error via toast outside (caller)
       log("Stake: tx failed", eTx?.message || eTx);
+    } finally {
+      if (pendingToastId) app.dismissToast?.(pendingToastId);
+      if (approveToastId) app.dismissToast?.(approveToastId);
+      if (stakeToastId) app.dismissToast?.(stakeToastId);
+      setIsProcessing(false);
     }
   }
 
@@ -201,7 +185,6 @@ export default function IncreaseStakingModal(props) {
         <form onSubmit={submit} class="p-4 space-y-4">
           <ModalAutoCloser onClose={props.onClose} />
           <h3 class="text-lg font-semibold">{t("wallet.stake.title")}</h3>
-
           <Show when={!stakingInfo.loading && stakingInfo() && !stakingInfo().error} fallback={<div class="flex justify-center"><Spinner /></div>}>
             <div class="text-sm space-y-1 text-[hsl(var(--muted-foreground))]">
               <div class="flex justify-between">
@@ -217,7 +200,6 @@ export default function IncreaseStakingModal(props) {
               </div>
             </div>
           </Show>
-
           <div ref={el => (amountWrapRef = el)}>
             <AmountInput
               label={t("wallet.stake.amount")}
@@ -228,11 +210,9 @@ export default function IncreaseStakingModal(props) {
               onChange={handleAmountChange}
             />
           </div>
-
           <Show when={err()}>
             <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
           </Show>
-
           <div class="pt-1 flex items-center justify-end gap-2">
             <button
               type="button"

@@ -30,10 +30,10 @@ export default function SearchModal(props) {
 
   return (
     <Portal>
-      <div class="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="sv-search-title">
+      <div class="fixed inset-0 z-60" role="dialog" aria-modal="true" aria-labelledby="sv-search-title">
         <ModalBackdrop onClick={close} />
         <div
-          class={`fixed left-0 right-0 top-0 transition-transform duration-300 ease-out ${
+          class={`fixed z-70 left-0 right-0 top-0 transition-transform duration-300 ease-out ${
             enter() ? "translate-y-0" : "-translate-y-full"
           }`}
           onClick={(e) => e.stopPropagation()}

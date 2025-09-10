@@ -9,6 +9,7 @@ import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
 import ModalBackdrop from "../modals/ModalBackdrop.jsx";
+import { Portal } from "solid-js/web";
 
 export default function UnstakeModal(props) {
   const app = useApp();
@@ -187,81 +188,83 @@ export default function UnstakeModal(props) {
   const actorMissing = () => !actorAddr();
 
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-     <ModalBackdrop onClick={props.onClose} />
-      <form
-        onSubmit={submit}
-        class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
-      >
-        <ModalAutoCloser onClose={props.onClose} />
-        <h3 class="text-lg font-semibold">{t("wallet.unstake.title")}</h3>
+    <Portal>
+      <div class="fixed inset-0 z-60 flex items-center justify-center">
+        <ModalBackdrop onClick={props.onClose} />
+        <form
+          onSubmit={submit}
+          class="relative z-70 w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
+        >
+          <ModalAutoCloser onClose={props.onClose} />
+          <h3 class="text-lg font-semibold">{t("wallet.unstake.title")}</h3>
 
-        <Show when={!actorMissing()}>
-          <p class="text-sm opacity-80">
-            {t("wallet.unstake.notice", { days: withdrawDays() || 0 })}
-          </p>
-        </Show>
-        <Show when={actorMissing()}>
-          <div class="text-sm text-[hsl(var(--destructive))]">
-            {t("wallet.errors.noActor")}
+          <Show when={!actorMissing()}>
+            <p class="text-sm opacity-80">
+              {t("wallet.unstake.notice", { days: withdrawDays() || 0 })}
+            </p>
+          </Show>
+          <Show when={actorMissing()}>
+            <div class="text-sm text-[hsl(var(--destructive))]">
+              {t("wallet.errors.noActor")}
+            </div>
+          </Show>
+
+          <div ref={(el) => (inputWrapEl = el)} class="space-y-2">
+            <AmountInput
+              value={amountText()}
+              tokenAddress={stakingAddress()}
+              onInput={handleAmountChange}
+              onChange={handleAmountChange}
+              placeholder={t("wallet.unstake.amountPlaceholder")}
+              disabled={actorMissing()}
+            />
+            <div class="flex justify-end">
+              <button
+                type="button"
+                class="text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
+                disabled={actorMissing()}
+                onClick={async () => {
+                  const max = staked() || 0n;
+                  setAmountWei(max);
+                  try {
+                    const dec = tokenDecimals();
+                    const s = Number(max) === 0 ? "0" : (max / 10n ** BigInt(dec)).toString();
+                    setAmountText(s);
+                  } catch { }
+                  const inputEl = inputWrapEl?.querySelector("input");
+                  if (inputEl) inputEl.value = amountText();
+                  log("Unstake: Max set", { wei: max.toString() });
+                }}
+              >
+                {t("wallet.common.max")}
+              </button>
+            </div>
           </div>
-        </Show>
 
-        <div ref={(el) => (inputWrapEl = el)} class="space-y-2">
-          <AmountInput
-            value={amountText()}
-            tokenAddress={stakingAddress()}
-            onInput={handleAmountChange}
-            onChange={handleAmountChange}
-            placeholder={t("wallet.unstake.amountPlaceholder")}
-            disabled={actorMissing()}
-          />
-          <div class="flex justify-end">
+          <Show when={err()}>
+            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+          </Show>
+
+          <div class="flex justify-end gap-2 pt-1">
             <button
               type="button"
-              class="text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
-              disabled={actorMissing()}
-              onClick={async () => {
-                const max = staked() || 0n;
-                setAmountWei(max);
-                try {
-                  const dec = tokenDecimals();
-                  const s = Number(max) === 0 ? "0" : (max / 10n ** BigInt(dec)).toString();
-                  setAmountText(s);
-                } catch {}
-                const inputEl = inputWrapEl?.querySelector("input");
-                if (inputEl) inputEl.value = amountText();
-                log("Unstake: Max set", { wei: max.toString() });
-              }}
+              class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+              onClick={close}
             >
-              {t("wallet.common.max")}
+              {t("common.cancel")}
+            </button>
+            <button
+              type="submit"
+              disabled={isProcessing() || actorMissing()}
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+            >
+              <Show when={!isProcessing()} fallback={<Spinner class="w-5 h-5" />}>
+                {t("wallet.unstake.submit")}
+              </Show>
             </button>
           </div>
-        </div>
-
-        <Show when={err()}>
-          <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
-        </Show>
-
-        <div class="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
-            onClick={close}
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            type="submit"
-            disabled={isProcessing() || actorMissing()}
-            class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-          >
-            <Show when={!isProcessing()} fallback={<Spinner class="w-5 h-5" />}>
-              {t("wallet.unstake.submit")}
-            </Show>
-          </button>
-        </div>
-      </form>
-    </div>
+        </form>
+      </div>
+    </Portal>
   );
 }

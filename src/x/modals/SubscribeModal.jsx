@@ -13,6 +13,7 @@ import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
 import ModalBackdrop from "../modals/ModalBackdrop.jsx";
+import { Portal } from "solid-js/web";
 
 export default function SubscribeModal(props) {
   const app = useApp();
@@ -183,109 +184,111 @@ export default function SubscribeModal(props) {
   };
 
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center">
-      <ModalBackdrop onClick={props.onClose} />
-      <form
-        onSubmit={submit}
-        class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
-      >
-        <ModalAutoCloser onClose={props.onClose} />
-        <h3 class="text-lg font-semibold">{t("subscriptions.subscribe.title")}</h3>
+    <Portal>
+      <div class="fixed inset-0 z-60 flex items-center justify-center">
+        <ModalBackdrop onClick={props.onClose} />
+        <form
+          onSubmit={submit}
+          class="relative z-70 w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
+        >
+          <ModalAutoCloser onClose={props.onClose} />
+          <h3 class="text-lg font-semibold">{t("subscriptions.subscribe.title")}</h3>
 
-        <p class="text-sm opacity-80">{t("subscriptions.info")}</p>
+          <p class="text-sm opacity-80">{t("subscriptions.info")}</p>
 
-        {/* Author */}
-        <div class="rounded-md border border-[hsl(var(--border))] p-2">
-          <UserCard author={props.author} />
-        </div>
-
-        {/* Current subscription */}
-        <Show when={!subInfo.loading} fallback={<div class="flex justify-center"><Spinner /></div>}>
-          <Show when={subInfo()?.amountPerWeek > 0n}>
-            <div class="rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] p-3 space-y-1">
-              <div class="font-medium">{t("subscriptions.current.title")}</div>
-              <div class="text-sm flex items-center justify-between">
-                <span>{t("subscriptions.current.amountPerWeek")}</span>
-                <Show when={stakingAddr()}>
-                  <TokenValue amount={subInfo()?.amountPerWeek || 0n} tokenAddress={stakingAddr()} />
-                </Show>
-              </div>
-              <div class="text-sm">
-                <Show when={weeksLeft() > 1} fallback={<span class="text-[hsl(var(--destructive))]">{t("subscriptions.current.expired")}</span>}>
-                  <span>{t("subscriptions.current.weeksLeft", { n: weeksLeft() })}</span>
-                </Show>
-              </div>
-            </div>
-          </Show>
-        </Show>
-
-        {/* Form */}
-        <div class="space-y-3">
-          <AmountInput
-            label={t("subscriptions.form.weeklyAmount")}
-            tokenAddress={stakingAddr()}
-            value={amountText()}
-            onInput={handleAmountChange}
-            onChange={(v) => handleAmountChange(v?.text ?? "", v?.amountWei)}
-            placeholder={t("subscriptions.form.weeklyAmountPlaceholder")}
-          />
-
-          <div class="flex items-center gap-2">
-            <label class="text-sm font-medium">{t("subscriptions.form.weeks")}</label>
-            <input
-              type="number"
-              min="1"
-              max="52"
-              inputmode="numeric"
-              value={weeksText()}
-              onInput={(e) => setWeeksText(e.currentTarget.value)}
-              class="w-24 px-2 py-1 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] text-right"
-            />
+          {/* Author */}
+          <div class="rounded-md border border-[hsl(var(--border))] p-2">
+            <UserCard author={props.author} />
           </div>
-          <Show when={weeksTooBig()}>
-            <div class="text-xs text-[hsl(var(--destructive))]">
-              {t("subscriptions.errors.badWeeks")}
-            </div>
-          </Show>
 
-          {/* Total price – only when weeks valid AND weekly amount (wei) > 0 */}
-          <Show when={weeksValid() && amountWei() > 0n && stakingAddr()}>
-            <div class="flex items-center justify-between">
-              <span class="text-sm opacity-80">{t("subscriptions.form.total")}</span>
-              <TokenValue amount={totalWei()} tokenAddress={stakingAddr()} />
-            </div>
-          </Show>
-        </div>
-
-        <Show when={err()}>
-          <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
-        </Show>
-
-        <div class="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
-            disabled={isBusy()}
-            onClick={() => !isBusy() && props.onClose?.()}
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            type="submit"
-            disabled={
-              isBusy() ||
-              !stakingAddr() ||
-              amountWei() <= 0n ||
-              !weeksValid()
-            }
-            class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-          >
-            <Show when={!isBusy()} fallback={<Spinner class="w-5 h-5" />}>
-              {t("subscriptions.form.subscribeBtn")}
+          {/* Current subscription */}
+          <Show when={!subInfo.loading} fallback={<div class="flex justify-center"><Spinner /></div>}>
+            <Show when={subInfo()?.amountPerWeek > 0n}>
+              <div class="rounded-md bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] p-3 space-y-1">
+                <div class="font-medium">{t("subscriptions.current.title")}</div>
+                <div class="text-sm flex items-center justify-between">
+                  <span>{t("subscriptions.current.amountPerWeek")}</span>
+                  <Show when={stakingAddr()}>
+                    <TokenValue amount={subInfo()?.amountPerWeek || 0n} tokenAddress={stakingAddr()} />
+                  </Show>
+                </div>
+                <div class="text-sm">
+                  <Show when={weeksLeft() > 1} fallback={<span class="text-[hsl(var(--destructive))]">{t("subscriptions.current.expired")}</span>}>
+                    <span>{t("subscriptions.current.weeksLeft", { n: weeksLeft() })}</span>
+                  </Show>
+                </div>
+              </div>
             </Show>
-          </button>
-        </div>
-      </form>
-    </div>
+          </Show>
+
+          {/* Form */}
+          <div class="space-y-3">
+            <AmountInput
+              label={t("subscriptions.form.weeklyAmount")}
+              tokenAddress={stakingAddr()}
+              value={amountText()}
+              onInput={handleAmountChange}
+              onChange={(v) => handleAmountChange(v?.text ?? "", v?.amountWei)}
+              placeholder={t("subscriptions.form.weeklyAmountPlaceholder")}
+            />
+
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium">{t("subscriptions.form.weeks")}</label>
+              <input
+                type="number"
+                min="1"
+                max="52"
+                inputmode="numeric"
+                value={weeksText()}
+                onInput={(e) => setWeeksText(e.currentTarget.value)}
+                class="w-24 px-2 py-1 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] text-right"
+              />
+            </div>
+            <Show when={weeksTooBig()}>
+              <div class="text-xs text-[hsl(var(--destructive))]">
+                {t("subscriptions.errors.badWeeks")}
+              </div>
+            </Show>
+
+            {/* Total price – only when weeks valid AND weekly amount (wei) > 0 */}
+            <Show when={weeksValid() && amountWei() > 0n && stakingAddr()}>
+              <div class="flex items-center justify-between">
+                <span class="text-sm opacity-80">{t("subscriptions.form.total")}</span>
+                <TokenValue amount={totalWei()} tokenAddress={stakingAddr()} />
+              </div>
+            </Show>
+          </div>
+
+          <Show when={err()}>
+            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+          </Show>
+
+          <div class="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+              disabled={isBusy()}
+              onClick={() => !isBusy() && props.onClose?.()}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="submit"
+              disabled={
+                isBusy() ||
+                !stakingAddr() ||
+                amountWei() <= 0n ||
+                !weeksValid()
+              }
+              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+            >
+              <Show when={!isBusy()} fallback={<Spinner class="w-5 h-5" />}>
+                {t("subscriptions.form.subscribeBtn")}
+              </Show>
+            </button>
+          </div>
+        </form>
+      </div>
+    </Portal>
   );
 }

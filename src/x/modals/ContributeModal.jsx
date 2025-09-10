@@ -1,4 +1,4 @@
-// src/x/post/ContributeModal.jsx
+// src/x/modals/ContributeModal.jsx
 import { createSignal, Show, createResource, createMemo, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
@@ -13,6 +13,7 @@ import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
 import ModalBackdrop from "../modals/ModalBackdrop.jsx";
+import { Portal } from "solid-js/web";
 
 async function fetchProfileDetails(params) {
     const { app, userAddress } = params;
@@ -107,52 +108,40 @@ export default function ContributeModal(props) {
         }
 
         setIsProcessing(true);
-
-        const mainToastId = "contribute_toast";
-        const approveToastId = "approve_toast";
-        const contribToastId = "contrib_toast";
-
-        pushToast({
-            type: "info",
-            message: t("post.fund.toast.pending"),
-            autohideMs: 0,
-            id: mainToastId,
-        });
+        let mainToastId, approveToastId, contribToastId;
 
         try {
-            // Read-only contracts for addresses/allowance
+            mainToastId = pushToast({
+                type: "info",
+                message: t("post.fund.toast.pending"),
+                autohideMs: 0,
+            });
+
             const tokenContract = await getSavvaContract(app, "SavvaToken");
             const fundContract = await getSavvaContract(app, "ContentFund");
-
-            // Check allowance for the ACTOR (self or NPO)
             const owner = actorAddr();
             const spender = fundContract.address;
             const allowance = await tokenContract.read.allowance([owner, spender]);
 
             if (allowance < amountWei()) {
-                pushToast({
+                approveToastId = pushToast({
                     type: "info",
                     message: t("post.fund.toast.approving"),
                     autohideMs: 0,
-                    id: approveToastId,
                 });
-                // Approve via ACTOR (if NPO, this becomes NPO.multicall of a single approve)
                 await sendAsActor(app, {
                     contractName: "SavvaToken",
                     functionName: "approve",
                     args: [spender, MAX_UINT],
                 });
-                app.dismissToast?.(approveToastId);
             }
 
-            pushToast({
+            contribToastId = pushToast({
                 type: "info",
                 message: t("post.fund.toast.contributing"),
                 autohideMs: 0,
-                id: contribToastId,
             });
 
-            // Contribute via ACTOR (if NPO, this wraps into NPO.multicall)
             const { author, domain, guid } = props.post;
             await sendAsActor(app, {
                 contractName: "ContentFund",
@@ -160,39 +149,35 @@ export default function ContributeModal(props) {
                 args: [author.address, domain, guid, amountWei()],
             });
 
-            app.dismissToast?.(contribToastId);
-            app.dismissToast?.(mainToastId);
             pushToast({ type: "success", message: t("post.fund.toast.success") });
             props.onClose?.();
             app.triggerWalletDataRefresh?.();
         } catch (error) {
             pushErrorToast(error, { context: t("post.fund.toast.error") });
         } finally {
-            app.dismissToast?.(mainToastId);
-            app.dismissToast?.(approveToastId);
-            app.dismissToast?.(contribToastId);
+            if (mainToastId) app.dismissToast?.(mainToastId);
+            if (approveToastId) app.dismissToast?.(approveToastId);
+            if (contribToastId) app.dismissToast?.(contribToastId);
             setIsProcessing(false);
         }
     };
 
     return (
         <Show when={props.isOpen}>
-            <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <Portal>
+            <div class="fixed inset-0 z-60 flex items-center justify-center p-4">
                 <ModalBackdrop onClick={props.onClose} />
                 <form
                     onSubmit={handleSubmit}
-                    class="relative w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
+                    class="relative w-full z-70 max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
                 >
                     <ModalAutoCloser onClose={props.onClose} />
-
                     <h3 class="text-lg font-semibold text-center uppercase">
                         {t("post.fund.contribute")}
                     </h3>
-
                     <p class="text-xs text-left text-[hsl(var(--muted-foreground))]">
                         {t("post.fund.explanation")}
                     </p>
-
                     <AmountInput
                         label={t("wallet.transfer.amount")}
                         tokenAddress={savvaTokenAddress()}
@@ -202,7 +187,6 @@ export default function ContributeModal(props) {
                             if (wei !== undefined) setAmountWei(wei);
                         }}
                     />
-
                     <Show when={!profileDetails.loading && predefinedAmounts().length > 0}>
                         <div class="space-y-2 pt-2">
                             <h4 class="text-sm font-medium">
@@ -223,7 +207,6 @@ export default function ContributeModal(props) {
                             </div>
                         </div>
                     </Show>
-
                     <div class="pt-2 space-y-3">
                         <Show when={!donationInfo.loading} fallback={<Spinner />}>
                             <p class="text-xs text-left text-[hsl(var(--muted-foreground))]">
@@ -258,6 +241,7 @@ export default function ContributeModal(props) {
                     </div>
                 </form>
             </div>
+            </Portal>
         </Show>
     );
 }
