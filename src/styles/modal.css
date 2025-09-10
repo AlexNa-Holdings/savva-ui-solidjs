@@ -1,11 +1,14 @@
 /* src/styles/modal.css */
 :root {
-  --modal-overlay-alpha: 0.45;   /* tweak per-domain in domain.css if needed */
-  --modal-overlay-blur: 8px;
+  --modal-overlay-alpha: 0.85;   /* override in your domain.css as needed */
+  --modal-overlay-blur: 8px;     /* blur radius when enabled */
 }
 
 .sv-modal-overlay {
+  /* Correct: alpha goes INSIDE the function with a slash */
   background-color: hsl(var(--background) / var(--modal-overlay-alpha));
-  backdrop-filter: blur(var(--modal-overlay-blur));
-  -webkit-backdrop-filter: blur(var(--modal-overlay-blur));
+
+  /* Keep these commented if you don't want blur yet */
+  /* backdrop-filter: blur(var(--modal-overlay-blur));
+     -webkit-backdrop-filter: blur(var(--modal-overlay-blur)); */
 }
