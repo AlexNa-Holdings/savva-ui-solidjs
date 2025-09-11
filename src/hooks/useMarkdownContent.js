@@ -3,7 +3,7 @@ import { createMemo, createResource } from "solid-js";
 import { ipfs } from "../ipfs/index.js";
 import { parse } from "yaml";
 import { dbg } from "../utils/debug.js";
-import { getPostContentBaseCid, getPostDescriptorPath } from "../ipfs/utils.js";
+import { getPostContentBaseCid } from "../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../docs/rehype-rewrite-links.js";
 import { fetchDescriptorWithFallback } from "../ipfs/fetchDescriptorWithFallback.js";
 

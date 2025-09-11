@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { dbg } from "../../utils/debug.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import CommentThread from "../comments/CommentThread.jsx";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 export default function CommentsTab(props) {
   const { t } = useApp();
@@ -13,6 +14,12 @@ export default function CommentsTab(props) {
   const [hasMore, setHasMore] = createSignal(true);
   const [loading, setLoading] = createSignal(false);
   const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
+  const { dataStable: profile } = useUserProfile();
+
+    const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
 
   const commentListFetcher = app.wsMethod ? app.wsMethod("latest-comments-new") : null;
 
@@ -26,6 +33,7 @@ export default function CommentsTab(props) {
 
       const params = {
         domain: app.selectedDomainName(),
+        show_nsfw: showNsfw(),
         limit: pageSize,
         offset: (nextPage - 1) * pageSize,
       };

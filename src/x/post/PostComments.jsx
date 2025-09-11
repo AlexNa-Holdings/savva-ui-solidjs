@@ -5,35 +5,9 @@ import { toChecksumAddress } from "../../blockchain/utils.js";
 import Spinner from "../ui/Spinner.jsx";
 import CommentCard from "./CommentCard.jsx";
 import { navigate } from "../../routing/hashRouter.js";
+import useUserProfile, { selectField } from "../profile/userProfileStore";
 
-async function fetchComments(params) {
-  const { app, postId, offset = 0 } = params;
-  if (!app.wsMethod || !postId) return { list: [], nextOffset: null };
 
-  const getChildren = app.wsMethod("content-children");
-  const requestParams = {
-    domain: app.selectedDomainName(),
-    savva_cid: postId,
-    max_deep: 4,
-    limit: 20,
-    offset,
-  };
-
-  const user = app.authorizedUser();
-  if (user?.address) {
-    requestParams.my_addr = toChecksumAddress(user.address);
-  }
-
-  try {
-    const res = await getChildren(requestParams);
-    const list = Array.isArray(res?.list) ? res.list : [];
-    const nextOffset = res?.next_offset > 0 ? res.next_offset : null;
-    return { list, nextOffset };
-  } catch (err) {
-    console.error(`Failed to fetch comments for post '${postId}':`, err);
-    return { list: [], nextOffset: null, error: err.message };
-  }
-}
 
 export default function PostComments(props) {
   const app = useApp();
@@ -43,6 +17,13 @@ export default function PostComments(props) {
   const [comments, setComments] = createSignal([]);
   const [nextOffset, setNextOffset] = createSignal(0);
   const [isLoadingMore, setIsLoadingMore] = createSignal(false);
+  const { dataStable: profile } = useUserProfile();
+
+  const showNsfw = () => {
+    const pref = selectField(profile(), "nsfw") ?? "h";
+    return pref === "s" || pref === "w";
+  };
+
 
   const [initialData] = createResource(() => ({ app, postId: postId() }), fetchComments);
 
@@ -53,6 +34,36 @@ export default function PostComments(props) {
       setNextOffset(data.nextOffset);
     }
   });
+
+  async function fetchComments(params) {
+    const { app, postId, offset = 0 } = params;
+    if (!app.wsMethod || !postId) return { list: [], nextOffset: null };
+
+    const getChildren = app.wsMethod("content-children");
+    const requestParams = {
+      domain: app.selectedDomainName(),
+      savva_cid: postId,
+      show_nsfw: showNsfw(),
+      max_deep: 4,
+      limit: 20,
+      offset,
+    };
+
+    const user = app.authorizedUser();
+    if (user?.address) {
+      requestParams.my_addr = toChecksumAddress(user.address);
+    }
+
+    try {
+      const res = await getChildren(requestParams);
+      const list = Array.isArray(res?.list) ? res.list : [];
+      const nextOffset = res?.next_offset > 0 ? res.next_offset : null;
+      return { list, nextOffset };
+    } catch (err) {
+      console.error(`Failed to fetch comments for post '${postId}':`, err);
+      return { list: [], nextOffset: null, error: err.message };
+    }
+  }
 
   const loadMore = async () => {
     if (isLoadingMore() || nextOffset() === null) return;

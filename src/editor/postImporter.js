@@ -37,18 +37,8 @@ async function fetchPostObject(app, savva_cid) {
 }
 
 // Helper to find all referenced files in a post and copy them to a draft directory
-async function importReferencedFiles(app, sourcePost, targetDirHandle) {
+async function importReferencedFiles(app, descriptor, sourcePost, targetDirHandle) {
   if (!sourcePost) return;
-
-  const descriptorPath = getPostDescriptorPath(sourcePost);
-  if (!descriptorPath) return;
-
-  // Use fallback-aware descriptor fetch (handles legacy folder CIDs returning HTML)
-  const { descriptor, finalPath } = await fetchDescriptorWithFallback(
-    app,
-    sourcePost
-  );
-  if (!descriptor) return;
 
   const contentBaseCid = getPostContentBaseCid(sourcePost);
   if (!contentBaseCid) return;
@@ -169,21 +159,13 @@ export async function preparePostForEditing(post, app) {
     }
   }
 
-  await importReferencedFiles(app, fileSourceObject, dirHandle);
-
-  // Fallback-aware descriptor fetch for the post we’re editing
-  const {
-    text: descriptorText,
-    finalPath,
-    usedFallback,
-  } = await fetchDescriptorWithFallback(app, post, (path) =>
-    ipfs.fetchBest(app, path).then((r) => r.res)
+  const { descriptor, finalPath } = await fetchDescriptorWithFallback(
+    app,
+    post
   );
-  dbg.log("Importer", "Descriptor (edit) loaded", { finalPath, usedFallback });
+  if (!descriptor) return;
 
-  const descriptor = parse(descriptorText);
-  if (!descriptor)
-    throw new Error(app.t("editor.import.parseDescriptorFailed"));
+  await importReferencedFiles(app, descriptor, fileSourceObject, dirHandle);
 
   dbg.log("Importer", "Parsed descriptor:", descriptor);
 

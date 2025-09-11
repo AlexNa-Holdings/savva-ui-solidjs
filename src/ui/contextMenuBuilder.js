@@ -33,28 +33,24 @@ export function getPostAdminItems(post, t, finalPath) {
   if (!post) return [];
 
   const items = [];
-  const savvaCid = post.savva_cid;
-  const descriptorPath = post.finalDescriptorPath || post.ipfs;
-  const dataCid = getPostContentBaseCid(post);
 
-  if (savvaCid) {
-    items.push({
-      label: t("postcard.copySavvaCid"),
-      onClick: () => copyToClipboard(savvaCid, "SAVVA CID", t),
-    });
-  }
-  if (descriptorPath) {
-    items.push({
-      label: t("postcard.copyDescriptorCid"),
-      onClick: () => copyToClipboard(descriptorPath, "Descriptor Path", t),
-    });
-  }
-  if (dataCid) {
-    items.push({
-      label: t("postcard.copyDataCid"),
-      onClick: () => copyToClipboard(dataCid, "Data CID", t),
-    });
-  }
+  items.push({
+    label: t("postcard.copySavvaCid"),
+    onClick: () => copyToClipboard(savvaCid, "SAVVA CID", t),
+  });
+  items.push({
+    label: t("postcard.copyDescriptorCid"),
+    onClick: () =>
+      copyToClipboard(
+        post.finalDescriptorPath || post.ipfs,
+        "Descriptor Path",
+        t
+      ),
+  });
+  items.push({
+    label: t("postcard.copyDataCid"),
+    onClick: () => copyToClipboard(getPostContentBaseCid(post), "Data CID", t),
+  });
 
   return items;
 }

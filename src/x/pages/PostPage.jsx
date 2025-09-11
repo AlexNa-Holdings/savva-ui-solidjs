@@ -220,7 +220,7 @@ export default function PostPage() {
               <article class="space-y-4">
                 <header class="flex justify-between items-start gap-4">
                   <div class="flex-1 min-w-0 space-y-3">
-                    <h1 class="text-2xl lg:text-3xl font-bold break-words">{t(title() || "common.loading")}</h1>
+                    <h1 class="text-2xl lg:text-3xl font-bold break-words">{title() || t("common.loading")}</h1>
                     <div class="flex items-center justify-between gap-3">
                       <UserCard author={post().author} />
                       <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
@@ -274,7 +274,7 @@ export default function PostPage() {
                             <div class="flex justify-center p-8"><Spinner /></div>
                           </Match>
                           <Match when={localizedMainContent()}>
-                            <Show when={(availableLocales()?.length || 0) > 1}>
+                            <Show when={(availableLocales()?.chapters?.length || 0) > 1}>
                               <div class="flex justify-end mb-4">
                                 <ChapterSelector
                                   chapters={[
