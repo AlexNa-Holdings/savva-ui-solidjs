@@ -124,7 +124,6 @@ export default {
   "editor.fullPreview.help": "This is a preview of how your post will look once published. Review it carefully before publishing.",
   "editor.fullPreview.publish": "Publish",
   "editor.fullPreview.title": "Final Check",
-  "editor.import.parseDescriptorFailed": "Failed to parse descriptor.",
   "editor.params.categories": "Categories",
   "editor.params.fundraiser.label": "Promoted Fundrising Campaign ID",
   "editor.params.nsfw.help": "Content contains explicit language or images.",

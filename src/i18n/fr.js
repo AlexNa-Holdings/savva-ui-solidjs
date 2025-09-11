@@ -124,7 +124,6 @@ export default {
   "editor.fullPreview.help": "Ceci est un aperçu de l'apparence de votre publication une fois publiée. Vérifiez-le attentivement avant de publier.",
   "editor.fullPreview.publish": "Publier",
   "editor.fullPreview.title": "Vérification Finale",
-  "editor.import.parseDescriptorFailed": "Échec de l'analyse du descripteur.",
   "editor.params.categories": "Catégories",
   "editor.params.fundraiser.label": "ID de campagne de collecte de fonds promue",
   "editor.params.nsfw.help": "Le contenu contient un langage ou des images explicites.",

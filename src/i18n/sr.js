@@ -124,7 +124,6 @@ export default {
   "editor.fullPreview.help": "Ovo je pregled kako će vaš post izgledati nakon objavljivanja. Pažljivo ga pregledajte pre objavljivanja.",
   "editor.fullPreview.publish": "Objavi",
   "editor.fullPreview.title": "Završna Provera",
-  "editor.import.parseDescriptorFailed": "Nije uspelo parsiranje deskriptora.",
   "editor.params.categories": "Kategorije",
   "editor.params.fundraiser.label": "ID Promovisanog Kampanje Prikupljanja Sredstava",
   "editor.params.nsfw.help": "Sadržaj sadrži eksplicitni jezik ili slike.",

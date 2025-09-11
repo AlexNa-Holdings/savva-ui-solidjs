@@ -124,7 +124,6 @@ export default {
   "editor.fullPreview.help": "Это предварительный просмотр того, как будет выглядеть ваш пост после публикации. Внимательно проверьте его перед публикацией.",
   "editor.fullPreview.publish": "Опубликовать",
   "editor.fullPreview.title": "Финальная проверка",
-  "editor.import.parseDescriptorFailed": "Не удалось разобрать дескриптор.",
   "editor.params.categories": "Категории",
   "editor.params.fundraiser.label": "ID продвигаемой кампании по сбору средств",
   "editor.params.nsfw.help": "Контент содержит откровенный язык или изображения.",
