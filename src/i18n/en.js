@@ -329,6 +329,7 @@ export default {
   "post.fund.contribute": "Contribute",
   "post.fund.expectingRound": "Expected Round",
   "post.fund.explanation": "Contribute to boost this post and support the author. A share goes to the author, the rest is pooled and raffled among contributors—your chance to win!",
+  "post.fund.minContributionError": "Minimum contribution is {n}.",
   "post.fund.nextPrize": "Next Prize",
   "post.fund.predefinedAmounts": "Select a predefined amount",
   "post.fund.title": "Post Fund",
@@ -688,6 +689,5 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now",
-  "post.fund.minContributionError": "Minimum contribution is {n}.",
+  "wallet.unstaked.availableNow": "Available Now"
 };

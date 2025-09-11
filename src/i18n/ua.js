@@ -329,6 +329,7 @@ export default {
   "post.fund.contribute": "Внести",
   "post.fund.expectingRound": "Очікувана сума",
   "post.fund.explanation": "Внесіть кошти, щоб підтримати цей пост і автора. Частина йде автору, решта об'єднується і розігрується серед учасників — ваш шанс виграти!",
+  "post.fund.minContributionError": "Мінімальний внесок становить {n}.",
   "post.fund.nextPrize": "Наступний приз",
   "post.fund.predefinedAmounts": "Виберіть попередньо визначену суму",
   "post.fund.title": "Фонд Поста",

@@ -329,6 +329,7 @@ export default {
   "post.fund.contribute": "Doprini",
   "post.fund.expectingRound": "Očekivani krug",
   "post.fund.explanation": "Doprini da podržiš ovaj post i autora. Deo ide autoru, a ostatak se okuplja i deli među donatorima—tvoja šansa za dobitak!",
+  "post.fund.minContributionError": "Minimalni doprinos je {n}.",
   "post.fund.nextPrize": "Sledeća nagrada",
   "post.fund.predefinedAmounts": "Odaberi unapred definisani iznos",
   "post.fund.title": "Fond za post",

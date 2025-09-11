@@ -329,6 +329,7 @@ export default {
   "post.fund.contribute": "Contribuer",
   "post.fund.expectingRound": "Ronde Attendue",
   "post.fund.explanation": "Contribuez pour soutenir cette publication et l'auteur. Une part va à l'auteur, le reste est mis en commun et tiré au sort parmi les contributeurs—votre chance de gagner !",
+  "post.fund.minContributionError": "La contribution minimale est de {n}.",
   "post.fund.nextPrize": "Prochain prix",
   "post.fund.predefinedAmounts": "Sélectionnez un montant prédéfini",
   "post.fund.title": "Fonds de Publication",
