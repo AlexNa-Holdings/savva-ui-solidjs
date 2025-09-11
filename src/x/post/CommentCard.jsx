@@ -20,13 +20,14 @@ import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 import { parse } from "yaml";
 import ReactionInput from "./ReactionInput.jsx";
+import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
   if (!comment || !lang) return "";
 
   try {
-    const { descriptor, finalPath } = await fetchDescriptorWithFallback(app, comment);
+    const { descriptor } = await fetchDescriptorWithFallback(app, comment);
     if (!descriptor) throw new Error(app.t("comment.parseDescriptorFailed"));
 
     const dataCidForContent = getPostContentBaseCid(comment);
@@ -94,20 +95,14 @@ export default function CommentCard(props) {
   const [fullContent] = createResource(
     () => ({
       shouldFetch: isExpanded(),
-      app: app,
-      comment: comment,
+      app,
+      comment,
       lang: app.lang(),
     }),
-    async (params) => {
-      if (!params.shouldFetch) return null;
-      return fetchFullContent(params);
-    }
+    async (params) => (params.shouldFetch ? fetchFullContent(params) : null)
   );
 
-  const contextMenuItems = createMemo(() => {
-    if (!comment) return [];
-    return getPostAdminItems(comment, t);
-  });
+  const contextMenuItems = createMemo(() => (comment ? getPostAdminItems(comment, t) : []));
 
   const needsTruncation = createMemo(() => {
     const preview = localizedPreview();
@@ -120,13 +115,9 @@ export default function CommentCard(props) {
     if (!dataCid) return "";
 
     let bestGateway;
-    if (app.localIpfsEnabled() && app.localIpfsGateway()) {
-      bestGateway = app.localIpfsGateway();
-    } else if (Array.isArray(comment.gateways) && comment.gateways.length > 0) {
-      bestGateway = comment.gateways[0];
-    } else {
-      bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
-    }
+    if (app.localIpfsEnabled() && app.localIpfsGateway()) bestGateway = app.localIpfsGateway();
+    else if (Array.isArray(comment.gateways) && comment.gateways.length > 0) bestGateway = comment.gateways[0];
+    else bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
 
     return ipfs.buildUrl(bestGateway, dataCid);
   });
@@ -136,9 +127,7 @@ export default function CommentCard(props) {
   const handleReply = (e) => {
     e.stopPropagation();
     const commentCid = comment?.savva_cid;
-    if (commentCid) {
-      navigate(`/editor/new-comment/${commentCid}`);
-    }
+    if (commentCid) navigate(`/editor/new-comment/${commentCid}`);
   };
 
   const handleEdit = async (e) => {
@@ -154,6 +143,14 @@ export default function CommentCard(props) {
     }
   };
 
+  // --- NSFW (mirrors PostCard logic) ---
+  const { dataStable: profile } = useUserProfile();
+  const nsfwPref = createMemo(() => selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h");  // default 'h'
+  const commentIsNsfw = createMemo(() => !!(comment?.nsfw || comment?.savva_content?.nsfw));                        // flag from raw or content
+  const shouldHide = createMemo(() => commentIsNsfw() && nsfwPref() === "h");
+  const shouldWarn = createMemo(() => commentIsNsfw() && nsfwPref() === "w");
+  const [revealed, setRevealed] = createSignal(false);
+
   return (
     <div
       class="relative flex flex-col"
@@ -168,72 +165,109 @@ export default function CommentCard(props) {
               <ContextMenu
                 items={contextMenuItems()}
                 positionClass="relative z-20"
-                buttonClass="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+                class="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
               />
             </Show>
           </div>
         </div>
       </Show>
 
-      <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-        <div class="mb-2">
-          <UserCard author={comment.author} compact={false} />
-        </div>
-
-        <div class="text-sm prose prose-sm max-w-none">
-          <Switch>
-            <Match when={isExpanded() && fullContent?.loading}>
-              <div class="flex items-center justify-center h-24">
-                <Spinner />
-              </div>
-            </Match>
-            <Match when={isExpanded() && fullContent()}>
-              <MarkdownView markdown={fullContent() || ""} rehypePlugins={markdownPlugins()} />
-            </Match>
-            <Match when={!isExpanded()}>
-              <MarkdownView markdown={localizedPreview()} rehypePlugins={markdownPlugins()} />
-            </Match>
-          </Switch>
-        </div>
-
-        <div class="mt-2 flex items-center justify-between">
-          <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
-          <div class="flex items-center gap-2 text-xs font-semibold flex-shrink-0 whitespace-nowrap">
-            <Show when={app.authorizedUser()}>
-              <ReactionInput post={comment} />
-            </Show>
-            <Show when={isAuthor()}>
-              <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title={t("comment.edit")}>
-                <Show when={isPreparing()} fallback={<EditIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]" />}>
-                  <Spinner class="w-4 h-4" />
-                </Show>
-              </button>
-              <button
-                class="p-1"
-                onClick={openConfirm}
-                disabled={modalProps().isDeleting}
-                title={t("comment.delete")}
-              >
-                <TrashIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]" />
-              </button>
-            </Show>
-            <Show when={needsTruncation() || isExpanded()}>
-              <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
-                {isExpanded() ? t("comment.showLess") : t("comment.showMore")}
-              </button>
-            </Show>
-            <button class="hover:underline" onClick={handleReply}>{t("comment.reply")}</button>
-          </div>
-        </div>
-      </div>
-
-      <Show when={comment.children?.length > 0}>
-        <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
-          <For each={comment.children}>{(reply) => <CommentCard comment={reply} level={level() + 1} />}</For>
+      {/* Hard-hide state */}
+      <Show when={shouldHide()}>
+        <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+          <h3 class="font-semibold">{t("post.nsfw.hidden.title")}</h3>
+          <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.nsfw.hidden.message")}</p>
         </div>
       </Show>
 
-      <ConfirmModal isOpen={showConfirm()} onClose={closeConfirm} onConfirm={confirmDelete} {...modalProps()} />
+      {/* Normal / warn states */}
+      <Show when={!shouldHide()}>
+        <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+          <div class="mb-2">
+            <UserCard author={comment.author} compact={false} />
+          </div>
+
+          <div class="text-sm prose prose-sm max-w-none relative rounded-[inherit]">
+            {/* Image-free, center warning overlay covering the text block */}
+            <Show when={shouldWarn() && !revealed()}>
+              <div
+                class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <div class="absolute inset-0 rounded-[inherit] bg-[hsl(var(--card))]/80 backdrop-blur-md" />
+                <div class="relative z-10 flex flex-col items-center gap-3 text-center px-4">
+                  <div class="text-sm text-[hsl(var(--muted-foreground))]">{t("nsfw.cover.warning")}</div>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                    onClick={() => setRevealed(true)}
+                  >
+                    {t("nsfw.cover.show")}
+                  </button>
+                </div>
+              </div>
+            </Show>
+
+            <Switch>
+              <Match when={isExpanded() && fullContent?.loading}>
+                <div class="flex items-center justify-center h-24">
+                  <Spinner />
+                </div>
+              </Match>
+              <Match when={isExpanded() && fullContent()}>
+                <MarkdownView markdown={fullContent() || ""} rehypePlugins={markdownPlugins()} />
+              </Match>
+              <Match when={!isExpanded()}>
+                <MarkdownView markdown={localizedPreview()} rehypePlugins={markdownPlugins()} />
+              </Match>
+            </Switch>
+          </div>
+
+          <div class="mt-2 flex items-center justify-between">
+            <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
+            <div class="flex items-center gap-2 text-xs font-semibold flex-shrink-0 whitespace-nowrap">
+              <Show when={app.authorizedUser()}>
+                <ReactionInput post={comment} />
+              </Show>
+              <Show when={isAuthor()}>
+                <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title={t("comment.edit")}>
+                  <Show
+                    when={isPreparing()}
+                    fallback={<EditIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]" />}
+                  >
+                    <Spinner class="w-4 h-4" />
+                  </Show>
+                </button>
+                <button
+                  class="p-1"
+                  onClick={openConfirm}
+                  disabled={modalProps().isDeleting}
+                  title={t("comment.delete")}
+                >
+                  <TrashIcon class="w-4 h-4 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]" />
+                </button>
+              </Show>
+              <Show when={needsTruncation() || isExpanded()}>
+                <button class="hover:underline" onClick={() => setIsExpanded(!isExpanded())}>
+                  {isExpanded() ? t("comment.showLess") : t("comment.showMore")}
+                </button>
+              </Show>
+              <button class="hover:underline" onClick={handleReply}>{t("comment.reply")}</button>
+            </div>
+          </div>
+
+          <Show when={comment.children?.length > 0}>
+            <div class="mt-3 space-y-3 border-l-2 border-[hsl(var(--border))]">
+              <For each={comment.children}>{(reply) => <CommentCard comment={reply} level={level() + 1} />}</For>
+            </div>
+          </Show>
+
+          <ConfirmModal isOpen={showConfirm()} onClose={closeConfirm} onConfirm={confirmDelete} {...modalProps()} />
+        </div>
+      </Show>
     </div>
   );
 }

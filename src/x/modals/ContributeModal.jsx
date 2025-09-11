@@ -3,10 +3,8 @@ import { createSignal, Show, createResource, createMemo, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
-import { ipfs } from "../../ipfs/index.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
-import { toHexBytes32 } from "../../blockchain/utils.js";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
 import { getConfigParam } from "../../blockchain/config.js";
 import Spinner from "../ui/Spinner.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
@@ -14,234 +12,257 @@ import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
 import ModalBackdrop from "../modals/ModalBackdrop.jsx";
 import { Portal } from "solid-js/web";
-
-async function fetchProfileDetails(params) {
-    const { app, userAddress } = params;
-    if (!app || !userAddress) return null;
-    try {
-        const userProfileContract = await getSavvaContract(app, "UserProfile");
-        const profileCid = await userProfileContract.read.getString([
-            userAddress,
-            toHexBytes32(app.selectedDomainName()), // Use current domain
-            toHexBytes32("profile_cid"),
-        ]);
-        if (!profileCid) return null;
-
-        const { data } = await ipfs.getJSONBest(app, profileCid);
-        return data || {};
-    } catch (e) {
-        console.error("Failed to fetch profile details for modal:", e);
-        return null;
-    }
-}
+import { useProfileByCid, selectField } from "../profile/userProfileStore.js";
 
 export default function ContributeModal(props) {
-    const app = useApp();
-    const { t } = app;
+  const app = useApp();
+  const { t } = app;
 
-    const MAX_UINT = (1n << 256n) - 1n;
+  const MAX_UINT = (1n << 256n) - 1n;
 
-    const [amountText, setAmountText] = createSignal("");
-    const [amountWei, setAmountWei] = createSignal(0n);
-    const [isProcessing, setIsProcessing] = createSignal(false);
+  const [amountText, setAmountText] = createSignal("");
+  const [amountWei, setAmountWei] = createSignal(0n);
+  const [isProcessing, setIsProcessing] = createSignal(false);
 
-    // actor-aware subject (spender/owner of SAVVA for contribution)
-    const actorAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
+  // actor-aware subject (spender/owner of SAVVA for contribution)
+  const actorAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
-    const [profileDetails] = createResource(
-        () => ({ app, userAddress: actorAddr() }),
-        fetchProfileDetails
-    );
+  // Actor profile via storage (CID -> JSON)
+  const actorProfileCid = createMemo(() => app.actorProfile?.()?.profile_cid || app.authorizedUser?.()?.profile_cid);
+  const { dataStable: actorProfile } = useProfileByCid(actorProfileCid);
 
-    const [donationInfo] = createResource(
-        () => ({ post: props.post }),
-        async ({ post }) => {
-            if (!app) return { percentage: 0, hasNft: false };
-            try {
-                const hasNft =
-                    post?.nft?.owner &&
-                    post.nft.owner !== "0x0000000000000000000000000000000000000000";
-                const authorShare = await getConfigParam(app, "authorShare");
-                let total = Number(authorShare || 0);
-
-                if (hasNft) {
-                    const nftOwnerCut = await getConfigParam(app, "nftOwnerCut");
-                    total += Number(nftOwnerCut || 0);
-                }
-
-                return { percentage: total / 100, hasNft };
-            } catch (e) {
-                console.error("Failed to get donation percentages", e);
-                return { percentage: 0, hasNft: false };
-            }
+  const [donationInfo] = createResource(
+    () => ({ post: props.post }),
+    async ({ post }) => {
+      if (!app) return { percentage: 0, hasNft: false };
+      try {
+        const hasNft = post?.nft?.owner && post.nft.owner !== "0x0000000000000000000000000000000000000000";
+        const authorShare = await getConfigParam(app, "authorShare");
+        let total = Number(authorShare || 0);
+        if (hasNft) {
+          const nftOwnerCut = await getConfigParam(app, "nftOwnerCut");
+          total += Number(nftOwnerCut || 0);
         }
-    );
+        return { percentage: total / 100, hasNft };
+      } catch (e) {
+        console.error("Failed to get donation percentages", e);
+        return { percentage: 0, hasNft: false };
+      }
+    }
+  );
 
-    const predefinedAmounts = createMemo(() => {
-        const values = profileDetails()?.sponsor_values;
-        return Array.isArray(values) ? values.filter((v) => v > 0) : [];
-    });
+  // --- minContribution: robustly convert to WEI using token decimals ---
+  const [minContributionRaw] = createResource(
+    () => ({ app }),
+    async ({ app }) => {
+      try {
+        // Could be a string/number/BigInt; may represent wei or token units
+        const v = await getConfigParam(app, "minContribution");
+        return v ?? "0";
+      } catch {
+        return "0";
+      }
+    }
+  );
 
-    const savvaTokenAddress = () =>
-        app.info()?.savva_contracts?.SavvaToken?.address || "";
-    const [savvaMeta] = createResource(
-        () => ({ app, addr: savvaTokenAddress() }),
-        ({ app, addr }) => getTokenInfo(app, addr)
-    );
-    const savvaDecimals = () => Number(savvaMeta()?.decimals ?? 18);
+  const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address || "";
+  const [savvaMeta] = createResource(
+    () => ({ app, addr: savvaTokenAddress() }),
+    ({ app, addr }) => getTokenInfo(app, addr)
+  );
+  const savvaDecimals = () => Number(savvaMeta()?.decimals ?? 18);
+  const savvaSymbol = () => savvaMeta()?.symbol || "SAVVA";
 
-    const handlePredefinedClick = (amount) => {
-        const text = String(amount);
-        setAmountText(text);
-        try {
-            const wei = parseUnits(text, savvaDecimals());
-            setAmountWei(wei);
-        } catch { }
-    };
+  // Heuristic: if config value looks like WEI (big integer), use as-is; if it looks like tokens (may have '.'), convert via parseUnits
+  const minWei = createMemo(() => {
+    try {
+      const raw = minContributionRaw();
+      if (raw === undefined || raw === null) return 0n;
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (amountWei() <= 0n) return;
-        if (!props.post || !props.post.author?.address || !props.post.domain || !props.post.guid) {
-            pushErrorToast({ message: t("post.fund.toast.error") });
-            return;
-        }
+      // BigInt already? treat as wei
+      if (typeof raw === "bigint") return raw;
 
-        setIsProcessing(true);
-        let mainToastId, approveToastId, contribToastId;
+      const s = String(raw).trim();
+      if (s.length === 0) return 0n;
 
-        try {
-            mainToastId = pushToast({
-                type: "info",
-                message: t("post.fund.toast.pending"),
-                autohideMs: 0,
-            });
+      // If decimal point or scientific notation -> tokens
+      if (s.includes(".") || /e/i.test(s)) {
+        return parseUnits(s, savvaDecimals());
+      }
 
-            const tokenContract = await getSavvaContract(app, "SavvaToken");
-            const fundContract = await getSavvaContract(app, "ContentFund");
-            const owner = actorAddr();
-            const spender = fundContract.address;
-            const allowance = await tokenContract.read.allowance([owner, spender]);
+      // Pure integer string: decide wei vs tokens
+      const bi = BigInt(s);
+      const tenPow = 10n ** BigInt(savvaDecimals());
 
-            if (allowance < amountWei()) {
-                approveToastId = pushToast({
-                    type: "info",
-                    message: t("post.fund.toast.approving"),
-                    autohideMs: 0,
-                });
-                await sendAsActor(app, {
-                    contractName: "SavvaToken",
-                    functionName: "approve",
-                    args: [spender, MAX_UINT],
-                });
-            }
+      // If it's large enough to likely be wei (>= 0.001 token in wei), use as wei; else treat as integer tokens.
+      if (bi >= tenPow / 1000n) return bi;
+      return parseUnits(s, savvaDecimals());
+    } catch {
+      return 0n;
+    }
+  });
 
-            contribToastId = pushToast({
-                type: "info",
-                message: t("post.fund.toast.contributing"),
-                autohideMs: 0,
-            });
+  const belowMin = createMemo(() => {
+    const amt = amountWei();
+    const min = minWei();
+    return min > 0n && amt > 0n && amt < min;
+  });
 
-            const { author, domain, guid } = props.post;
-            await sendAsActor(app, {
-                contractName: "ContentFund",
-                functionName: "contribute",
-                args: [author.address, domain, guid, amountWei()],
-            });
+  // Predefined contribution buttons from actor profile JSON
+  const predefinedAmounts = createMemo(() => {
+    const values = selectField(actorProfile(), "sponsor_values");
+    return Array.isArray(values) ? values.filter((v) => Number(v) > 0) : [];
+  });
 
-            pushToast({ type: "success", message: t("post.fund.toast.success") });
-            props.onClose?.();
-            app.triggerWalletDataRefresh?.();
-        } catch (error) {
-            pushErrorToast(error, { context: t("post.fund.toast.error") });
-        } finally {
-            if (mainToastId) app.dismissToast?.(mainToastId);
-            if (approveToastId) app.dismissToast?.(approveToastId);
-            if (contribToastId) app.dismissToast?.(contribToastId);
-            setIsProcessing(false);
-        }
-    };
+  const handlePredefinedClick = (amount) => {
+    const text = String(amount);
+    setAmountText(text);
+    try {
+      const wei = parseUnits(text, savvaDecimals());
+      setAmountWei(wei);
+    } catch {}
+  };
 
-    return (
-        <Show when={props.isOpen}>
-            <Portal>
-            <div class="fixed inset-0 z-60 flex items-center justify-center p-4">
-                <ModalBackdrop onClick={props.onClose} />
-                <form
-                    onSubmit={handleSubmit}
-                    class="relative w-full z-70 max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (amountWei() <= 0n) return;
+    if (belowMin()) return; // guard (button also disabled)
+    if (!props.post || !props.post.author?.address || !props.post.domain || !props.post.guid) {
+      pushErrorToast({ message: t("post.fund.toast.error") });
+      return;
+    }
+
+    setIsProcessing(true);
+    let mainToastId, approveToastId, contribToastId;
+
+    try {
+      mainToastId = pushToast({ type: "info", message: t("post.fund.toast.pending"), autohideMs: 0 });
+
+      const tokenContract = await getSavvaContract(app, "SavvaToken");
+      const fundContract = await getSavvaContract(app, "ContentFund");
+      const owner = actorAddr();
+      const spender = fundContract.address;
+      const allowance = await tokenContract.read.allowance([owner, spender]);
+
+      if (allowance < amountWei()) {
+        approveToastId = pushToast({ type: "info", message: t("post.fund.toast.approving"), autohideMs: 0 });
+        await sendAsActor(app, {
+          contractName: "SavvaToken",
+          functionName: "approve",
+          args: [spender, MAX_UINT],
+        });
+      }
+
+      contribToastId = pushToast({ type: "info", message: t("post.fund.toast.contributing"), autohideMs: 0 });
+
+      const { author, domain, guid } = props.post;
+      await sendAsActor(app, {
+        contractName: "ContentFund",
+        functionName: "contribute",
+        args: [author.address, domain, guid, amountWei()],
+      });
+
+      pushToast({ type: "success", message: t("post.fund.toast.success") });
+      props.onClose?.();
+      app.triggerWalletDataRefresh?.();
+    } catch (error) {
+      pushErrorToast(error, { context: t("post.fund.toast.error") });
+    } finally {
+      if (mainToastId) app.dismissToast?.(mainToastId);
+      if (approveToastId) app.dismissToast?.(approveToastId);
+      if (contribToastId) app.dismissToast?.(contribToastId);
+      setIsProcessing(false);
+    }
+  };
+
+  const minDisplay = createMemo(() => {
+    try {
+      return `${formatUnits(minWei(), savvaDecimals())} ${savvaSymbol()}`;
+    } catch {
+      return `0 ${savvaSymbol()}`;
+    }
+  });
+
+  return (
+    <Show when={props.isOpen}>
+      <Portal>
+        <div class="fixed inset-0 z-60 flex items-center justify-center p-4">
+          <ModalBackdrop onClick={props.onClose} />
+          <form
+            onSubmit={handleSubmit}
+            class="relative w-full z-70 max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
+          >
+            <ModalAutoCloser onClose={props.onClose} />
+            <h3 class="text-lg font-semibold text-center uppercase">{t("post.fund.contribute")}</h3>
+            <p class="text-xs text-left text-[hsl(var(--muted-foreground))]">{t("post.fund.explanation")}</p>
+
+            <AmountInput
+              label={t("wallet.transfer.amount")}
+              tokenAddress={savvaTokenAddress()}
+              value={amountText()}
+              onInput={(txt, wei) => {
+                setAmountText(txt);
+                if (wei !== undefined) setAmountWei(wei);
+              }}
+            />
+
+            {/* Inline validation for minContribution */}
+            <Show when={belowMin()}>
+              <p class="text-xs mt-1 text-[hsl(var(--destructive))]">
+                {t("post.fund.minContributionError", { n: minDisplay() })}
+              </p>
+            </Show>
+
+            <Show when={predefinedAmounts().length > 0}>
+              <div class="space-y-2 pt-2">
+                <h4 class="text-sm font-medium">{t("post.fund.predefinedAmounts")}</h4>
+                <div class="flex gap-2">
+                  <For each={predefinedAmounts()}>
+                    {(amount) => (
+                      <button
+                        type="button"
+                        onClick={() => handlePredefinedClick(amount)}
+                        class="flex-1 text-center px-3 py-1.5 text-sm rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
+                      >
+                        {amount}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
+
+            <div class="pt-2 space-y-3">
+              <Show when={!donationInfo.loading} fallback={<Spinner />}>
+                <p class="text-xs text-left text-[hsl(var(--muted-foreground))]">
+                  {donationInfo()?.hasNft
+                    ? t("post.fund.confirmation", { n: donationInfo()?.percentage || "N/A" })
+                    : t("post.fund.confirmation_no_nft", { n: donationInfo()?.percentage || "N/A" })}
+                </p>
+              </Show>
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={props.onClose}
+                  disabled={isProcessing()}
+                  class="px-4 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
                 >
-                    <ModalAutoCloser onClose={props.onClose} />
-                    <h3 class="text-lg font-semibold text-center uppercase">
-                        {t("post.fund.contribute")}
-                    </h3>
-                    <p class="text-xs text-left text-[hsl(var(--muted-foreground))]">
-                        {t("post.fund.explanation")}
-                    </p>
-                    <AmountInput
-                        label={t("wallet.transfer.amount")}
-                        tokenAddress={savvaTokenAddress()}
-                        value={amountText()}
-                        onInput={(txt, wei) => {
-                            setAmountText(txt);
-                            if (wei !== undefined) setAmountWei(wei);
-                        }}
-                    />
-                    <Show when={!profileDetails.loading && predefinedAmounts().length > 0}>
-                        <div class="space-y-2 pt-2">
-                            <h4 class="text-sm font-medium">
-                                {t("post.fund.predefinedAmounts")}
-                            </h4>
-                            <div class="flex gap-2">
-                                <For each={predefinedAmounts()}>
-                                    {(amount) => (
-                                        <button
-                                            type="button"
-                                            onClick={() => handlePredefinedClick(amount)}
-                                            class="flex-1 text-center px-3 py-1.5 text-sm rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-                                        >
-                                            {amount}
-                                        </button>
-                                    )}
-                                </For>
-                            </div>
-                        </div>
-                    </Show>
-                    <div class="pt-2 space-y-3">
-                        <Show when={!donationInfo.loading} fallback={<Spinner />}>
-                            <p class="text-xs text-left text-[hsl(var(--muted-foreground))]">
-                                {donationInfo()?.hasNft
-                                    ? t("post.fund.confirmation", {
-                                        n: donationInfo()?.percentage || "N/A",
-                                    })
-                                    : t("post.fund.confirmation_no_nft", {
-                                        n: donationInfo()?.percentage || "N/A",
-                                    })}
-                            </p>
-                        </Show>
-                        <div class="flex justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={props.onClose}
-                                disabled={isProcessing()}
-                                class="px-4 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
-                            >
-                                {t("common.cancel")}
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isProcessing() || amountWei() <= 0n}
-                                class="px-4 py-2 min-w-[120px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-                            >
-                                <Show when={isProcessing()} fallback={t("post.fund.contribute")}>
-                                    <Spinner class="w-5 h-5" />
-                                </Show>
-                            </button>
-                        </div>
-                    </div>
-                </form>
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing() || amountWei() <= 0n || belowMin()}
+                  class="px-4 py-2 min-w-[120px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                >
+                  <Show when={isProcessing()} fallback={t("post.fund.contribute")}>
+                    <Spinner class="w-5 h-5" />
+                  </Show>
+                </button>
+              </div>
             </div>
-            </Portal>
-        </Show>
-    );
+          </form>
+        </div>
+      </Portal>
+    </Show>
+  );
 }
