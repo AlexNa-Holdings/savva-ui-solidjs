@@ -36,8 +36,15 @@ export default function PostsTab(props) {
 
   const { dataStable: profile } = useUserProfile();
 
+  const isViewingSelf = createMemo(() => {
+    const actor = (app.actorAddress?.() || app.authorizedUser?.()?.address || "").toLowerCase();
+    const viewed = (user()?.address || "").toLowerCase();
+    return !!actor && !!viewed && actor === viewed;
+  });
+
   const showNsfw = () => {
-    const pref = selectField(profile(), "nsfw") ?? "h";
+    if (isViewingSelf()) return true; // actor viewing their own profile → always show
+    const pref = selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h";
     return pref === "s" || pref === "w";
   };
 
