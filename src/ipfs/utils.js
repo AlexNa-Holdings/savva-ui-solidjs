@@ -60,21 +60,4 @@ export function resolvePostCidPath(post, path) {
   return `${baseCid}/${cleanPath}`;
 }
 
-/**
- * Determines the full IPFS path to a post's descriptor file (info.yaml),
- * supporting both new and legacy formats.
- * @param {object} post - The raw post object from the API.
- * @returns {string|null} The full, resolvable IPFS path to the descriptor.
- */
-export function getPostDescriptorPath(post) {
-  if (!post || !post.ipfs) return null;
-  
-  // If data_cid is in savva_content, it's the new format where `ipfs` is the direct path.
-  if (post.savva_content?.data_cid) {
-    return post.ipfs;
-  }
-  
-  // Otherwise, it's the legacy format where `ipfs` is the folder CID.
-  const baseCid = post.ipfs.split('/')[0];
-  return `${baseCid}/info.yaml`;
-}
+

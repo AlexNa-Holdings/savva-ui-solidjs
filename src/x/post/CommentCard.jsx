@@ -26,12 +26,7 @@ async function fetchFullContent(params) {
   if (!comment || !lang) return "";
 
   try {
-    const { text: descriptorText } = await fetchDescriptorWithFallback(
-      app,
-      comment,
-      (path) => ipfs.fetchBest(app, path).then((r) => r.res)
-    );
-    const descriptor = parse(descriptorText);
+    const { descriptor, finalPath } = await fetchDescriptorWithFallback(app, comment);
     if (!descriptor) throw new Error(app.t("comment.parseDescriptorFailed"));
 
     const dataCidForContent = getPostContentBaseCid(comment);

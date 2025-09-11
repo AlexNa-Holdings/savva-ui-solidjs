@@ -11,23 +11,15 @@ import { fetchDescriptorWithFallback } from "../ipfs/fetchDescriptorWithFallback
 async function fetchDetails(app, contentObject) {
   if (!contentObject) return null;
 
-  const descriptorPath = getPostDescriptorPath(contentObject);
   const dataCidForContent = getPostContentBaseCid(contentObject);
-  if (!descriptorPath) return { descriptor: null, dataCidForContent };
-
+  
   try {
-    const { text, finalPath, usedFallback } = await fetchDescriptorWithFallback(
-      app,
-      contentObject,
-      (path) => ipfs.fetchBest(app, path).then((x) => x.res)
-    );
-    dbg.log("useMarkdownContent", "descriptor loaded", { finalPath, usedFallback });
-
-    const descriptor = parse(text) || null;
-    return { descriptor, dataCidForContent };
+    const { descriptor, finalPath } = await fetchDescriptorWithFallback(app, contentObject);
+    return { descriptor, dataCidForContent, finalPath };
   } catch (error) {
+    const descriptorPath = contentObject.ipfs; // Best guess for error logging
     dbg.error("useMarkdownContent", "Failed to fetch descriptor", { path: descriptorPath, error });
-    return { descriptor: { error: error.message }, dataCidForContent };
+    return { descriptor: { error: error.message }, dataCidForContent, finalPath: null };
   }
 }
 

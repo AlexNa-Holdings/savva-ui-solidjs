@@ -1,6 +1,6 @@
 // src/ui/contextMenuBuilder.js
 import { pushToast } from "../ui/toast.js";
-import { getPostDescriptorPath, getPostContentBaseCid } from "../ipfs/utils.js";
+import { getPostContentBaseCid } from "../ipfs/utils.js";
 
 // A helper to avoid rewriting the clipboard logic everywhere
 function copyToClipboard(text, label, t) {
@@ -22,16 +22,6 @@ function isProbablyCid(s) {
   if (s.startsWith("bafy")) return true; // v1
   return false;
 }
-function normalizeDescriptorCopyPath(post) {
-  const path = getPostDescriptorPath(post);
-  if (!path) return path;
-  const clean = String(path).replace(/^\/+|\/+$/g, "");
-  const endsWithYaml = /(^|\/)info\.ya?ml$/i.test(clean);
-  if (endsWithYaml) return clean;
-  const first = clean.split("/")[0].replace(/^ipfs\//, "");
-  if (isProbablyCid(first)) return `${first}/info.yaml`;
-  return clean;
-}
 
 /**
  * Returns a standard set of admin menu items for a given post.
@@ -39,12 +29,12 @@ function normalizeDescriptorCopyPath(post) {
  * @param {function} t - The translation function from i18n.
  * @returns {Array<object>} An array of menu item objects.
  */
-export function getPostAdminItems(post, t) {
+export function getPostAdminItems(post, t, finalPath) {
   if (!post) return [];
 
   const items = [];
   const savvaCid = post.savva_cid;
-  const descriptorPath = normalizeDescriptorCopyPath(post);
+  const descriptorPath = post.finalDescriptorPath || post.ipfs;
   const dataCid = getPostContentBaseCid(post);
 
   if (savvaCid) {

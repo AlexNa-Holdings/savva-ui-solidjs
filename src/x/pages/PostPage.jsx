@@ -18,7 +18,7 @@ import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import ChapterSelector from "../post/ChapterSelector.jsx";
 import ChapterPager from "../post/ChapterPager.jsx";
 import PostTags from "../post/PostTags.jsx";
-import { getPostContentBaseCid, getPostDescriptorPath, resolvePostCidPath } from "../../ipfs/utils.js";
+import { getPostContentBaseCid, resolvePostCidPath } from "../../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
@@ -30,13 +30,14 @@ import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import PostRightPanel from "../post/PostRightPanel.jsx";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
 
+
 const getIdentifier = (route) => route().split('/')[2] || "";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
   if (!identifier || !domain || !app.wsMethod) return null;
   const contentList = app.wsMethod("content-list");
-  const requestParams = { domain, lang, limit: 1 };
+  const requestParams = { domain, lang, limit: 1 , show_nsfw: true };
   if (identifier.startsWith("0x")) {
     requestParams.savva_cid = identifier;
   } else {
@@ -52,28 +53,13 @@ async function fetchPostByIdentifier(params) {
 async function fetchPostDetails(mainPost, app) {
   if (!mainPost) return null;
 
-  const descriptorPath = getPostDescriptorPath(mainPost);
   const dataCidForContent = getPostContentBaseCid(mainPost);
 
-  dbg.log("PostPage", "Determined paths", { descriptorPath, dataCidForContent });
-
-  if (!descriptorPath) {
-    return { descriptor: null, dataCidForContent };
-  }
-
   try {
-    const { text, finalPath, usedFallback } = await fetchDescriptorWithFallback(
-      app,
-      mainPost,
-      (path) => ipfs.fetchBest(app, path).then(x => x.res)
-    );
-
-    dbg.log("PostPage", "descriptor loaded", { finalPath, usedFallback });
-
-    const descriptor = parse(text) || null;
+    const { descriptor, finalPath } = await fetchDescriptorWithFallback(app, mainPost);
     return { descriptor, dataCidForContent };
   } catch (error) {
-    dbg.error("PostPage", "Failed to fetch or parse descriptor", { path: descriptorPath, error });
+    dbg.error("PostPage", "Failed to fetch or parse descriptor", { path: mainPost.ipfs, error });
     return { descriptor: { error: error.message }, dataCidForContent };
   }
 }
@@ -133,6 +119,8 @@ export default function PostPage() {
     const resourceData = postResource();
     if (resourceData) setPost(reconcile(resourceData));
   });
+
+
 
   const [details] = createResource(postResource, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
