@@ -274,7 +274,7 @@ export default function PostPage() {
                             <div class="flex justify-center p-8"><Spinner /></div>
                           </Match>
                           <Match when={localizedMainContent()}>
-                            <Show when={(availableLocales()?.chapters?.length || 0) > 1}>
+                            <Show when={(details()?.descriptor?.locales?.[postLang()]?.chapters || []).length > 0}>
                               <div class="flex justify-end mb-4">
                                 <ChapterSelector
                                   chapters={[
