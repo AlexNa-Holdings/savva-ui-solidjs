@@ -320,6 +320,7 @@ export default {
   "nsfw.cover.show": "Show",
   "nsfw.cover.warning": "This post may be sensitive in nature. Viewer discretion is advised.",
   "post.addComment": "Add a comment...",
+  "post.chapters.chapter": "Chapter",
   "post.chapters.prologue": "Prologue",
   "post.chapters.title": "Table of Contents",
   "post.comments": "Comments",
@@ -337,10 +338,17 @@ export default {
   "post.fund.toast.error": "Funding failed. Please try again.",
   "post.fund.toast.pending": "Funding is pending...",
   "post.fund.toast.success": "Funding successful!",
+  "post.loadError": "Error loading content",
   "post.loadMoreComments": "Load more comments",
   "post.noComments": "No comments yet.",
-  "post.notFound.message": "The post you're looking for doesn't exist or has been removed.",
-  "post.notFound.title": "Post Not Found",
+  "post.notFound.message": "We couldn’t find this post. It may have been deleted or the link is incorrect.",
+  "post.notFound.title": "Post not found",
+  "post.nsfw.hidden.message": "This post is marked as sensitive. To view it, change your NSFW setting to “Show” or “Warn” in your profile.",
+  "post.nsfw.hidden.title": "Sensitive content",
+  "post.nsfw.warning.message": "This post may contain nudity, violence, or other sensitive material.",
+  "post.nsfw.warning.show": "Show",
+  "post.nsfw.warning.title": "Sensitive content",
+  "post.thumbnailAlt": "Post thumbnail",
   "postcard.copyDataCid": "Copy Data CID",
   "postcard.copyDescriptorCid": "Copy Descriptor CID",
   "postcard.copySavvaCid": "Copy SAVVA CID",
@@ -681,20 +689,5 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now",
-    "post.nsfw.hidden.title": "Sensitive content",
-  "post.nsfw.hidden.message": "This post is marked as sensitive. To view it, change your NSFW setting to “Show” or “Warn” in your profile.",
-
-  "post.nsfw.warning.title": "Sensitive content",
-  "post.nsfw.warning.message": "This post may contain nudity, violence, or other sensitive material.",
-  "post.nsfw.warning.show": "Show",
-
-  "post.notFound.title": "Post not found",
-  "post.notFound.message": "We couldn’t find this post. It may have been deleted or the link is incorrect.",
-
-  "post.thumbnailAlt": "Post thumbnail",
-  "post.loadError": "Error loading content",
-  "post.chapters.prologue": "Prologue",
-  "post.chapters.chapter": "Chapter"
-
+  "wallet.unstaked.availableNow": "Available Now"
 };
