@@ -74,7 +74,7 @@ export default function PostCard(props) {
   const isSensitive = createMemo(() => {
     const raw = item._raw || {};
     const c = content() || {};
-    return !!(raw.nsfw || raw.nsft || c.nsfw || c.nsft);
+    return !!(raw.nsfw || c.nsfw );
   });
 
   // User preference (default 'h')

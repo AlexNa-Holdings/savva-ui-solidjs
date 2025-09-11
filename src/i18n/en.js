@@ -681,5 +681,20 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now"
+  "wallet.unstaked.availableNow": "Available Now",
+    "post.nsfw.hidden.title": "Sensitive content",
+  "post.nsfw.hidden.message": "This post is marked as sensitive. To view it, change your NSFW setting to “Show” or “Warn” in your profile.",
+
+  "post.nsfw.warning.title": "Sensitive content",
+  "post.nsfw.warning.message": "This post may contain nudity, violence, or other sensitive material.",
+  "post.nsfw.warning.show": "Show",
+
+  "post.notFound.title": "Post not found",
+  "post.notFound.message": "We couldn’t find this post. It may have been deleted or the link is incorrect.",
+
+  "post.thumbnailAlt": "Post thumbnail",
+  "post.loadError": "Error loading content",
+  "post.chapters.prologue": "Prologue",
+  "post.chapters.chapter": "Chapter"
+
 };
