@@ -27,7 +27,7 @@ export default function StepUploadDescriptor(props) {
       try {
         const s = String(v.toString?.() ?? "");
         if (s && s !== "[object Object]") return s.trim() || undefined;
-      } catch {}
+      } catch { }
       const candidates = [v.ipfsCid, v.cid, v.data_cid, v.dataCid, v.value, v["/"], v.result, v.payload, v.data];
       for (const c of candidates) {
         const s = extractCid(c);
@@ -86,7 +86,14 @@ export default function StepUploadDescriptor(props) {
     if (params.root_savva_cid) descriptor.root_savva_cid = params.root_savva_cid;
     if (params.nsfw) descriptor.nsfw = params.nsfw;
     if (params.fundraiser) descriptor.fundraiser = params.fundraiser;
-    if (params.thumbnail) descriptor.thumbnail = params.thumbnail;
+    if (params.thumbnail) {
+      let tn = String(params.thumbnail || "").trim();
+      tn = tn.replace(/^\/+/, "");
+      if (!/^uploads\//.test(tn) && !/^https?:\/\//i.test(tn) && !tn.startsWith("ipfs://")) {
+        tn = !tn.includes("/") ? `uploads/${tn}` : `uploads/${tn}`;
+      }
+      descriptor.thumbnail = tn;
+    }
 
     const gateways = isPinningEnabled()
       ? (getPinningServices().map((s) => s.gatewayUrl).filter(Boolean) || [])

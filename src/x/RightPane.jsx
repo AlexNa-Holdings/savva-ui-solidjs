@@ -2,7 +2,7 @@
 import { createSignal, Show, createMemo } from "solid-js";
 import { navigate } from "../routing/hashRouter.js";
 import { useApp } from "../context/AppContext.jsx";
-import SwitchConnectDialog from "./SwitchConnectDialog.jsx";
+import SwitchConnectModal from "./modals/SwitchConnectModal.jsx";
 import ThemeToggle from "./ui/ThemeToggle.jsx";
 import LangSelector from "./ui/LangSelector.jsx";
 import RightPaneFooter from "./RightPaneFooter.jsx";
@@ -138,7 +138,7 @@ export default function RightPane({ isOpen, onClose }) {
       )}
 
       <Show when={showSwitch()} keyed>
-        <SwitchConnectDialog
+        <SwitchConnectModal
           open={true}
           domain={app.config()?.domain}
           backendLink={app.config()?.backendLink}
