@@ -18,7 +18,6 @@ import { pushErrorToast } from "../../ui/toast.js";
 import ConfirmModal from "../modals/ConfirmModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
-import { parse } from "yaml";
 import ReactionInput from "./ReactionInput.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 
@@ -143,10 +142,10 @@ export default function CommentCard(props) {
     }
   };
 
-  // --- NSFW (mirrors PostCard logic) ---
+  // NSFW
   const { dataStable: profile } = useUserProfile();
-  const nsfwPref = createMemo(() => selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h");  // default 'h'
-  const commentIsNsfw = createMemo(() => !!(comment?.nsfw || comment?.savva_content?.nsfw));                        // flag from raw or content
+  const nsfwPref = createMemo(() => selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h");
+  const commentIsNsfw = createMemo(() => !!(comment?.nsfw || comment?.savva_content?.nsfw));
   const shouldHide = createMemo(() => commentIsNsfw() && nsfwPref() === "h");
   const shouldWarn = createMemo(() => commentIsNsfw() && nsfwPref() === "w");
   const [revealed, setRevealed] = createSignal(false);
@@ -158,14 +157,15 @@ export default function CommentCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Context button above NSFW overlay */}
       <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
-        <div class="pointer-events-none absolute top-2 right-2 z-20">
+        <div class="pointer-events-none absolute top-2 right-2 z-40">
           <div class="pointer-events-auto">
             <Show when={isHovered()}>
               <ContextMenu
                 items={contextMenuItems()}
-                positionClass="relative z-20"
-                class="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
+                positionClass="relative z-40"
+                buttonClass="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
               />
             </Show>
           </div>
@@ -188,7 +188,7 @@ export default function CommentCard(props) {
           </div>
 
           <div class="text-sm prose prose-sm max-w-none relative rounded-[inherit]">
-            {/* Image-free, center warning overlay covering the text block */}
+            {/* Centered warning overlay covering the text block */}
             <Show when={shouldWarn() && !revealed()}>
               <div
                 class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"

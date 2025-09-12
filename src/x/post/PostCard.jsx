@@ -1,11 +1,11 @@
-// src/x/feed/PostCard.jsx
-import { Show, createMemo, createSignal, createEffect } from "solid-js";
+// src/x/post/PostCard.jsx
+import { Show, Switch, Match, createMemo, createSignal, createEffect } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import PostInfo from "../post/PostInfo.jsx";
+import PostInfo from "./PostInfo.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
 import { navigate } from "../../routing/hashRouter.js";
@@ -16,8 +16,8 @@ import { resolvePostCidPath } from "../../ipfs/utils.js";
 
 function PinIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class={`${props.class} scale-x-[-1]`}>
-      <path d="M19.1835 7.80516L16.2188 4.83755C14.1921 2.8089 13.1788 1.79457 12.0904 2.03468C11.0021 2.2748 10.5086 3.62155 9.5217 6.31506L8.85373 8.1381C8.59063 8.85617 8.45908 9.2152 8.22239 9.49292C8.11619 9.61754 7.99536 9.72887 7.86251 9.82451C7.56644 10.0377 7.19811 10.1392 6.46145 10.3423C4.80107 10.8 3.97088 11.0289 3.65804 11.5721C3.5228 11.8069 3.45242 12.0735 3.45413 12.3446C3.45809 12.9715 4.06698 13.581 5.28476 14.8L6.69935 16.2163L2.22345 20.6964C1.92552 20.9946 1.92552 21.4782 2.22345 21.7764C2.52138 22.0746 3.00443 22.0746 3.30236 21.7764L7.77841 17.2961L9.24441 18.7635C10.4699 19.9902 11.0827 20.6036 11.7134 20.6045C11.9792 20.6049 12.2404 20.5358 12.4713 20.4041C13.0192 20.0914 13.2493 19.2551 13.7095 17.5825C13.9119 16.8472 14.013 16.4795 14.2254 16.1835C14.3184 16.054 14.4262 15.9358 14.5468 15.8314C14.8221 15.593 15.1788 15.459 15.8922 15.191L17.7362 14.4981C20.4 13.4973 21.7319 12.9969 21.9667 11.9115C22.2014 10.826 21.1954 9.81905 19.1835 7.80516Z" fill="currentColor"></path>
+    <svg viewBox="0 0 24 24" class={props.class || "w-5 h-5"} fill="currentColor" aria-hidden="true">
+      <path d="M13.5 2.5l8 8-3.5 1.5L22 16l-2 2-4-4-1.5 3.5-8-8L10 8 13.5 2.5z" />
     </svg>
   );
 }
@@ -70,21 +70,16 @@ export default function PostCard(props) {
   const title = createMemo(() => getLocalizedField(content()?.locales, "title", app.lang()));
   const textPreview = createMemo(() => getLocalizedField(content()?.locales, "text_preview", app.lang()));
 
-  // Sensitive flag on post
-  const isSensitive = createMemo(() => {
-    const raw = item._raw || {};
-    const c = content() || {};
-    return !!(raw.nsfw || c.nsfw );
-  });
-
-  // User preference (default 'h')
+  const isSensitive = createMemo(() => !!(item._raw?.nsfw || content()?.nsfw));
   const nsfwPref = createMemo(() => {
     const p = profile();
     return selectField(p, "nsfw") ?? selectField(p, "prefs.nsfw") ?? "h";
   });
-
-  // Cover when warn-pref and not revealed yet
   const shouldCover = createMemo(() => isSensitive() && nsfwPref() === "w" && !revealed());
+
+  // Banned ribbons
+  const isBannedPost = createMemo(() => !!item._raw?.banned);
+  const isBannedAuthor = createMemo(() => !!item._raw?.author_banned);
 
   const handleCardClick = (e) => {
     if (shouldCover()) {
@@ -95,8 +90,6 @@ export default function PostCard(props) {
     if (item.id) {
       app.setSavedScrollY(window.scrollY);
       navigate(`/post/${item.id}`);
-    } else {
-      console.warn("PostCard: Could not find post ID to navigate.", { item: item });
     }
   };
 
@@ -126,13 +119,13 @@ export default function PostCard(props) {
           postGateways={item._raw?.gateways || []}
           fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
         />
+
         <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
           <div class="absolute bottom-2 right-0 z-10">
             <PostFundBadge amount={fund()?.amount} />
           </div>
         </Show>
 
-        {/* Image-centered warning UI */}
         <Show when={shouldCover()}>
           <div
             class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
@@ -161,14 +154,15 @@ export default function PostCard(props) {
     );
   };
 
-  const contentContainerClasses = createMemo(() => (isListMode() ? "px-3 py-2 flex-1 flex flex-col min-w-0" : "p-3 flex-1 flex flex-col"));
+  const contentContainerClasses = createMemo(() =>
+    isListMode() ? "px-3 py-2 flex-1 flex flex-col min-w-0" : "p-3 flex-1 flex flex-col"
+  );
 
   const textPreviewClasses = createMemo(() => {
     const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
     return isListMode() ? `${base} ${props.compact ? "line-clamp-1" : "line-clamp-2"}` : `${base} line-clamp-3`;
   });
 
-  // Title + preview (mask only, no button/text here)
   const TitlePreviewBlock = () => (
     <div class="relative">
       <div>
@@ -179,7 +173,6 @@ export default function PostCard(props) {
           <p class={textPreviewClasses()}>{textPreview()}</p>
         </Show>
       </div>
-
       <Show when={shouldCover()}>
         <div
           class="absolute inset-0 z-10 rounded-md bg-[hsl(var(--card))]/70 backdrop-blur-[2px]"
@@ -229,13 +222,30 @@ export default function PostCard(props) {
         </div>
       </Show>
 
+      {/* BANNED ribbons (above NSFW overlay, below context button) */}
+      <Show when={isBannedPost() || isBannedAuthor()}>
+        <div class="pointer-events-none absolute top-2 left-2 z-30 space-y-1">
+          <Show when={isBannedPost()}>
+            <div class="inline-flex items-center px-2 py-1 rounded-md uppercase text-[10px] font-extrabold tracking-wider bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] shadow">
+              {t("post.bannedPost")}
+            </div>
+          </Show>
+          <Show when={isBannedAuthor()}>
+            <div class="inline-flex items-center px-2 py-1 rounded-md uppercase text-[10px] font-extrabold tracking-wider bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] shadow">
+              {t("post.bannedAuthor")}
+            </div>
+          </Show>
+        </div>
+      </Show>
+
+      {/* Context button stays on top */}
       <Show when={app.authorizedUser()?.isAdmin && finalContextMenuItems().length > 0}>
-        <div class="pointer-events-none absolute top-2 right-2 z-20">
+        <div class="pointer-events-none absolute top-2 right-2 z-40">
           <div class="pointer-events-auto">
             <Show when={isHovered()}>
               <ContextMenu
                 items={finalContextMenuItems()}
-                positionClass="relative z-20"
+                positionClass="relative z-40"
                 buttonClass="p-1 rounded-md bg-[hsl(var(--background))]/80 backdrop-blur-[2px] border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]"
               />
             </Show>

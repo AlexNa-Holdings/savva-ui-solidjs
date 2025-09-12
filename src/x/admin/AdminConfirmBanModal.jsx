@@ -1,5 +1,5 @@
 // src/x/admin/AdminConfirmBanModal.jsx
-import { createSignal, Show, onMount, onCleanup } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import ModalBackdrop from "../modals/ModalBackdrop.jsx";
@@ -8,10 +8,13 @@ import ContentCard from "../post/ContentCard.jsx";
 import UserCard from "../ui/UserCard.jsx";
 
 export default function AdminConfirmBanModal(props) {
-  // props: { open, action: "ban-post"|"ban-user", savva_cid, author, post, onConfirm(comment), onClose() }
+  // props: { open, action: "ban-post"|"ban-user", savva_cid, author, user, post, onConfirm(comment), onClose() }
   const app = useApp();
   const { t } = app;
   const [comment, setComment] = createSignal("");
+
+  const isBanPost = () => props.action === "ban-post";
+  const isBanUser = () => props.action === "ban-user";
 
   const close = () => {
     setComment("");
@@ -19,61 +22,50 @@ export default function AdminConfirmBanModal(props) {
   };
 
   const confirm = () => {
-    const c = String(comment() || "");
-    setComment("");
-    props.onConfirm?.(c);
+    props.onConfirm?.(comment());
   };
 
-  const handleKey = (e) => {
-    if (e.key === "Escape") close();
-  };
-
-  onMount(() => document.addEventListener("keydown", handleKey));
-  onCleanup(() => document.removeEventListener("keydown", handleKey));
-
-  const authorObj = () => props.post?.author || (props.author ? { address: props.author } : null);
+  const authorObj = () =>
+    props.user ||
+    props.post?.author ||
+    (props.author ? { address: props.author } : null);
 
   return (
     <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-[1000]">
+        <div class="fixed inset-0 z-60">
           <ModalBackdrop onClick={close} />
           <div role="dialog" aria-modal="true" class="fixed inset-0 flex items-center justify-center p-4">
-            <div class="w-full max-w-2xl rounded-2xl shadow-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+            <div class="w-full z-70 max-w-2xl rounded-2xl shadow-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
               <ModalAutoCloser onClose={close} />
 
               <div class="px-5 py-4 border-b border-[hsl(var(--border))]">
                 <h2 class="text-lg font-semibold">
-                  {props.action === "ban-post" ? t("admin.banPostTitle") : t("admin.banUserTitle")}
+                  {isBanPost() ? t("admin.banPostTitle") : t("admin.banUserTitle")}
                 </h2>
+                <p class="text-sm opacity-80 mt-1">
+                  {isBanPost() ? t("admin.banPostDesc") : t("admin.banUserDesc")}
+                </p>
               </div>
 
               <div class="px-5 py-4 space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
-                <Show when={props.action === "ban-post"}>
-                  <p class="text-sm opacity-80">{t("admin.banPostDesc")}</p>
-                </Show>
-                <Show when={props.action === "ban-user"}>
-                  <p class="text-sm opacity-80">{t("admin.banUserDesc")}</p>
-                </Show>
+                {/* Always show user */}
+                <div>
+                  <div class="text-xs font-medium opacity-70 mb-2">{t("admin.previewUser")}</div>
+                  <div class="rounded-xl border border-[hsl(var(--border))] overflow-hidden">
+                    <UserCard author={authorObj()} />
+                  </div>
+                </div>
 
-                <div class="space-y-4">
+                {/* Only show post preview for ban-post */}
+                <Show when={isBanPost() && props.post}>
                   <div>
-                    <div class="text-xs font-medium opacity-70 mb-2">{t("admin.previewUser")}</div>
-                    {/* Full UserCard (interactive) */}
+                    <div class="text-xs font-medium opacity-70 mb-2">{t("admin.previewPost")}</div>
                     <div class="rounded-xl border border-[hsl(var(--border))] overflow-hidden">
-                      <UserCard author={authorObj()} />
+                      <ContentCard item={props.post} mode="list" compact={true} />
                     </div>
                   </div>
-
-                  <Show when={props.post}>
-                    <div>
-                      <div class="text-xs font-medium opacity-70 mb-2">{t("admin.previewPost")}</div>
-                      <div class="rounded-xl border border-[hsl(var(--border))] overflow-hidden">
-                        <ContentCard item={props.post} mode="list" compact={true} />
-                      </div>
-                    </div>
-                  </Show>
-                </div>
+                </Show>
 
                 <div>
                   <label class="block text-sm mb-1 opacity-80">{t("admin.commentLabel")}</label>
@@ -90,12 +82,14 @@ export default function AdminConfirmBanModal(props) {
 
               <div class="px-5 py-4 border-t border-[hsl(var(--border))] flex items-center justify-end gap-3">
                 <button
+                  type="button"
                   class="px-4 py-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:opacity-90"
                   onClick={close}
                 >
                   {t("admin.cancel")}
                 </button>
                 <button
+                  type="button"
                   class="px-4 py-2 rounded-xl bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
                   onClick={confirm}
                 >
