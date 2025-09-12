@@ -2,6 +2,8 @@
 import { dbg } from "../utils/debug";
 import { wsUrl as endpointsWsUrl } from "./endpoints";
 
+let __WS_SID = 0;
+
 /**
  * Pure WebSocket transport.
  * Request:  { id: number, type: string, data: any }
@@ -10,6 +12,7 @@ import { wsUrl as endpointsWsUrl } from "./endpoints";
  */
 export default class WsClient {
   constructor({ url = "", protocols } = {}) {
+    this._sid = ++__WS_SID;
     this._url = url || "";
     this._protocols = protocols || undefined;
     this._ws = null;
@@ -26,6 +29,7 @@ export default class WsClient {
     this._sendQueue = [];
     this._pending = new Map(); // id (string) -> { resolve, reject, timer }
     this._nextId = 1;
+    this._expectedCloseSids = new Set();
 
     this._listeners = new Map();
 
@@ -77,80 +81,111 @@ export default class WsClient {
     }
     if (u === this._url) return;
     this._url = u;
-    dbg.log("ws", "URL updated", { url: u });
+    dbg.log("ws", "URL updated", { sid: this._sid, url: u });
   }
 
   setAutoReconnect(on) {
     this._shouldReconnect = !!on;
   }
 
-  connect() {
-    if (!this._url) return;
-    if (
-      this._ws &&
-      (this._ws.readyState === WebSocket.OPEN ||
-        this._ws.readyState === WebSocket.CONNECTING)
-    ) {
-      return;
-    }
-    this._clearReconnect();
-    this._setStatus("connecting");
-    dbg.log("ws", "Connecting…", { url: this._url });
+connect() {
+  if (!this._url) return;
+  if (
+    this._ws &&
+    (this._ws.readyState === WebSocket.OPEN ||
+      this._ws.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
 
-    try {
-      const ws = new WebSocket(this._url, this._protocols);
-      this._ws = ws;
+  this._clearReconnect();
+  this._setStatus("connecting");
 
-      ws.addEventListener("open", () => {
-        this._attempt = 0;
-        this._setStatus("open");
-        dbg.log("ws", "Connected", { url: this._url });
-        this._flushQueue();
-        this._startHeartbeat();
-        this._emit("open");
-      });
+  const mySid = (this._sid = (this._sid || 0) + 1);
+  dbg.log("ws", "Connecting…", { sid: mySid, url: this._url });
 
-      ws.addEventListener("message", (ev) => this._onMessage(ev));
+  try {
+    const ws = new WebSocket(this._url, this._protocols);
+    this._ws = ws;
 
-      ws.addEventListener("error", (ev) => {
-        dbg.warn("ws", "Error", { event: ev });
-        this._emit("error", ev);
-      });
+    ws.addEventListener("open", () => {
+      this._attempt = 0;
+      this._setStatus("open");
+      dbg.log("ws", "Connected", { sid: mySid, url: this._url });
+      this._flushQueue();
+      this._startHeartbeat();
+      this._emit("open");
+      // reconnection phase finished
+      this._closingForReconnect = false;
+    });
 
-      ws.addEventListener("close", (ev) => {
-        dbg.warn("ws", "Closed", { code: ev.code, reason: ev.reason });
-        this._stopHeartbeat();
-        this._setStatus("closed");
-        this._emit("close", ev);
-        
-        // Only fail inflight requests on unexpected closures.
-        if (!this._manualClose) {
-          this._failInflight(new Error("WS closed"));
-        }
-        
-        if (this._shouldReconnect && !this._manualClose) {
-          this._scheduleReconnect();
-        }
-        this._manualClose = false;
-      });
-    } catch (e) {
-      dbg.error("ws", "Connect exception", e);
+    ws.addEventListener("message", (ev) => this._onMessage(ev));
+
+    ws.addEventListener("error", (ev) => {
+      dbg.warn("ws", "Error", { sid: mySid, event: ev });
+      this._emit("error", ev);
+    });
+
+    ws.addEventListener("close", (ev) => {
+      // Treat normal, orchestrated closes as expected.
+      const expected =
+        this._manualClose ||
+        this._closingForReconnect ||
+        (ev.code === 1000 && (ev.reason === "reconnect" || ev.reason === ""));
+
+      const info = {
+        sid: mySid,
+        code: ev.code,
+        reason: ev.reason,
+        expected,
+        url: this._url,
+        attempt: this._attempt || 0,
+      };
+
+      if (expected) dbg.log("ws", "Closed", info);
+      else dbg.warn("ws", "Closed", info);
+
+      this._stopHeartbeat();
       this._setStatus("closed");
-      this._scheduleReconnect();
-    }
-  }
 
-  reconnect(reason = "manual") {
-    dbg.log("ws", "Reconnecting…", { reason });
-    this._clearReconnect();
-    if (this._ws) {
-      this._manualClose = true; 
-      try { this._ws.close(1000, `reconnect: ${reason}`); } catch {}
-    }
-    this._ws = null;
-    
-    this.connect();
+      // Emit the normalized info object so listeners can decide what to do.
+      this._emit("close", info);
+
+      // Only fail inflight requests on unexpected closures.
+      if (!expected) {
+        this._failInflight(new Error("WS closed"));
+      }
+
+      // Only auto-reconnect on unexpected closures.
+      if (this._shouldReconnect && !expected) {
+        this._scheduleReconnect();
+      }
+
+      this._manualClose = false;
+      this._closingForReconnect = false;
+    });
+  } catch (e) {
+    dbg.error("ws", "Connect exception", e);
+    this._setStatus("closed");
+    this._scheduleReconnect();
   }
+}
+
+reconnect(reason = "manual") {
+  // Intentional reconnect: mark this cycle so onclose is treated as expected
+  this._manualClose = true;
+  this._closingForReconnect = true;
+
+  dbg.log("ws", "Reconnecting…", { sid: this._sid, reason });
+
+  try {
+    // Normal, expected close; onclose will log at 'Closed' (not warn)
+    this._ws?.close(1000, "reconnect");
+  } catch {}
+
+  // Start a fresh connection with the current URL
+  this.connect();
+}
 
   close() {
     this._manualClose = true;
@@ -254,7 +289,9 @@ export default class WsClient {
             entry.resolve(obj);
           }
         } else {
-          dbg.warn("ws", "Received response for untracked call ID", { id: obj.id });
+          dbg.warn("ws", "Received response for untracked call ID", {
+            id: obj.id,
+          });
         }
       } else {
         if (obj && obj.type) {
@@ -307,6 +344,7 @@ export default class WsClient {
     dbg.log("ws", "Reconnect scheduled", {
       inMs: delay,
       attempt: this._attempt,
+      sid: this._sid,
     });
     this._clearReconnect();
     this._reconnectTid = setTimeout(() => this.connect(), delay);

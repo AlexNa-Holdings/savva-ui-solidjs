@@ -36,17 +36,29 @@ export default function WsConnector() {
 
     const onOpen = () => { setHasConnectedOnce(true); };
     const onClose = (ev) => {
+      // `ev` may be a DOM CloseEvent or a normalized info object from WsClient
+      const code = typeof ev?.code === "number" ? ev.code : 0;
+      const reason = typeof ev?.reason === "string" ? ev.reason : "";
+
+      // Treat orchestrated reconnects and clean 1000-closes as expected
+      const expected =
+        ev?.expected === true ||                 // from WsClient normalized payload (if present)
+        (code === 1000 && (reason === "reconnect" || reason === "")); // clean close during reconnect
+
+      // Suppress the toast for expected closes
+      if (expected) return;
+
+      // Keep original behavior: only warn before we've ever connected once
       if (!hasConnectedOnce()) {
-        // Add useful debugging details into the toast.
         pushToast({
           type: "warning",
           message: t("error.ws.title"),
           details: {
             message: t("error.ws.message"),
-            code: ev?.code,
-            reason: ev?.reason,
+            code,
+            reason,
             attempt: ws.attempt?.(),
-            url: ws.url?.()
+            url: ws.url?.(),
           },
           autohideMs: 15000,
         });
