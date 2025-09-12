@@ -97,7 +97,7 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
   const ChainLogo = createMemo(() => getChainLogo(desiredId()));
 
   return (
-    <header class="sticky top-0 z-10 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
+    <header class="sticky top-0 z-40 bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm">
       <Container>
         <div class="h-12 px-2 flex items-center justify-between">
           <div class="flex items-center gap-4">
