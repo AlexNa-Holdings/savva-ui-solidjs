@@ -455,7 +455,6 @@ export default {
   "rightPane.language": "Langue",
   "rightPane.npoList": "NPOs",
   "rightPane.settings": "Paramètres",
-  "rightPane.switch.backend.help": "L'application récupérera /info depuis cette URL pour lister les domaines pris en charge.",
   "rightPane.switch.backend.label": "URL du backend",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.label": "Domaine",

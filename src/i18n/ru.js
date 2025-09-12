@@ -455,7 +455,6 @@ export default {
   "rightPane.language": "Язык",
   "rightPane.npoList": "НПО",
   "rightPane.settings": "Настройки",
-  "rightPane.switch.backend.help": "Приложение получит /info с этого URL для отображения поддерживаемых доменов.",
   "rightPane.switch.backend.label": "URL бэкенда",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.label": "Домен",

@@ -455,7 +455,6 @@ export default {
   "rightPane.language": "Jezik",
   "rightPane.npoList": "NVO",
   "rightPane.settings": "Podešavanja",
-  "rightPane.switch.backend.help": "Aplikacija će preuzeti /info sa ove URL adrese da bi prikazala podržane domene.",
   "rightPane.switch.backend.label": "Backend URL",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.label": "Domen",

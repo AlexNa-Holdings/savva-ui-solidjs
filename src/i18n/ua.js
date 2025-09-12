@@ -455,7 +455,6 @@ export default {
   "rightPane.language": "Мова",
   "rightPane.npoList": "НПО",
   "rightPane.settings": "Налаштування",
-  "rightPane.switch.backend.help": "Додаток отримає /info з цього URL, щоб перерахувати підтримувані домени.",
   "rightPane.switch.backend.label": "URL бекенду",
   "rightPane.switch.backend.placeholder": "https://example.com/api/",
   "rightPane.switch.domain.label": "Домен",
