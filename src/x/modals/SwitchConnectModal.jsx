@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { Portal } from "solid-js/web";
 import ModalBackdrop from "./ModalBackdrop.jsx";
 import { dbg } from "../../utils/debug.js";
+import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
 
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
 const asStr = (v) => (v ?? "").toString().trim();
@@ -161,6 +162,7 @@ export default function SwitchConnectModal(props) {
         <div class="fixed inset-0 z-60 flex items-center justify-center">
           <ModalBackdrop onClick={props.onClose} />
           <div class="relative z-70 themed-dialog rounded-lg shadow-lg w-[34rem] max-w-[95vw] p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
+            <ModalAutoCloser onClose={props.onClose} />
             <h3 class="text-lg font-semibold mb-3">{t("rightPane.switch.title")}</h3>
 
             <label class="block mb-3">

@@ -28,6 +28,7 @@ import NpoPage from "./pages/NpoPage.jsx";
 import { closeAllModals } from "../utils/modalBus.js";
 import NavigationPanel from "./navigation/NavigationPanel.jsx";
 import VersionChecker from "./main/VersionChecker.jsx";
+import AdminActionsBridge from "./admin/AdminActionsBridge.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -81,7 +82,7 @@ export default function App() {
 
       const view = currentView();
       if (view !== "main") {
-        navigate(app.lastTabRoute() || "/");
+        navigate(app.lastTabRoute?.() || "/");
         return;
       }
 
@@ -111,10 +112,7 @@ export default function App() {
         </div>
       }
     >
-      <Show
-        when={!app.error()}
-        fallback={<ConnectionError error={app.error()} />}
-      >
+      <Show when={!app.error()} fallback={<ConnectionError error={app.error()} />}>
         <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
           <DomainCssLoader />
           <FaviconLoader />
@@ -122,35 +120,37 @@ export default function App() {
           <WsConnector />
           <AlertManager />
           <VersionChecker />
-          
+          <AdminActionsBridge />
+
           <Show when={domainRevision()} keyed>
             <>
               <Header onTogglePane={togglePane} onToggleMobileNav={() => setIsMobileNavOpen(p => !p)} />
-              <NavigationPanel isMobileOpen={isMobileNavOpen()} onMobileNavClose={() => setIsMobileNavOpen(false)} /> 
-              
-              <main class="main-content-wrapper">
-                <div hidden={currentView() !== 'main'}>
-                  <MainView />
-                </div>
+              <NavigationPanel isMobileOpen={isMobileNavOpen()} onMobileNavClose={() => setIsMobileNavOpen(false)} />
 
-                <Show when={currentView() === 'post'}><PostPage /></Show>
-                <Show when={currentView() === 'profile'}><ProfilePage /></Show>
-                <Show when={currentView() === 'settings'}><Settings /></Show>
-                <Show when={currentView() === 'docs'}><Docs /></Show>
-                <Show when={currentView() === 'editor'}><EditorPage /></Show>
-                <Show when={currentView() === 'npo-list'}><NpoListPage /></Show>
-                <Show when={currentView() === 'npo'}><NpoPage /></Show>
-                <Show when={currentView() === 'profile-edit'}><ProfileEditPage /></Show>
-                <Show when={currentView() === 'fundraising'}><FundraisingPage /></Show>
-                <Show when={currentView() === 'contribute'}><ContributePage /></Show>
+              <main class="main-content-wrapper">
+                {/* Lazy mount MainView so feeds aren't fetched while on a post */}
+                <Show when={currentView() === "main"} keyed>
+                  <MainView />
+                </Show>
+
+                <Show when={currentView() === "post"}><PostPage /></Show>
+                <Show when={currentView() === "profile"}><ProfilePage /></Show>
+                <Show when={currentView() === "settings"}><Settings /></Show>
+                <Show when={currentView() === "docs"}><Docs /></Show>
+                <Show when={currentView() === "editor"}><EditorPage /></Show>
+                <Show when={currentView() === "npo-list"}><NpoListPage /></Show>
+                <Show when={currentView() === "npo"}><NpoPage /></Show>
+                <Show when={currentView() === "profile-edit"}><ProfileEditPage /></Show>
+                <Show when={currentView() === "fundraising"}><FundraisingPage /></Show>
+                <Show when={currentView() === "contribute"}><ContributePage /></Show>
               </main>
             </>
           </Show>
-          
+
           <RightPane isOpen={isPaneOpen} onClose={togglePane} />
           <Toaster />
           <AssetDebugTap />
-          
+
           <SwitchAccountModal
             isOpen={app.isSwitchAccountModalOpen()}
             requiredAddress={app.requiredAccount()}
