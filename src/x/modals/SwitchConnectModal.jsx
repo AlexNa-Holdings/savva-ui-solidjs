@@ -40,6 +40,17 @@ export default function SwitchConnectModal(props) {
     try { dbg.log("switch-dialog", phase, obj); } catch {}
   };
 
+  const normalizeDomains = (list) =>
+    (Array.isArray(list) ? list : [])
+      .filter(Boolean)
+      .map((d) => {
+        if (typeof d === "string") return { name: d };
+        const name = d?.name || d?.domain || d?.host || d?.hostname || d?.slug || d?.id;
+        return name ? { ...d, name: String(name) } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => (a.name > b.name ? 1 : -1));
+
   const fetchDomains = async (url) => {
     setFetching(true);
     setLocalError("");
@@ -63,15 +74,7 @@ export default function SwitchConnectModal(props) {
       if (!res.ok) throw new Error(`/info failed: ${res.status}`);
 
       const info = await res.json();
-      const normalized = (Array.isArray(info?.domains) ? info.domains : [])
-        .filter(Boolean)
-        .map((d) => {
-          if (typeof d === "string") return { name: d };
-          const name = d?.name || d?.domain || d?.host || d?.hostname || d?.slug || d?.id;
-          return name ? { ...d, name: String(name) } : null;
-        })
-        .filter(Boolean)
-        .sort((a, b) => (a.name > b.name ? 1 : -1));
+      const normalized = normalizeDomains(info?.domains);
 
       setDomains(normalized);
       log("fetchDomains:response", { domains: normalized.map((d) => d.name) });
@@ -105,6 +108,18 @@ export default function SwitchConnectModal(props) {
       setDomains([]);
       setLocalError("");
       log("open", { backendUrl: initBackend, domain: initDomain });
+
+      // Prefill domains from already-fetched /info (if available)
+      const cachedInfo = app.info?.();
+      const pre = normalizeDomains(cachedInfo?.domains);
+      if (pre.length > 0) {
+        setDomains(pre);
+        const prefer = initDomain;
+        const keep = pre.find((d) => eq(d.name, prefer));
+        const next = keep?.name || pre[0].name;
+        setDomain(next);
+        log("domains:prefillFromInfo", { domains: pre.map((d) => d.name), chosen: next });
+      }
     }
     if (!isOpen && wasOpen) {
       aborter?.abort();
