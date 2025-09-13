@@ -7,6 +7,7 @@ import { pushErrorToast } from "../../ui/toast.js";
 import PostInfo from "./PostInfo.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import ConfirmModal from "../modals/ConfirmModal.jsx";
+import PromotePostModal from "../modals/PromotePostModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 
@@ -14,8 +15,10 @@ export default function PostControls(props) {
   const app = useApp();
   const { t } = app;
   const [isPreparing, setIsPreparing] = createSignal(false);
-  
-  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(() => props.post);
+  const [showPromote, setShowPromote] = createSignal(false);
+
+  const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } =
+    useDeleteAction(() => props.post);
 
   const isAuthor = createMemo(() => {
     const userAddr = app.authorizedUser()?.address?.toLowerCase();
@@ -29,7 +32,7 @@ export default function PostControls(props) {
       await preparePostForEditing(props.post, app);
       navigate(`/editor/edit/${props.post.savva_cid}`);
     } catch (e) {
-      pushErrorToast(e, { context: "Failed to prepare post for editing." });
+      pushErrorToast(e, { context: t("editor.errors.prepareForEdit") });
     } finally {
       setIsPreparing(false);
     }
@@ -39,11 +42,7 @@ export default function PostControls(props) {
     <>
       <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center justify-between">
         <div class="flex-1 min-w-0">
-          <PostInfo 
-            item={props.post} 
-            hideTopBorder={true} 
-            timeFormat="long" 
-          />
+          <PostInfo item={props.post} hideTopBorder={true} timeFormat="long" />
         </div>
 
         <div class="pl-4">
@@ -53,33 +52,45 @@ export default function PostControls(props) {
                 onClick={handleEdit}
                 disabled={isPreparing()}
                 class="p-2 rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] disabled:opacity-60"
-                title="Edit Post"
+                title={t("post.edit")}
               >
                 <Show when={isPreparing()} fallback={<EditIcon class="w-5 h-5" />}>
                   <Spinner class="w-5 h-5" />
                 </Show>
               </button>
+
               <button
                 onClick={openConfirm}
                 disabled={modalProps().isDeleting}
                 class="p-2 rounded text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))] disabled:opacity-60"
-                title="Delete Post"
+                title={t("post.delete")}
               >
                 <TrashIcon class="w-5 h-5" />
               </button>
-              <button class="px-4 py-2 text-sm rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]" disabled>
-                Promote
+
+              <button
+                onClick={() => setShowPromote(true)}
+                class="px-4 py-2 text-sm rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+                title={t("post.promote")}
+              >
+                {t("post.promote")}
               </button>
             </div>
           </Show>
         </div>
       </div>
-      
+
       <ConfirmModal
         isOpen={showConfirm()}
         onClose={closeConfirm}
         onConfirm={confirmDelete}
         {...modalProps()}
+      />
+
+      <PromotePostModal
+        isOpen={showPromote()}
+        onClose={() => setShowPromote(false)}
+        post={props.post}
       />
     </>
   );
