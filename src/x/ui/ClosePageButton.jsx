@@ -1,26 +1,18 @@
 // src/x/ui/ClosePageButton.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter } from "../../routing/hashRouter.js";
 
 /**
- * Close (go to main tabs view) or Back (go to previous history entry) floating button.
- * @param {object} props
- * @param {string} [props.mode='back'] - 'back' for history.back(), 'close' to navigate to the main feed.
+ * Floating button that simply goes back in history.
  */
 export default function ClosePageButton(props) {
-  const app = useApp();
-  const { navigate } = useHashRouter();
-  const { t } = app;
-  const label = props.title || t("settings.back");
+  const { t } = useApp();
+  const label = t(props.title || "settings.back");
   const offsetTop = props.offsetTop ?? 56;
-  const mode = props.mode || 'back';
 
   const handleClick = () => {
-    if (mode === 'close') {
-      navigate(app.lastTabRoute() || "/");
-    } else {
+    try {
       window.history.back();
-    }
+    } catch {}
   };
 
   return (
