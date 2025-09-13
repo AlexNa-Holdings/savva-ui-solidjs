@@ -10,7 +10,7 @@ import { getPostContentBaseCid } from "../../ipfs/utils.js";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
 import Spinner from "../ui/Spinner.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js"; // ← your path
 import { navigate } from "../../routing/hashRouter.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
@@ -24,7 +24,6 @@ import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
   if (!comment || !lang) return "";
-
   try {
     const { descriptor } = await fetchDescriptorWithFallback(app, comment);
     if (!descriptor) throw new Error(app.t("comment.parseDescriptorFailed"));
@@ -36,9 +35,7 @@ async function fetchFullContent(params) {
       descriptor.locales?.[Object.keys(descriptor.locales || {})[0]];
     const dataPath = localizedDescriptor?.data_path;
 
-    if (!dataCidForContent || !dataPath) {
-      return localizedDescriptor?.text_preview || "";
-    }
+    if (!dataCidForContent || !dataPath) return localizedDescriptor?.text_preview || "";
 
     const fullIpfsPath = `${dataCidForContent}/${dataPath}`;
     const postGateways = descriptor?.gateways || [];
@@ -61,9 +58,27 @@ export default function CommentCard(props) {
 
   const [comment, setComment] = createStore(props.comment);
 
+  // Existing live updates
   createEffect(() => {
-    const update = app.postUpdate();
-    if (!update || update.cid !== comment.savva_cid) return;
+    const update = app.postUpdate?.();
+    if (!update) return;
+
+    // author-level ban/unban applies to all comments by that author
+    if (update.type === "authorBanned" || update.type === "authorUnbanned") {
+      const my = (comment.author?.address || comment?._raw?.author?.address || "").toLowerCase();
+      if (my && my === (update.author || "").toLowerCase()) {
+        setComment("author_banned", update.type === "authorBanned");
+      }
+      return;
+    }
+
+    // post-level ban/unban for this specific comment
+    const myCid =
+      comment?.savva_cid || comment?.id || comment?._raw?.savva_cid || comment?._raw?.id;
+    if (!myCid || update.cid !== myCid) return;
+
+    if (update.type === "postBanned") setComment("banned", true);
+    else if (update.type === "postUnbanned") setComment("banned", false);
 
     if (update.type === "reactionsChanged") {
       setComment("reactions", reconcile(update.data.reactions));
@@ -142,7 +157,7 @@ export default function CommentCard(props) {
     }
   };
 
-  // NSFW
+  // NSFW (unchanged)
   const { dataStable: profile } = useUserProfile();
   const nsfwPref = createMemo(() => selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h");
   const commentIsNsfw = createMemo(() => !!(comment?.nsfw || comment?.savva_content?.nsfw));
@@ -157,7 +172,7 @@ export default function CommentCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Context button above NSFW overlay */}
+      {/* Admin context on top of overlays */}
       <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
         <div class="pointer-events-none absolute top-2 right-2 z-40">
           <div class="pointer-events-auto">
@@ -188,7 +203,7 @@ export default function CommentCard(props) {
           </div>
 
           <div class="text-sm prose prose-sm max-w-none relative rounded-[inherit]">
-            {/* Centered warning overlay covering the text block */}
+            {/* Center warning overlay */}
             <Show when={shouldWarn() && !revealed()}>
               <div
                 class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"

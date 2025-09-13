@@ -13,6 +13,7 @@ export default function AlertManager() {
       const handler = alertRegistry[type];
       if (handler) {
         try {
+          dbg.log("AlertManager", `Handling alert of type: '${type}'`, payload);
           handler(app, payload);
         } catch (error) {
           dbg.error("AlertManager", `Error in handler for '${type}':`, error);

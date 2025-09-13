@@ -1,5 +1,7 @@
 // src/alerts/registry.js
 import * as h from "./handlers.js";
+import * as bh from "./ban_handlers.js";
+
 
 /**
  * A map of WebSocket alert types to their handler functions.
@@ -16,4 +18,9 @@ export const alertRegistry = {
   fund_contributed: h.handleFundContributed,
   fund_prize: h.handleFundPrize,
   fundraiser_contribution: h.handleFundraiserContribution,
+
+  banned_post: bh.handleBannedPost,
+  banned_user: bh.handleBannedUser,
+  unbanned_post: bh.handleUnbannedPost,
+  unbanned_user: bh.handleUnbannedUser,
 };

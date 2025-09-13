@@ -1,5 +1,5 @@
 // src/x/post/PostCard.jsx
-import { Show, Switch, Match, createMemo, createSignal, createEffect } from "solid-js";
+import { Show, Switch, Match, createMemo, createSignal, createEffect, onMount, onCleanup } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
@@ -40,9 +40,23 @@ export default function PostCard(props) {
   const [item, setItem] = createStore(props.item);
   const [revealed, setRevealed] = createSignal(false);
 
+  // Live updates
   createEffect(() => {
-    const update = app.postUpdate();
-    if (!update || update.cid !== item.id) return;
+    const update = app.postUpdate?.();
+    if (!update) return;
+
+    // Author-level updates: apply to all posts by that author
+    if (update.type === "authorBanned" || update.type === "authorUnbanned") {
+      const myAuthor = (item._raw?.author?.address || item.author?.address || "").toLowerCase();
+      if (myAuthor && myAuthor === (update.author || "").toLowerCase()) {
+        setItem("_raw", "author_banned", update.type === "authorBanned");
+      }
+      return;
+    }
+
+    // Post-level updates: gate by cid/id
+    const myCid = item._raw?.savva_cid || item._raw?.id || item.id;
+    if (update.cid !== myCid) return;
 
     if (update.type === "reactionsChanged") {
       setItem("_raw", "reactions", reconcile(update.data.reactions));
@@ -53,6 +67,10 @@ export default function PostCard(props) {
       setItem("_raw", "total_childs", update.data.newTotal);
     } else if (update.type === "fundChanged" && update.data.fund) {
       setItem("_raw", "fund", (prev) => ({ ...prev, ...update.data.fund }));
+    } else if (update.type === "postBanned") {
+      setItem("_raw", "banned", true);
+    } else if (update.type === "postUnbanned") {
+      setItem("_raw", "banned", false);
     }
   });
 
@@ -70,6 +88,7 @@ export default function PostCard(props) {
   const title = createMemo(() => getLocalizedField(content()?.locales, "title", app.lang()));
   const textPreview = createMemo(() => getLocalizedField(content()?.locales, "text_preview", app.lang()));
 
+  // Sensitive flag + user preference
   const isSensitive = createMemo(() => !!(item._raw?.nsfw || content()?.nsfw));
   const nsfwPref = createMemo(() => {
     const p = profile();
@@ -79,7 +98,7 @@ export default function PostCard(props) {
 
   // Banned ribbons
   const isBannedPost = createMemo(() => !!item._raw?.banned);
-  const isBannedAuthor = createMemo(() => !!item._raw?.author_banned);
+  const isBannedAuthor = createMemo(() => !!(item._raw?.author_banned || item._raw?.author?.banned));
 
   const handleCardClick = (e) => {
     if (shouldCover()) {
@@ -88,7 +107,7 @@ export default function PostCard(props) {
       return;
     }
     if (item.id) {
-      app.setSavedScrollY(window.scrollY);
+      app.setSavedScrollY?.(window.scrollY);
       navigate(`/post/${item.id}`);
     }
   };
@@ -126,6 +145,7 @@ export default function PostCard(props) {
           </div>
         </Show>
 
+        {/* NSFW warning over the image */}
         <Show when={shouldCover()}>
           <div
             class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
@@ -173,6 +193,8 @@ export default function PostCard(props) {
           <p class={textPreviewClasses()}>{textPreview()}</p>
         </Show>
       </div>
+
+      {/* Thin mask over text area when covered */}
       <Show when={shouldCover()}>
         <div
           class="absolute inset-0 z-10 rounded-md bg-[hsl(var(--card))]/70 backdrop-blur-[2px]"
@@ -238,7 +260,7 @@ export default function PostCard(props) {
         </div>
       </Show>
 
-      {/* Context button stays on top */}
+      {/* Context button on top */}
       <Show when={app.authorizedUser()?.isAdmin && finalContextMenuItems().length > 0}>
         <div class="pointer-events-none absolute top-2 right-2 z-40">
           <div class="pointer-events-auto">

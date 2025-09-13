@@ -368,6 +368,8 @@ export default {
   "postcard.copyDescriptorCid": "Copy Descriptor CID",
   "postcard.copySavvaCid": "Copy SAVVA CID",
   "postcard.pin": "Pin Post",
+  "postcard.unbanPost": "Unban Post",
+  "postcard.unbanUser": "Unban User",
   "postcard.unpin": "Unpin Post",
   "profile.addressCopied": "Address copied to clipboard",
   "profile.avatarAlt": "User's profile picture",
