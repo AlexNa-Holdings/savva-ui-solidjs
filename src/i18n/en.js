@@ -331,7 +331,7 @@ export default {
   "nsfw.cover.warning": "This post may be sensitive in nature. Viewer discretion is advised.",
   "post.addComment": "Add a comment...",
   "post.bannedAuthor": "This author is banned.",
-  "post.bannedPost": "This post has been removed.",
+  "post.bannedPost": "This post has been banned.",
   "post.chapters.chapter": "Chapter",
   "post.chapters.prologue": "Prologue",
   "post.chapters.title": "Table of Contents",

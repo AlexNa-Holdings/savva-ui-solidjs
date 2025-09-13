@@ -27,9 +27,9 @@ import PostFundCard from "../post/PostFundCard.jsx";
 import FundraisingCard from "../post/FundraisingCard.jsx";
 import PostRightPanel from "../post/PostRightPanel.jsx";
 import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
-
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
+import BannedBanner from "../post/BannedBanner.jsx";
 
 // ⬇️ Profile store (same as PostCard)
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
@@ -134,6 +134,14 @@ export default function PostPage() {
     if (p && id.startsWith("0x") && p.short_cid) navigate(`/post/${p.short_cid}`, { replace: true });
   });
 
+  const bannedFlags = () => {
+    const p = post(); // your existing signal/store accessor
+    return {
+      banned: !!(p?._raw?.banned ?? p?.banned),
+      authorBanned: !!(p?._raw?.author_banned ?? p?.author_banned ?? p?.author?.banned),
+    };
+  };
+
   const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || {}));
   createEffect(() => {
     const locales = availableLocales();
@@ -204,6 +212,9 @@ export default function PostPage() {
         </Match>
 
         <Match when={post()}>
+
+          <BannedBanner banned={bannedFlags().banned} authorBanned={bannedFlags().authorBanned} />
+      
           {/* Hard hide */}
           <Show when={shouldHide()}>
             <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">

@@ -19,42 +19,58 @@ function isProbablyCid(s) {
   return false;
 }
 
-// Dispatch to AdminActionsBridge → shows confirm dialog, then sends on-chain command
-function dispatchAdminAction(action, detail = {}) {
+// Dispatch to AdminActionsBridge
+export function dispatchAdminAction(action, detail = {}) {
   try {
     window.dispatchEvent(new CustomEvent("savva:admin-action", { detail: { action, ...detail } }));
   } catch {}
 }
 
 /**
- * Build admin items for a post.
- * Visible only if caller gates by admin role in the UI.
+ * Build admin items for a post (Ban/Unban Post, Ban/Unban Author + utilities).
  */
 export function getPostAdminItems(post, t) {
   if (!post) return [];
 
+  const raw = post._raw || post;
   const savvaCid =
-    post.savva_cid || post.savvaCID || post.id || post._raw?.savva_cid || post._raw?.id || "";
+    raw.savva_cid || raw.savvaCID || raw.id || post.savva_cid || post.savvaCID || post.id || "";
 
-  const descriptorPathRaw = String(post.finalDescriptorPath || post.ipfs || "");
+  const descriptorPathRaw = String(raw.finalDescriptorPath || raw.ipfs || post.finalDescriptorPath || post.ipfs || "");
   const descriptorPath = descriptorPathRaw
     ? isProbablyCid(descriptorPathRaw)
       ? `${descriptorPathRaw}/info.yaml`
       : descriptorPathRaw
     : "";
 
-  const dataCid = getPostContentBaseCid(post);
-  const authorAddr = post.author?.address || post._raw?.author?.address || "";
+  const dataCid = getPostContentBaseCid(raw) || getPostContentBaseCid(post);
+  const authorAddr =
+    raw.author?.address || post.author?.address || raw.author_address || post.author_address || "";
+
+  const bannedPost = !!(raw.banned ?? post.banned);
+  const bannedAuthor = !!((raw.author_banned ?? post.author_banned) || raw.author?.banned || post.author?.banned);
 
   const items = [
-    // Admin actions → confirm dialog (AdminActionsBridge) → ContentRegistry.command(...)
+    // Post: Ban/Unban
     {
-      label: t("postcard.banPost"),
-      onClick: () => dispatchAdminAction("ban-post", { savva_cid: savvaCid, author: authorAddr, post }),
+      label: bannedPost ? t("postcard.unbanPost") : t("postcard.banPost"),
+      onClick: () =>
+        dispatchAdminAction(bannedPost ? "unban-post" : "ban-post", {
+          savva_cid: savvaCid,
+          author: authorAddr,
+          post,
+        }),
     },
+
+    // Author: Ban/Unban
     {
-      label: t("postcard.banUser"),
-      onClick: () => dispatchAdminAction("ban-user", { author: authorAddr, savva_cid: savvaCid, post }),
+      label: bannedAuthor ? t("postcard.unbanUser") : t("postcard.banUser"),
+      onClick: () =>
+        dispatchAdminAction(bannedAuthor ? "unban-user" : "ban-user", {
+          author: authorAddr,
+          savva_cid: savvaCid,
+          post,
+        }),
     },
 
     // Utilities
