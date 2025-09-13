@@ -525,7 +525,6 @@ export default {
   "settings.ai.testSuccess": "Test successful.",
   "settings.ai.testing": "Testing…",
   "settings.ai.title": "AI",
-  "settings.back": "Back",
   "settings.dev.assets.baseUrl": "Assets base URL",
   "settings.dev.assets.configUrl": "Config URL",
   "settings.dev.assets.configUrl.computed": "Computed URL",

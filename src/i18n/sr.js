@@ -525,7 +525,6 @@ export default {
   "settings.ai.testSuccess": "Test uspešan.",
   "settings.ai.testing": "Testiranje…",
   "settings.ai.title": "AI",
-  "settings.back": "Nazad",
   "settings.dev.assets.baseUrl": "Osnovni URL resursa",
   "settings.dev.assets.configUrl": "Config URL",
   "settings.dev.assets.configUrl.computed": "Izračunati URL",
