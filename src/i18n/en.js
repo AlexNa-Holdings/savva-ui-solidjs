@@ -705,5 +705,13 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now"
+  "wallet.unstaked.availableNow": "Available Now",
+   "telegram.connect.menu": "Connect Telegram",
+  "telegram.connect.title": "Connect your Telegram",
+  "telegram.connect.subtitle": "Link your SAVVA account to Telegram",
+  "telegram.connect.body": "We’ll generate a one-time code and guide you to our bot to complete the link.",
+  "telegram.connect.openInApp": "Open in app",
+  "telegram.connect.expiresIn": "Expires in",
+  "telegram.connect.error": "Could not request an authorization token. Please try again."
+
 };

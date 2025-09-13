@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import { navigate, useHashRouter } from "../../routing/hashRouter.js";
+import ConnectTelegramModal from "../modals/ConnectTelegramModal.jsx";
 
 function ChevronDownIcon(props) {
   return (
@@ -18,6 +19,7 @@ export default function AuthorizedUser() {
   const { t } = app;
   const { route } = useHashRouter();
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [tgOpen, setTgOpen] = createSignal(false);
   let menuRef;
 
   const user = () => app.authorizedUser();
@@ -44,6 +46,11 @@ export default function AuthorizedUser() {
     go(`${basePath}?tab=wallet`);
   };
 
+  const handleConnectTelegramClick = () => {
+    setMenuOpen(false);
+    setTgOpen(true);
+  };
+
   const handleLogoutClick = () => {
     app.logout();
     setMenuOpen(false);
@@ -60,7 +67,6 @@ export default function AuthorizedUser() {
     <div class="relative" ref={menuRef}>
       <Show when={user()}>
         <button
-          /* removed hover/focus border + hide outline/ring */
           class="flex items-center gap-1 p-0.5 rounded-full outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0"
           onClick={() => setMenuOpen(!menuOpen())}
           aria-haspopup="true"
@@ -79,18 +85,29 @@ export default function AuthorizedUser() {
       </Show>
 
       <Show when={menuOpen()}>
-        <div class="absolute right-0 mt-2 w-40 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow">
-          <button class="w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleProfileClick}>
+        <div
+          class="absolute right-0 mt-2
+                 min-w-[10rem] w-auto max-w-[90vw] whitespace-nowrap
+                 rounded-md border border-[hsl(var(--border))]
+                 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow
+                 flex flex-col items-stretch"
+        >
+          <button class="block w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleProfileClick}>
             {t("profile.menu.myProfile")}
           </button>
-          <button class="w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleWalletClick}>
+          <button class="block w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleWalletClick}>
             {t("profile.menu.myWallet")}
           </button>
-          <button class="w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleLogoutClick}>
+          <button class="block w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleConnectTelegramClick}>
+            {t("telegram.connect.menu")}
+          </button>
+          <button class="block w-full text-left px-3 py-2 hover:bg-[hsl(var(--accent))]" onClick={handleLogoutClick}>
             {t("profile.menu.logout")}
           </button>
         </div>
       </Show>
+
+      <ConnectTelegramModal open={tgOpen()} onClose={() => setTgOpen(false)} />
     </div>
   );
 }
