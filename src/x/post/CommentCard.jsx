@@ -10,7 +10,7 @@ import { getPostContentBaseCid } from "../../ipfs/utils.js";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
 import Spinner from "../ui/Spinner.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
-import { getPostAdminItems } from "../../ui/contextMenuBuilder.js"; // ← your path
+import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import { navigate } from "../../routing/hashRouter.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
@@ -56,31 +56,43 @@ export default function CommentCard(props) {
   const [isHovered, setIsHovered] = createSignal(false);
   const [isPreparing, setIsPreparing] = createSignal(false);
 
-  const [comment, setComment] = createStore(props.comment);
+  // Always have an object to write into; keep it synced with props, with default _raw
+  const [comment, setComment] = createStore(props.comment ?? { _raw: {} });
+  createEffect(() => {
+    setComment(reconcile({ _raw: {}, ...(props.comment ?? {}) }));
+  });
 
-  // Existing live updates
+  // Live updates (author/post banned/unbanned, reactions)
   createEffect(() => {
     const update = app.postUpdate?.();
     if (!update) return;
 
-    // author-level ban/unban applies to all comments by that author
+    // Author-level updates
     if (update.type === "authorBanned" || update.type === "authorUnbanned") {
       const my = (comment.author?.address || comment?._raw?.author?.address || "").toLowerCase();
-      if (my && my === (update.author || "").toLowerCase()) {
-        setComment("author_banned", update.type === "authorBanned");
+      const uaddr = String(update.author || "").toLowerCase();
+      if (my && my === uaddr) {
+        const v = update.type === "authorBanned";
+        setComment("author_banned", v);
+        setComment("_raw", (p) => ({ ...(p || {}), author_banned: v }));
       }
       return;
     }
 
-    // post-level ban/unban for this specific comment
-    const myCid =
-      comment?.savva_cid || comment?.id || comment?._raw?.savva_cid || comment?._raw?.id;
-    if (!myCid || update.cid !== myCid) return;
+    // Post-level updates (match by savva_cid/id, case-insensitive)
+    const myCid = String(
+      comment?.savva_cid || comment?.id || comment?._raw?.savva_cid || comment?._raw?.id || ""
+    ).toLowerCase();
+    const uCid = String(update.cid || "").toLowerCase();
+    if (!myCid || uCid !== myCid) return;
 
-    if (update.type === "postBanned") setComment("banned", true);
-    else if (update.type === "postUnbanned") setComment("banned", false);
-
-    if (update.type === "reactionsChanged") {
+    if (update.type === "postBanned") {
+      setComment("banned", true);
+      setComment("_raw", (p) => ({ ...(p || {}), banned: true }));
+    } else if (update.type === "postUnbanned") {
+      setComment("banned", false);
+      setComment("_raw", (p) => ({ ...(p || {}), banned: false }));
+    } else if (update.type === "reactionsChanged") {
       setComment("reactions", reconcile(update.data.reactions));
       if (app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()) {
         setComment("my_reaction", update.data.reaction);
@@ -107,32 +119,22 @@ export default function CommentCard(props) {
   });
 
   const [fullContent] = createResource(
-    () => ({
-      shouldFetch: isExpanded(),
-      app,
-      comment,
-      lang: app.lang(),
-    }),
+    () => ({ shouldFetch: isExpanded(), app, comment, lang: app.lang() }),
     async (params) => (params.shouldFetch ? fetchFullContent(params) : null)
   );
 
   const contextMenuItems = createMemo(() => (comment ? getPostAdminItems(comment, t) : []));
 
-  const needsTruncation = createMemo(() => {
-    const preview = localizedPreview();
-    return preview.endsWith("...");
-  });
+  const needsTruncation = createMemo(() => localizedPreview().endsWith("..."));
 
   const ipfsBaseUrl = createMemo(() => {
     if (!comment) return "";
     const dataCid = getPostContentBaseCid(comment);
     if (!dataCid) return "";
-
     let bestGateway;
     if (app.localIpfsEnabled() && app.localIpfsGateway()) bestGateway = app.localIpfsGateway();
     else if (Array.isArray(comment.gateways) && comment.gateways.length > 0) bestGateway = comment.gateways[0];
     else bestGateway = app.remoteIpfsGateways()[0] || "https://ipfs.io/";
-
     return ipfs.buildUrl(bestGateway, dataCid);
   });
 
@@ -140,7 +142,7 @@ export default function CommentCard(props) {
 
   const handleReply = (e) => {
     e.stopPropagation();
-    const commentCid = comment?.savva_cid;
+    const commentCid = comment?.savva_cid || comment?._raw?.savva_cid;
     if (commentCid) navigate(`/editor/new-comment/${commentCid}`);
   };
 
@@ -149,7 +151,7 @@ export default function CommentCard(props) {
     setIsPreparing(true);
     try {
       await preparePostForEditing(comment, app);
-      navigate(`/editor/comment/${comment.savva_cid}`);
+      navigate(`/editor/comment/${comment.savva_cid || comment?._raw?.savva_cid}`);
     } catch (err) {
       pushErrorToast(err, { context: t("comment.prepareEditFailed") });
     } finally {
@@ -157,13 +159,19 @@ export default function CommentCard(props) {
     }
   };
 
-  // NSFW (unchanged)
+  // NSFW
   const { dataStable: profile } = useUserProfile();
   const nsfwPref = createMemo(() => selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h");
   const commentIsNsfw = createMemo(() => !!(comment?.nsfw || comment?.savva_content?.nsfw));
   const shouldHide = createMemo(() => commentIsNsfw() && nsfwPref() === "h");
   const shouldWarn = createMemo(() => commentIsNsfw() && nsfwPref() === "w");
   const [revealed, setRevealed] = createSignal(false);
+
+  // Banned flags (render)
+  const isBanned = createMemo(() => !!(comment?.banned || comment?._raw?.banned));
+  const isAuthorBanned = createMemo(
+    () => !!(comment?.author_banned || comment?._raw?.author_banned || comment?.author?.banned || comment?._raw?.author?.banned)
+  );
 
   return (
     <div
@@ -172,7 +180,6 @@ export default function CommentCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Admin context on top of overlays */}
       <Show when={app.authorizedUser()?.isAdmin && contextMenuItems().length > 0}>
         <div class="pointer-events-none absolute top-2 right-2 z-40">
           <div class="pointer-events-auto">
@@ -187,7 +194,7 @@ export default function CommentCard(props) {
         </div>
       </Show>
 
-      {/* Hard-hide state */}
+      {/* NSFW hard-hide */}
       <Show when={shouldHide()}>
         <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
           <h3 class="font-semibold">{t("post.nsfw.hidden.title")}</h3>
@@ -195,15 +202,26 @@ export default function CommentCard(props) {
         </div>
       </Show>
 
-      {/* Normal / warn states */}
+      {/* Normal / warn */}
       <Show when={!shouldHide()}>
         <div class="p-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
           <div class="mb-2">
             <UserCard author={comment.author} compact={false} />
           </div>
 
+          {/* BANNED banner */}
+          <Show when={isBanned() || isAuthorBanned()}>
+            <div class="mb-2 rounded-md border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 text-[hsl(var(--destructive))] px-3 py-2 text-xs sm:text-sm font-semibold">
+              {isBanned() && isAuthorBanned()
+                ? `${t("post.bannedPost")} • ${t("post.bannedAuthor")}`
+                : isBanned()
+                ? t("post.bannedPost")
+                : t("post.bannedAuthor")}
+            </div>
+          </Show>
+
           <div class="text-sm prose prose-sm max-w-none relative rounded-[inherit]">
-            {/* Center warning overlay */}
+            {/* NSFW soft-cover */}
             <Show when={shouldWarn() && !revealed()}>
               <div
                 class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
