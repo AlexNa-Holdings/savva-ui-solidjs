@@ -6,7 +6,6 @@ import ContributionToast from "../x/ui/toasts/ContributionToast.jsx";
 import { formatUnits } from "viem";
 import FundraiserContributionToast from "../x/ui/toasts/FundraiserContributionToast.jsx";
 
-
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);
   app.updateTokenPrices?.(payload.data);
@@ -193,7 +192,7 @@ export function handleFundraiserContribution(app, payload) {
   dbg.log("Alerts:fundraiser_contribution", data);
 
   if (!data || !data.id) return;
-  
+
   // Trigger UI updates for fundraising components
   app.triggerFundraiserUpdate?.();
 
@@ -205,4 +204,54 @@ export function handleFundraiserContribution(app, payload) {
     bodyComponent: FundraiserContributionToast,
     bodyProps: { data },
   });
+}
+
+export function handleListUpdated(app, payload) {
+  try {
+    dbg.log("Alerts:list_updated", payload);
+
+    // Optional: ignore if broadcast domain (when present) doesn't match current app domain
+    const currentDomain = app.selectedDomainName?.()?.toLowerCase?.();
+    const alertDomain = String(
+      payload?.domain || payload?.data?.domain || ""
+    ).toLowerCase();
+    if (alertDomain && currentDomain && alertDomain !== currentDomain) {
+      dbg.log(
+        "Alerts:list_updated",
+        `Ignoring alert for different domain. App: ${currentDomain}, Alert: ${alertDomain}`
+      );
+      return;
+    }
+
+    // Be tolerant to different payload shapes
+    const list = String(
+      payload?.list ??
+        payload?.data?.list ??
+        payload?.list_id ??
+        payload?.data?.list_id ??
+        payload?.List ??
+        payload?.data?.List ??
+        ""
+    ).trim();
+
+    if (!list) return;
+
+    // Generic broadcast consumed by widgets (e.g., ContentListBlock)
+    try {
+      window.dispatchEvent(
+        new CustomEvent("savva:ws-broadcast", {
+          detail: { type: "list_updated", payload: { list } },
+        })
+      );
+    } catch {}
+
+    // Convenience event for direct listeners
+    try {
+      window.dispatchEvent(
+        new CustomEvent("savva:list-updated", { detail: { list } })
+      );
+    } catch {}
+  } catch (e) {
+    dbg.warn?.("Alerts:list_updated", "failed to handle", e);
+  }
 }

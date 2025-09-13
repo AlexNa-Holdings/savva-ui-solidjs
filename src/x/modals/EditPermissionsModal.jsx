@@ -104,8 +104,8 @@ export default function EditPermissionsModal(props) {
         <div class="fixed inset-0 z-60" role="dialog" aria-modal="true">
           <ModalBackdrop onClick={props.onClose} />
           <div class="absolute z-70 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(560px,92vw)] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-xl">
+            <ModalAutoCloser onClose={props.onClose} />
             <div class="px-4 py-3 border-b border-[hsl(var(--border))] flex items-center justify-between">
-              <ModalAutoCloser onClose={props.onClose} />
               <h2 class="text-lg font-semibold">{t("npo.editPerms.title") || "Edit Permissions"}</h2>
               <button class="w-8 h-8 rounded hover:bg-[hsl(var(--accent))]" onClick={close} aria-label={t("common.close")}>✕</button>
             </div>

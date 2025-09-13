@@ -1,32 +1,33 @@
 // src/x/widgets/ContentListBlock.jsx
-import { createMemo, createResource, For, Show } from "solid-js";
+import { createMemo, createResource, For, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
 import PostCard from "../post/PostCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
+import { getPinningItems as getPinnedItems } from "../../ui/contextMenuBuilder.js";
 
 function getLocalizedTitle(titleData, currentLang) {
-    if (!titleData || typeof titleData !== 'object') return "";
-    if (titleData[currentLang]) return titleData[currentLang];
-    if (titleData['*']) return titleData['*'];
-    if (titleData.en) return titleData.en;
-    const firstKey = Object.keys(titleData)[0];
-    return firstKey ? titleData[firstKey] : "";
+  if (!titleData || typeof titleData !== "object") return "";
+  if (titleData[currentLang]) return titleData[currentLang];
+  if (titleData["*"]) return titleData["*"];
+  if (titleData.en) return titleData.en;
+  const firstKey = Object.keys(titleData)[0];
+  return firstKey ? titleData[firstKey] : "";
 }
 
 async function fetchListContent(params) {
   const { app, listName, count, lang } = params;
   if (!app.wsMethod || !listName) return [];
-  
+
   const getList = app.wsMethod("get-list");
-  
+
   const requestParams = {
     domain: app.selectedDomainName(),
     list_name: listName,
     limit: count || 5,
     offset: 0,
-    lang: lang,
+    lang,
   };
 
   const user = app.authorizedUser();
@@ -43,7 +44,7 @@ async function fetchListContent(params) {
     }));
   } catch (err) {
     console.error(`Failed to fetch content list '${listName}':`, err);
-    return { error: err.message }; 
+    return { error: err.message };
   }
 }
 
@@ -54,17 +55,19 @@ export default function ContentListBlock(props) {
   const [contentListModule] = createResource(modulePath, async (path) => {
     if (!path) return null;
     try {
-      return await loadAssetResource(app, path, { type: 'yaml' });
+      return await loadAssetResource(app, path, { type: "yaml" });
     } catch (e) {
       console.error(`Failed to load content list module from ${path}`, e);
       return null;
     }
   });
-  
+
+  const listName = () => props.block?.list_name;
+
   const listDefinition = createMemo(() => {
-    const listName = props.block?.list_name;
-    if (!listName) return null;
-    return contentListModule()?.list?.[listName] || null;
+    const name = listName();
+    if (!name) return null;
+    return contentListModule()?.list?.[name] || null;
   });
 
   const title = createMemo(() => {
@@ -72,16 +75,63 @@ export default function ContentListBlock(props) {
     return getLocalizedTitle(def?.title, app.lang());
   });
 
-  const [listData] = createResource(() => ({
-    app: app,
-    listName: props.block?.list_name,
-    count: props.block?.count,
-    lang: app.lang()
-  }), fetchListContent);
+  const [listData, { refetch }] = createResource(
+    () => ({
+      app,
+      listName: listName(),
+      count: props.block?.count,
+      lang: app.lang(),
+    }),
+    fetchListContent
+  );
+
+  // Refresh on broadcast: BCM_ListUpdated { list }
+  onMount(() => {
+    const handleBroadcast = (e) => {
+      try {
+        const d = e?.detail || {};
+        // Accept several shapes to be robust:
+        const type = d.type || d.msg_type || d.kind;
+        const payload = d.payload || d.data || d;
+        const updatedList = payload.list || payload.list_id || d.list;
+
+        // Direct DOM helper event (if someone triggers it): "savva:list-updated"
+        const isDomListUpdated = e.type === "savva:list-updated";
+
+        if ((type === "list_updated" || isDomListUpdated) && updatedList && updatedList === listName()) {
+          refetch();
+        }
+
+        // Also refresh when our own admin actions affect this list
+        if (e.type === "savva:admin-action") {
+          const act = d.action;
+          const affected = d.list_id || d.list;
+          if (
+            affected === listName() &&
+            (act === "list:pinned" || act === "list:unpinned" || act === "list:removed" || act === "announce-post:confirm")
+          ) {
+            refetch();
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener("savva:ws-broadcast", handleBroadcast);
+    window.addEventListener("savva:list-updated", handleBroadcast);
+    window.addEventListener("savva:admin-action", handleBroadcast);
+
+    onCleanup(() => {
+      window.removeEventListener("savva:ws-broadcast", handleBroadcast);
+      window.removeEventListener("savva:list-updated", handleBroadcast);
+      window.removeEventListener("savva:admin-action", handleBroadcast);
+    });
+  });
 
   return (
     <div class="p-3 rounded-lg" style={{ background: "var(--gradient)" }}>
-      <h4 class="font-semibold text-sm mb-2 text-[hsl(var(--card))]">{title() || props.block?.list_name}</h4>
+      <h4 class="font-semibold text-sm mb-2 text-[hsl(var(--card))]">
+        {title() || listName()}
+      </h4>
       <div class="space-y-3">
         <Show when={listData.loading}>
           <div class="flex justify-center items-center h-24">
@@ -93,13 +143,14 @@ export default function ContentListBlock(props) {
             {app.t("common.error")}: {listData.error}
           </p>
         </Show>
-        <Show when={!listData.loading && !listData.error && listData()?.length > 0}>
+        <Show when={!listData.loading && !listData.error && Array.isArray(listData()) && listData().length > 0}>
           <For each={listData()}>
             {(item) => {
-              const menuItems = item._raw?.pinned
-                ? [{ label: "Unpin Post", onClick: () => console.log("Unpin clicked for:", item.id) }]
-                : [{ label: "Pin Post", onClick: () => console.log("Pin clicked for:", item.id) }];
-              
+              const menuItems = getPinnedItems(item._raw || item, app.t, {
+                app,
+                listId: listName(),
+              });
+
               return (
                 <PostCard
                   item={item}

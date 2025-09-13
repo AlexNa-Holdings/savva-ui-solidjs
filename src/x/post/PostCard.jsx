@@ -37,7 +37,24 @@ export default function PostCard(props) {
   const { dataStable: profile } = useUserProfile();
 
   const [isHovered, setIsHovered] = createSignal(false);
-  const [item, setItem] = createStore(props.item);
+
+  // Normalize source: accept either props.item or props.post. If no _raw, create one.
+  const src = () => (props.item ?? props.post ?? {});
+  const normalize = (obj) => (obj && obj._raw ? obj : { _raw: obj || {}, ...obj });
+
+  const [item, setItem] = createStore(normalize(src()));
+
+  // Keep store in sync if caller swaps the post/item prop
+  createEffect(() => {
+    setItem(reconcile(normalize(src())));
+  });
+
+  // Unified accessor for the underlying record (prefers _raw if present)
+  const base = () => item._raw ?? item;
+
+  // Allow disabling the context menu via either camelCase or dashed prop
+  const disableContextMenu = () => !!(props.noContextMenu ?? props["no-context-menu"]);
+
   const [revealed, setRevealed] = createSignal(false);
 
   // Live updates
@@ -47,7 +64,8 @@ export default function PostCard(props) {
 
     // Author-level updates: apply to all posts by that author
     if (update.type === "authorBanned" || update.type === "authorUnbanned") {
-      const myAuthor = (item._raw?.author?.address || item.author?.address || "").toLowerCase();
+      const b = base();
+      const myAuthor = (b?.author?.address || item.author?.address || "").toLowerCase();
       if (myAuthor && myAuthor === (update.author || "").toLowerCase()) {
         setItem("_raw", "author_banned", update.type === "authorBanned");
       }
@@ -55,7 +73,8 @@ export default function PostCard(props) {
     }
 
     // Post-level updates: gate by cid/id
-    const myCid = item._raw?.savva_cid || item._raw?.id || item.id;
+    const b = base();
+    const myCid = b?.savva_cid || b?.id || item.id;
     if (update.cid !== myCid) return;
 
     if (update.type === "reactionsChanged") {
@@ -74,14 +93,14 @@ export default function PostCard(props) {
     }
   });
 
-  const author = () => item._raw?.author;
-  const content = () => item._raw?.savva_content;
-  const fund = () => item._raw?.fund;
+  const author = () => base()?.author;
+  const content = () => base()?.savva_content ?? base()?.content;
+  const fund = () => base()?.fund;
   const isListMode = () => props.mode === "list";
 
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
-    if (thumbnailPath) return resolvePostCidPath(item._raw, thumbnailPath);
+    if (thumbnailPath) return resolvePostCidPath(base(), thumbnailPath);
     return author()?.avatar;
   });
 
@@ -89,7 +108,7 @@ export default function PostCard(props) {
   const textPreview = createMemo(() => getLocalizedField(content()?.locales, "text_preview", app.lang()));
 
   // Sensitive flag + user preference
-  const isSensitive = createMemo(() => !!(item._raw?.nsfw || content()?.nsfw));
+  const isSensitive = createMemo(() => !!(base()?.nsfw || content()?.nsfw));
   const nsfwPref = createMemo(() => {
     const p = profile();
     return selectField(p, "nsfw") ?? selectField(p, "prefs.nsfw") ?? "h";
@@ -97,8 +116,8 @@ export default function PostCard(props) {
   const shouldCover = createMemo(() => isSensitive() && nsfwPref() === "w" && !revealed());
 
   // Banned ribbons
-  const isBannedPost = createMemo(() => !!item._raw?.banned);
-  const isBannedAuthor = createMemo(() => !!(item._raw?.author_banned || item._raw?.author?.banned));
+  const isBannedPost = createMemo(() => !!base()?.banned);
+  const isBannedAuthor = createMemo(() => !!(base()?.author_banned || base()?.author?.banned));
 
   const handleCardClick = (e) => {
     if (shouldCover()) {
@@ -106,21 +125,22 @@ export default function PostCard(props) {
       e.stopPropagation();
       return;
     }
-    if (item.id) {
+    const id = base()?.id ?? item.id;
+    if (id) {
       app.setSavedScrollY?.(window.scrollY);
-      navigate(`/post/${item.id}`);
+      navigate(`/post/${id}`);
     }
   };
 
   const finalContextMenuItems = createMemo(() => {
     const propItems = props.contextMenuItems || [];
-    const adminItems = getPostAdminItems(item._raw, t);
+    const adminItems = getPostAdminItems(base(), t);
     return [...propItems, ...adminItems];
   });
 
   const articleClasses = createMemo(() => {
-    const base = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
-    return isListMode() ? `${base} flex-row ${props.compact ? "h-20" : "h-40"}` : `${base} flex-col`;
+    const baseCls = "relative rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] flex";
+    return isListMode() ? `${baseCls} flex-row ${props.compact ? "h-20" : "h-40"}` : `${baseCls} flex-col`;
   });
 
   const imageContainerClasses = createMemo(() => {
@@ -135,7 +155,7 @@ export default function PostCard(props) {
         <IpfsImage
           src={displayImageSrc()}
           class={roundingClass}
-          postGateways={item._raw?.gateways || []}
+          postGateways={base()?.gateways || []}
           fallback={<UnknownUserIcon class={`absolute inset-0 w-full h-full ${roundingClass}`} />}
         />
 
@@ -179,8 +199,8 @@ export default function PostCard(props) {
   );
 
   const textPreviewClasses = createMemo(() => {
-    const base = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
-    return isListMode() ? `${base} ${props.compact ? "line-clamp-1" : "line-clamp-2"}` : `${base} line-clamp-3`;
+    const baseCls = "text-xs leading-snug text-[hsl(var(--muted-foreground))]";
+    return isListMode() ? `${baseCls} ${props.compact ? "line-clamp-1" : "line-clamp-2"}` : `${baseCls} line-clamp-3`;
   });
 
   const TitlePreviewBlock = () => (
@@ -232,13 +252,13 @@ export default function PostCard(props) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Show when={item._raw?.pinned}>
+      <Show when={base()?.pinned}>
         <div class="absolute -top-2 -left-2 z-10">
           <PinIcon class="w-5 h-5 text-[hsl(var(--primary))]" />
         </div>
       </Show>
 
-      <Show when={item._raw?.nft?.owner}>
+      <Show when={base()?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
           <NftBadge />
         </div>
@@ -260,8 +280,8 @@ export default function PostCard(props) {
         </div>
       </Show>
 
-      {/* Context button on top */}
-      <Show when={app.authorizedUser()?.isAdmin && finalContextMenuItems().length > 0}>
+      {/* Context button on top (hidden when no-context-menu is set) */}
+      <Show when={!disableContextMenu() && app.authorizedUser()?.isAdmin && finalContextMenuItems().length > 0}>
         <div class="pointer-events-none absolute top-2 right-2 z-40">
           <div class="pointer-events-auto">
             <Show when={isHovered()}>

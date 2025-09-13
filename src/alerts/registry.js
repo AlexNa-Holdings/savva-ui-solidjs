@@ -23,4 +23,7 @@ export const alertRegistry = {
   banned_user: bh.handleBannedUser,
   unbanned_post: bh.handleUnbannedPost,
   unbanned_user: bh.handleUnbannedUser,
+
+  list_updated: h.handleListUpdated,
+
 };

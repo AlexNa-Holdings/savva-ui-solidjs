@@ -23,3 +23,5 @@ sections:
         file: core-concepts/publishing-posts.md
       - label: Config Contract
         file: core-concepts/config-contract.md
+      - label: Connection Orchestration
+        file: core-concepts/connection-orchestration.md

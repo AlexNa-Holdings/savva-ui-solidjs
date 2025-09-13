@@ -26,14 +26,12 @@ export default function AdminConfirmBanModal(props) {
   };
 
   const authorObj = () =>
-    props.user ||
     props.post?.author ||
     (props.author ? { address: props.author } : null);
 
   return (
-    <Show when={props.open}>
       <Portal>
-        <div class="fixed inset-0 z-60">
+        <div class="fixed inset-0 z-60 flex items-center justify-center">
           <ModalBackdrop onClick={close} />
           <div role="dialog" aria-modal="true" class="fixed inset-0 flex items-center justify-center p-4">
             <div class="w-full z-70 max-w-2xl rounded-2xl shadow-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
@@ -62,7 +60,7 @@ export default function AdminConfirmBanModal(props) {
                   <div>
                     <div class="text-xs font-medium opacity-70 mb-2">{t("admin.previewPost")}</div>
                     <div class="rounded-xl border border-[hsl(var(--border))] overflow-hidden">
-                      <ContentCard item={props.post} mode="list" compact={true} />
+                      <ContentCard item={props.post} noContextMenu={true} mode="list" compact={true} />
                     </div>
                   </div>
                 </Show>
@@ -100,6 +98,5 @@ export default function AdminConfirmBanModal(props) {
           </div>
         </div>
       </Portal>
-    </Show>
   );
 }

@@ -1,6 +1,8 @@
 // src/x/ui/contextMenuBuilder.js
 import { pushToast } from "./toast.js";
 import { getPostContentBaseCid } from "../ipfs/utils.js";
+import { listRemovePost, listPinPost, listUnpinPost } from "../blockchain/adminCommands.js";
+import { dbg } from "../utils/debug.js";
 
 // Clipboard helper
 function copyToClipboard(text, label, t) {
@@ -27,16 +29,32 @@ export function dispatchAdminAction(action, detail = {}) {
 }
 
 /**
- * Build admin items for a post (Ban/Unban Post, Ban/Unban Author + utilities).
+ * Build admin items for a post (Ban/Unban Post, Ban/Unban Author + utilities + Announce).
+ * NOTE: "Announce…" is shown only for POSTS (no ParentSavvaCID).
  */
 export function getPostAdminItems(post, t) {
   if (!post) return [];
 
   const raw = post._raw || post;
+
   const savvaCid =
     raw.savva_cid || raw.savvaCID || raw.id || post.savva_cid || post.savvaCID || post.id || "";
 
-  const descriptorPathRaw = String(raw.finalDescriptorPath || raw.ipfs || post.finalDescriptorPath || post.ipfs || "");
+  // A "comment" has a ParentSavvaCID; a "post" does not (be liberal about casing/aliases).
+  const isComment = !!(
+    raw.ParentSavvaCID ??
+    raw.parentSavvaCid ??
+    raw.parentSavvaCID ??
+    raw.parent_cid ??
+    post.ParentSavvaCID ??
+    post.parentSavvaCid ??
+    post.parentSavvaCID ??
+    post.parent_cid
+  );
+
+  const descriptorPathRaw = String(
+    raw.finalDescriptorPath || raw.ipfs || post.finalDescriptorPath || post.ipfs || ""
+  );
   const descriptorPath = descriptorPathRaw
     ? isProbablyCid(descriptorPathRaw)
       ? `${descriptorPathRaw}/info.yaml`
@@ -48,7 +66,9 @@ export function getPostAdminItems(post, t) {
     raw.author?.address || post.author?.address || raw.author_address || post.author_address || "";
 
   const bannedPost = !!(raw.banned ?? post.banned);
-  const bannedAuthor = !!((raw.author_banned ?? post.author_banned) || raw.author?.banned || post.author?.banned);
+  const bannedAuthor = !!(
+    (raw.author_banned ?? post.author_banned) || raw.author?.banned || post.author?.banned
+  );
 
   const items = [
     // Post: Ban/Unban
@@ -72,8 +92,23 @@ export function getPostAdminItems(post, t) {
           post,
         }),
     },
+  ];
 
-    // Utilities
+  // Posts only: Announce…
+  if (!isComment) {
+    items.push({
+      label: t("admin.announce"),
+      onClick: () =>
+        dispatchAdminAction("announce-post", {
+          savva_cid: savvaCid,
+          author: authorAddr,
+          post,
+        }),
+    });
+  }
+
+  // Utilities
+  items.push(
     {
       label: t("postcard.copySavvaCid"),
       onClick: () => copyToClipboard(savvaCid, "SAVVA CID", t),
@@ -85,17 +120,130 @@ export function getPostAdminItems(post, t) {
     {
       label: t("postcard.copyDataCid"),
       onClick: () => copyToClipboard(dataCid, "Data CID", t),
-    },
-  ];
+    }
+  );
 
   return items;
 }
 
-/** Optional pin/unpin items if you decide to use them */
-export function getPinningItems(post, t) {
+/**
+ * Pin / Unpin / Remove-from-list actions for a post shown within a list context.
+ * Usage: getPinningItems(post, app.t, { app, listId })
+ */
+export function getPinningItems(post, t, opts = {}) {
   if (!post) return [];
-  if (post.pinned) {
-    return [{ label: t("postcard.unpin"), onClick: () => console.log("Unpin clicked for:", post.savva_cid) }];
+
+  const { app, listId: listIdOpt } = opts || {};
+  const listId =
+    listIdOpt ||
+    post?.list_id ||
+    post?.listId ||
+    post?._context?.listId ||
+    "";
+
+  const savvaCid =
+    post?.savva_cid ||
+    post?.savvaCID ||
+    post?.id ||
+    post?._raw?.savva_cid ||
+    post?._raw?.savvaCID ||
+    post?._raw?.id ||
+    "";
+
+  const ensureCtx = () => {
+    if (!app) {
+      pushToast({ type: "error", message: t("postcard.errorNoApp") });
+      return false;
+    }
+    if (!listId) {
+      pushToast({ type: "error", message: t("postcard.errorNoListContext") });
+      return false;
+    }
+    if (!savvaCid) {
+      pushToast({ type: "error", message: t("postcard.errorNoPostId") });
+      return false;
+    }
+    return true;
+  };
+
+  const onRemove = async () => {
+    if (!ensureCtx()) return;
+    try {
+      await listRemovePost(app, { listId, savvaCid });
+      pushToast({ type: "success", message: t("postcard.removedFromList") });
+      try {
+        window.dispatchEvent(
+          new CustomEvent("savva:admin-action", {
+            detail: { action: "list:removed", list_id: listId, savva_cid: savvaCid },
+          })
+        );
+      } catch {}
+    } catch (e) {
+      dbg.error("listRemovePost failed", e);
+      pushToast({
+        type: "error",
+        message: t("postcard.removeFailed"),
+        details: { error: String(e?.message || e) },
+        autohideMs: 12000,
+      });
+    }
+  };
+
+  const onPin = async () => {
+    if (!ensureCtx()) return;
+    try {
+      await listPinPost(app, { listId, savvaCid });
+      pushToast({ type: "success", message: t("postcard.pinned") });
+      try {
+        window.dispatchEvent(
+          new CustomEvent("savva:admin-action", {
+            detail: { action: "list:pinned", list_id: listId, savva_cid: savvaCid },
+          })
+        );
+      } catch {}
+    } catch (e) {
+      dbg.error("listPinPost failed", e);
+      pushToast({
+        type: "error",
+        message: t("postcard.pinFailed"),
+        details: { error: String(e?.message || e) },
+        autohideMs: 12000,
+      });
+    }
+  };
+
+  const onUnpin = async () => {
+    if (!ensureCtx()) return;
+    try {
+      await listUnpinPost(app, { listId, savvaCid });
+      pushToast({ type: "success", message: t("postcard.unpinned") });
+      try {
+        window.dispatchEvent(
+          new CustomEvent("savva:admin-action", {
+            detail: { action: "list:unpinned", list_id: listId, savva_cid: savvaCid },
+          })
+        );
+      } catch {}
+    } catch (e) {
+      dbg.error("listUnpinPost failed", e);
+      pushToast({
+        type: "error",
+        message: t("postcard.unpinFailed"),
+        details: { error: String(e?.message || e) },
+        autohideMs: 12000,
+      });
+    }
+  };
+
+  const items = [];
+
+  if (post?.pinned) {
+    items.push({ label: t("postcard.unpin"), onClick: onUnpin });
+  } else {
+    items.push({ label: t("postcard.pin"), onClick: onPin });
   }
-  return [{ label: t("postcard.pin"), onClick: () => console.log("Pin clicked for:", post.savva_cid) }];
+
+  items.push({ label: t("postcard.removeFromList"), onClick: onRemove });
+
+  return items;
 }

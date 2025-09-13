@@ -3,6 +3,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { pushErrorToast } from "../../ui/toast.js";
 import AdminConfirmBanModal from "./AdminConfirmBanModal.jsx";
+import AdminAnnouncePostModal from "./AdminAnnouncePostModal.jsx";
 import { banPost, banUser, sendAdminCommand } from "../../blockchain/adminCommands.js";
 
 export default function AdminActionsBridge() {
@@ -11,7 +12,7 @@ export default function AdminActionsBridge() {
 
   const [open, setOpen] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
-  const [action, setAction] = createSignal(null); // "ban-post" | "ban-user"
+  const [action, setAction] = createSignal(null); // "ban-post" | "ban-user" | "announce-post"
   const [post, setPost] = createSignal(null);
   const [userAddr, setUserAddr] = createSignal(null);
 
@@ -54,6 +55,16 @@ export default function AdminActionsBridge() {
     setOpen(true);
   }
 
+  function openAnnounce(detail) {
+    setAction("announce-post");
+    // accept a few common shapes just in case
+    const p = detail?.post ?? detail?.item ?? detail?.raw ?? null;
+    setPost(p);
+    setUserAddr(detail?.author || authorOf(p) || null);
+    // open on next microtask to ensure post() is ready before rendering the modal
+    queueMicrotask(() => setOpen(true));
+  }
+
   async function handleConfirm(comment) {
     setBusy(true);
     try {
@@ -81,10 +92,11 @@ export default function AdminActionsBridge() {
     const onAdmin = (ev) => {
       const detail = ev?.detail || {};
       switch (detail.action) {
-        case "ban-post":  openBanPost(detail);  break;
-        case "ban-user":  openBanUser(detail);  break;
-        case "unban-post": unbanPostNow(detail); break;
-        case "unban-user": unbanUserNow(detail); break;
+        case "ban-post":      openBanPost(detail);     break;
+        case "ban-user":      openBanUser(detail);     break;
+        case "unban-post":    unbanPostNow(detail);    break;
+        case "unban-user":    unbanUserNow(detail);    break;
+        case "announce-post": openAnnounce(detail);    break;
         default: break;
       }
     };
@@ -94,15 +106,25 @@ export default function AdminActionsBridge() {
 
   return (
     <Show when={open()}>
-      <AdminConfirmBanModal
-        open={open()}
-        action={action()}
-        post={post()}
-        user={userAddr() ? { address: userAddr() } : undefined}
-        onConfirm={handleConfirm}
-        onClose={handleClose}
-        busy={busy()}
-      />
+      <Show
+        when={action() === "announce-post"}
+        fallback={
+          <AdminConfirmBanModal
+            open={open()}
+            action={action()}
+            post={post()}
+            user={userAddr() ? { address: userAddr() } : undefined}
+            onConfirm={handleConfirm}
+            onClose={handleClose}
+            busy={busy()}
+          />
+        }
+      >
+        <AdminAnnouncePostModal
+          post={post()}
+          onClose={handleClose}
+        />
+      </Show>
     </Show>
   );
 }
