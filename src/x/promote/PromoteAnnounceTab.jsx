@@ -1,56 +1,58 @@
 // src/x/promote/PromoteAnnounceTab.jsx
-import { createMemo, createResource, createSignal, For, Show } from "solid-js";
+import { Show, For, createMemo, createResource, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
 import Spinner from "../ui/Spinner.jsx";
-import { formatUnits } from "viem";
-import { isWalletAvailable } from "../../blockchain/wallet.js";
-import * as chain from "../../blockchain/contracts.js";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import TokenValue from "../ui/TokenValue.jsx";
+import { pushToast } from "../../ui/toast.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import { dbg } from "../../utils/debug.js";
-
-const NATIVE_DECIMALS = 18;
 
 function getLocalizedTitle(titleData, currentLang) {
   if (!titleData || typeof titleData !== "object") return "";
   if (titleData[currentLang]) return titleData[currentLang];
   if (titleData["*"]) return titleData["*"];
   if (titleData.en) return titleData.en;
-  const firstKey = Object.keys(titleData)[0];
-  return firstKey ? titleData[firstKey] : "";
+  const k = Object.keys(titleData)[0];
+  return k ? titleData[k] : "";
 }
 
-// Use contracts.js the same way we do elsewhere
+function resolveSavvaCid(post) {
+  return (
+    post?.savva_cid ??
+    post?.savvaCid ??
+    post?.cid ??
+    post?.content_cid ??
+    post?.ipfs_cid ??
+    post?.params?.cid ??
+    post?.publishedData?.rootCid ??
+    post?.publishedData?.cid ??
+    ""
+  );
+}
+
 async function readListMarketPrice(app, listId) {
-  const args = [String(listId)];
   try {
-    const out = await app?.contracts?.ListMarket?.read?.getPrice?.(...args);
-    if (typeof out === "bigint") return out;
-    if (out != null) return BigInt(out);
+    const lm = await getSavvaContract(app, "ListMarket");
+    const out = await lm.read.getPrice([String(listId)]);
+    return typeof out === "bigint" ? out : BigInt(out ?? 0);
   } catch (e) {
-    dbg.warn?.("PromoteAnnounceTab: prebound getPrice failed", e?.message);
+    dbg.warn?.("PromoteAnnounceTab:getPrice failed", e?.message);
+    return 0n;
   }
-  try {
-    const out = await chain.readContract?.(app, {
-      contractName: "ListMarket",
-      functionName: "getPrice",
-      args,
-    });
-    if (typeof out === "bigint") return out;
-    if (out != null) return BigInt(out);
-  } catch (e) {
-    dbg.warn?.("PromoteAnnounceTab: readContract getPrice failed", e?.message);
-  }
-  return 0n;
 }
 
 export default function PromoteAnnounceTab(props) {
   const app = useApp();
-  const { t } = app;
   const post = () => props.post || null;
+
+  const actorAddr = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
+  const hasActor = createMemo(() => !!actorAddr());
 
   const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
   const currentLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const nativeSymbol = createMemo(() => app.desiredChain?.()?.nativeCurrency?.symbol || "ETH");
+  const activeDomain = createMemo(() => String(app.domain?.() || ""));
 
   const [contentListModule] = createResource(modulePath, async (path) => {
     if (!path || typeof path !== "string") return null;
@@ -78,13 +80,15 @@ export default function PromoteAnnounceTab(props) {
   const listDefs = createMemo(() => {
     const obj = listsObj();
     if (!obj || typeof obj !== "object") return [];
-    return Object.entries(obj).map(([id, data]) => ({
-      id,
-      title: getLocalizedTitle(data?.title || {}, currentLang()),
-    }));
+    const seen = new Set();
+    const out = [];
+    for (const [id, data] of Object.entries(obj)) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, title: getLocalizedTitle(data?.title || {}, currentLang()) });
+    }
+    return out;
   });
-
-  const [allPrices, setAllPrices] = createSignal([]);
 
   const [pricedLists] = createResource(
     () => ({ app, lists: listDefs() }),
@@ -96,36 +100,73 @@ export default function PromoteAnnounceTab(props) {
           return { ...it, price };
         })
       );
-
-      setAllPrices(results);
-      dbg.log("PromoteAnnounceTab:price-scan", {
-        results: results.map((r) => ({
-          id: r.id,
-          priceWei: typeof r.price === "bigint" ? r.price.toString() : String(r.price),
-        })),
-      });
-
-      return results
-        .filter((r) => (typeof r.price === "bigint" ? r.price > 0n : Number(r.price) > 0))
-        .map((r) => ({
-          ...r,
-          priceFormatted:
-            typeof r.price === "bigint" ? formatUnits(r.price, NATIVE_DECIMALS) : String(r.price),
-        }));
+      const filtered = results.filter((r) => r.price !== 0n);
+      dbg.log("PromoteAnnounceTab:prices", filtered.map((r) => ({ id: r.id, wei: r.price.toString() })));
+      return filtered;
     }
   );
 
-  const connected = createMemo(() => isWalletAvailable());
+  const [pending, setPending] = createSignal(new Set());
+  const isPending = (id) => pending().has(id);
+  const setRowPending = (id, on) => {
+    const s = new Set(pending());
+    on ? s.add(id) : s.delete(id);
+    setPending(s);
+  };
+
+  async function handleBuy(row) {
+    const domain = activeDomain();
+    const cid = resolveSavvaCid(post());
+    if (!hasActor()) {
+      pushToast({ type: "warning", message: app.t("wallet.connectPrompt") });
+      return;
+    }
+    if (!cid) {
+      pushToast({ type: "danger", message: app.t("promote.error.noCid") });
+      return;
+    }
+
+    setRowPending(row.id, true);
+    try {
+      const res = await sendAsActor(app, {
+        contractName: "ListMarket",
+        functionName: "buy",
+        args: [domain, String(row.id), String(cid)],
+        value: row.price, // native coin
+      });
+      const txHash = res?.hash || res;
+      dbg.log("PromoteAnnounceTab:buy", { hash: txHash, list: row.id, price: row.price.toString(), domain, cid });
+      pushToast({
+        type: "success",
+        message: app.t("promote.buySubmitted"),
+        details: txHash ? { hash: txHash } : undefined,
+        autohideMs: 6000,
+      });
+      try {
+        window.dispatchEvent(new CustomEvent("savva:promote:after-buy", { detail: { list_id: row.id, txHash, domain, cid } }));
+      } catch {}
+    } catch (e) {
+      dbg.error?.("PromoteAnnounceTab:buy failed", e);
+      pushToast({
+        type: "danger",
+        message: app.t("promote.buyFailed"),
+        details: { message: e?.shortMessage || e?.message || String(e) },
+        autohideMs: 9000,
+      });
+    } finally {
+      setRowPending(row.id, false);
+    }
+  }
 
   return (
     <div class="bg-[hsl(var(--background))] rounded-b-xl rounded-t-none border border-[hsl(var(--border))] border-t-0 p-4 space-y-4 -mt-px">
       <p class="text-sm text-[hsl(var(--muted-foreground))]">
-        {t("promote.announce.intro")}
+        {app.t("promote.announce.intro")}
       </p>
 
-      <Show when={!connected()}>
+      <Show when={!hasActor()}>
         <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 text-sm">
-          {t("wallet.connectPrompt")}
+          {app.t("wallet.connectPrompt")}
         </div>
       </Show>
 
@@ -137,21 +178,7 @@ export default function PromoteAnnounceTab(props) {
 
       <Show when={!pricedLists.loading && Array.isArray(pricedLists()) && pricedLists().length === 0}>
         <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 text-sm">
-          {t("promote.announce.noPaidLists")}
-        </div>
-
-        {/* Small debug: which ids we queried & raw wei */}
-        <div class="mt-3 rounded-lg border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3">
-          <div class="text-xs opacity-70 mb-2">{t("promote.announce.debugTitle")}</div>
-          <ul class="text-xs font-mono grid gap-1">
-            <For each={allPrices()}>
-              {(r) => (
-                <li>
-                  {r.id}: {typeof r.price === "bigint" ? r.price.toString() : String(r.price)}
-                </li>
-              )}
-            </For>
-          </ul>
+          {app.t("promote.announce.noPaidLists")}
         </div>
       </Show>
 
@@ -160,10 +187,10 @@ export default function PromoteAnnounceTab(props) {
           <table class="w-full text-sm">
             <thead class="bg-[hsl(var(--muted))]">
               <tr class="text-left">
-                <th class="px-3 py-2 w-40">{t("promote.table.id")}</th>
-                <th class="px-3 py-2">{t("promote.table.title")}</th>
-                <th class="px-3 py-2 w-40">{t("promote.table.price")}</th>
-                <th class="px-3 py-2 w-36 text-right">{t("promote.table.actions")}</th>
+                <th class="px-3 py-2 w-40">{app.t("promote.table.id")}</th>
+                <th class="px-3 py-2">{app.t("promote.table.title")}</th>
+                <th class="px-3 py-2 w-40">{app.t("promote.table.price")}</th>
+                <th class="px-3 py-2 w-36 text-right">{app.t("promote.table.actions")}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[hsl(var(--border))] bg-[hsl(var(--card))]">
@@ -173,22 +200,15 @@ export default function PromoteAnnounceTab(props) {
                     <td class="px-3 py-2 font-mono text-xs">{row.id}</td>
                     <td class="px-3 py-2">{row.title || row.id}</td>
                     <td class="px-3 py-2">
-                      {row.priceFormatted} {nativeSymbol()}
+                      <TokenValue amount={row.price} tokenAddress={0} class="font-medium tabular-nums" />
                     </td>
                     <td class="px-3 py-2 text-right">
                       <button
-                        class="px-3 py-1.5 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
-                        onClick={() => {
-                          try {
-                            window.dispatchEvent(
-                              new CustomEvent("savva:promote:buy", {
-                                detail: { list_id: row.id, price: row.price, post: post() },
-                              })
-                            );
-                          } catch {}
-                        }}
+                        class={`px-3 py-1.5 rounded-lg text-[hsl(var(--primary-foreground))] ${isPending(row.id) ? "opacity-60" : "hover:opacity-90"} bg-[hsl(var(--primary))]`}
+                        disabled={isPending(row.id) || !hasActor()}
+                        onClick={() => handleBuy(row)}
                       >
-                        {t("promote.buy")}
+                        {isPending(row.id) ? app.t("promote.buying") : app.t("promote.buy")}
                       </button>
                     </td>
                   </tr>

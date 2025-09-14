@@ -88,8 +88,12 @@ export function erc20ApproveCall(tokenAddress, spender, amount) {
 
 // Always send directly (user/self)
 export async function sendAsUser(app, spec) {
-  const { functionName, args = [], valueWei = 0n } = spec || {};
+  const { functionName, args = [] } = spec || {};
   if (!functionName) throw new Error("functionName is required");
+
+  // Accept both `value` and `valueWei` for compatibility
+  const valueToSend = toBigInt(spec?.valueWei ?? spec?.value ?? 0n);
+
   const { t } = app;
   const toastId = pushToast({ type: "info", message: t("tx.pending"), autohideMs: 0 });
 
@@ -98,7 +102,7 @@ export async function sendAsUser(app, spec) {
 
     if (spec.contractName) {
       const c = await getSavvaContract(app, spec.contractName, { write: true });
-      const hash = await c.write[functionName]([...args], { value: toBigInt(valueWei) });
+      const hash = await c.write[functionName]([...args], { value: valueToSend });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== "success") throw new Error(`Transaction failed with status: ${receipt.status}`);
       pushToast({ type: "success", message: t("tx.success") });
@@ -107,7 +111,7 @@ export async function sendAsUser(app, spec) {
 
     if (!spec.target || !spec.abi) throw new Error("Provide contractName OR (target + abi)");
     const c = getContract({ address: spec.target, abi: spec.abi, client: walletClient });
-    const hash = await c.write[functionName]([...args], { value: toBigInt(valueWei) });
+    const hash = await c.write[functionName]([...args], { value: valueToSend });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error(`Transaction failed with status: ${receipt.status}`);
     pushToast({ type: "success", message: t("tx.success") });
@@ -127,8 +131,11 @@ export async function sendAsActor(app, spec) {
 }
 
 async function sendViaNpoMulticall(app, spec) {
-  const { functionName, args = [], valueWei = 0n } = spec || {};
+  const { functionName, args = [] } = spec || {};
   if (!functionName) throw new Error("functionName is required");
+
+  // Accept both `value` and `valueWei`, forward native value through the NPO
+  const valueToSend = toBigInt(spec?.valueWei ?? spec?.value ?? 0n);
 
   const { t } = app;
   const toastId = pushToast({ type: "info", message: t("npo.multicall.pending"), autohideMs: 0 });
@@ -139,14 +146,17 @@ async function sendViaNpoMulticall(app, spec) {
 
     const call =
       spec.contractName
-        ? await buildCallByContractName(app, spec.contractName, functionName, args, valueWei)
-        : buildCall({ target: spec.target, abi: spec.abi, functionName, args, valueWei });
+        ? await buildCallByContractName(app, spec.contractName, functionName, args, valueToSend)
+        : buildCall({ target: spec.target, abi: spec.abi, functionName, args, valueWei: valueToSend });
 
     const npo = getContract({ address: npoAddr, abi: SavvaNPOAbi, client: walletClient });
 
     // SavvaNPO.multicall((address target, bytes data, uint256 value)[] calls)
     const calls = [{ target: call.target, data: call.data, value: call.value }];
-    const hash = await npo.write.multicall([calls]);
+    const totalValue = calls.reduce((acc, c) => acc + toBigInt(c.value), 0n);
+
+    // Forward msg.value so the underlying payable target receives native coin
+    const hash = await npo.write.multicall([calls], { value: totalValue });
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error(`Transaction failed with status: ${receipt.status}`);
