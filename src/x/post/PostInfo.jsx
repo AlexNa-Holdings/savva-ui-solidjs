@@ -12,23 +12,26 @@ function PostComments(props) {
   const sourceCount = createMemo(() => props.item?._raw?.total_childs || props.item?.total_childs || 0);
   const [displayCount, setDisplayCount] = createSignal(sourceCount());
 
-  createEffect(on(sourceCount, (newCount, prevCount) => {
-    if (prevCount === undefined) {
-      setDisplayCount(newCount);
-      return;
-    }
-    setDisplayCount(prevCount);
-    setIsAnimating(true);
-    setTimeout(() => setDisplayCount(newCount), 200);
-    setTimeout(() => setIsAnimating(false), 400);
-  }, { defer: true }));
+  createEffect(
+    on(
+      sourceCount,
+      (newCount, prevCount) => {
+        if (prevCount === undefined) {
+          setDisplayCount(newCount);
+          return;
+        }
+        setDisplayCount(prevCount);
+        setIsAnimating(true);
+        setTimeout(() => setDisplayCount(newCount), 200);
+        setTimeout(() => setIsAnimating(false), 400);
+      },
+      { defer: true }
+    )
+  );
 
   return (
     <Show when={displayCount() > 0 || isAnimating()}>
-      <div 
-        class="flex items-center gap-1 text-xs"
-        classList={{ "default-animation": isAnimating() }}
-      >
+      <div class="flex items-center gap-1 text-xs" classList={{ "default-animation": isAnimating() }}>
         <span>💬</span>
         <span>{displayCount()}</span>
       </div>
@@ -65,8 +68,13 @@ function PostRewards(props) {
 export default function PostInfo(props) {
   const app = useApp();
   const { lang } = app;
+
+  // Actor-aware: react to actor changes (like on the profile page)
+  // Using actorAddress ensures this block updates when user switches between self/NPO.
+  const actorAddr = createMemo(() => app.actorAddress?.() || ""); // empty when not selected/connected
+
   const postData = createMemo(() => props.item?._raw || props.item || {});
-  
+
   const [width, setWidth] = createSignal(0);
   let containerRef;
 
@@ -78,11 +86,9 @@ export default function PostInfo(props) {
 
   onMount(() => {
     if (!containerRef) return;
-    const observer = new ResizeObserver(entries => {
+    const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) {
-        setWidth(entry.contentRect.width);
-      }
+      if (entry) setWidth(entry.contentRect.width);
     });
     observer.observe(containerRef);
     onCleanup(() => observer.disconnect());
@@ -91,13 +97,10 @@ export default function PostInfo(props) {
   return (
     <div
       ref={containerRef}
-      class={`flex w-full items-center justify-between gap-2 ${props.hideTopBorder ? '' : 'pt-0.5 border-t border-[hsl(var(--border))]'}`}
+      class={`flex w-full items-center justify-between gap-2 ${props.hideTopBorder ? "" : "pt-0.5 border-t border-[hsl(var(--border))]"}`}
     >
       <div class="flex items-center gap-2 min-w-0 whitespace-nowrap">
-        <PostTime 
-          timestamp={postData().effective_time} 
-          format={useShortTimeFormat() ? 'short' : (props.timeFormat || "long")} 
-        />
+        <PostTime timestamp={postData().effective_time} format={useShortTimeFormat() ? "short" : props.timeFormat || "long"} />
         <Show when={showPostReactions()}>
           <PostReactions item={props.item} />
         </Show>
@@ -106,11 +109,12 @@ export default function PostInfo(props) {
         </Show>
         <PostComments item={props.item} />
       </div>
-      
+
       <Show when={!props.hideActions && showReactionInput()}>
         <div class="flex-shrink-0">
-          <Show when={app.authorizedUser()}>
-            <ReactionInput post={props.item} />
+          {/* Re-render on actor change by depending on actorAddr and passing it down */}
+          <Show when={!!actorAddr()}>
+            <ReactionInput post={props.item} actorAddr={actorAddr()} />
           </Show>
         </div>
       </Show>

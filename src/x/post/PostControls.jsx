@@ -14,6 +14,10 @@ import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 export default function PostControls(props) {
   const app = useApp();
   const { t } = app;
+
+  // Actor-aware (updates when user switches self/NPO)
+  const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
+
   const [isPreparing, setIsPreparing] = createSignal(false);
   const [showPromote, setShowPromote] = createSignal(false);
 
@@ -21,9 +25,9 @@ export default function PostControls(props) {
     useDeleteAction(() => props.post);
 
   const isAuthor = createMemo(() => {
-    const userAddr = app.authorizedUser()?.address?.toLowerCase();
-    const authorAddr = props.post?.author?.address?.toLowerCase();
-    return !!userAddr && userAddr === authorAddr;
+    const actor = actorAddress()?.toLowerCase() || "";
+    const postAuthor = props.post?.author?.address?.toLowerCase() || "";
+    return !!actor && actor === postAuthor;
   });
 
   const handleEdit = async () => {
@@ -42,7 +46,8 @@ export default function PostControls(props) {
     <>
       <div class="mt-8 pt-4 border-t border-[hsl(var(--border))] flex items-center justify-between">
         <div class="flex-1 min-w-0">
-          <PostInfo item={props.post} hideTopBorder={true} timeFormat="long" />
+          {/* Pass actorAddr so child re-renders on actor switch */}
+          <PostInfo item={props.post} hideTopBorder={true} timeFormat="long" actorAddr={actorAddress()} />
         </div>
 
         <div class="pl-4">

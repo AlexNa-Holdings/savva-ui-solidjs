@@ -1,36 +1,22 @@
 // src/x/fundraising/CampaignContributeModal.jsx
-import { Show } from "solid-js";
+import Modal from "../modals/Modal.jsx";
 import ContributeView from "../fundraising/ContributeView.jsx";
-import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
-import ModalBackdrop from "../modals/ModalBackdrop.jsx";
-import { Portal } from "solid-js/web";
 
 export default function CampaignContributeModal(props) {
-    const handleClose = () => {
-        props.onClose?.();
-    };
+  const handleClose = () => props.onClose?.();
+  const handleSuccess = () => {
+    props.onSuccess?.();
+    handleClose();
+  };
 
-    const handleSuccess = () => {
-        props.onSuccess?.();
-        handleClose();
-    };
-
-    return (
-        <Show when={props.isOpen}>
-            <Portal>
-            <div class="fixed inset-0 z-60 flex items-center justify-center p-4">
-                <ModalBackdrop onClick={props.onClose} />
-                <div class="relative z-70 w-full max-w-4xl rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg">
-                    <ModalAutoCloser onClose={props.onClose} />
-                    <ContributeView
-                        campaignId={props.campaignId}
-                        onSuccess={handleSuccess}
-                        showCancel={true}
-                        onCancel={handleClose}
-                    />
-                </div>
-            </div>
-            </Portal>
-        </Show>
-    );
+  return (
+    <Modal isOpen={props.isOpen} onClose={handleClose} size="xl" noPadding>
+      <ContributeView
+        campaignId={props.campaignId}
+        onSuccess={handleSuccess}
+        showCancel={true}
+        onCancel={handleClose}
+      />
+    </Modal>
+  );
 }

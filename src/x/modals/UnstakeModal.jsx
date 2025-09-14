@@ -7,9 +7,7 @@ import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
-import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
-import ModalBackdrop from "../modals/ModalBackdrop.jsx";
-import { Portal } from "solid-js/web";
+import Modal from "../modals/Modal.jsx";
 
 export default function UnstakeModal(props) {
   const app = useApp();
@@ -18,7 +16,6 @@ export default function UnstakeModal(props) {
 
   // STRICT: current actor only; no fallback to authorized user
   const actorAddr = () => app.actorAddress?.() || "";
-
   const stakingAddress = () => app.info()?.savva_contracts?.Staking?.address || "";
 
   const [amountText, setAmountText] = createSignal("");
@@ -188,83 +185,79 @@ export default function UnstakeModal(props) {
   const actorMissing = () => !actorAddr();
 
   return (
-    <Portal>
-      <div class="fixed inset-0 z-60 flex items-center justify-center">
-        <ModalBackdrop onClick={props.onClose} />
-        <form
-          onSubmit={submit}
-          class="relative z-70 w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg p-4 space-y-4"
-        >
-          <ModalAutoCloser onClose={props.onClose} />
-          <h3 class="text-lg font-semibold">{t("wallet.unstake.title")}</h3>
+    <Modal
+      isOpen={props.isOpen}
+      onClose={close}
+      title={t("wallet.unstake.title")}
+      size="md"
+      footer={
+        <div class="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+            onClick={close}
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            type="button"
+            disabled={isProcessing() || actorMissing()}
+            class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+            onClick={() => submit()}
+          >
+            <Show when={!isProcessing()} fallback={<Spinner class="w-5 h-5" />}>
+              {t("wallet.unstake.submit")}
+            </Show>
+          </button>
+        </div>
+      }
+    >
+      <Show when={!actorMissing()}>
+        <p class="text-sm opacity-80">
+          {t("wallet.unstake.notice", { days: withdrawDays() || 0 })}
+        </p>
+      </Show>
+      <Show when={actorMissing()}>
+        <div class="text-sm text-[hsl(var(--destructive))]">
+          {t("wallet.errors.noActor")}
+        </div>
+      </Show>
 
-          <Show when={!actorMissing()}>
-            <p class="text-sm opacity-80">
-              {t("wallet.unstake.notice", { days: withdrawDays() || 0 })}
-            </p>
-          </Show>
-          <Show when={actorMissing()}>
-            <div class="text-sm text-[hsl(var(--destructive))]">
-              {t("wallet.errors.noActor")}
-            </div>
-          </Show>
-
-          <div ref={(el) => (inputWrapEl = el)} class="space-y-2">
-            <AmountInput
-              value={amountText()}
-              tokenAddress={stakingAddress()}
-              onInput={handleAmountChange}
-              onChange={handleAmountChange}
-              placeholder={t("wallet.unstake.amountPlaceholder")}
-              disabled={actorMissing()}
-            />
-            <div class="flex justify-end">
-              <button
-                type="button"
-                class="text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
-                disabled={actorMissing()}
-                onClick={async () => {
-                  const max = staked() || 0n;
-                  setAmountWei(max);
-                  try {
-                    const dec = tokenDecimals();
-                    const s = Number(max) === 0 ? "0" : (max / 10n ** BigInt(dec)).toString();
-                    setAmountText(s);
-                  } catch { }
-                  const inputEl = inputWrapEl?.querySelector("input");
-                  if (inputEl) inputEl.value = amountText();
-                  log("Unstake: Max set", { wei: max.toString() });
-                }}
-              >
-                {t("wallet.common.max")}
-              </button>
-            </div>
-          </div>
-
-          <Show when={err()}>
-            <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
-          </Show>
-
-          <div class="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
-              onClick={close}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              type="submit"
-              disabled={isProcessing() || actorMissing()}
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-            >
-              <Show when={!isProcessing()} fallback={<Spinner class="w-5 h-5" />}>
-                {t("wallet.unstake.submit")}
-              </Show>
-            </button>
-          </div>
-        </form>
+      <div ref={(el) => (inputWrapEl = el)} class="space-y-2 mt-2">
+        <AmountInput
+          value={amountText()}
+          tokenAddress={stakingAddress()}
+          onInput={handleAmountChange}
+          onChange={handleAmountChange}
+          placeholder={t("wallet.unstake.amountPlaceholder")}
+          disabled={actorMissing()}
+        />
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="text-xs underline opacity-80 hover:opacity-100 disabled:opacity-50"
+            disabled={actorMissing()}
+            onClick={async () => {
+              const max = staked() || 0n;
+              setAmountWei(max);
+              try {
+                const dec = tokenDecimals();
+                const s = Number(max) === 0 ? "0" : (max / 10n ** BigInt(dec)).toString();
+                setAmountText(s);
+              } catch {}
+              const inputEl = inputWrapEl?.querySelector("input");
+              if (inputEl) inputEl.value = amountText();
+              log("Unstake: Max set", { wei: max.toString() });
+            }}
+          >
+            {t("wallet.common.max")}
+          </button>
+        </div>
       </div>
-    </Portal>
+
+      <Show when={err()}>
+        <div class="text-sm text-[hsl(var(--destructive))]">{err()}</div>
+      </Show>
+    </Modal>
   );
 }

@@ -52,6 +52,9 @@ export default function CommentCard(props) {
   const { t } = app;
   const level = () => props.level || 0;
 
+  // Actor-aware: re-compute on actor switch (self/NPO)
+  const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
+
   const [isExpanded, setIsExpanded] = createSignal(false);
   const [isHovered, setIsHovered] = createSignal(false);
   const [isPreparing, setIsPreparing] = createSignal(false);
@@ -102,17 +105,18 @@ export default function CommentCard(props) {
 
   const { showConfirm, openConfirm, closeConfirm, confirmDelete, modalProps } = useDeleteAction(() => comment);
 
+  // Author check is actor-aware
   const isAuthor = createMemo(() => {
-    const userAddr = app.authorizedUser()?.address?.toLowerCase();
-    const authorAddr = comment?.author?.address?.toLowerCase();
-    return !!userAddr && userAddr === authorAddr;
+    const actor = actorAddress()?.toLowerCase() || "";
+    const authorAddr = comment?.author?.address?.toLowerCase() || "";
+    return !!actor && actor === authorAddr;
   });
 
   const localizedPreview = createMemo(() => {
     const locales = comment.savva_content?.locales;
     if (!locales) return "";
-    const lang = app.lang();
-    if (locales[lang]?.text_preview) return locales[lang].text_preview;
+    const l = app.lang();
+    if (locales[l]?.text_preview) return locales[l].text_preview;
     if (locales.en?.text_preview) return locales.en.text_preview;
     const firstKey = Object.keys(locales)[0];
     return firstKey ? locales[firstKey].text_preview : "";
@@ -124,7 +128,6 @@ export default function CommentCard(props) {
   );
 
   const contextMenuItems = createMemo(() => (comment ? getPostAdminItems(comment, t) : []));
-
   const needsTruncation = createMemo(() => localizedPreview().endsWith("..."));
 
   const ipfsBaseUrl = createMemo(() => {
@@ -260,10 +263,12 @@ export default function CommentCard(props) {
           </div>
 
           <div class="mt-2 flex items-center justify-between">
-            <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} />
+            {/* Make PostInfo re-render on actor change and hide actions for comment header */}
+            <PostInfo item={{ _raw: comment }} hideTopBorder={true} timeFormat="long" hideActions={true} actorAddr={actorAddress()} />
             <div class="flex items-center gap-2 text-xs font-semibold flex-shrink-0 whitespace-nowrap">
-              <Show when={app.authorizedUser()}>
-                <ReactionInput post={comment} />
+              {/* ReactionInput should also reflect the current actor */}
+              <Show when={!!actorAddress()}>
+                <ReactionInput post={comment} actorAddr={actorAddress()} />
               </Show>
               <Show when={isAuthor()}>
                 <button class="p-1" onClick={handleEdit} disabled={isPreparing()} title={t("comment.edit")}>

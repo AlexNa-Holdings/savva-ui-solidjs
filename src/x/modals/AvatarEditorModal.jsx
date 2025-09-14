@@ -2,13 +2,11 @@
 import { createSignal, onCleanup, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import Spinner from "../ui/Spinner.jsx";
-import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
-import ModalBackdrop from "../modals/ModalBackdrop.jsx";
-import { Portal } from "solid-js/web";
+import Modal from "../modals/Modal.jsx";
 
 const CROP_SIZE = 256;
-const HANDLE_VISUAL = 12;   // drawn handle square
-const HANDLE_HOT = 22;      // generous hit area for mouse
+const HANDLE_VISUAL = 12;
+const HANDLE_HOT = 22;
 const MIN_SIZE = 48;
 
 export default function AvatarEditorModal(props) {
@@ -17,16 +15,14 @@ export default function AvatarEditorModal(props) {
 
   const [imgEl, setImgEl] = createSignal(null);
   const [crop, setCrop] = createSignal({ x: 10, y: 10, size: 200 });
-  const [drag, setDrag] = createSignal(null); // {mode:'drag'|'tl'|'br', startX, startY, startCrop}
+  const [drag, setDrag] = createSignal(null);
   const [processing, setProcessing] = createSignal(false);
 
-  // actor-aware subject (who the avatar belongs to)
   const subjectAddr = () => props.subjectAddr || app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
   let canvas;
   let fileInput;
 
-  // DPR helpers (we draw in CSS px; canvas backing store scaled by DPR)
   const dpr = () => (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
   const cssRect = () => {
     const wCss = parseInt(canvas?.style.width || "0", 10) || Math.round((canvas?.width || 0) / dpr());
@@ -38,24 +34,19 @@ export default function AvatarEditorModal(props) {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
-  // Hit-test utils
   const inRect = (p, x, y, w, h) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
   const getHoverAction = (pos) => {
     const c = crop();
-    // Corner hot rectangles (generous)
     const tl = { x: c.x, y: c.y, w: HANDLE_HOT, h: HANDLE_HOT };
     const br = { x: c.x + c.size - HANDLE_HOT, y: c.y + c.size - HANDLE_HOT, w: HANDLE_HOT, h: HANDLE_HOT };
-
     if (inRect(pos, br.x, br.y, br.w, br.h)) return "br";
     if (inRect(pos, tl.x, tl.y, tl.w, tl.h)) return "tl";
-
-    // Inside crop
     if (inRect(pos, c.x, c.y, c.size, c.size)) return "drag";
     return null;
   };
   const setCursor = (pos) => {
     const mode = getHoverAction(pos);
-    canvas.style.cursor = mode === "drag" ? "move" : mode ? "se-resize" : "default";
+    if (canvas) canvas.style.cursor = mode === "drag" ? "move" : mode ? "se-resize" : "default";
   };
 
   function fitCanvasToImage(image) {
@@ -86,17 +77,14 @@ export default function AvatarEditorModal(props) {
     const ratio = dpr();
     const ctx = canvas.getContext("2d");
     ctx.save();
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0); // draw in CSS px
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, wCss, hCss);
 
-    // base
     ctx.drawImage(image, 0, 0, wCss, hCss);
 
-    // dim
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(0, 0, wCss, hCss);
 
-    // crop window
     const c = crop();
     ctx.save();
     ctx.beginPath();
@@ -105,16 +93,12 @@ export default function AvatarEditorModal(props) {
     ctx.drawImage(image, 0, 0, wCss, hCss);
     ctx.restore();
 
-    // outline
     ctx.strokeStyle = "rgba(255,255,255,0.9)";
     ctx.lineWidth = 2;
     ctx.strokeRect(c.x, c.y, c.size, c.size);
 
-    // visual handles (TL & BR)
     ctx.fillStyle = "rgba(255,255,255,0.96)";
-    // TL
     ctx.fillRect(c.x - 1, c.y - 1, HANDLE_VISUAL, HANDLE_VISUAL);
-    // BR
     ctx.fillRect(c.x + c.size - HANDLE_VISUAL + 1, c.y + c.size - HANDLE_VISUAL + 1, HANDLE_VISUAL, HANDLE_VISUAL);
 
     ctx.restore();
@@ -149,13 +133,11 @@ export default function AvatarEditorModal(props) {
       const ny = Math.max(0, Math.min(startCrop.y + dy, hCss - startCrop.size));
       setCrop({ x: nx, y: ny, size: startCrop.size });
     } else if (mode === "br") {
-      // resize from bottom-right; clamp against canvas using original TL
       const grow = Math.max(dx, dy);
-      let size = Math.max(MIN_SIZE, Math.min(startCrop.size + grow, wCss - startCrop.x, hCss - startCrop.y));
+      const size = Math.max(MIN_SIZE, Math.min(startCrop.size + grow, wCss - startCrop.x, hCss - startCrop.y));
       setCrop({ x: startCrop.x, y: startCrop.y, size });
     } else if (mode === "tl") {
-      // resize from top-left; keep BR fixed
-      const delta = Math.min(dx, dy); // move right/down => shrink
+      const delta = Math.min(dx, dy);
       let x = startCrop.x + delta;
       let y = startCrop.y + delta;
       let size = Math.max(MIN_SIZE, startCrop.size - delta);
@@ -228,7 +210,6 @@ export default function AvatarEditorModal(props) {
     out.toBlob(async (blob) => {
       try {
         if (!blob) throw new Error("Render failed");
-        // Actor-aware: pass the subject address (self or selected NPO) to the caller
         await props.onSave?.(blob, subjectAddr());
         props.onClose?.();
       } finally {
@@ -238,55 +219,52 @@ export default function AvatarEditorModal(props) {
   }
 
   return (
-    <Show when={props.isOpen}>
-      <Portal>
-      <div class="fixed inset-0 z-60 flex items-center justify-center">
-        <ModalBackdrop onClick={props.onClose} />
-        <div class="relative z-70 themed-dialog rounded-lg shadow-lg w-full max-w-lg p-4 bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
-           <ModalAutoCloser onClose={props.onClose} />
-          <h3 class="text-lg font-semibold mb-4">{t("profile.edit.avatar.title")}</h3>
-
-          <input
-            type="file"
-            ref={el => (fileInput = el)}
-            class="hidden"
-            accept="image/*"
-            onChange={onFileChange}
-          />
-
-          <div class="flex justify-center items-center mb-4 min-h-[200px]">
-            <Show when={imgEl()} fallback={<p>{t("profile.edit.avatar.select")}</p>}>
-              <canvas
-                ref={el => (canvas = el)}
-                class="max-w-full max-h-[60vh] touch-none select-none"
-                onMouseDown={onDown}
-                onMouseMove={onMove}
-                onMouseUp={onUp}
-                onMouseLeave={onUp}
-              />
+    <Modal
+      isOpen={props.isOpen}
+      onClose={props.onClose}
+      title={t("profile.edit.avatar.title")}
+      size="xl"
+      footer={
+        <div class="flex gap-2 justify-end">
+          <button
+            class="px-3 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+            onClick={props.onClose}
+            disabled={processing()}
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+            onClick={onSave}
+            disabled={processing() || !imgEl()}
+          >
+            <Show when={processing()} fallback={<span>{t("profile.edit.avatar.save")}</span>}>
+              <Spinner class="w-5 h-5" />
             </Show>
-          </div>
-
-          <div class="flex gap-2 justify-end mt-4">
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              onClick={props.onClose}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              class="px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onSave}
-              disabled={processing() || !imgEl()}
-            >
-              <Show when={processing()} fallback={<span>{t("profile.edit.avatar.save")}</span>}>
-                <Spinner class="w-5 h-5" />
-              </Show>
-            </button>
-          </div>
+          </button>
         </div>
+      }
+    >
+      <input
+        type="file"
+        ref={(el) => (fileInput = el)}
+        class="hidden"
+        accept="image/*"
+        onChange={onFileChange}
+      />
+
+      <div class="flex justify-center items-center min-h-[200px]">
+        <Show when={imgEl()} fallback={<p>{t("profile.edit.avatar.select")}</p>}>
+          <canvas
+            ref={(el) => (canvas = el)}
+            class="max-w-full max-h-[60vh] touch-none select-none"
+            onMouseDown={onDown}
+            onMouseMove={onMove}
+            onMouseUp={onUp}
+            onMouseLeave={onUp}
+          />
+        </Show>
       </div>
-      </Portal>
-    </Show>
+    </Modal>
   );
 }

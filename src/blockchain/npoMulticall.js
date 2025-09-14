@@ -153,10 +153,9 @@ async function sendViaNpoMulticall(app, spec) {
 
     // SavvaNPO.multicall((address target, bytes data, uint256 value)[] calls)
     const calls = [{ target: call.target, data: call.data, value: call.value }];
-    const totalValue = calls.reduce((acc, c) => acc + toBigInt(c.value), 0n);
 
     // Forward msg.value so the underlying payable target receives native coin
-    const hash = await npo.write.multicall([calls], { value: totalValue });
+    const hash = await npo.write.multicall([calls]);
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error(`Transaction failed with status: ${receipt.status}`);

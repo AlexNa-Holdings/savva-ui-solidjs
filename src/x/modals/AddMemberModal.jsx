@@ -6,10 +6,8 @@ import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import AddressInput from "../ui/AddressInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { sendAsUser } from "../../blockchain/npoMulticall.js"; // actor-aware helpers (config must be "as user")
-import ModalAutoCloser from "../modals/ModalAutoCloser.jsx";
-import ModalBackdrop from "../modals/ModalBackdrop.jsx";
-import { Portal } from "solid-js/web";
+import { sendAsUser } from "../../blockchain/npoMulticall.js";
+import Modal from "./Modal.jsx";
 
 function bytes32ToString(hex) {
   if (!hex || typeof hex !== "string" || !hex.startsWith("0x")) return "";
@@ -24,7 +22,6 @@ function bytes32ToString(hex) {
 
 export default function AddMemberModal(props) {
   const app = useApp();
-  const { t } = app;
 
   const [addr, setAddr] = createSignal("");
   const [roles, setRoles] = createSignal([]); // [{value: bytes32, label: string}]
@@ -35,7 +32,7 @@ export default function AddMemberModal(props) {
   function toggleRole(value) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(value)) next.delete(value); else next.add(value);
+      next.has(value) ? next.delete(value) : next.add(value);
       return next;
     });
   }
@@ -60,20 +57,19 @@ export default function AddMemberModal(props) {
       const list = (raw || []).map((b) => ({ value: b, label: bytes32ToString(b) || b }));
       setRoles(list);
     } catch (e) {
-      pushErrorToast({ message: e?.message || t("errors.loadFailed") });
+      pushErrorToast({ message: e?.message || app.t("errors.loadFailed") });
       setRoles([]);
     } finally {
       setLoadingRoles(false);
     }
   });
 
-  // IMPORTANT: NPO configuration must be executed "as user" (not via NPO.multicall)
-  // We use sendAsUser so that msg.sender is the admin EOA.
+  // NPO configuration must be executed "as user" (msg.sender = admin EOA)
   async function onAdd() {
     if (submitting()) return;
     const member = addr()?.trim();
-    if (!props.npoAddr) { pushErrorToast({ message: t("errors.missingParam") }); return; }
-    if (!member) { pushErrorToast({ message: t("errors.invalidAddress") }); return; }
+    if (!props.npoAddr) { pushErrorToast({ message: app.t("errors.missingParam") }); return; }
+    if (!member) { pushErrorToast({ message: app.t("errors.invalidAddress") }); return; }
 
     try {
       setSubmitting(true);
@@ -85,76 +81,70 @@ export default function AddMemberModal(props) {
         args: [member, selectedArray()],
       });
 
-      pushToast({ type: "success", message: t("npo.addMember.added") });
+      pushToast({ type: "success", message: app.t("npo.addMember.added") });
       props.onAdded?.();
+      close();
     } catch (e) {
-      pushErrorToast({ message: e?.message || t("errors.updateFailed") });
+      pushErrorToast({ message: e?.message || app.t("errors.updateFailed") });
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Show when={props.isOpen}>
-      <Portal>
-      <div class="fixed inset-0 z-60" role="dialog" aria-modal="true">
-        <ModalBackdrop onClick={props.onClose} />
-        <div class="absolute z-70 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(560px,92vw)] rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] shadow-xl">
-          <div class="px-4 py-3 border-b border-[hsl(var(--border))] flex items-center justify-between">
-             <ModalAutoCloser onClose={props.onClose} />
-            <h2 class="text-lg font-semibold">{t("npo.addMember.title")}</h2>
-            <button class="w-8 h-8 rounded hover:bg-[hsl(var(--accent))]" onClick={close} aria-label={t("common.close")}>✕</button>
-          </div>
+    <Modal
+      isOpen={props.isOpen}
+      onClose={close}
+      size="xl"
+      title={app.t("npo.addMember.title")}
+      footer={
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="px-3 py-1.5 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+            onClick={close}
+            disabled={submitting()}
+          >
+            {app.t("npo.addMember.cancel")}
+          </button>
+          <button
+            class="px-3 py-1.5 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+            onClick={onAdd}
+            disabled={submitting()}
+          >
+            {submitting() ? { toString: () => app.t("common.working") } : app.t("npo.addMember.add")}
+          </button>
+        </div>
+      }
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm mb-1">{app.t("npo.addMember.addressLabel")}</label>
+          <AddressInput value={addr()} onChange={setAddr} placeholder={app.t("npo.addMember.addressPlaceholder")} />
+        </div>
 
-          <div class="p-4 space-y-4">
-            <div>
-              <label class="block text-sm mb-1">{t("npo.addMember.addressLabel")}</label>
-              <AddressInput value={addr()} onChange={setAddr} placeholder={t("npo.addMember.addressPlaceholder")} />
-            </div>
-
-            <div>
-              <label class="block text-sm mb-2">{t("npo.addMember.rolesLabel")}</label>
-              <Show when={!loadingRoles()} fallback={<div class="py-2"><Spinner /></div>}>
-                <Show when={roles().length > 0} fallback={<div class="text-sm opacity-70">{t("npo.addMember.noRoles")}</div>}>
-                  <div class="flex flex-wrap gap-2">
-                    <For each={roles()}>
-                      {(r) => (
-                        <label class="inline-flex items-center gap-2 px-2 py-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            class="accent-[hsl(var(--primary))]"
-                            checked={selected().has(r.value)}
-                            onInput={() => toggleRole(r.value)}
-                          />
-                          <span class="text-sm">{r.label}</span>
-                        </label>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-              </Show>
-            </div>
-          </div>
-
-          <div class="px-4 py-3 border-t border-[hsl(var(--border))] flex items-center justify-end gap-2">
-            <button
-              class="px-3 py-1.5 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
-              onClick={close}
-              disabled={submitting()}
-            >
-              {t("npo.addMember.cancel")}
-            </button>
-            <button
-              class="px-3 py-1.5 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-              onClick={onAdd}
-              disabled={submitting()}
-            >
-              {submitting() ? t("common.working") : t("npo.addMember.add")}
-            </button>
-          </div>
+        <div>
+          <label class="block text-sm mb-2">{app.t("npo.addMember.rolesLabel")}</label>
+          <Show when={!loadingRoles()} fallback={<div class="py-2"><Spinner /></div>}>
+            <Show when={roles().length > 0} fallback={<div class="text-sm opacity-70">{app.t("npo.addMember.noRoles")}</div>}>
+              <div class="flex flex-wrap gap-2">
+                <For each={roles()}>
+                  {(r) => (
+                    <label class="inline-flex items-center gap-2 px-2 py-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        class="accent-[hsl(var(--primary))]"
+                        checked={selected().has(r.value)}
+                        onInput={() => toggleRole(r.value)}
+                      />
+                      <span class="text-sm">{r.label}</span>
+                    </label>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
         </div>
       </div>
-      </Portal>
-    </Show>
+    </Modal>
   );
 }

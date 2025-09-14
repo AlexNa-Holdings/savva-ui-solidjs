@@ -473,7 +473,7 @@ export default {
   "profile.wallet.unstaked.requests.title": "Pending withdraw requests",
   "profile.wallet.unstaked.table.amount": "Amount",
   "profile.wallet.unstaked.table.status": "Pending",
-  "promote.announce.intro": "Share your announcement to reach a wider audience.",
+  "promote.announce.intro": "!Pay once to place your post in the Announcements block. Listings are sorted by the latest payments, except pinned posts chosen by admins. Pay again anytime to climb back to the top. All payments go to the Buy & Burn contract.",
   "promote.announce.noPaidLists": "No paid listings available.",
   "promote.buy": "Buy Now",
   "promote.buyFailed": "Purchase failed. Please try again.",
