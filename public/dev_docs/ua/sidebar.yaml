@@ -19,5 +19,7 @@ sections:
         file: core-concepts/showing-posts.md
       - label: Публікація постів
         file: core-concepts/publishing-posts.md
-      - label: Контракт конфігурації
+      - label: Конфігурація контракту
         file: core-concepts/config-contract.md
+      - label: Оркестрація з'єднання
+        file: core-concepts/connection-orchestration.md
