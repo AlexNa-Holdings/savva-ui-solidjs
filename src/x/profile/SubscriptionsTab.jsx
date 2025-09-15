@@ -178,7 +178,12 @@ export default function SubscriptionsTab(props) {
       </div>
 
       <Show when={showSub() && selected()}>
-        <SubscribeModal domain={selected()?.domain} author={selected()?.user} onClose={() => setShowSub(false)} onSubmit={handleEdited} />
+        <SubscribeModal 
+          isOpen={showSub()}
+          domain={selected()?.domain} 
+          author={selected()?.user} 
+          onClose={() => setShowSub(false)} 
+          onSubmit={handleEdited} />
       </Show>
     </div>
   );

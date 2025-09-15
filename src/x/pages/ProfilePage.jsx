@@ -315,6 +315,7 @@ export default function ProfilePage() {
               {/* Subscribe / Edit modal */}
               <Show when={showSub()}>
                 <SubscribeModal
+                  isOpen={showSub()}
                   domain={domainName()}
                   author={user()}
                   onClose={() => setShowSub(false)}
