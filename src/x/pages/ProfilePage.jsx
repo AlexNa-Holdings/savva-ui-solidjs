@@ -39,6 +39,23 @@ async function fetchUserProfile({ app, identifier }) {
   }
 }
 
+// Minimal fetcher for subscribe-state only (actor → author relationship)
+async function fetchSubRelation({ app, domain, actor, author }) {
+  if (!app?.wsCall || !domain || !actor || !author) return false;
+  try {
+    const res = await app.wsCall("get-user", {
+      domain,
+      user_addr: author,
+      caller: actor, // so i_sponsor_for refers to the ACTOR
+    });
+    const n = Number(res?.i_sponsor_for ?? 0);
+    return Number.isFinite(n) && n > 0;
+  } catch (e) {
+    console.warn("fetchSubRelation failed", e);
+    return false;
+  }
+}
+
 // Data fetcher for the profile details from IPFS
 async function fetchProfileDetails(cid, app) {
   if (!cid) return null;
@@ -66,40 +83,20 @@ export default function ProfilePage() {
 
   const [activeTab, setActiveTab] = createSignal('posts');
 
-  // EDIT button should show if we are viewing the *actor's* profile (self or selected NPO)
-  const isActorProfile = createMemo(() => {
-    const actorAddr = app.actorAddress?.()?.toLowerCase();
-    const profileAddr = userResource()?.address?.toLowerCase();
-    return !!actorAddr && !!profileAddr && actorAddr === profileAddr;
-  });
-
-  const canEdit = createMemo(() => {
-    const connectedWallet = walletAccount()?.toLowerCase();
-    const authAddr = app.authorizedUser()?.address?.toLowerCase();
-    // We can edit when the viewed profile == current actor AND the connected wallet matches the authorized user
-    return isActorProfile() && !!connectedWallet && connectedWallet === authAddr;
-  });
-
-  const handleEditProfile = () => {
-    navigate(`/profile-edit/${identifier()}`);
-  };
-
+  // Center screen title tabs sync
   const TABS = createMemo(() => ([
     { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
     { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
     { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-    // Wallet is visible for any profile; actions are gated inside WalletTab
     { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> },
   ]));
 
-  // Read ?tab= from current hash route (reactive to route() changes)
   const desiredTab = createMemo(() => {
     const path = route() || "";
     const qs = path.split("?")[1] || "";
     return new URLSearchParams(qs).get("tab") || "";
   });
 
-  // Apply ?tab= when available and valid
   createEffect(() => {
     const tab = desiredTab();
     if (!tab) return;
@@ -107,7 +104,6 @@ export default function ProfilePage() {
     if (valid.includes(tab)) setActiveTab(tab);
   });
 
-  // Guard: if active tab becomes invalid, fallback to posts
   createEffect(() => {
     const available = TABS();
     if (!available.some(t => t.id === activeTab())) setActiveTab('posts');
@@ -123,6 +119,7 @@ export default function ProfilePage() {
     setActiveTab(nextId);
   }
 
+  // Display helpers
   const uiLang = () => (app.lang?.() || "en").toLowerCase();
 
   const displayName = createMemo(() => {
@@ -152,21 +149,44 @@ export default function ProfilePage() {
     return "";
   });
 
+  // Actor/profile context
+  const isActorProfile = createMemo(() => {
+    const actorAddr = app.actorAddress?.()?.toLowerCase();
+    const profileAddr = userResource()?.address?.toLowerCase();
+    return !!actorAddr && !!profileAddr && actorAddr === profileAddr;
+  });
+
+  const canEdit = createMemo(() => {
+    const connectedWallet = walletAccount()?.toLowerCase();
+    const authAddr = app.authorizedUser()?.address?.toLowerCase();
+    return isActorProfile() && !!connectedWallet && connectedWallet === authAddr;
+  });
+
   const [showSub, setShowSub] = createSignal(false);
   const domainName = createMemo(() => app.selectedDomainName?.() || "");
 
-  const isSubscribed = createMemo(() => {
-    const u = userResource();
-    return u && u.i_sponsor_for > 0;
-  });
+  // Lightweight subscribe-state that updates on actor change (no full page refetch)
+  const [subState, { refetch: refetchSub }] = createResource(
+    () => {
+      const author = userResource()?.address;
+      const actor = app.actorAddress?.();
+      const domain = domainName();
+      return author && actor && domain ? { app, domain, actor, author } : null;
+    },
+    fetchSubRelation
+  );
 
+  const isSubscribed = createMemo(() => !!subState()); // true/false
+
+  // Actions
   async function handleUnsubscribe(authorAddress) {
     try {
       const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
       const hash = await clubs.write.stop([domainName(), authorAddress]);
       const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain()?.rpcUrls?.[0]) });
       await pc.waitForTransactionReceipt({ hash });
-      await refetchUser();
+      // Only update subscribe-state — no full profile refetch
+      await refetchSub();
     } catch (e) {
       console.error("ProfilePage: stop() failed", e);
     }
@@ -174,8 +194,13 @@ export default function ProfilePage() {
 
   function handleSubscribed() {
     setShowSub(false);
-    refetchUser();
+    // Only update subscribe-state — no full profile refetch
+    refetchSub();
   }
+
+  const handleEditProfile = () => {
+    navigate(`/profile-edit/${identifier()}`);
+  };
 
   return (
     <main class="sv-container p-4 max-w-4xl mx-auto">
