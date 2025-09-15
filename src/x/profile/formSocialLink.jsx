@@ -1,6 +1,6 @@
 // src/x/ui/social/formSocialLink.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { TelegramIcon, XIcon, FacebookIcon } from "../ui/icons/SocialIcons.jsx";
+import { TelegramIcon, XIcon, FacebookIcon, YouTubeIcon } from "../ui/icons/SocialIcons.jsx";
 
 /**
  * Detect known social network by URL host.
@@ -22,6 +22,7 @@ export function detectSocialNetwork(rawUrl) {
     { key: "telegram", hosts: ["t.me", "telegram.me", "telegram.org", "telegram.dog"], Icon: TelegramIcon },
     { key: "x",        hosts: ["x.com", "twitter.com", "mobile.twitter.com"],           Icon: XIcon },
     { key: "facebook", hosts: ["facebook.com", "m.facebook.com", "fb.com"],             Icon: FacebookIcon },
+    { key: "youtube",  hosts: ["youtube.com", "m.youtube.com", "youtu.be"],             Icon: YouTubeIcon },
   ];
 
   for (const r of rules) {

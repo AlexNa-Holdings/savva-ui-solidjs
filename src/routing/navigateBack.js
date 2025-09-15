@@ -26,7 +26,6 @@ function pushRoute(path) {
 }
 
 if (typeof window !== "undefined") {
-  // seed and keep tracking route changes (hash router)
   pushRoute(currentPath());
   window.addEventListener("hashchange", () => pushRoute(), { passive: true });
 }
@@ -39,15 +38,26 @@ export function getNavHistory() {
   return [..._stack];
 }
 
+function defaultIsPostRoute(p) {
+  // Heuristics for post pages; adjust as needed
+  return (
+    /^\/post(\/|$)/.test(p) ||
+    /^\/p(\/|$)/.test(p) ||
+    /^\/thread(\/|$)/.test(p) ||
+    /^\/content(\/|$)/.test(p)
+  );
+}
+
 /**
  * Smart back navigation.
- * @param {'page'|'main'} mode
- * @param {{ navigate?: (to:string)=>void, mainRoute?: string }} [opts]
+ * @param {'page'|'main'|'post'} mode
+ * @param {{ navigate?: (to:string)=>void, mainRoute?: string, isPost?: (path:string)=>boolean }} [opts]
  */
 export default function NavigateBack(mode = "page", opts = {}) {
   const navigate = typeof opts.navigate === "function" ? opts.navigate : null;
   const main = norm(opts.mainRoute || _mainRoute || "/");
   const cur = currentPath();
+  const isPost = typeof opts.isPost === "function" ? opts.isPost : defaultIsPostRoute;
 
   const go = (to) => {
     const dest = norm(to || main);
@@ -61,7 +71,7 @@ export default function NavigateBack(mode = "page", opts = {}) {
     return;
   }
 
-  // mode === 'page': go to the most recent prior page, but never past main.
+  // Find last main index to not jump past it
   let lastMainIdx = -1;
   for (let i = _stack.length - 1; i >= 0; i--) {
     if (_stack[i] === main) {
@@ -70,6 +80,25 @@ export default function NavigateBack(mode = "page", opts = {}) {
     }
   }
 
+  if (mode === "post") {
+    // Go back until we hit a post page; fallback to main.
+    for (let i = _stack.length - 2; i >= 0; i--) {
+      const p = _stack[i];
+      if (p === cur) continue;
+      if (i <= lastMainIdx) {
+        go(main);
+        return;
+      }
+      if (isPost(p)) {
+        go(p);
+        return;
+      }
+    }
+    go(main);
+    return;
+  }
+
+  // mode === 'page': go to the most recent prior page, but never past main.
   for (let i = _stack.length - 2; i >= 0; i--) {
     const p = _stack[i];
     if (p === cur) continue;
@@ -81,6 +110,5 @@ export default function NavigateBack(mode = "page", opts = {}) {
     return;
   }
 
-  // Fallbacks
   go(main || "/");
 }

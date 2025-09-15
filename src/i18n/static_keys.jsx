@@ -70,6 +70,10 @@ t("promocodes.new.steps.publish")
 t("promocodes.new.steps.publish.help")
 t("promocodes.new.publishing")
 
+t("social.telegram")
+t("social.x")
+t("social.facebook")
+t("social.youtube")
 
 
 */

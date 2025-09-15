@@ -3,6 +3,7 @@ import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, b
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import NavigateBack from "../../routing/navigateBack.js";
 import MarkdownInput from "../editor/MarkdownInput.jsx";
 import LangSelector from "../ui/LangSelector.jsx";
 import EditorToolbar from "../editor/EditorToolbar.jsx";
@@ -347,7 +348,7 @@ export default function EditorPage() {
   const handlePublishSuccess = () => {
     pushToast({ type: "success", message: t("editor.publish.success") });
     setShowPublishWizard(false);
-    navigate(lastTabRoute() || "/");
+    NavigateBack("post");
   };
 
   const currentLangData = createMemo(() => postData()?.[activeLang()] || { title: "", body: "", chapters: [] });
