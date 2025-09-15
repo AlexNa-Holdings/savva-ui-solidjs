@@ -22,6 +22,7 @@ import { walletAccount } from "../../blockchain/wallet.js";
 import SubscribeModal from "../modals/SubscribeModal.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
+import formSocialLink from "../profile/formSocialLink.jsx";
 
 // Data fetcher for the user profile
 async function fetchUserProfile({ app, identifier }) {
@@ -107,6 +108,17 @@ export default function ProfilePage() {
   createEffect(() => {
     const available = TABS();
     if (!available.some(t => t.id === activeTab())) setActiveTab('posts');
+  });
+
+  const profileLinks = createMemo(() => {
+    const details = profileDetails();
+    const arr = Array.isArray(details?.links) ? details.links : [];
+    return arr
+      .map((l) => ({
+        title: String(l?.title || "").trim(),
+        url: String(l?.url || "").trim(),
+      }))
+      .filter((x) => x.title || x.url);
   });
 
   function onTabChange(nextId) {
@@ -299,6 +311,20 @@ export default function ProfilePage() {
 
                     <Show when={aboutText()}>
                       <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
+                    </Show>
+
+                    {/* Links */}
+                    <Show when={profileLinks().length > 0}>
+                      <div class="pt-2 flex flex-wrap gap-2">
+                        <For each={profileLinks()}>
+                          {(lnk) =>
+                            formSocialLink(lnk.title || "", lnk.url || "", {
+                              class: "inline-flex items-center gap-1.5 underline hover:opacity-80 break-all",
+                              iconClass: "w-6 h-6",
+                            })
+                          }
+                        </For>
+                      </div>
                     </Show>
                   </div>
                 </div>

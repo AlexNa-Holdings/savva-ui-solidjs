@@ -19,6 +19,7 @@ import { pushErrorToast, pushToast } from "../../ui/toast.js";
 import ConfirmModal from "../modals/ConfirmModal.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import LinksEditor from "../profile/LinksEditor.jsx";
 // ✅ import the shared profile store utilities
 import useUserProfile, { applyProfileEditResult } from "../profile/userProfileStore.js";
 
@@ -98,11 +99,11 @@ function getActorAddress(app) {
     const a = app.actor?.();
     if (typeof a === "string") return a;
     if (a && typeof a === "object" && a.address) return a.address;
-  } catch (_) {}
+  } catch (_) { }
   try {
     if (typeof app.actorAddress === "function") return app.actorAddress();
     if (app.actorAddress) return app.actorAddress;
-  } catch (_) {}
+  } catch (_) { }
   // fallback: use auth address
   return app.authorizedUser?.()?.address;
 }
@@ -145,6 +146,7 @@ export default function ProfileEditPage() {
   const subjectAddress = createMemo(() => (profileData()?.address || "").toLowerCase());
   const authAddress = createMemo(() => (app.authorizedUser?.()?.address || "").toLowerCase());
   const actorAddress = createMemo(() => (getActorAddress(app) || "").toLowerCase());
+  const [links, setLinks] = createStore([]);
 
   // true only if we’re editing the auth user and we’re acting as the auth user
   const isSelfActorEditingSelf = createMemo(
@@ -163,6 +165,11 @@ export default function ProfileEditPage() {
 
       const profile = data.profile || {};
       setNsfwPreference(profile.nsfw || "h");
+
+      const initialLinks = Array.isArray(profile.links)
+        ? profile.links.map((l) => ({ title: String(l?.title || "").trim(), url: String(l?.url || "").trim() }))
+        : [];
+      setLinks(reconcile(initialLinks));
 
       let initialDisplayNames = {};
       if (profile.display_names && typeof profile.display_names === "object") {
@@ -338,6 +345,15 @@ export default function ProfileEditPage() {
     }
   };
 
+  function sanitizeLinks(arr) {
+    return (Array.isArray(arr) ? arr : [])
+      .map((x) => ({
+        title: String(x?.title || "").trim(),
+        url: String(x?.url || "").trim(),
+      }))
+      .filter((x) => x.title || x.url);
+  }
+
   // Actor-aware: Save profile JSON (write profile_cid via actor)
   const handleSave = async () => {
     setIsSaving(true);
@@ -347,6 +363,7 @@ export default function ProfileEditPage() {
         nsfw: nsfwPreference(),
         about_me: filterEmptyValues({ ...about }),
         sponsor_values: [...sponsorValues].map((v) => Number(v) || 0).filter((v) => v > 0),
+        links: sanitizeLinks(links),
       };
 
       const profileFile = new File([JSON.stringify(profileJson)], "profile.json", { type: "application/json" });
@@ -509,6 +526,10 @@ export default function ProfileEditPage() {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  <div class="pt-4 border-t border-[hsl(var(--border))]">
+                    <LinksEditor value={links} onChange={(next) => setLinks(reconcile(next || []))} />
                   </div>
 
                   <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
