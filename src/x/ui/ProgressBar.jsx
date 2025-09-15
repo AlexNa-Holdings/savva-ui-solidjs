@@ -24,7 +24,7 @@ export default function ProgressBar(props) {
   return (
     <div class="flex items-center gap-2">
       <div
-        class="flex-grow h-2 rounded-full bg-[hsl(var(--muted))] overflow-hidden flex border border-[hsl(var(--border))]"
+        class="flex-grow h-2 rounded-full bg-[hsl(var(--muted))] overflow-hidden flex border border-[hsl(var(--primary))]"
         role="progressbar"
         aria-valuenow={percentage()}
         aria-valuemin="0"
