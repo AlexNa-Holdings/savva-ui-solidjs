@@ -62,4 +62,14 @@ t("settings.ai.providers.gemini")
 t("settings.ai.providers.azure")
 
 
+t("promocodes.new.steps.enter")
+t("promocodes.new.steps.enter.help")
+t("promocodes.new.steps.save")
+t("promocodes.new.steps.save.help")
+t("promocodes.new.steps.publish")
+t("promocodes.new.steps.publish.help")
+t("promocodes.new.publishing")
+
+
+
 */

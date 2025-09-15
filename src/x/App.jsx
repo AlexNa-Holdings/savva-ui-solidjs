@@ -29,6 +29,8 @@ import { closeAllModals } from "../utils/modalBus.js";
 import NavigationPanel from "./navigation/NavigationPanel.jsx";
 import VersionChecker from "./main/VersionChecker.jsx";
 import AdminActionsBridge from "./admin/AdminActionsBridge.jsx";
+import PromoCodesPage from "./pages/PromoCodesPage.jsx";
+import PromoRedeemPage from "./pages/PromoRedeemPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -46,6 +48,8 @@ export default function App() {
     if (r.startsWith("/npo-list")) return "npo-list";
     if (r.startsWith("/fundraising")) return "fundraising";
     if (r.startsWith("/npo/")) return "npo";
+    if (r.startsWith("/promo-codes")) return "promo-codes";
+    if (r.startsWith("/promo-code/")) return "promo-code"; 
     if (r.startsWith("/fr/")) return "contribute";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
@@ -143,6 +147,8 @@ export default function App() {
                 <Show when={currentView() === "profile-edit"}><ProfileEditPage /></Show>
                 <Show when={currentView() === "fundraising"}><FundraisingPage /></Show>
                 <Show when={currentView() === "contribute"}><ContributePage /></Show>
+                <Show when={currentView() === "promo-codes"}><PromoCodesPage /></Show>
+                <Show when={currentView() === "promo-code"}><PromoRedeemPage /></Show>
               </main>
             </>
           </Show>

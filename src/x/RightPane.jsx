@@ -89,6 +89,29 @@ export default function RightPane({ isOpen, onClose }) {
                 </div>
               </li>
 
+              {/* PromoCodes list link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/promo-codes");
+                    onClose();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      app.setSavedScrollY(window.scrollY);
+                      navigate("/promo-codes");
+                      onClose();
+                    }
+                  }}
+                >
+                  {t("rightPane.promoCodes")}
+                </div>
+              </li>
+
               {/* Documentation link */}
               <li>
                 <div
