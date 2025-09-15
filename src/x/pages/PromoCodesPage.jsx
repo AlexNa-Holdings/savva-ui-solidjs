@@ -83,7 +83,6 @@ export default function PromoCodesPage() {
   const [items, setItems] = createSignal([]);
   const [hasExpiredAny, setHasExpiredAny] = createSignal(false);
 
-  // modal state
   const [newOpen, setNewOpen] = createSignal(false);
 
   onMount(() => {
@@ -121,7 +120,25 @@ export default function PromoCodesPage() {
         hashes.map((h, i) => isZeroHash(h) ? null : readPromoStruct(promo, h, i))
       );
 
-      const filtered = rows.filter(Boolean).sort((a, b) => a.index - b.index);
+      let filtered = rows.filter(Boolean).sort((a, b) => a.index - b.index);
+
+      // Admin sees all; non-admin only sees promos where donator == actor
+      const isAdmin = !!app.authorizedUser?.()?.isAdmin;
+      if (!isAdmin) {
+        const me = (() => {
+          try {
+            const addr = app.actorAddress?.() || app.authorizedUser?.()?.address || walletAccount();
+            return addr ? toChecksumAddress(addr) : "";
+          } catch { return ""; }
+        })();
+        filtered = me
+          ? filtered.filter(r => {
+              try { return toChecksumAddress(r.donator) === me; }
+              catch { return false; }
+            })
+          : [];
+      }
+
       setItems(filtered);
 
       const expiredFlag = await promo.read.hasExpiredPromoCodes().catch(() => false);
@@ -261,7 +278,6 @@ export default function PromoCodesPage() {
         </div>
       </Show>
 
-      {/* Wizard modal */}
       <NewPromoModal
         open={newOpen()}
         onClose={() => setNewOpen(false)}
