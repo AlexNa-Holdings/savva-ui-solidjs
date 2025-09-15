@@ -289,11 +289,14 @@ export default function WalletTab(props) {
                         {(r) => (
                           <tr class="border-t border-[hsl(var(--border))]">
                             <td class="px-3 py-2">
-                              <Show when={isReqAvailable(r.timestamp)} fallback={
-                                <span class="opacity-80" data-countdown-ts={Number(r.timestamp)}>
-                                  <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" labelStyle="short" />
-                                </span>
-                              }>
+                              <Show
+                                when={isReqAvailable(r.timestamp)}
+                                fallback={
+                                  <span class="opacity-80" data-countdown-ts={Number(r.timestamp)}>
+                                    <Countdown targetTs={Number(r.timestamp)} size="sm" anim="reverse" labelStyle="short" />
+                                  </span>
+                                }
+                              >
                                 <span class="text-emerald-600">{t("wallet.unstaked.availableNow")}</span>
                               </Show>
                             </td>
@@ -314,19 +317,51 @@ export default function WalletTab(props) {
 
       {/* Modals */}
       <Show when={showTransfer()}>
-        <TransferModal tokenAddress={walletData()?.savvaTokenAddress} onClose={() => setShowTransfer(false)} onSubmit={() => { setShowTransfer(false); refetch(); }} maxAmount={walletData()?.savvaBalance} />
+        <TransferModal
+          isOpen={showTransfer()}
+          tokenAddress={walletData()?.savvaTokenAddress}
+          onClose={() => setShowTransfer(false)}
+          onSubmit={() => { setShowTransfer(false); refetch(); }}
+          maxAmount={walletData()?.savvaBalance}
+        />
       </Show>
+
       <Show when={showBaseTransfer()}>
-        <TransferModal tokenAddress="" onClose={() => setShowBaseTransfer(false)} onSubmit={() => { setShowBaseTransfer(false); refetch(); }} maxAmount={walletData()?.baseTokenBalance} />
+        <TransferModal
+          isOpen={showBaseTransfer()}
+          tokenAddress=""
+          onClose={() => setShowBaseTransfer(false)}
+          onSubmit={() => { setShowBaseTransfer(false); refetch(); }}
+          maxAmount={walletData()?.baseTokenBalance}
+        />
       </Show>
+
       <Show when={showStakeTransfer()}>
-        <TransferModal tokenAddress={walletData()?.stakingTokenAddress} onClose={() => setShowStakeTransfer(false)} onSubmit={() => { setShowStakeTransfer(false); refetch(); }} maxAmount={walletData()?.stakedBalance} />
+        <TransferModal
+          isOpen={showStakeTransfer()}
+          tokenAddress={walletData()?.stakingTokenAddress}
+          onClose={() => setShowStakeTransfer(false)}
+          onSubmit={() => { setShowStakeTransfer(false); refetch(); }}
+          maxAmount={walletData()?.stakedBalance}
+        />
       </Show>
+
       <Show when={showIncreaseStaking()}>
-        <IncreaseStakingModal savvaBalance={walletData()?.savvaBalance} savvaTokenAddress={walletData()?.savvaTokenAddress} onClose={() => setShowIncreaseStaking(false)} onSubmit={() => { setShowIncreaseStaking(false); refetch(); }} />
+        <IncreaseStakingModal
+          isOpen={showIncreaseStaking()}
+          savvaBalance={walletData()?.savvaBalance}
+          savvaTokenAddress={walletData()?.savvaTokenAddress}
+          onClose={() => setShowIncreaseStaking(false)}
+          onSubmit={() => { setShowIncreaseStaking(false); refetch(); }}
+        />
       </Show>
+
       <Show when={showUnstake()}>
-        <UnstakeModal onClose={() => setShowUnstake(false)} onSubmit={() => { setShowUnstake(false); refetch(); }} />
+        <UnstakeModal
+          isOpen={showUnstake()}
+          onClose={() => setShowUnstake(false)}
+          onSubmit={() => { setShowUnstake(false); refetch(); }}
+        />
       </Show>
     </div>
   );

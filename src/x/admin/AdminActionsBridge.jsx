@@ -17,15 +17,14 @@ export default function AdminActionsBridge() {
   const [userAddr, setUserAddr] = createSignal(null);
 
   const savvaCidOf = (p) => p?.savva_cid || p?.id || p?._raw?.savva_cid || p?._raw?.id;
-  const authorOf  = (p) => p?.author?.address || p?._raw?.author?.address;
+  const authorOf = (p) => p?.author?.address || p?._raw?.author?.address;
 
-  // Unban actions are immediate (no comment dialog)
+  // Unban actions are immediate (no confirm dialog)
   async function unbanPostNow(detail) {
     try {
       const cid = detail?.savva_cid || savvaCidOf(detail?.post);
       if (!cid) throw new Error("Missing savva_cid");
       await sendAdminCommand(app, { cmd: "unban_post", p1: String(cid) });
-      // Success toast comes via WS alert handlers
     } catch (e) {
       pushErrorToast(e, { context: t("tx.error") });
     }
@@ -57,11 +56,9 @@ export default function AdminActionsBridge() {
 
   function openAnnounce(detail) {
     setAction("announce-post");
-    // accept a few common shapes just in case
     const p = detail?.post ?? detail?.item ?? detail?.raw ?? null;
     setPost(p);
     setUserAddr(detail?.author || authorOf(p) || null);
-    // open on next microtask to ensure post() is ready before rendering the modal
     queueMicrotask(() => setOpen(true));
   }
 
@@ -78,7 +75,6 @@ export default function AdminActionsBridge() {
         await banUser(app, { authorAddress: addr, comment });
       }
       setOpen(false);
-      // Result toasts + UI updates arrive via WS BCM handlers
     } catch (e) {
       pushErrorToast(e, { context: t("tx.error") });
     } finally {
@@ -92,11 +88,11 @@ export default function AdminActionsBridge() {
     const onAdmin = (ev) => {
       const detail = ev?.detail || {};
       switch (detail.action) {
-        case "ban-post":      openBanPost(detail);     break;
-        case "ban-user":      openBanUser(detail);     break;
-        case "unban-post":    unbanPostNow(detail);    break;
-        case "unban-user":    unbanUserNow(detail);    break;
-        case "announce-post": openAnnounce(detail);    break;
+        case "ban-post": openBanPost(detail); break;
+        case "ban-user": openBanUser(detail); break;
+        case "unban-post": unbanPostNow(detail); break;
+        case "unban-user": unbanUserNow(detail); break;
+        case "announce-post": openAnnounce(detail); break;
         default: break;
       }
     };
@@ -110,7 +106,7 @@ export default function AdminActionsBridge() {
         when={action() === "announce-post"}
         fallback={
           <AdminConfirmBanModal
-            open={open()}
+            isOpen={open()}
             action={action()}
             post={post()}
             user={userAddr() ? { address: userAddr() } : undefined}
@@ -121,6 +117,7 @@ export default function AdminActionsBridge() {
         }
       >
         <AdminAnnouncePostModal
+          isOpen={open()}
           post={post()}
           onClose={handleClose}
         />
