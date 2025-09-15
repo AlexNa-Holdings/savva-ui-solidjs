@@ -1,5 +1,5 @@
 // src/x/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect } from "solid-js";
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
@@ -47,7 +47,7 @@ async function fetchSubRelation({ app, domain, actor, author }) {
     const res = await app.wsCall("get-user", {
       domain,
       user_addr: author,
-      caller: actor, // so i_sponsor_for refers to the ACTOR
+      caller: actor,
     });
     const n = Number(res?.i_sponsor_for ?? 0);
     return Number.isFinite(n) && n > 0;
@@ -84,13 +84,20 @@ export default function ProfilePage() {
 
   const [activeTab, setActiveTab] = createSignal('posts');
 
+  const isBanned = createMemo(() => !!userResource()?.banned);
+
   // Center screen title tabs sync
-  const TABS = createMemo(() => ([
-    { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-    { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-    { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
-    { id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> },
-  ]));
+  const TABS = createMemo(() => {
+    const items = [
+      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+    ];
+    if (!isBanned()) {
+      items.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
+    }
+    return items;
+  });
 
   const desiredTab = createMemo(() => {
     const path = route() || "";
@@ -197,7 +204,6 @@ export default function ProfilePage() {
       const hash = await clubs.write.stop([domainName(), authorAddress]);
       const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain()?.rpcUrls?.[0]) });
       await pc.waitForTransactionReceipt({ hash });
-      // Only update subscribe-state — no full profile refetch
       await refetchSub();
     } catch (e) {
       console.error("ProfilePage: stop() failed", e);
@@ -206,7 +212,6 @@ export default function ProfilePage() {
 
   function handleSubscribed() {
     setShowSub(false);
-    // Only update subscribe-state — no full profile refetch
     refetchSub();
   }
 
@@ -231,21 +236,30 @@ export default function ProfilePage() {
         <Match when={userResource()}>
           {(user) =>
             <div class="space-y-6">
+              {/* Banned banner */}
+              <Show when={isBanned()}>
+                <div class="p-3 rounded-md border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 text-[hsl(var(--destructive))] font-semibold">
+                  {t("user.banned")}
+                </div>
+              </Show>
+
               {/* Header */}
               <div class="flex justify-between items-end gap-4">
                 <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                   <div class="flex flex-col items-center gap-4 shrink-0">
                     <div class="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] border-2 border-[hsl(var(--border))]">
-                      <IpfsImage
-                        src={user().avatar}
-                        alt={`${user().name} avatar`}
-                        class="w-full h-full object-cover"
-                        fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
-                      />
+                      <Show when={!isBanned()} fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}>
+                        <IpfsImage
+                          src={user().avatar}
+                          alt={`${user().name} avatar`}
+                          class="w-full h-full object-cover"
+                          fallback={<UnknownUserIcon class="w-full h-full text-[hsl(var(--muted-foreground))]" />}
+                        />
+                      </Show>
                     </div>
 
-                    {/* Hide subscribe/unsubscribe when we're on the ACTOR's profile */}
-                    <Show when={app.authorizedUser() && !isActorProfile()}>
+                    {/* Subscribe/Unsubscribe — hidden on actor's profile and if banned */}
+                    <Show when={app.authorizedUser() && !isActorProfile() && !isBanned()}>
                       <Show
                         when={!isSubscribed()}
                         fallback={
@@ -269,52 +283,57 @@ export default function ProfilePage() {
 
                   <div class="flex-1 w-full text-center sm:text-left space-y-3">
                     <div class="flex flex-col items-center sm:items-start">
-                      <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
-                      <Show when={user().name}>
-                        <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                          <span>{String(user().name || "").toUpperCase()}</span>
-                          <VerifiedBadge class="w-4 h-4" />
-                        </div>
+                      <Show when={!isBanned()}>
+                        <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
+                        <Show when={user().name}>
+                          <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
+                            <span>{String(user().name || "").toUpperCase()}</span>
+                            <VerifiedBadge class="w-4 h-4" />
+                          </div>
+                        </Show>
                       </Show>
+
+                      {/* Always show address */}
                       <div class="mt-1">
                         <Address address={user().address} format="full" />
                       </div>
-                      <div class="flex items-center gap-2 mt-2 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
-                        <TokenValue amount={user().staked} />
-                        <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
-                      </div>
-                      <div class="flex items-center gap-2 mt-1 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
-                        <TokenValue amount={user().total_sponsoring} />
-                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                      </div>
 
-                      {/* Received from subscribers */}
-                      <div class="flex items-center gap-2 mt-1 text-sm">
-                        <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
-                        <TokenValue amount={user().total_sponsored} />
-                        <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
-                      </div>
-
-                      {/* If NPO: show NPO icon on the NEXT line with tip "NPO" */}
-                      <Show when={user().is_npo}>
-                        <div class="mt-1">
-                          <NpoIcon
-                            class="w-7 h-7 opacity-95"
-                            title={t("npo.short")}
-                            aria-label={t("npo.short")}
-                          />
+                      {/* Accounts info — hidden if banned */}
+                      <Show when={!isBanned()}>
+                        <div class="flex items-center gap-2 mt-2 text-sm">
+                          <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
+                          <TokenValue amount={user().staked} />
+                          <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
                         </div>
+                        <div class="flex items-center gap-2 mt-1 text-sm">
+                          <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                          <TokenValue amount={user().total_sponsoring} />
+                          <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-1 text-sm">
+                          <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                          <TokenValue amount={user().total_sponsored} />
+                          <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
+                        </div>
+                        <Show when={user().is_npo}>
+                          <div class="mt-1">
+                            <NpoIcon
+                              class="w-7 h-7 opacity-95"
+                              title={t("npo.short")}
+                              aria-label={t("npo.short")}
+                            />
+                          </div>
+                        </Show>
                       </Show>
                     </div>
 
-                    <Show when={aboutText()}>
+                    {/* About — hidden if banned */}
+                    <Show when={!isBanned() && aboutText()}>
                       <p class="text-sm pt-2 text-[hsl(var(--foreground))]">{aboutText()}</p>
                     </Show>
 
-                    {/* Links */}
-                    <Show when={profileLinks().length > 0}>
+                    {/* Links — hidden if banned */}
+                    <Show when={!isBanned() && profileLinks().length > 0}>
                       <div class="pt-2 flex flex-wrap gap-2">
                         <For each={profileLinks()}>
                           {(lnk) =>
@@ -330,7 +349,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div class="flex-shrink-0">
-                  <Show when={canEdit()}>
+                  <Show when={canEdit() && !isBanned()}>
                     <button
                       onClick={handleEditProfile}
                       class="px-4 py-2 text-sm rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--accent))]"
@@ -363,8 +382,8 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Subscribe / Edit modal */}
-              <Show when={showSub()}>
+              {/* Subscribe modal — hidden if banned */}
+              <Show when={!isBanned() && showSub()}>
                 <SubscribeModal
                   isOpen={showSub()}
                   domain={domainName()}

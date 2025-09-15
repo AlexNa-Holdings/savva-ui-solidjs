@@ -784,6 +784,7 @@ export default {
   "ui.toast.hide": "Hide",
   "ui.toast.hideDetails": "Hide Details",
   "ui.toast.showDetails": "Show Details",
+  "user.banned": "Account has been banned.",
   "version.new.message": "A new version of the app is ready. Update now to enjoy the latest features and improvements.",
   "version.new.refresh": "Refresh to Update",
   "version.new.title": "New Version Available!",

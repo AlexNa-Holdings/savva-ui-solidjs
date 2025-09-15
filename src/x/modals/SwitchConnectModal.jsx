@@ -20,6 +20,9 @@ export default function SwitchConnectModal(props) {
   const app = useApp();
   const { t } = app;
 
+  // Back-compat: support both `isOpen` (new) and `open` (old)
+  const isOpen = () => !!(props.isOpen ?? props.open);
+
   const [backendUrl, setBackendUrl] = createSignal(props.backendLink ?? app.config?.()?.backendLink ?? "");
   const [domain, setDomain] = createSignal(dn(props.domain) || (app.config?.()?.domain || ""));
   const [domains, setDomains] = createSignal([]);
@@ -28,7 +31,7 @@ export default function SwitchConnectModal(props) {
   const [localError, setLocalError] = createSignal("");
 
   let aborter;
-  let selectEl; // read ground-truth value at apply time
+  let selectEl;
 
   const selectedDomainObj = createMemo(() => {
     const cur = (domain() || "").trim().toLowerCase();
@@ -98,8 +101,8 @@ export default function SwitchConnectModal(props) {
   // Only when modal goes closed → open
   let wasOpen = false;
   createEffect(() => {
-    const isOpen = !!props.open;
-    if (isOpen && !wasOpen) {
+    const nowOpen = isOpen();
+    if (nowOpen && !wasOpen) {
       const initBackend = props.backendLink ?? app.config?.()?.backendLink ?? "";
       const initDomain = dn(props.domain) || (app.config?.()?.domain || "");
       setBackendUrl(initBackend);
@@ -120,16 +123,16 @@ export default function SwitchConnectModal(props) {
         log("domains:prefillFromInfo", { domains: pre.map((d) => d.name), chosen: next });
       }
     }
-    if (!isOpen && wasOpen) {
+    if (!nowOpen && wasOpen) {
       aborter?.abort();
       log("close", {});
     }
-    wasOpen = isOpen;
+    wasOpen = nowOpen;
   });
 
   onCleanup(() => aborter?.abort());
 
-  // Trace state (useful to see changes after user picks an option)
+  // Trace state
   createEffect(() => {
     log("state", { backendUrl: backendUrl(), domain: domain() });
   });
@@ -155,7 +158,7 @@ export default function SwitchConnectModal(props) {
 
   return (
     <Modal
-      isOpen={props.open}
+      isOpen={isOpen()}
       onClose={props.onClose}
       title={t("rightPane.switch.title")}
       size="lg"
