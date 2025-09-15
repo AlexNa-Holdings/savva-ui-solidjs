@@ -190,6 +190,7 @@ export default {
   "editor.publish.validation.backToEditor": "Back to Editor",
   "editor.publish.validation.errorIncomplete": "Please complete all required fields.",
   "editor.publish.validation.errorTitle": "Validation Error",
+  "editor.publishNowGet": "Publish now and get",
   "editor.sidebar.files": "Files",
   "editor.sidebar.filesPlaceholder": "File manager coming soon.",
   "editor.sidebar.language": "Language",
@@ -817,6 +818,5 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now",
-  "editor.publishNowGet": "Publish now and get",
+  "wallet.unstaked.availableNow": "Available Now"
 };

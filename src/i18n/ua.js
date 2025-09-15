@@ -190,6 +190,7 @@ export default {
   "editor.publish.validation.backToEditor": "Назад до Редактора",
   "editor.publish.validation.errorIncomplete": "Будь ласка, заповніть всі обов'язкові поля.",
   "editor.publish.validation.errorTitle": "Помилка валідації",
+  "editor.publishNowGet": "Опублікуйте зараз і отримайте",
   "editor.sidebar.files": "Файли",
   "editor.sidebar.filesPlaceholder": "Менеджер файлів незабаром.",
   "editor.sidebar.language": "Мова",

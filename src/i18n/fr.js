@@ -190,6 +190,7 @@ export default {
   "editor.publish.validation.backToEditor": "Retour à l'Éditeur",
   "editor.publish.validation.errorIncomplete": "Veuillez compléter tous les champs obligatoires.",
   "editor.publish.validation.errorTitle": "Erreur de validation",
+  "editor.publishNowGet": "Publiez maintenant et obtenez",
   "editor.sidebar.files": "Fichiers",
   "editor.sidebar.filesPlaceholder": "Gestionnaire de fichiers à venir.",
   "editor.sidebar.language": "Langue",

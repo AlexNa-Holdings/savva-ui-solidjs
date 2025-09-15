@@ -190,6 +190,7 @@ export default {
   "editor.publish.validation.backToEditor": "Nazad na Uređivač",
   "editor.publish.validation.errorIncomplete": "Molimo vas da popunite sva obavezna polja.",
   "editor.publish.validation.errorTitle": "Greška u validaciji",
+  "editor.publishNowGet": "Objavite sada i dobijte",
   "editor.sidebar.files": "Datoteke",
   "editor.sidebar.filesPlaceholder": "Upravljač datotekama uskoro dolazi.",
   "editor.sidebar.language": "Jezik",
