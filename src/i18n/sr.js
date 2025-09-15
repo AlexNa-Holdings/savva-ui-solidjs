@@ -317,7 +317,7 @@ export default {
   "npo.list.col.npo": "NPO",
   "npo.list.col.open": "Otvoreno",
   "npo.list.create": "Kreiraj NPO",
-  "npo.list.createdTx": "Kreirano %s",
+  "npo.list.createdTx": "Kreirana NPO",
   "npo.list.creating": "Kreiranje…",
   "npo.list.empty": "Još nema NPO-ova.",
   "npo.list.onlyConfirmed": "Prikaži samo potvrđene",

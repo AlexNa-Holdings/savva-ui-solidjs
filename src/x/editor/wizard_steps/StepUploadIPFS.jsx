@@ -17,18 +17,44 @@ export default function StepUploadIPFS(props) {
   const [uploadProgress, setUploadProgress] = createSignal(0);
   const [uploadMessage, setUploadMessage] = createSignal(t("editor.publish.uploadingToIpfs"));
 
+  // --- helpers ---------------------------------------------------------------
+
+  const resolveBaseDir = (mode) => {
+    if (mode === "new_post") return DRAFT_DIRS.NEW_POST;
+    if (mode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
+    if (mode === "edit_post" || mode === "edit_comment") return DRAFT_DIRS.EDIT;
+    return "unknown";
+  };
+
+  // Extract every `uploads/<name>` reference from all locales
+  const collectContentAssetRefs = (content) => {
+    const refs = new Set();
+    const rx = /(?:!\[[^\]]*\]\(|\[[^\]]*\]\()?\s*(uploads\/[A-Za-z0-9._\-/%]+)\s*\)?/g;
+    Object.keys(content || {}).forEach((lang) => {
+      const d = content[lang] || {};
+      const scan = (txt) => {
+        if (!txt) return;
+        let m;
+        while ((m = rx.exec(String(txt))) !== null) {
+          refs.add(m[1].replace(/^\.?\//, "")); // normalize leading ./ if any
+        }
+      };
+      scan(d.body);
+      (d.chapters || []).forEach((ch) => scan(ch?.body));
+    });
+    return refs;
+  };
+
   const getFilesFromDraft = async () => {
     const { postData, editorMode } = props;
     const files = [];
 
-    const baseDir = (() => {
-      if (editorMode === "new_post") return DRAFT_DIRS.NEW_POST;
-      if (editorMode === "new_comment") return DRAFT_DIRS.NEW_COMMENT;
-      if (["edit_post", "edit_comment"].includes(editorMode)) return DRAFT_DIRS.EDIT;
-      return "unknown";
-    })();
-
+    const baseDir = resolveBaseDir(editorMode);
     const content = postData();
+
+    dbg.log("StepUploadIPFS", "collect start", { editorMode, baseDir, langs: Object.keys(content || {}) });
+
+    // 1) Markdown files
     for (const lang in content) {
       const data = content[lang];
       const path = `${lang}/data.md`;
@@ -37,17 +63,51 @@ export default function StepUploadIPFS(props) {
       if (Array.isArray(data.chapters)) {
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          files.push({ file: new File([data.chapters[i].body || ""], chapterPath, { type: "text/markdown" }), path: chapterPath });
+          files.push({
+            file: new File([data.chapters[i].body || ""], chapterPath, { type: "text/markdown" }),
+            path: chapterPath,
+          });
         }
       }
     }
 
+    // 2) Uploads
     const assetNames = await getAllUploadedFileNames(baseDir);
+    dbg.log("StepUploadIPFS", "storage uploads list", { baseDir, assetNames });
+
     for (const name of assetNames) {
       const file = await getUploadedFileAsFileObject(baseDir, name);
-      if (file) files.push({ file, path: `uploads/${name}` });
+      if (file) {
+        files.push({ file, path: `uploads/${name}` });
+      } else {
+        dbg.warn?.("StepUploadIPFS", "missing file object for", { baseDir, name });
+      }
     }
-    return files;
+
+    // 3) Compare content refs vs actual uploads
+    const contentRefs = collectContentAssetRefs(content);
+    const storageSet = new Set(assetNames.map((n) => `uploads/${n}`));
+    const missing = [...contentRefs].filter((r) => !storageSet.has(r));
+    const extra = [...storageSet].filter((r) => !contentRefs.has(r));
+
+    // Log sizes for traceability
+    const filesPreview = await Promise.all(
+      files.map(async (it) => {
+        const size = it.file?.size ?? 0;
+        const type = it.file?.type || "";
+        return { path: it.path, size, type };
+      })
+    );
+
+    dbg.log("StepUploadIPFS", "content refs vs storage delta", {
+      baseDir,
+      contentRefs: [...contentRefs],
+      missing, // referenced in markdown but not in storage
+      extra,   // present in storage but not referenced
+      filesPreview,
+    });
+
+    return { files, baseDir, contentRefs, missing, extra };
   };
 
   const uploadToPinningServices = async () => {
@@ -55,7 +115,9 @@ export default function StepUploadIPFS(props) {
     const services = getPinningServices();
     if (services.length === 0) throw new Error(t("editor.publish.ipfs.errorNoServices"));
 
-    const filesToUpload = await getFilesFromDraft();
+    const { files, baseDir } = await getFilesFromDraft();
+    dbg.log("StepUploadIPFS", "pin: files count", { count: files.length, baseDir });
+
     const progressMap = new Map(services.map((s) => [s.id, 0]));
     const updateTotalProgress = () => {
       const sum = Array.from(progressMap.values()).reduce((a, b) => a + b, 0);
@@ -65,57 +127,89 @@ export default function StepUploadIPFS(props) {
     const cids = await Promise.all(
       services.map(async (service) => {
         try {
-          const cid = await pinDirectory(service, filesToUpload, {
+          const cid = await pinDirectory(service, files, {
             onProgress: (p) => {
               progressMap.set(service.id, p);
               updateTotalProgress();
             },
           });
 
-          const firstLangWithContent = Object.keys(props.postData())[0];
+          // quick verification of a deterministic path
+          const content = props.postData();
+          const langs = Object.keys(content || {});
+          const firstLangWithContent = langs[0] || "en";
           const verificationPath = `${firstLangWithContent}/data.md`;
           const gatewayUrl = service.gatewayUrl.trim().replace(/\/+$/, "");
           const verifyUrl = `${gatewayUrl}/ipfs/${cid}/${verificationPath}`;
+
+          dbg.log("StepUploadIPFS", "pin verify", { service: service.name, verifyUrl });
 
           await new Promise((r) => setTimeout(r, 3000));
           await fetchWithTimeout(verifyUrl, { timeoutMs: 30000 });
           return cid;
         } catch (e) {
+          dbg.error("StepUploadIPFS", "pin service failed", { service: service.name, message: e?.message, stack: e?.stack });
           throw new Error(`Failed on service '${service.name}': ${e.message}`);
         }
       })
     );
 
     const firstCid = cids[0];
-    if (!cids.every((cid) => cid === firstCid)) throw new Error("Inconsistent CIDs returned from pinning services.");
+    if (!cids.every((cid) => cid === firstCid)) {
+      dbg.error("StepUploadIPFS", "inconsistent CIDs", { cids });
+      throw new Error("Inconsistent CIDs returned from pinning services.");
+    }
     return firstCid;
   };
 
   const uploadToBackend = async () => {
     const { postData, editorMode } = props;
-    const baseDir = editorMode === "new_post" ? DRAFT_DIRS.NEW_POST : DRAFT_DIRS.EDIT;
-
+    const baseDir = resolveBaseDir(editorMode);
     const formData = new FormData();
     const content = postData();
+
+    dbg.log("StepUploadIPFS", "backend: start", { editorMode, baseDir, langs: Object.keys(content || {}) });
+
+    // markdown
     for (const lang in content) {
       const data = content[lang];
       formData.append("file", new File([data.body || ""], `${lang}/data.md`, { type: "text/markdown" }));
       if (Array.isArray(data.chapters)) {
         for (let i = 0; i < data.chapters.length; i++) {
-          formData.append("file", new File([data.chapters[i].body || ""], `${lang}/chapters/${i + 1}.md`, { type: "text/markdown" }));
+          formData.append(
+            "file",
+            new File([data.chapters[i].body || ""], `${lang}/chapters/${i + 1}.md`, { type: "text/markdown" })
+          );
         }
       }
     }
+
+    // uploads
     const assetFileNames = await getAllUploadedFileNames(baseDir);
+    dbg.log("StepUploadIPFS", "backend: storage uploads list", { baseDir, assetFileNames });
+
     for (const fileName of assetFileNames) {
       const file = await getUploadedFileAsFileObject(baseDir, fileName);
-      if (file) formData.append("file", file, `uploads/${fileName}`);
+      if (file) {
+        formData.append("file", file, `uploads/${fileName}`);
+      } else {
+        dbg.warn?.("StepUploadIPFS", "backend: missing file object", { baseDir, fileName });
+      }
     }
 
-    return await uploadWithProgress(`${httpBase()}store-dir`, formData);
+    // compare refs
+    const contentRefs = collectContentAssetRefs(content);
+    const storageSet = new Set(assetFileNames.map((n) => `uploads/${n}`));
+    const missing = [...contentRefs].filter((r) => !storageSet.has(r));
+    const extra = [...storageSet].filter((r) => !contentRefs.has(r));
+
+    dbg.log("StepUploadIPFS", "backend: refs delta", { missing, extra });
+
+    return await uploadWithProgress(`${httpBase()}store-dir`, formData, { baseDir, assetCount: assetFileNames.length });
   };
 
-  const uploadWithProgress = (url, formData) => {
+  const uploadWithProgress = (url, formData, ctx = {}) => {
+    dbg.log("StepUploadIPFS", "xhr upload begin", { url, ...ctx });
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", url);
@@ -128,35 +222,44 @@ export default function StepUploadIPFS(props) {
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
             const json = JSON.parse(xhr.responseText);
+            dbg.log("StepUploadIPFS", "xhr upload done", { status: xhr.status, cid: json?.cid });
             resolve(json.cid);
           } else {
+            dbg.error("StepUploadIPFS", "xhr upload failed", { status: xhr.status, body: xhr.responseText });
             reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
           }
-        } catch {
+        } catch (e) {
+          dbg.error("StepUploadIPFS", "xhr invalid JSON", { body: xhr.responseText });
           reject(new Error("Upload failed: invalid JSON response"));
         }
       };
-      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.onerror = () => {
+        dbg.error("StepUploadIPFS", "xhr network error");
+        reject(new Error("Network error during upload"));
+      };
       xhr.send(formData);
     });
   };
+
+  // --- lifecycle -------------------------------------------------------------
 
   onMount(() => {
     setTimeout(async () => {
       try {
         const usePinners = isPinningEnabled();
         const cid = usePinners ? await uploadToPinningServices() : await uploadToBackend();
-        dbg.log("StepUploadIPFS", "CID ready:", cid);
-        // IMPORTANT: return a structured payload (wizard expects an object downstream)
+        dbg.log("StepUploadIPFS", "CID ready", { cid });
         props.onComplete?.({ ipfsCid: cid });
       } catch (e) {
-        dbg.error("StepUploadIPFS", "An error occurred in the upload process:", e);
+        dbg.error("StepUploadIPFS", "upload process error", { message: e?.message, stack: e?.stack });
         setError(e.message);
       } finally {
         setIsUploading(false);
       }
     }, 500);
   });
+
+  // --- UI --------------------------------------------------------------------
 
   return (
     <div class="flex flex-col items-center justify-center h-full">

@@ -317,7 +317,7 @@ export default {
   "npo.list.col.npo": "НПО",
   "npo.list.col.open": "Открыть",
   "npo.list.create": "Создать НПО",
-  "npo.list.createdTx": "Создано %s",
+  "npo.list.createdTx": "Создано НПО",
   "npo.list.creating": "Создание…",
   "npo.list.empty": "Пока нет НПО.",
   "npo.list.onlyConfirmed": "Показать только подтвержденные",

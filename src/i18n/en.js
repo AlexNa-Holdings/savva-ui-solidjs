@@ -317,7 +317,7 @@ export default {
   "npo.list.col.npo": "NPO",
   "npo.list.col.open": "Open",
   "npo.list.create": "Create NPO",
-  "npo.list.createdTx": "Created on %s",
+  "npo.list.createdTx": "Created NPO",
   "npo.list.creating": "Creating…",
   "npo.list.empty": "No NPOs yet.",
   "npo.list.onlyConfirmed": "Show only confirmed",
