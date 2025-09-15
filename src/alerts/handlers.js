@@ -26,6 +26,7 @@ export async function handleContentProcessed(app, payload) {
   const draftParams = await getDraftParams(DRAFT_DIRS.NEW_POST);
   if (draftParams && draftParams.guid === content.guid) {
     await clearDraft(DRAFT_DIRS.NEW_POST);
+    window.dispatchEvent(new Event("savva:claimable-refresh"));
     pushToast({
       type: "success",
       message: app.t("editor.publish.draftCleared"),
