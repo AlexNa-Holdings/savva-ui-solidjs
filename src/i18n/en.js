@@ -5,7 +5,7 @@ export default {
   "actor.badge.titleSelf": "Self Member",
   "actor.noNpoAvailable": "No NPOs available at the moment.",
   "addressInput.placeholder": "0x... / name",
-  "admin.announce": "!Announce",
+  "admin.announce": "Announce",
   "admin.announceCta": "Announce",
   "admin.announceError": "Failed to post announcement. Please try again.",
   "admin.announceHint": "Craft an announcement for this post.",
