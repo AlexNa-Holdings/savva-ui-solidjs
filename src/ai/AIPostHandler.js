@@ -574,8 +574,7 @@ function makeCleanOriginalAiTask(t, opts) {
         typeof opts.editorMode === "function"
           ? opts.editorMode()
           : opts.editorMode;
-      if (mode === "new_comment" || mode === "edit_comment")
-        return { state, modified: false };
+      const isComment = mode === "new_comment" || mode === "edit_comment";
 
       const meta = opts._getMeta?.() || {};
       const baseAliased =
@@ -590,22 +589,28 @@ function makeCleanOriginalAiTask(t, opts) {
       const langData = state?.postData?.[baseKey];
       if (!langData) throw new Error(t("editor.ai.errors.nothingToClean"));
 
+      // Build cleaning batch:
+      // - For comments: only body
+      // - For posts: body + title + chapter bodies + chapter titles
       const items = [];
-      if (langData.body?.trim())
-        items.push({ id: "body", text: langData.body });
-      if (typeof langData.title === "string" && langData.title.trim())
-        items.push({ id: "title", text: langData.title });
-      if (Array.isArray(langData.chapters)) {
-        langData.chapters.forEach((ch, i) => {
-          if (ch?.body?.trim()) items.push({ id: `ch_${i}`, text: ch.body });
+      if (langData.body?.trim()) items.push({ id: "body", text: langData.body });
+
+      if (!isComment) {
+        if (typeof langData.title === "string" && langData.title.trim()) {
+          items.push({ id: "title", text: langData.title });
+        }
+        if (Array.isArray(langData.chapters)) {
+          langData.chapters.forEach((ch, i) => {
+            if (ch?.body?.trim()) items.push({ id: `ch_${i}`, text: ch.body });
+          });
+        }
+        const paramsChs = state?.postParams?.locales?.[baseKey]?.chapters || [];
+        paramsChs.forEach((cp, i) => {
+          if (cp?.title && String(cp.title).trim()) {
+            items.push({ id: `cht_${i}`, text: String(cp.title) });
+          }
         });
       }
-
-      const paramsChs = state?.postParams?.locales?.[baseKey]?.chapters || [];
-      paramsChs.forEach((cp, i) => {
-        if (cp?.title && String(cp.title).trim())
-          items.push({ id: `cht_${i}`, text: String(cp.title) });
-      });
 
       if (items.length === 0)
         throw new Error(t("editor.ai.errors.nothingToClean"));
@@ -621,9 +626,9 @@ function makeCleanOriginalAiTask(t, opts) {
       const map = new Map(cleaned.map((x) => [x.id, x.text]));
       let changed = false;
       const next = deepClone(state);
-
       const nextLD = { ...(next.postData?.[baseKey] || {}) };
 
+      // Body (always for both posts and comments)
       if (langData.body?.trim() && map.has("body")) {
         const newBody = String(map.get("body") ?? "");
         if (newBody.trim() && newBody !== langData.body) {
@@ -632,59 +637,66 @@ function makeCleanOriginalAiTask(t, opts) {
         }
       }
 
-      if (
-        typeof langData.title === "string" &&
-        langData.title.trim() &&
-        map.has("title")
-      ) {
-        const newTitle = String(map.get("title") ?? "");
-        if (newTitle.trim() && newTitle !== langData.title) {
-          nextLD.title = newTitle;
-          changed = true;
-        }
-      }
-
-      if (Array.isArray(langData.chapters)) {
-        const chs = (langData.chapters || []).map((c) => ({ ...(c || {}) }));
-        for (let i = 0; i < chs.length; i++) {
-          const key = `ch_${i}`;
-          if (chs[i]?.body?.trim() && map.has(key)) {
-            const nb = String(map.get(key) ?? "");
-            if (nb.trim() && nb !== chs[i].body) {
-              chs[i].body = nb;
-              changed = true;
-            }
+      if (!isComment) {
+        // Title (posts only)
+        if (
+          typeof langData.title === "string" &&
+          langData.title.trim() &&
+          map.has("title")
+        ) {
+          const newTitle = String(map.get("title") ?? "");
+          if (newTitle.trim() && newTitle !== langData.title) {
+            nextLD.title = newTitle;
+            changed = true;
           }
         }
-        nextLD.chapters = chs;
+
+        // Chapter bodies (posts only)
+        if (Array.isArray(langData.chapters)) {
+          const chs = (langData.chapters || []).map((c) => ({ ...(c || {}) }));
+          for (let i = 0; i < chs.length; i++) {
+            const key = `ch_${i}`;
+            if (chs[i]?.body?.trim() && map.has(key)) {
+              const nb = String(map.get(key) ?? "");
+              if (nb.trim() && nb !== chs[i].body) {
+                chs[i].body = nb;
+                changed = true;
+              }
+            }
+          }
+          nextLD.chapters = chs;
+        }
       }
 
       next.postData = { ...(next.postData || {}), [baseKey]: nextLD };
 
-      const locales = { ...(next.postParams?.locales || {}) };
-      const langParams = { ...(locales[baseKey] || {}) };
-      const chParams = Array.isArray(langParams.chapters)
-        ? [...langParams.chapters]
-        : [];
-      const totalCh = Array.isArray(nextLD.chapters)
-        ? nextLD.chapters.length
-        : chParams.length;
-      while (chParams.length < totalCh) chParams.push({});
-      for (let i = 0; i < totalCh; i++) {
-        const key = `cht_${i}`;
-        if (map.has(key)) {
-          const newTitle = String(map.get(key) ?? "");
-          if (newTitle.trim() && newTitle !== (chParams[i]?.title || "")) {
-            chParams[i] = { ...(chParams[i] || {}), title: newTitle };
-            changed = true;
+      if (!isComment) {
+        // Chapter titles (posts only)
+        const locales = { ...(next.postParams?.locales || {}) };
+        const langParams = { ...(locales[baseKey] || {}) };
+        const chParams = Array.isArray(langParams.chapters)
+          ? [...langParams.chapters]
+          : [];
+        const totalCh = Array.isArray(nextLD.chapters)
+          ? nextLD.chapters.length
+          : chParams.length;
+        while (chParams.length < totalCh) chParams.push({});
+        for (let i = 0; i < totalCh; i++) {
+          const key = `cht_${i}`;
+          if (map.has(key)) {
+            const newTitle = String(map.get(key) ?? "");
+            if (newTitle.trim() && newTitle !== (chParams[i]?.title || "")) {
+              chParams[i] = { ...(chParams[i] || {}), title: newTitle };
+              changed = true;
+            }
           }
         }
+        langParams.chapters = chParams;
+        next.postParams = {
+          ...(next.postParams || {}),
+          locales: { ...locales, [baseKey]: langParams },
+        };
       }
-      langParams.chapters = chParams;
-      next.postParams = {
-        ...(next.postParams || {}),
-        locales: { ...locales, [baseKey]: langParams },
-      };
 
       if (!changed) return { state, modified: false };
       return { state: next, modified: true };
@@ -742,7 +754,7 @@ function makeTitleAiTask(t, opts) {
       let final = String(title || "")
         .replace(/^["“”'`]+|["“”'`]+$/g, "")
         .trim();
-        
+
       if (!final) throw new Error(t("editor.ai.errors.noContentForTitle"));
       if (final.length > 90) final = final.slice(0, 87).trimEnd() + "…";
 
@@ -841,6 +853,8 @@ function makeChapterTitlesAiTask(t, opts) {
   };
 }
 
+// src/ai/AIPostHandler.js
+// (replace makeTranslateAiTask with this version)
 function makeTranslateAiTask(t, opts) {
   return {
     id: "translateAll",
@@ -850,8 +864,7 @@ function makeTranslateAiTask(t, opts) {
         typeof opts.editorMode === "function"
           ? opts.editorMode()
           : opts.editorMode;
-      if (mode === "new_comment" || mode === "edit_comment")
-        return { state, modified: false };
+      const isComment = mode === "new_comment" || mode === "edit_comment";
 
       const meta = opts._getMeta?.() || {};
       const supportedNow = resolveSupportedLangs(opts, state);
@@ -861,6 +874,7 @@ function makeTranslateAiTask(t, opts) {
         normCode(state?.activeLang) ||
         supportedNow[0];
       if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
+
       const baseKey =
         meta.analysis?.baseKey || normCode(state?.activeLang) || baseAliased;
 
@@ -888,10 +902,21 @@ function makeTranslateAiTask(t, opts) {
         })),
       };
 
+      const ai = createAiClient();
+      const next = deepClone(state);
+      let changed = false;
 
+      // We never invent titles in translate step.
+      // If there’s no title in the base, we skip titles entirely.
+      const baseTitleNow = String(
+        next?.postData?.[baseKey]?.title || ""
+      ).trim();
+      const sourceTitle = baseTitleNow || sourceStruct.title;
+      const allowTitles = !!sourceTitle && !isComment;
+
+      // Prepare body images to preserve
       const baseImages = extractImages(sourceStruct.body);
 
-      const ai = createAiClient();
       let translations;
       try {
         translations = await ai.translateStructure(
@@ -912,14 +937,6 @@ function makeTranslateAiTask(t, opts) {
         });
       }
 
-      const next = deepClone(state);
-      let changed = false;
-      const baseTitleNow = String(
-        next?.postData?.[baseKey]?.title || ""
-      ).trim();
-      const sourceTitle = baseTitleNow || sourceStruct.title;
-
-
       for (const lang of targets) {
         const tdata = translations?.[lang] || {};
         const target = normCode(lang);
@@ -936,20 +953,23 @@ function makeTranslateAiTask(t, opts) {
         );
         newBody = ensureImages(newBody, baseImages);
 
-        // TITLE with fallback proposeTitle in target language
-        let newTitle = await _ensureLocaleTitle(
-          ai,
-          t,
-          { baseAliased, targetAliased },
-          sourceTitle, // ← was sourceStruct.title
-          newBody,
-          Array.isArray(sourceStruct.chapters)
-            ? sourceStruct.chapters.map((c) => ({ body: c.body }))
-            : [],
-          tdata.title
-        );
+        // TITLE — only when allowed
+        let newTitle = "";
+        if (allowTitles) {
+          newTitle = await _ensureLocaleTitle(
+            ai,
+            t,
+            { baseAliased, targetAliased },
+            sourceTitle,
+            newBody,
+            Array.isArray(sourceStruct.chapters)
+              ? sourceStruct.chapters.map((c) => ({ body: c.body }))
+              : [],
+            tdata.title
+          );
+        }
 
-        // CHAPTERS
+        // CHAPTERS (empty for comments)
         const srcChLen = sourceStruct.chapters.length;
         const tdChapters = Array.isArray(tdata.chapters) ? tdata.chapters : [];
         const mergedBodies = [];
@@ -959,7 +979,7 @@ function makeTranslateAiTask(t, opts) {
           const srcChBody = sourceStruct.chapters[i]?.body || "";
           const srcChTitle = sourceStruct.chapters[i]?.title || "";
 
-          let cb = await ensureTranslated(
+          const cb = await ensureTranslated(
             ai,
             t,
             baseAliased,
@@ -967,7 +987,7 @@ function makeTranslateAiTask(t, opts) {
             srcChBody,
             tdChapters[i]?.body
           );
-          let ct = await ensureTranslated(
+          const ct = await ensureTranslated(
             ai,
             t,
             baseAliased,
@@ -985,7 +1005,7 @@ function makeTranslateAiTask(t, opts) {
 
         // Apply to postData
         const nextContent = {
-          title: newTitle,
+          title: allowTitles ? newTitle : "",
           body: newBody,
           chapters: mergedBodies,
         };
@@ -996,26 +1016,31 @@ function makeTranslateAiTask(t, opts) {
           changed = true;
         }
 
-        // Apply chapter titles to postParams
-        const locales = { ...(next.postParams?.locales || {}) };
-        const lp = { ...(locales[target] || {}) };
-        const curChParams = Array.isArray(lp.chapters) ? [...lp.chapters] : [];
-        while (curChParams.length < mergedChParams.length) curChParams.push({});
-        for (let i = 0; i < mergedChParams.length; i++) {
-          const tt = mergedChParams[i]?.title || "";
-          if (tt !== (curChParams[i]?.title || "")) {
-            curChParams[i] = { ...(curChParams[i] || {}), title: tt };
-            changed = true;
+        // Chapter titles to postParams (posts only)
+        if (!isComment) {
+          const locales = { ...(next.postParams?.locales || {}) };
+          const lp = { ...(locales[target] || {}) };
+          const curChParams = Array.isArray(lp.chapters)
+            ? [...lp.chapters]
+            : [];
+          while (curChParams.length < mergedChParams.length)
+            curChParams.push({});
+          for (let i = 0; i < mergedChParams.length; i++) {
+            const tt = mergedChParams[i]?.title || "";
+            if (tt !== (curChParams[i]?.title || "")) {
+              curChParams[i] = { ...(curChParams[i] || {}), title: tt };
+              changed = true;
+            }
           }
+          lp.chapters = curChParams;
+          next.postParams = {
+            ...(next.postParams || {}),
+            locales: { ...locales, [target]: lp },
+          };
         }
-        lp.chapters = curChParams;
-        next.postParams = {
-          ...(next.postParams || {}),
-          locales: { ...locales, [target]: lp },
-        };
       }
 
-      // Final verification pass (also fix the spread typo here)
+      // Final verification (skip title check if titles aren’t allowed)
       try {
         const locales = Object.keys(next.postData || {});
         const ai2 = ai;
@@ -1038,10 +1063,11 @@ function makeTranslateAiTask(t, opts) {
             }
           };
 
-          await fixField(sourceTitle, cur.title || "", (v) => {
-            // ← was sourceStruct.title
-            next.postData[key] = { ...(next.postData[key] || {}), title: v };
-          });
+          if (allowTitles) {
+            await fixField(sourceTitle, cur.title || "", (v) => {
+              next.postData[key] = { ...(next.postData[key] || {}), title: v };
+            });
+          }
 
           const chs = Array.isArray(sourceStruct.chapters)
             ? sourceStruct.chapters
@@ -1069,28 +1095,30 @@ function makeTranslateAiTask(t, opts) {
               changed = true;
             }
 
-            const fixedTitle = await ensureTranslated(
-              ai2,
-              t,
-              baseAliased,
-              targetAliased,
-              srcT,
-              candT
-            );
-            if (fixedTitle && fixedTitle !== candT) {
-              const localesMap = { ...(next.postParams?.locales || {}) };
-              const lp = { ...(localesMap[key] || {}) };
-              const chParams = Array.isArray(lp.chapters)
-                ? [...lp.chapters]
-                : [];
-              while (chParams.length <= i) chParams.push({});
-              chParams[i] = { ...(chParams[i] || {}), title: fixedTitle };
-              lp.chapters = chParams;
-              next.postParams = {
-                ...(next.postParams || {}),
-                locales: { ...localesMap, [key]: lp },
-              };
-              changed = true;
+            if (!isComment) {
+              const fixedTitle = await ensureTranslated(
+                ai2,
+                t,
+                baseAliased,
+                targetAliased,
+                srcT,
+                candT
+              );
+              if (fixedTitle && fixedTitle !== candT) {
+                const localesMap = { ...(next.postParams?.locales || {}) };
+                const lp = { ...(localesMap[key] || {}) };
+                const chParams = Array.isArray(lp.chapters)
+                  ? [...lp.chapters]
+                  : [];
+                while (chParams.length <= i) chParams.push({});
+                chParams[i] = { ...(chParams[i] || {}), title: fixedTitle };
+                lp.chapters = chParams;
+                next.postParams = {
+                  ...(next.postParams || {}),
+                  locales: { ...localesMap, [key]: lp },
+                };
+                changed = true;
+              }
             }
           }
 
@@ -1100,7 +1128,7 @@ function makeTranslateAiTask(t, opts) {
           };
         }
       } catch {
-        // ignore verification errors – better to return partial than fail
+        // ignore
       }
 
       if (!changed) return { state, modified: false };
@@ -1137,14 +1165,16 @@ export function createAIPostHandler(opts) {
     const tasks = [
       makeAnalyzeAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta }),
     ];
+ 
+    tasks.push(
+      makeCleanOriginalAiTask(t, {
+        ...opts,
+        _getMeta: meta,
+        _setMeta: setMeta,
+      })
+    );
+
     if (isPostMode()) {
-      tasks.push(
-        makeCleanOriginalAiTask(t, {
-          ...opts,
-          _getMeta: meta,
-          _setMeta: setMeta,
-        })
-      );
       tasks.push(
         makeTitleAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta })
       );
@@ -1155,10 +1185,11 @@ export function createAIPostHandler(opts) {
           _setMeta: setMeta,
         })
       );
-      tasks.push(
-        makeTranslateAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta })
-      );
     }
+
+    tasks.push(
+      makeTranslateAiTask(t, { ...opts, _getMeta: meta, _setMeta: setMeta })
+    );
     return tasks;
   };
 
