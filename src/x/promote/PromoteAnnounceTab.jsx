@@ -52,7 +52,18 @@ export default function PromoteAnnounceTab(props) {
 
   const modulePath = createMemo(() => app.domainAssetsConfig?.()?.modules?.content_lists);
   const currentLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
-  const activeDomain = createMemo(() => String(app.domain?.() || ""));
+
+  // Robust domain resolver: tries multiple AppContext sources
+  const activeDomain = createMemo(() => {
+    const candidates = [
+      typeof app.domain === "function" ? app.domain() : app.domain,
+      app.info?.()?.domain,
+      app.config?.()?.domain,
+      app.params?.()?.domain,
+    ];
+    const found = candidates.find((d) => typeof d === "string" && d.trim().length > 0);
+    return String(found || "").trim();
+  });
 
   const [contentListModule] = createResource(modulePath, async (path) => {
     if (!path || typeof path !== "string") return null;
@@ -117,8 +128,13 @@ export default function PromoteAnnounceTab(props) {
   async function handleBuy(row) {
     const domain = activeDomain();
     const cid = resolveSavvaCid(post());
+
     if (!hasActor()) {
       pushToast({ type: "warning", message: app.t("wallet.connectPrompt") });
+      return;
+    }
+    if (!domain) {
+      pushToast({ type: "warning", message: app.t("promote.announce.domainMissing") });
       return;
     }
     if (!cid) {
@@ -132,7 +148,7 @@ export default function PromoteAnnounceTab(props) {
         contractName: "ListMarket",
         functionName: "buy",
         args: [domain, String(row.id), String(cid)],
-        value: row.price, // native coin
+        value: row.price,
       });
       const txHash = res?.hash || res;
       dbg.log("PromoteAnnounceTab:buy", { hash: txHash, list: row.id, price: row.price.toString(), domain, cid });
@@ -208,7 +224,7 @@ export default function PromoteAnnounceTab(props) {
                         disabled={isPending(row.id) || !hasActor()}
                         onClick={() => handleBuy(row)}
                       >
-                        {isPending(row.id) ? app.t("promote.buying") : app.t("promote.buy")}
+                        {isPending(row.id) ? { toString() { return app.t("promote.buying"); } } : app.t("promote.buy")}
                       </button>
                     </td>
                   </tr>

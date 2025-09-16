@@ -15,6 +15,7 @@ import { pushErrorToast } from "../../ui/toast.js";
 import { dbg } from "../../utils/debug.js";
 import NpoUsers from "../npo/NpoUsers.jsx";
 import NpoTOokens from "../npo/NpoTOokens.jsx";
+import NpoRoles from "../npo/NpoRoles.jsx";
 
 function bytes32ToString(hex) {
   if (!hex || typeof hex !== "string" || !hex.startsWith("0x")) return "";
@@ -53,7 +54,8 @@ export default function NpoPage() {
 
   const [activeTab, setActiveTab] = createSignal("users");
   const TABS = createMemo(() => ([
-    { id: "users",  label: t("npo.page.tabs.users") },
+    { id: "users", label: t("npo.page.tabs.users") },
+    { id: "roles", label: t("npo.page.tabs.roles") },
     { id: "tokens", label: t("npo.page.tabs.tokens") },
   ]));
 
@@ -245,6 +247,14 @@ export default function NpoPage() {
               onOpenAdd={() => setShowAdd(true)}
               onOpenEdit={(addr, user) => { setEditTarget({ address: addr, user }); setEditOpen(true); }}
               onToggleAdmin={handleAdminToggle}
+            />
+          </Show>
+
+          <Show when={activeTab() === "roles"}>
+            <NpoRoles
+              npoAddr={npoAddr()}
+              selfIsAdmin={selfIsAdmin()}
+              refreshEpoch={refreshEpoch()}
             />
           </Show>
 
