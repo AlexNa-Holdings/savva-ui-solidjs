@@ -31,16 +31,35 @@ export default function AISettingsSection() {
   function update(field, value) { setCfg((prev) => ({ ...prev, [field]: value })); }
   function updateExtra(field, value) { setCfg((prev) => ({ ...prev, extra: { ...(prev.extra || {}), [field]: value } })); }
 
+  // Persist AUTO immediately when toggled so the editor can pick it up
+  function onToggleAuto(e) {
+    const v = !!e.currentTarget.checked;
+    setCfg((prev) => ({ ...prev, auto: v }));
+    try {
+      const toSave = { ...cfg(), auto: v };
+      saveAiConfig(toSave);
+      pushToast({ type: "success", message: t("settings.ai.saved") });
+    } catch { /* ignore */ }
+  }
+
   function handleSave() {
-    saveAiConfig(cfg());
+    const toSave = { ...cfg(), auto: !!cfg().auto };
+    saveAiConfig(toSave);
     pushToast({ type: "success", message: t("settings.ai.saved") });
   }
 
   async function handleTest() {
     setBusyTest(true);
     const prevCfg = loadAiConfig();
+    const preserveAuto = !!cfg().auto; // ← keep user's auto setting
     let restored = false;
-    const restore = () => { if (!restored) { saveAiConfig(prevCfg); restored = true; } };
+    const restore = () => {
+      if (!restored) {
+        const merged = { ...prevCfg, auto: preserveAuto }; // ← restore without clobbering AUTO
+        saveAiConfig(merged);
+        restored = true;
+      }
+    };
 
     try {
       // Apply on-screen config so the client uses it
@@ -83,12 +102,11 @@ export default function AISettingsSection() {
         } catch (e) {
           if (!firstErr) firstErr = e;
           const msg = String(e?.message || "").toLowerCase();
-          if (msg.includes("ambiguous")) { ok = true; break; } // network/auth OK, semantics irrelevant for test
+          if (msg.includes("ambiguous")) { ok = true; break; }
         }
       }
 
       if (!probes.length) {
-        // Fallback: connectivity-only probe
         const probe = await testConnection(cfg());
         ok = !!probe?.ok;
         if (!ok) firstErr = Object.assign(new Error("probe"), { status: probe?.status, code: probe?.code, endpoint: probe?.endpoint });
@@ -173,7 +191,7 @@ export default function AISettingsSection() {
 
       <div class="flex items-center gap-2">
         <label class="flex items-center gap-2">
-          <input type="checkbox" checked={!!cfg().auto} onInput={(e) => update("auto", e.currentTarget.checked)} />
+          <input type="checkbox" checked={!!cfg().auto} onInput={onToggleAuto} />
           <span>{t("settings.ai.auto")}</span>
         </label>
         <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.autoHint")}</span>
@@ -220,8 +238,7 @@ export default function AISettingsSection() {
   );
 }
 
-// ---- local helpers ----
-
+// ---- helpers shown in toast error details ----
 function sanitizeUrl(u) {
   if (!u) return "";
   try {
@@ -231,12 +248,12 @@ function sanitizeUrl(u) {
     return String(u).replace(/^https?:\/\/[^/]+/, "");
   }
 }
-
 function extractErrorInfo(e) {
   try {
     const status = e?.status ?? e?.response?.status ?? e?.cause?.status;
     const code = e?.code ?? e?.cause?.code ?? e?.error?.code;
-    const endpoint = e?.endpoint ?? e?.url ?? e?.config?.url ?? e?.response?.url;
+    const endpoint =
+      e?.endpoint ?? e?.url ?? e?.config?.url ?? e?.response?.url;
     const requestId =
       e?.requestId ??
       e?.response?.headers?.get?.("x-request-id") ??
@@ -253,7 +270,6 @@ function extractErrorInfo(e) {
     return {};
   }
 }
-
 async function getAuthDebug(app) {
   try {
     const tok = await app?.auth?.getToken?.();
@@ -264,31 +280,14 @@ async function getAuthDebug(app) {
     return { hasToken: true };
   }
 }
-
 async function buildTestErrorDetails(t, err, cfg, app) {
   const info = extractErrorInfo(err);
   const auth = await getAuthDebug(app);
   const parts = [t("editor.ai.errors.api")];
-
-  if (info.status) parts.push(`${t("editor.ai.errors.status")}: ${info.status}`);
-  if (info.code) parts.push(`${t("editor.ai.errors.code")}: ${info.code}`);
-  if (info.endpoint) parts.push(`${t("editor.ai.errors.endpoint")}: ${info.endpoint}`);
-  if (info.requestId) parts.push(`${t("editor.ai.errors.requestId")}: ${info.requestId}`);
-
-  parts.push(`${t("settings.ai.details.provider")}: ${cfg.providerId || "-"}`);
-  parts.push(`${t("settings.ai.details.model")}: ${cfg.model || "-"}`);
-  parts.push(`${t("settings.ai.details.baseUrl")}: ${cfg.baseUrl || "-"}`);
-  parts.push(`${t("settings.ai.details.tokenIssuer")}: ${auth.iss || (auth.hasToken ? "-" : "none")}`);
-  parts.push(`${t("settings.ai.details.tokenAudience")}: ${Array.isArray(auth.aud) ? auth.aud.join(",") : (auth.aud || "-")}`);
-  if (auth.exp) {
-    const expDate = new Date(auth.exp * 1000);
-    parts.push(`${t("settings.ai.details.tokenExpiry")}: ${expDate.toISOString()}`);
-  }
-
-  const reason = info.rawMessage || err?.message;
-  if (reason && reason !== t("settings.ai.testFailed") && reason !== t("editor.ai.errors.api")) {
-    parts.push(`${t("editor.ai.errors.reason")}: ${String(reason).slice(0, 300)}`);
-  }
-  return parts.join("\n");
+  if (info.status) parts.push(`${t("error.httpStatus")}: ${info.status}`);
+  if (info.code) parts.push(`${t("error.code")}: ${info.code}`);
+  if (info.endpoint) parts.push(`${t("error.endpoint")}: ${info.endpoint}`);
+  if (info.requestId) parts.push(`x-request-id: ${info.requestId}`);
+  if (auth?.hasToken === false) parts.push(t("auth.noToken"));
+  return parts.join(" · ");
 }
-
