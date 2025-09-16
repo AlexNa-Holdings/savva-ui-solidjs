@@ -112,7 +112,7 @@ export default function EditorActionsRow(props) {
             // Undo/Confirm block with AI icon (shown even in auto mode)
             <div class="flex items-stretch rounded-lg border border-[hsl(var(--border))] overflow-hidden">
               <div class="px-4 py-3 flex items-center">
-                {AiGlyphButton}
+                <AiIcon size={28} class="opacity-90 inline-block" />
               </div>
               <button
                 type="button"

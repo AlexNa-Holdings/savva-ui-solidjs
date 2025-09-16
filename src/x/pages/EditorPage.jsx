@@ -73,6 +73,7 @@ export default function EditorPage() {
   const [filesRevision, setFilesRevision] = createSignal(0);
 
   const [parentPreviewCid, setParentPreviewCid] = createSignal(null);
+  const [aiLastRunOk, setAiLastRunOk] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -134,7 +135,11 @@ export default function EditorPage() {
     readState: readEditorState,
     applyState: applyEditorState,
     t,
-    onToast: pushToast,
+    onToast: (evt) => {
+      if (evt?.type === "error") setAiLastRunOk(false);
+      if (evt?.type === "info" || evt?.type === "success") setAiLastRunOk(true);
+      pushToast(evt);
+    },
     supportedLangs: () => domainLangCodes(),
     editorMode: () => editorMode(),
   });
@@ -660,10 +665,23 @@ export default function EditorPage() {
                           <TrashIcon />
                         </button>
                       }
-                      renderPreviewButton={({ withAiIcon, AiIconEl }) => (
+                      renderPreviewButton={({ withAiIcon, AiIconEl, disabled }) => (
                         <button
-                          onClick={() => setShowFullPreview(true)}
-                          class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 flex items-center"
+                          onClick={async () => {
+                            if (withAiIcon) {          // ← auto mode + configured
+                              if (ai.running()) return;
+                              setAiLastRunOk(false);
+                              await ai.run();          // toasts set aiLastRunOk(true/false)
+                              if (aiLastRunOk()) {
+                                setShowFullPreview(true);
+                              }
+                              return;                  // on failure, stay on the page
+                            }
+                            // manual flow
+                            setShowFullPreview(true);
+                          }}
+                          disabled={!!disabled}
+                          class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center"
                         >
                           {withAiIcon && <span class="mr-2">{AiIconEl}</span>}
                           {t("editor.previewPost")}
