@@ -42,15 +42,8 @@ export function getPostAdminItems(post, t) {
 
   // A "comment" has a ParentSavvaCID; a "post" does not (be liberal about casing/aliases).
   const isComment = !!(
-    raw.ParentSavvaCID ??
-    raw.parentSavvaCid ??
-    raw.parentSavvaCID ??
-    raw.parent_cid ??
-    post.ParentSavvaCID ??
-    post.parentSavvaCid ??
-    post.parentSavvaCID ??
-    post.parent_cid
-  );
+    raw?.savva_content?.parent_savva_cid ??
+    post?.savva_content?.parent_savva_cid );
 
   const descriptorPathRaw = String(
     raw.finalDescriptorPath || raw.ipfs || post.finalDescriptorPath || post.ipfs || ""

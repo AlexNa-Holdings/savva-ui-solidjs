@@ -31,9 +31,9 @@ async function fetchUserProfile({ app, identifier }) {
     const wsParams = { domain: app.selectedDomainName() };
     const currentUser = app.authorizedUser();
     if (currentUser) wsParams.caller = currentUser.address;
-    if (identifier.startsWith('@')) wsParams.user_name = identifier.substring(1);
+    if (identifier.startsWith("@")) wsParams.user_name = identifier.substring(1);
     else wsParams.user_addr = identifier;
-    return await app.wsCall('get-user', wsParams);
+    return await app.wsCall("get-user", wsParams);
   } catch (error) {
     console.error("Failed to fetch user profile:", error);
     return { error: error.message };
@@ -76,26 +76,30 @@ export default function ProfilePage() {
 
   const identifier = createMemo(() => {
     const path = route();
-    return (path.split('?')[0].split('/')[1] || "");
+    return path.split("?")[0].split("/")[1] || "";
   });
 
-  const [userResource, { refetch: refetchUser }] = createResource(() => ({ app, identifier: identifier() }), fetchUserProfile);
-  const [profileDetails] = createResource(() => userResource()?.profile_cid, (cid) => fetchProfileDetails(cid, app));
+  const [userResource, { refetch: refetchUser }] = createResource(
+    () => ({ app, identifier: identifier() }),
+    fetchUserProfile
+  );
+  const [profileDetails] = createResource(
+    () => userResource()?.profile_cid,
+    (cid) => fetchProfileDetails(cid, app)
+  );
 
-  const [activeTab, setActiveTab] = createSignal('posts');
+  const [activeTab, setActiveTab] = createSignal("posts");
 
   const isBanned = createMemo(() => !!userResource()?.banned);
 
-  // Center screen title tabs sync
+  // Tabs (hide Wallet when banned)
   const TABS = createMemo(() => {
     const items = [
-      { id: 'posts', label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-      { id: 'subscribers', label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-      { id: 'subscriptions', label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+      { id: "posts", label: t("profile.tabs.posts"), icon: <PostsIcon /> },
+      { id: "subscribers", label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
+      { id: "subscriptions", label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
     ];
-    if (!isBanned()) {
-      items.push({ id: 'wallet', label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
-    }
+    if (!isBanned()) items.push({ id: "wallet", label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
     return items;
   });
 
@@ -108,13 +112,13 @@ export default function ProfilePage() {
   createEffect(() => {
     const tab = desiredTab();
     if (!tab) return;
-    const valid = TABS().map(t => t.id);
+    const valid = TABS().map((t) => t.id);
     if (valid.includes(tab)) setActiveTab(tab);
   });
 
   createEffect(() => {
     const available = TABS();
-    if (!available.some(t => t.id === activeTab())) setActiveTab('posts');
+    if (!available.some((t) => t.id === activeTab())) setActiveTab("posts");
   });
 
   const profileLinks = createMemo(() => {
@@ -159,10 +163,10 @@ export default function ProfilePage() {
     const details = profileDetails();
     if (!details) return "";
     const lang = app.lang();
-    if (details.about_me && typeof details.about_me === 'object') {
+    if (details.about_me && typeof details.about_me === "object") {
       return details.about_me[lang] || details.about_me.en || Object.values(details.about_me)[0] || "";
     }
-    if (details.about && typeof details.about === 'string') {
+    if (details.about && typeof details.about === "string") {
       return details.about;
     }
     return "";
@@ -225,7 +229,9 @@ export default function ProfilePage() {
 
       <Switch>
         <Match when={userResource.loading}>
-          <div class="flex justify-center items-center h-64"><Spinner class="w-8 h-8" /></div>
+          <div class="flex justify-center items-center h-64">
+            <Spinner class="w-8 h-8" />
+          </div>
         </Match>
         <Match when={userResource.error || userResource()?.error}>
           <div class="p-4 rounded border text-center border-[hsl(var(--destructive))] bg-[hsl(var(--card))]">
@@ -234,12 +240,15 @@ export default function ProfilePage() {
           </div>
         </Match>
         <Match when={userResource()}>
-          {(user) =>
+          {(user) => (
             <div class="space-y-6">
-              {/* Banned banner */}
+              {/* Banned banner (+ optional admin comment) */}
               <Show when={isBanned()}>
                 <div class="p-3 rounded-md border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 text-[hsl(var(--destructive))] font-semibold">
-                  {t("user.banned")}
+                  <span>{t("user.banned")}</span>
+                  <Show when={String(user().ban_comment || "").trim()}>
+                    <span class="opacity-90"> — {user().ban_comment}</span>
+                  </Show>
                 </div>
               </Show>
 
@@ -306,22 +315,22 @@ export default function ProfilePage() {
                           <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
                         </div>
                         <div class="flex items-center gap-2 mt-1 text-sm">
-                          <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.paysForSubscriptions")}:</span>
+                          <span class="text-[hsl(var(--muted-foreground))]">
+                            {t("profile.stats.paysForSubscriptions")}:
+                          </span>
                           <TokenValue amount={user().total_sponsoring} />
                           <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
                         </div>
                         <div class="flex items-center gap-2 mt-1 text-sm">
-                          <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.receivedFromSubscribers")}:</span>
+                          <span class="text-[hsl(var(--muted-foreground))]">
+                            {t("profile.stats.receivedFromSubscribers")}:
+                          </span>
                           <TokenValue amount={user().total_sponsored} />
                           <span class="text-[hsl(var(--muted-foreground))] text-sm ml-1">{t("profile.stats.perWeek")}</span>
                         </div>
                         <Show when={user().is_npo}>
                           <div class="mt-1">
-                            <NpoIcon
-                              class="w-7 h-7 opacity-95"
-                              title={t("npo.short")}
-                              aria-label={t("npo.short")}
-                            />
+                            <NpoIcon class="w-7 h-7 opacity-95" title={t("npo.short")} aria-label={t("npo.short")} />
                           </div>
                         </Show>
                       </Show>
@@ -366,16 +375,16 @@ export default function ProfilePage() {
                 <Tabs items={TABS()} value={activeTab()} onChange={onTabChange} compactWidth={640} />
                 <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
                   <Switch>
-                    <Match when={activeTab() === 'posts'}>
+                    <Match when={activeTab() === "posts"}>
                       <PostsTab user={user()} />
                     </Match>
-                    <Match when={activeTab() === 'subscribers'}>
+                    <Match when={activeTab() === "subscribers"}>
                       <SubscribersTab user={user()} />
                     </Match>
-                    <Match when={activeTab() === 'subscriptions'}>
+                    <Match when={activeTab() === "subscriptions"}>
                       <SubscriptionsTab user={user()} />
                     </Match>
-                    <Match when={activeTab() === 'wallet'}>
+                    <Match when={activeTab() === "wallet"}>
                       <WalletTab user={user()} />
                     </Match>
                   </Switch>
@@ -393,7 +402,7 @@ export default function ProfilePage() {
                 />
               </Show>
             </div>
-          }
+          )}
         </Match>
       </Switch>
     </main>
