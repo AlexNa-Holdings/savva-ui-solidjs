@@ -1,0 +1,418 @@
+// src/x/pages/admin/DomainConfigPage.jsx
+import { createSignal, createMemo, createEffect, createResource, onMount, onCleanup } from "solid-js";
+import { useApp } from "../../../context/AppContext.jsx";
+import FileBrowser from "./domain_config/FileBrowser.jsx";
+import FileViewer from "./domain_config/FileViewer.jsx";
+import DownloadConfigModal from "./domain_config/DownloadConfigModal.jsx";
+import CreateEntryModal from "./domain_config/CreateEntryModal.jsx";
+import { resetDir, getDirHandle, writeFile, listFiles, deleteEntry, createDir } from "./domain_config/fs.js";
+import { pushToast, pushErrorToast } from "../../../ui/toast.js";
+import { MaximizeIcon, MinimizeIcon } from "../../ui/icons/ToolbarIcons.jsx";
+import { dbg } from "../../../utils/debug.js";
+
+/* helpers */
+const LS_KEY = (d) => `sv_domain_config_dir:${d}`;
+const ensureSlash = (s) => (s && !s.endsWith("/") ? s + "/" : s || "/");
+
+function parseHtmlListing(html = "") {
+  const hrefs = [...html.matchAll(/href\s*=\s*"(.*?)"/gi)].map((m) => m[1]).filter(Boolean);
+  const cleaned = hrefs.map((h) => decodeURIComponent(h))
+    .filter((h) => !h.startsWith("?") && !h.startsWith("#") && h !== "../" && h !== "/")
+    .filter((h) => !/^https?:\/\//i.test(h)).map((h) => (h.startsWith("./") ? h.slice(2) : h));
+  const files = [], dirs = [];
+  for (const h of cleaned) (h.endsWith("/") ? dirs : files).push(h.replace(/\/+$/, ""));
+  return { files, dirs };
+}
+
+async function discoverEntriesOrThrow(prefixUrl, subPath = "", depth = 0, maxDepth = 8, cap = { count: 0, max: 10000 }) {
+  const url = ensureSlash(prefixUrl) + subPath;
+  if (depth > maxDepth) return [];
+  for (const mf of ["__files.json", "files.json", "_files.json"]) {
+    try {
+      const r = await fetch(ensureSlash(url) + mf, { cache: "no-store" });
+      if (r.ok) {
+        const json = await r.json();
+        let items = Array.isArray(json) ? json : json?.files || [];
+        items = items.map((x) => (typeof x === "string" ? x : x?.path)).filter(Boolean)
+          .map((p) => (subPath ? `${subPath}${p}` : p));
+        return items;
+      }
+    } catch {}
+  }
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (r.ok) {
+      const ct = r.headers.get("content-type") || "";
+      if (ct.includes("text/html")) {
+        const html = await r.text();
+        const { files, dirs } = parseHtmlListing(html);
+        const out = [];
+        for (const f of files) { if (cap.count >= cap.max) break; out.push(subPath ? `${subPath}${f}` : f); cap.count++; }
+        for (const d of dirs) { if (cap.count >= cap.max) break;
+          const child = await discoverEntriesOrThrow(prefixUrl, `${subPath}${d}/`, depth + 1, maxDepth, cap);
+          out.push(...child);
+        }
+        return out;
+      }
+    }
+  } catch {}
+  if (depth === 0) { const err = new Error("No manifest or directory listing"); err.code = "NO_LISTING"; throw err; }
+  return [];
+}
+
+async function downloadAllDomainFiles(app, sourceType) {
+  const info = app.info?.() || {};
+  const domain = app.selectedDomainName?.() || "";
+  let base = "", prefix = "", targetDirName = "";
+  if (sourceType === "prod")      { base = ensureSlash(info.assets_url);      prefix = `${domain}/`; targetDirName = `domain_config_edit/${domain}`; }
+  else if (sourceType === "test") { base = ensureSlash(info.temp_assets_url); prefix = `${domain}/`; targetDirName = `domain_config_edit/${domain}`; }
+  else                            { base = ensureSlash("/domain_default");    prefix = "";           targetDirName = "domain_config_edit/default"; }
+  const sourceUrlPrefix = ensureSlash(base) + prefix;
+
+  dbg.log("DomainConfigPage", "download start", { sourceType, base, prefix, sourceUrlPrefix, targetDirName });
+  await resetDir(targetDirName);
+  const targetDirHandle = await getDirHandle(targetDirName, { create: true });
+
+  const scanToastId = pushToast({ type: "info", message: app.t("admin.domainConfig.download.scanning"), autohideMs: 0 });
+  let fileList = [];
+  try { fileList = await discoverEntriesOrThrow(sourceUrlPrefix); } finally { app.dismissToast(scanToastId); }
+
+  fileList = [...new Set(fileList.map((p) => p.replace(/^\/+/, "")))];
+  if (!fileList.length) { const err = new Error(app.t("admin.domainConfig.download.noFiles")); err.code = "EMPTY_LIST"; throw err; }
+
+  pushToast({ type: "info", message: app.t("admin.domainConfig.download.found", { n: fileList.length }), autohideMs: 2000 });
+
+  let ok = 0, skipped = 0;
+  for (const rel of fileList) {
+    try {
+      const res = await fetch(sourceUrlPrefix + rel, { cache: "no-store" });
+      if (!res.ok) { skipped++; continue; }
+      const blob = await res.blob();
+      await writeFile(targetDirHandle, rel, blob);
+      ok++;
+    } catch { skipped++; }
+  }
+
+  pushToast({
+    type: ok ? "success" : "warning",
+    message: app.t("admin.domainConfig.download.result", { ok, total: fileList.length, skipped }),
+    autohideMs: 6000,
+  });
+
+  try { localStorage.setItem(LS_KEY(domain || "default"), targetDirName); } catch {}
+  return { targetDirName, ok, total: fileList.length, skipped };
+}
+
+/* component */
+export default function DomainConfigPage() {
+  const app = useApp();
+  const { t } = app;
+  const domainName = () => app.selectedDomainName?.() || "";
+
+  const [currentConfigDir, setCurrentConfigDir] = createSignal(`domain_config_edit/${domainName()}`);
+  const [currentPath, setCurrentPath] = createSignal("/");
+  const [selectedItem, setSelectedItem] = createSignal(null); // file or dir
+  const [showDownloadModal, setShowDownloadModal] = createSignal(false);
+  const [showCreateModal, setShowCreateModal] = createSignal(false);
+  const [isDownloading, setIsDownloading] = createSignal(false);
+  const [refreshKey, setRefreshKey] = createSignal(0);
+
+  const [canSave, setCanSave] = createSignal(false);
+  let viewerApi = null;
+
+  // fullscreen
+  const [maximized, setMaximized] = createSignal(false);
+  const containerClass = createMemo(() =>
+    maximized()
+      ? "fixed inset-0 z-[100] bg-[hsl(var(--background))] p-4 sm:p-6 flex flex-col"
+      : "p-4 h-[calc(100vh-12rem)] flex flex-col"
+  );
+  createEffect(() => {
+    if (maximized()) {
+      const prev = document.documentElement.style.overflow;
+      document.documentElement.style.overflow = "hidden";
+      onCleanup(() => { document.documentElement.style.overflow = prev; });
+    }
+  });
+  onMount(() => {
+    const onKey = (e) => {
+      const key = (e.key || "").toLowerCase();
+      if (key === "escape" && maximized()) setMaximized(false);
+      if (key === "m" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setMaximized((v) => !v); }
+      if (key === "delete") onDeleteSelected();
+    };
+    window.addEventListener("keydown", onKey);
+    onCleanup(() => window.removeEventListener("keydown", onKey));
+  });
+
+  // restore working folder
+  onMount(() => {
+    const key = LS_KEY(domainName() || "default");
+    const saved = (() => { try { return localStorage.getItem(key) || ""; } catch { return ""; } })();
+    if (saved) {
+      dbg.log("DomainConfigPage", "restore working dir", saved);
+      setCurrentConfigDir(saved);
+      setCurrentPath("/");
+      setSelectedItem(null);
+      setRefreshKey((k) => k + 1);
+    }
+  });
+
+  // data
+  const fullPath = createMemo(() => (currentPath() === "/" ? currentConfigDir() : `${currentConfigDir()}${currentPath()}`));
+  const [filesResource, { refetch }] = createResource(
+    () => [fullPath(), refreshKey()],
+    async ([path]) => {
+      const items = await listFiles(path);
+      dbg.log("DomainConfigPage", "listFiles", path, items?.length ?? 0);
+      return items;
+    }
+  );
+
+  const displayedFiles = createMemo(() => {
+    const files = filesResource() || [];
+    return currentPath() !== "/" ? [{ name: "..", type: "dir" }, ...files] : files;
+  });
+
+  // no auto-select; we keep selection until user clicks
+  createEffect(() => {
+    if (filesResource.loading) return;
+    if (!displayedFiles()?.length) setSelectedItem(null);
+  });
+
+  const confirmAndMaybeSave = async () => {
+    if (!canSave()) return true;
+    const yes = confirm(t("admin.domainConfig.editor.confirmSave"));
+    if (!yes) return true; // discard
+    try {
+      const ok = await viewerApi?.save?.();
+      if (!ok) return false;
+      pushToast({ type: "success", message: t("admin.domainConfig.editor.savedOk") });
+      return true;
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.editor.saveErr") });
+      return false;
+    }
+  };
+
+  // single-click: select
+  const handleSelectItem = async (file) => {
+    if (!file) return;
+    // switching away from an open text file
+    const proceed = await confirmAndMaybeSave();
+    if (!proceed) return;
+    setSelectedItem(file);
+  };
+
+  // double-click: open folder (or go up)
+  const handleOpenDir = async (file) => {
+    if (!file || file.type !== "dir") return;
+    const proceed = await confirmAndMaybeSave();
+    if (!proceed) return;
+    if (file.name === "..") {
+      const parts = currentPath().split("/").filter(Boolean); parts.pop();
+      setCurrentPath(parts.length ? `/${parts.join("/")}` : "/");
+    } else {
+      setCurrentPath(currentPath() === "/" ? `/${file.name}` : `${currentPath()}/${file.name}`);
+    }
+    setSelectedItem(null); // show nothing on the right until user picks a file
+  };
+
+  // actions
+  const relFromCurrent = (name) => {
+    const sub = currentPath() === "/" ? "" : currentPath().slice(1);
+    return sub ? `${sub}/${name}` : name;
+  };
+
+  const onCreate = async ({ name, isFolder }) => {
+    try {
+      const base = await getDirHandle(currentConfigDir(), { create: true });
+      const rel = relFromCurrent(name);
+      if (isFolder) {
+        await createDir(currentConfigDir(), rel);
+      } else {
+        await writeFile(base, rel, "");
+      }
+      setRefreshKey((k) => k + 1);
+      await refetch();
+      pushToast({ type: "success", message: t("admin.domainConfig.new.createdOk", { name }) });
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.new.err") });
+    }
+  };
+
+  const onDeleteSelected = async () => {
+    const sel = selectedItem();
+    if (!sel || sel.name === "..") return;
+    const proceed = await confirmAndMaybeSave();
+    if (!proceed) return;
+    const rel = relFromCurrent(sel.name);
+    if (!confirm(t("admin.domainConfig.delete.confirmItem", { name: sel.name }))) return;
+    try {
+      await deleteEntry(currentConfigDir(), rel);
+      setSelectedItem(null);
+      setRefreshKey((k) => k + 1);
+      await refetch();
+      pushToast({ type: "success", message: t("admin.domainConfig.delete.ok") });
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.delete.err") });
+    }
+  };
+
+  const onUploadSelected = async (ev) => {
+    const proceed = await confirmAndMaybeSave();
+    if (!proceed) return;
+    try {
+      const files = Array.from(ev?.currentTarget?.files || []);
+      if (!files.length) return;
+      const baseHandle = await getDirHandle(currentConfigDir(), { create: true });
+      let ok = 0, skipped = 0;
+      for (const f of files) {
+        const rel = (f.webkitRelativePath || f.name).replace(/^\/+/, "");
+        try { await writeFile(baseHandle, rel, f); ok++; } catch { skipped++; }
+      }
+      setRefreshKey((k) => k + 1);
+      await refetch();
+      pushToast({ type: "success", message: t("admin.domainConfig.upload.result", { ok, skipped }) });
+      ev.currentTarget.value = "";
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.upload.err") });
+    }
+  };
+
+  const onSave = async () => {
+    try {
+      const ok = await viewerApi?.save?.();
+      if (ok) {
+        pushToast({ type: "success", message: t("admin.domainConfig.editor.savedOk") });
+      }
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.editor.saveErr") });
+    }
+  };
+
+  const onPublish = () => pushToast({ type: "info", message: t("common.comingSoon") });
+
+  const handleDownloadSelect = async (sourceType) => {
+    const proceed = await confirmAndMaybeSave();
+    if (!proceed) return;
+
+    setShowDownloadModal(false);
+    setIsDownloading(true);
+    const toastId = pushToast({ type: "info", message: t("admin.domainConfig.download.downloading"), autohideMs: 0 });
+    try {
+      const { targetDirName } = await downloadAllDomainFiles(app, sourceType);
+      setCurrentConfigDir(targetDirName);
+      try { localStorage.setItem(LS_KEY(domainName() || "default"), targetDirName); } catch {}
+      setCurrentPath("/");
+      setSelectedItem(null);
+      setRefreshKey((k) => k + 1);
+      await refetch();
+      pushToast({ type: "success", message: t("admin.domainConfig.download.success") });
+    } catch (e) {
+      const details = e?.code === "NO_LISTING" ? t("admin.domainConfig.download.noListingHint") : e?.message || String(e || "");
+      pushErrorToast(new Error(details), { context: t("admin.domainConfig.download.error") });
+    } finally {
+      setIsDownloading(false);
+      app.dismissToast(toastId);
+    }
+  };
+
+  const activeFileForViewer = createMemo(() => (selectedItem()?.type === "file" ? selectedItem() : null));
+
+  /* render */
+  let uploadInput;
+  return (
+    <div class={containerClass()}>
+      <div class="mb-2 flex items-center gap-2">
+        <h3 class="text-xl font-semibold">
+          {t("admin.domainConfig.title", { domain: domainName() })}
+        </h3>
+
+        <div class="ml-auto flex items-center gap-2">
+          <button
+            class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+            onClick={() => setMaximized((v) => !v)}
+            aria-pressed={maximized() ? "true" : "false"}
+            title={maximized() ? t("common.restore") : t("common.maximize")}
+          >
+            {maximized() ? <MinimizeIcon /> : <MaximizeIcon />}
+            <span class="sr-only">{maximized() ? t("common.restore") : t("common.maximize")}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-grow grid grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)] gap-4 border border-[hsl(var(--border))] rounded-lg p-2 overflow-hidden">
+        <FileBrowser
+          files={displayedFiles()}
+          currentPath={currentPath()}
+          selectedFile={selectedItem()}
+          onSelectFile={handleSelectItem}     // single click: select
+          onOpenDir={handleOpenDir}           // double click: open dir
+          loading={filesResource.loading}
+          emptyText={t("admin.domainConfig.browser.empty")}
+        />
+        <div class="overflow-hidden h-full min-h-0">
+          <FileViewer
+            file={activeFileForViewer()}
+            basePath={fullPath()}
+            bindApi={(api) => (viewerApi = api)}
+            onEditorState={(s) => setCanSave(!!s?.dirty && !!s?.canSave)}
+          />
+        </div>
+      </div>
+
+      {/* Action bar: Download · Create · Save · Upload · Delete · Publish (rightmost) */}
+      <div class="pt-3 mt-3">
+        <div class="grid grid-cols-6 gap-2">
+          <button class="px-3 py-2 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] w-full"
+            onClick={() => setShowDownloadModal(true)}
+            disabled={isDownloading()}>
+            {isDownloading() ? t("admin.domainConfig.download.downloading") : t("admin.domainConfig.actions.download")}
+          </button>
+
+          <button class="px-3 py-2 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] w-full"
+            onClick={() => setShowCreateModal(true)}>
+            {t("admin.domainConfig.actions.create")}
+          </button>
+
+          <button class="px-3 py-2 rounded-md border border-[hsl(var(--border))] w-full disabled:opacity-60 disabled:cursor-not-allowed hover:bg-[hsl(var(--accent))]"
+            onClick={onSave}
+            disabled={!canSave()}>
+            {t("admin.domainConfig.actions.save")}
+          </button>
+
+          <button class="px-3 py-2 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] w-full"
+            onClick={() => uploadInput?.click()}>
+            {t("admin.domainConfig.actions.upload")}
+          </button>
+
+          <button class="px-3 py-2 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] w-full disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={onDeleteSelected}
+            disabled={!selectedItem() || selectedItem()?.name === ".."}>
+            {t("admin.domainConfig.actions.delete")}
+          </button>
+
+          <button class="px-3 py-2 rounded-md border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90 w-full"
+            onClick={onPublish}>
+            {t("admin.domainConfig.actions.publish")}
+          </button>
+        </div>
+
+        <input ref={uploadInput} type="file" webkitdirectory multiple onInput={onUploadSelected} style="display:none" />
+      </div>
+
+      <DownloadConfigModal
+        isOpen={showDownloadModal()}
+        onClose={() => setShowDownloadModal(false)}
+        onSelect={handleDownloadSelect}
+      />
+
+      <CreateEntryModal
+        isOpen={showCreateModal()}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={onCreate}
+      />
+    </div>
+  );
+}

@@ -1,7 +1,7 @@
 // src/x/editor/EditorToolbar.jsx
 import { useApp } from "../../context/AppContext.jsx";
 import { applyMarkdownFormat } from "../../editor/text-utils.js";
-import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon, MaximizeIcon, MinimizeIcon } from "./ToolbarIcons.jsx";
+import { ToolbarButton, BoldIcon, ItalicIcon, LinkIcon, ImageIcon, MaximizeIcon, MinimizeIcon } from "../ui/icons/ToolbarIcons.jsx";
 import { Show } from "solid-js";
 
 export default function EditorToolbar(props) {

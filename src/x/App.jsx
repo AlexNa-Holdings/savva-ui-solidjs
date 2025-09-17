@@ -31,6 +31,7 @@ import VersionChecker from "./main/VersionChecker.jsx";
 import AdminActionsBridge from "./admin/AdminActionsBridge.jsx";
 import PromoCodesPage from "./pages/PromoCodesPage.jsx";
 import PromoRedeemPage from "./pages/PromoRedeemPage.jsx";
+import AdminPage from "./pages/AdminPage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -51,6 +52,7 @@ export default function App() {
     if (r.startsWith("/promo-codes")) return "promo-codes";
     if (r.startsWith("/promo-code/")) return "promo-code"; 
     if (r.startsWith("/fr/")) return "contribute";
+    if (r.startsWith("/admin")) return "admin";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
     return "main";
   });
@@ -149,6 +151,7 @@ export default function App() {
                 <Show when={currentView() === "contribute"}><ContributePage /></Show>
                 <Show when={currentView() === "promo-codes"}><PromoCodesPage /></Show>
                 <Show when={currentView() === "promo-code"}><PromoRedeemPage /></Show>
+                <Show when={currentView() === "admin"}><AdminPage /></Show>
               </main>
             </>
           </Show>

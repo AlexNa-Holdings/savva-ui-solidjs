@@ -75,5 +75,7 @@ t("social.x")
 t("social.facebook")
 t("social.youtube")
 
+t("admin.domainConfig.navTitle")
+
 
 */
