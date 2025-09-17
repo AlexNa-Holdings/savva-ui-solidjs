@@ -24,7 +24,7 @@ export default {
   "admin.cancel": "Cancel",
   "admin.commentLabel": "Comment",
   "admin.confirmBan": "Confirm Ban",
-  "admin.domainConfig.actions.create": "!New",
+  "admin.domainConfig.actions.create": "New",
   "admin.domainConfig.actions.delete": "Delete",
   "admin.domainConfig.actions.download": "Download",
   "admin.domainConfig.actions.publish": "Publish",
