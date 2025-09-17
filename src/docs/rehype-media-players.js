@@ -1,7 +1,10 @@
 // src/docs/rehype-media-players.js
 import { visit } from "unist-util-visit";
 
-const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+// const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/;
+const YOUTUBE_REGEX =
+  /(?:https?:\/\/)?(?:(?:www|m)\.)?(?:youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg)$/i;
 const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|m4a)$/i;
 
