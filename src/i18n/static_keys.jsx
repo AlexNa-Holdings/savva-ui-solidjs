@@ -77,5 +77,8 @@ t("social.youtube")
 
 t("admin.domainConfig.navTitle")
 
+t("delete.confirm.post.title")
+t("delete.confirm.comment.title")
+
 
 */

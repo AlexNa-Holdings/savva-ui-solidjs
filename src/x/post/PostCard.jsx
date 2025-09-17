@@ -266,7 +266,7 @@ export default function PostCard(props) {
 
       {/* BANNED ribbons (above NSFW overlay, below context button) */}
       <Show when={isBannedPost() || isBannedAuthor()}>
-        <div class="pointer-events-none absolute top-2 left-2 z-30 space-y-1">
+        <div class="pointer-events-none absolute top-2 left-2 z-19 space-y-1">
           <Show when={isBannedPost()}>
             <div class="inline-flex items-center px-2 py-1 rounded-md uppercase text-[10px] font-extrabold tracking-wider bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] shadow">
               {t("post.bannedPost")}

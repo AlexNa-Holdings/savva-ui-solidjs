@@ -1,10 +1,10 @@
 // src/hooks/useDeleteAction.js
 import { createSignal, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
-import { getSavvaContract } from "../blockchain/contracts.js";
 import { toHexBytes32 } from "../blockchain/utils.js";
 import { navigate } from "../routing/hashRouter.js";
 import { pushToast, pushErrorToast } from "../ui/toast.js";
+import { sendAsActor } from "../blockchain/npoMulticall.js";
 
 export function useDeleteAction(contentObjectAccessor) {
   const app = useApp();
@@ -18,7 +18,7 @@ export function useDeleteAction(contentObjectAccessor) {
     e?.stopPropagation();
     setShowConfirm(true);
   };
-  
+
   const closeConfirm = () => setShowConfirm(false);
 
   const confirmDelete = async () => {
@@ -27,17 +27,15 @@ export function useDeleteAction(contentObjectAccessor) {
 
     setIsDeleting(true);
     try {
-      const contract = await getSavvaContract(app, "ContentRegistry", { write: true });
-      
+      const domain = content.domain || app.selectedDomainName?.();
+      const actorAddr = app.actorAddress?.() || app.authorizedUser?.()?.address || "";
       const contentType = isComment() ? "comment" : "post";
-      
-      await contract.write.reg([
-          content.domain,
-          content.author.address,
-          content.guid,
-          "", // Empty IPFS field indicates deletion
-          toHexBytes32(contentType)
-      ]);
+
+      await sendAsActor(app, {
+        contractName: "ContentRegistry",
+        functionName: "reg",
+        args: [domain, actorAddr, content.guid, "", toHexBytes32(contentType)],
+      });
 
       navigate("/");
       pushToast({ type: "success", message: t("delete.toast.success") });
@@ -48,7 +46,7 @@ export function useDeleteAction(contentObjectAccessor) {
       closeConfirm();
     }
   };
-  
+
   const modalProps = createMemo(() => {
     const type = isComment() ? "comment" : "post";
     return {
