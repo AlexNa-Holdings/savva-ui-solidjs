@@ -216,7 +216,7 @@ export default function PromoteAnnounceTab(props) {
                     <td class="px-3 py-2 font-mono text-xs">{row.id}</td>
                     <td class="px-3 py-2">{row.title || row.id}</td>
                     <td class="px-3 py-2">
-                      <TokenValue amount={row.price} tokenAddress={0} class="font-medium tabular-nums" />
+                      <TokenValue amount={row.price} tokenAddress="0" format="vertical" class="font-medium tabular-nums" />
                     </td>
                     <td class="px-3 py-2 text-right">
                       <button
