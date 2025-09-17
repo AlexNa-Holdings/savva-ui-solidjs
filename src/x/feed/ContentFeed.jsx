@@ -39,9 +39,9 @@ export default function ContentFeed(props) {
     const u = authorizedUser?.();
     // Try profile first, then user's own flag (if present), then default 'h'
     return (selectField?.(p, "nsfw") ??
-            selectField?.(p, "prefs.nsfw") ??
-            u?.nsfw ??
-            "h");
+      selectField?.(p, "prefs.nsfw") ??
+      u?.nsfw ??
+      "h");
   });
 
   // ---------- DEBUG SNAPSHOTS ----------
@@ -138,6 +138,8 @@ export default function ContentFeed(props) {
       queueMicrotask(loadMore);
     }
   });
+
+  onCleanup(() => dbg.log("ContentFeed", "unmounted"));
 
   onMount(() => {
     dbg.log("ContentFeed", "onMount");

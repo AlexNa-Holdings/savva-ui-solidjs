@@ -50,7 +50,7 @@ export default function App() {
     if (r.startsWith("/fundraising")) return "fundraising";
     if (r.startsWith("/npo/")) return "npo";
     if (r.startsWith("/promo-codes")) return "promo-codes";
-    if (r.startsWith("/promo-code/")) return "promo-code"; 
+    if (r.startsWith("/promo-code/")) return "promo-code";
     if (r.startsWith("/fr/")) return "contribute";
     if (r.startsWith("/admin")) return "admin";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
@@ -107,6 +107,18 @@ export default function App() {
     }
   }));
 
+  let savedMainScrollY = 0;
+  createEffect(on(currentView, (next, prev) => {
+    // Save position when leaving main
+    if (prev === "main" && next !== "main") {
+      savedMainScrollY = window.scrollY;
+    }
+    // Restore when returning to main
+    if (prev !== "main" && next === "main") {
+      requestAnimationFrame(() => window.scrollTo({ top: savedMainScrollY, left: 0, behavior: "auto" }));
+    }
+  }));
+
   const togglePane = () => setIsPaneOpen(!isPaneOpen());
 
   return (
@@ -135,9 +147,9 @@ export default function App() {
 
               <main class="main-content-wrapper">
                 {/* Lazy mount MainView so feeds aren't fetched while on a post */}
-                <Show when={currentView() === "main"} keyed>
-                  <MainView />
-                </Show>
+                <div style={{ display: currentView() === "main" ? "block" : "none" }}>
+                  <MainView isActivated={currentView() === "main"} />
+                </div>
 
                 <Show when={currentView() === "post"}><PostPage /></Show>
                 <Show when={currentView() === "profile"}><ProfilePage /></Show>
