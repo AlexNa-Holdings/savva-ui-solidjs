@@ -2,6 +2,8 @@
 import { getAiConfig } from "./storage.js";
 import { fetchWithTimeout } from "../utils/net.js";
 
+const DEFAULT_AI_TIMEOUT_MS = 60_000; // 60s default for LLM calls
+
 function trimSlash(s = "") {
   return String(s || "").replace(/\/+$/, "");
 }
@@ -11,66 +13,55 @@ function safeModel(cfg) {
 
 function parseJsonStrict(s) {
   const raw = String(s || "").trim();
-  try {
-    return JSON.parse(raw);
-  } catch {}
+  try { return JSON.parse(raw); } catch {}
   const fenced =
     raw.match(/```json([\s\S]*?)```/i) || raw.match(/```([\s\S]*?)```/i);
   if (fenced && fenced[1]) {
-    try {
-      return JSON.parse(fenced[1]);
-    } catch {}
+    try { return JSON.parse(fenced[1]); } catch {}
   }
-  const b = raw.indexOf("{"),
-    e = raw.lastIndexOf("}");
+  const b = raw.indexOf("{"), e = raw.lastIndexOf("}");
   if (b >= 0 && e > b) {
-    try {
-      return JSON.parse(raw.slice(b, e + 1));
-    } catch {}
+    try { return JSON.parse(raw.slice(b, e + 1)); } catch {}
   }
   throw new Error("Bad JSON from AI");
 }
 
 // ---- Provider callers ----
 
-async function callOpenAICompat({ baseUrl, apiKey, model, messages }) {
+async function callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs }) {
   const url = `${trimSlash(baseUrl)}/chat/completions`;
   const res = await fetchWithTimeout(url, {
     method: "POST",
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model, messages, temperature: 0.2 }),
+    timeoutMs,
   });
   const j = await res.json();
   if (!res.ok) throw new Error(j?.error?.message || res.statusText);
   return j?.choices?.[0]?.message?.content ?? "";
 }
 
-async function callAzureOpenAI({
-  baseUrl,
-  apiKey,
-  model,
-  apiVersion,
-  messages,
-}) {
+async function callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, timeoutMs }) {
   const url = `${trimSlash(baseUrl)}/deployments/${encodeURIComponent(
     model
-  )}/chat/completions?api-version=${encodeURIComponent(
-    apiVersion || "2024-02-15-preview"
-  )}`;
+  )}/chat/completions?api-version=${encodeURIComponent(apiVersion || "2024-02-15-preview")}`;
   const res = await fetchWithTimeout(url, {
     method: "POST",
+    cache: "no-store",
     headers: { "api-key": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify({ messages, temperature: 0.2 }),
+    timeoutMs,
   });
   const j = await res.json();
   if (!res.ok) throw new Error(j?.error?.message || res.statusText);
   return j?.choices?.[0]?.message?.content ?? "";
 }
 
-async function callAnthropic({ baseUrl, apiKey, model, messages }) {
+async function callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs }) {
   const url = `${trimSlash(baseUrl)}/messages`;
   const system = messages.find((m) => m.role === "system")?.content || "";
   const msgs = messages
@@ -81,6 +72,7 @@ async function callAnthropic({ baseUrl, apiKey, model, messages }) {
     }));
   const res = await fetchWithTimeout(url, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "x-api-key": apiKey,
       "content-type": "application/json",
@@ -93,13 +85,14 @@ async function callAnthropic({ baseUrl, apiKey, model, messages }) {
       temperature: 0.2,
       max_tokens: 4096,
     }),
+    timeoutMs,
   });
   const j = await res.json();
   if (!res.ok) throw new Error(j?.error?.message || res.statusText);
   return j?.content?.[0]?.text ?? "";
 }
 
-async function callGemini({ baseUrl, apiKey, model, messages }) {
+async function callGemini({ baseUrl, apiKey, model, messages, timeoutMs }) {
   const url = `${trimSlash(baseUrl)}/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -114,8 +107,10 @@ async function callGemini({ baseUrl, apiKey, model, messages }) {
   ];
   const res = await fetchWithTimeout(url, {
     method: "POST",
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents, generationConfig: { temperature: 0.2 } }),
+    timeoutMs,
   });
   const j = await res.json();
   if (!res.ok) throw new Error(j?.error?.message || res.statusText);
@@ -133,18 +128,20 @@ export function createAiClient(explicitCfg) {
   const baseUrl = cfg.baseUrl;
   const apiKey = cfg.apiKey;
   const apiVersion = cfg.extra?.apiVersion;
+  const REQUEST_TIMEOUT_MS =
+    Number(cfg?.extra?.aiTimeoutMs) > 0 ? Number(cfg.extra.aiTimeoutMs) : DEFAULT_AI_TIMEOUT_MS;
 
   async function chat(messages) {
     if (!apiKey || !baseUrl || !model) throw new Error("AI not configured");
     if (providerId === "anthropic")
-      return callAnthropic({ baseUrl, apiKey, model, messages });
+      return callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS });
     if (providerId === "gemini")
-      return callGemini({ baseUrl, apiKey, model, messages });
+      return callGemini({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS });
     if (providerId === "azure-openai" || providerId === "azure_openai") {
-      return callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages });
+      return callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, timeoutMs: REQUEST_TIMEOUT_MS });
     }
     // openai, openai-compatible, groq, together, mistral → OpenAI-compatible
-    return callOpenAICompat({ baseUrl, apiKey, model, messages });
+    return callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS });
   }
 
   // --- Higher-level helpers used by the app (unchanged interfaces) ---
@@ -158,9 +155,7 @@ export function createAiClient(explicitCfg) {
       'Respond ONLY with strict JSON: {"items":[{"id":"...","text":"..."}, ...]}',
     ].join(" ");
     const user = [
-      languageHint
-        ? `Primary language: ${languageHint}.`
-        : "Detect and keep the original language for each item.",
+      languageHint ? `Primary language: ${languageHint}.` : "Detect and keep the original language for each item.",
       "Items to minimally clean (JSON):",
       JSON.stringify({ items }, null, 2),
     ].join("\n");
@@ -179,16 +174,19 @@ export function createAiClient(explicitCfg) {
 
   async function detectBaseLanguage(samples = []) {
     const sys = [
-      "You detect language codes for provided short samples.",
-      'Return ONLY strict JSON: {"lang":"<iso-2>"}',
+      "Detect the dominant language for the provided text samples.",
+      'Return ONLY strict JSON: {"base":"<iso-2>","confidence":0.0-1.0}',
     ].join(" ");
-    const sample = String(samples?.[0] || "").slice(0, 200);
+    const joined = (samples || []).map((s) => String(s || "")).join("\n").slice(0, 4000);
     const content = await chat([
       { role: "system", content: sys },
-      { role: "user", content: sample },
+      { role: "user", content: joined },
     ]);
     const j = parseJsonStrict(content);
-    return String(j?.lang || "en");
+    return {
+      base: String(j?.base || "en"),
+      confidence: typeof j?.confidence === "number" ? j.confidence : 0,
+    };
   }
 
   async function classifyLocales(texts = []) {
@@ -216,14 +214,12 @@ export function createAiClient(explicitCfg) {
   }
 
   async function proposeTitle(baseLang, source) {
-    // Build a clean text sample from string OR { body, chapters }
     let text = "";
     if (typeof source === "string") {
       text = source;
     } else if (source && typeof source === "object") {
       const parts = [];
-      if (typeof source.body === "string" && source.body.trim())
-        parts.push(source.body);
+      if (typeof source.body === "string" && source.body.trim()) parts.push(source.body);
       if (Array.isArray(source.chapters)) {
         for (const ch of source.chapters) {
           const b = ch && typeof ch.body === "string" ? ch.body : "";
@@ -231,35 +227,24 @@ export function createAiClient(explicitCfg) {
         }
       }
       text = parts.join("\n").slice(0, 4000);
-    } else {
-      text = "";
     }
-
     const sys = [
       "You are an expert editor.",
       "Create a clear, concise title in the requested language.",
       "Constraints: 3–10 words, <= 60 characters, no quotes/emoji.",
       'Respond ONLY with strict JSON: {"title":"..."}',
     ].join(" ");
-
     const user = [`LANG: ${baseLang}`, "TEXT:", String(text || "")].join("\n");
-
     const content = await chat([
       { role: "system", content: sys },
       { role: "user", content: user },
     ]);
-
     const j = parseJsonStrict(content);
-
-    // Accept both raw string or {title}
     const raw = typeof j === "string" ? j : j && j.title;
     let title = typeof raw === "string" ? raw : "";
-
-    // sanitize
     title = title.replace(/^["“”'`]+|["“”'`]+$/g, "").trim();
     if (!title) throw new Error("no_title");
     if (title.length > 60) title = title.slice(0, 57).trimEnd() + "…";
-
     return title;
   }
 
@@ -271,12 +256,7 @@ export function createAiClient(explicitCfg) {
       "Constraints: 2–10 words, <= 60 characters, no quotes/emoji.",
       'Respond ONLY with strict JSON: {"title":"..."}',
     ].join(" ");
-    const user = [
-      `LANG: ${baseLang}`,
-      `CHAPTER_INDEX: ${index}`,
-      "TEXT:",
-      text,
-    ].join("\n");
+    const user = [`LANG: ${baseLang}`, `CHAPTER_INDEX: ${index}`, "TEXT:", text].join("\n");
     const content = await chat([
       { role: "system", content: sys },
       { role: "user", content: user },
@@ -305,8 +285,7 @@ export function createAiClient(explicitCfg) {
       { role: "user", content: user },
     ]);
     const j = parseJsonStrict(content);
-    if (!j || typeof j !== "object" || !j.translations)
-      throw new Error("no_translations");
+    if (!j || typeof j !== "object" || !j.translations) throw new Error("no_translations");
     return j.translations;
   }
 
