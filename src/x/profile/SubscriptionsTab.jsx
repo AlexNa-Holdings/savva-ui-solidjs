@@ -37,7 +37,7 @@ export default function SubscriptionsTab(props) {
   const user = () => props.user;
 
   const [showActiveOnly, setShowActiveOnly] = createSignal(true);
-  const nWeeks = createMemo(() => (showActiveOnly() ? 1 : 0));
+  const nWeeks = createMemo(() => (showActiveOnly() ? 1 : -10000000));
 
   const [sponsees, setSponsees] = createSignal([]);
   const [offset, setOffset] = createSignal(0);
