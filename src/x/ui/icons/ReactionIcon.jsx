@@ -3,7 +3,7 @@ import { Show } from "solid-js";
 
 const REACTION_MAP = {
   like: "👍",
-  super: "❤️",
+  love: "❤️",
   ha_ha: "😂",
   sad: "😢",
   angry: "😡",
