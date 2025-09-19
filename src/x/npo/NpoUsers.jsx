@@ -1,4 +1,3 @@
-// src/x/npo/NpoUsers.jsx
 import { Show, For, createSignal } from "solid-js";
 import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -31,22 +30,12 @@ export default function NpoUsers(props) {
     (props.isAdminBusy && props.isAdminBusy(addr)) ||
     false;
 
-  const openDeleteConfirm = (addr) => {
-    setConfirmAddr(addr);
-    setConfirmOpen(true);
-  };
-  const closeDeleteConfirm = () => {
-    setConfirmOpen(false);
-    setConfirmAddr("");
-  };
+  const openDeleteConfirm = (addr) => { setConfirmAddr(addr); setConfirmOpen(true); };
+  const closeDeleteConfirm = () => { setConfirmOpen(false); setConfirmAddr(""); };
   const confirmDelete = async () => {
     const addr = confirmAddr();
     if (!addr) return;
-    try {
-      await props.onRemoveMember?.(addr); // parent should call NPO.removeMember(address) as current user
-    } finally {
-      closeDeleteConfirm();
-    }
+    try { await props.onRemoveMember?.(addr); } finally { closeDeleteConfirm(); }
   };
 
   return (
@@ -91,22 +80,17 @@ export default function NpoUsers(props) {
             <For each={props.members}>
               {(m) => {
                 const addr = m.user?.address || m.address;
-                const isSelf =
-                  String(addr || "").toLowerCase() === String(props.meAddr || "").toLowerCase();
+                const isSelf = String(addr || "").toLowerCase() === String(props.meAddr || "").toLowerCase();
                 const adminToggleBusy = props.isAdminBusy && props.isAdminBusy(addr);
-                const disabledSwitch = isSelf || !props.selfIsAdmin || adminToggleBusy;
+                const disabledSwitch = isSelf || !props.selfIsAdmin || adminToggleBusy; // only for admin toggle
                 const actionBusy = isActionBusy(addr);
 
                 return (
                   <tr class="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]">
                     <td class="px-3 py-2"><UserCard author={m.user} compact /></td>
 
-                    {/* Confirmed */}
-                    <td class="px-3 py-2">
-                      <Badge ok={m.confirmed} />
-                    </td>
+                    <td class="px-3 py-2"><Badge ok={m.confirmed} /></td>
 
-                    {/* Roles */}
                     <td class="px-3 py-2">
                       <Show when={(m.roles?.length || 0) > 0} fallback={<span class="opacity-60">—</span>}>
                         <div class="flex flex-wrap items-center gap-1">
@@ -132,10 +116,8 @@ export default function NpoUsers(props) {
                       </Show>
                     </td>
 
-                    {/* Limits placeholder */}
                     <td class="px-3 py-2"><span class="opacity-60">—</span></td>
 
-                    {/* Admin switch */}
                     <td class="px-3 py-2">
                       <input
                         type="checkbox"
@@ -147,10 +129,9 @@ export default function NpoUsers(props) {
                       />
                     </td>
 
-                    {/* Actions */}
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-2">
-                        {/* Self-confirm when not confirmed */}
+                        {/* Self: Confirm/Unconfirm (available even if self is admin) */}
                         <Show when={isSelf && !m.confirmed}>
                           <button
                             type="button"
@@ -161,6 +142,19 @@ export default function NpoUsers(props) {
                             onClick={() => props.onConfirmMembership?.(addr)}
                           >
                             {t("common.confirm")}
+                          </button>
+                        </Show>
+
+                        <Show when={isSelf && m.confirmed}>
+                          <button
+                            type="button"
+                            class="px-2 py-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+                            disabled={actionBusy}
+                            title={t("npo.page.members.unconfirm") || "Unconfirm"}
+                            aria-label={t("npo.page.members.unconfirm") || "Unconfirm"}
+                            onClick={() => props.onUnconfirmMembership?.(addr)}
+                          >
+                            {t("npo.page.members.unconfirm") || "Unconfirm"}
                           </button>
                         </Show>
 
@@ -178,8 +172,8 @@ export default function NpoUsers(props) {
                           </button>
                         </Show>
 
-                        {/* Idle placeholder when no actions apply */}
-                        <Show when={!((isSelf && !m.confirmed) || (props.selfIsAdmin && !isSelf))}>
+                        {/* Idle dash when no actions apply */}
+                        <Show when={!((isSelf) || (props.selfIsAdmin && !isSelf))}>
                           <span class="opacity-60">—</span>
                         </Show>
                       </div>
@@ -200,9 +194,7 @@ export default function NpoUsers(props) {
       <Modal isOpen={confirmOpen()} onClose={closeDeleteConfirm}>
         <div class="p-4 space-y-3">
           <div class="text-lg font-semibold">{t("npo.page.members.deleteTitle")}</div>
-          <div class="text-sm opacity-80">
-            {t("npo.page.members.deleteConfirmText")}
-          </div>
+          <div class="text-sm opacity-80">{t("npo.page.members.deleteConfirmText")}</div>
           <div class="flex justify-end gap-2 pt-2">
             <button
               type="button"

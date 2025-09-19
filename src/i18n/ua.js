@@ -399,6 +399,7 @@ export default {
   "npo.page.members.editRoles": "Редагувати ролі учасників",
   "npo.page.members.empty": "Ще немає учасників.",
   "npo.page.members.title": "Члени",
+  "npo.page.members.unconfirm": "Скасувати членство",
   "npo.page.tabs.roles": "Ролі",
   "npo.page.tabs.tokens": "Токени",
   "npo.page.tabs.users": "Користувачі",

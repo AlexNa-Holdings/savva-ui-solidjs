@@ -137,6 +137,27 @@ export default function NpoPage() {
     }
   }
 
+  async function handleUnconfirmMembership(addr) {
+    const me = app.authorizedUser?.()?.address;
+    if (String(addr || "").toLowerCase() !== String(me || "").toLowerCase()) return; // only self
+    try {
+      setActionBusy(addr, true);
+      const client = await app.getGuardedWalletClient?.();
+      if (!client) throw new Error(t("errors.walletRequired"));
+      const c = getContract({ address: npoAddr(), abi: SavvaNPOAbi, client });
+      const txHash = await c.write.unconfirmMembership([]); // no args
+      const pc = publicClient();
+      if (pc && txHash) await pc.waitForTransactionReceipt({ hash: txHash });
+      await refreshMembers();
+      setRefreshEpoch((e) => e + 1);
+    } catch (e) {
+      dbg.log("NPO:unconfirmMembership:error", String(e?.message || e));
+      pushErrorToast?.({ message: e?.message || t("errors.updateFailed") });
+    } finally {
+      setActionBusy(addr, false);
+    }
+  }
+
   async function fetchMembersList(addr, client) {
     if (!addr || !client) return [];
     try {
@@ -300,13 +321,14 @@ export default function NpoPage() {
               members={members()}
               membersLoading={membersLoading()}
               isAdminBusy={isAdminBusy}
-              isActionBusy={isActionBusy}             // <— NEW
+              isActionBusy={isActionBusy}
               refreshEpoch={refreshEpoch()}
               onOpenAdd={() => setShowAdd(true)}
               onOpenEdit={(addr, user) => { setEditTarget({ address: addr, user }); setEditOpen(true); }}
               onToggleAdmin={handleAdminToggle}
-              onConfirmMembership={handleConfirmMembership} // <— NEW
-              onRemoveMember={handleRemoveMember}           // <— NEW
+              onConfirmMembership={handleConfirmMembership}
+              onUnconfirmMembership={handleUnconfirmMembership}
+              onRemoveMember={handleRemoveMember}
             />
           </Show>
 

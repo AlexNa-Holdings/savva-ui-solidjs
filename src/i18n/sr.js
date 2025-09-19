@@ -399,6 +399,7 @@ export default {
   "npo.page.members.editRoles": "Izmeni uloge članova",
   "npo.page.members.empty": "Još nema članova.",
   "npo.page.members.title": "Članovi",
+  "npo.page.members.unconfirm": "Poništi članstvo",
   "npo.page.tabs.roles": "Uloge",
   "npo.page.tabs.tokens": "Tokeni",
   "npo.page.tabs.users": "Korisnici",

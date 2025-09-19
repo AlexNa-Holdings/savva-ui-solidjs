@@ -27,6 +27,8 @@ export default function NpoListPage() {
   const [onlyConfirmed, setOnlyConfirmed] = createSignal(true);
   const [creating, setCreating] = createSignal(false);
 
+  const showActions = createMemo(() => !!onlyMine());
+
   const effectiveUserAddr = createMemo(() => {
     if (!onlyMine()) return undefined;
     return app.authorizedUser?.()?.address;
@@ -98,13 +100,9 @@ export default function NpoListPage() {
     }
     try {
       setCreating(true);
-      // Get write-enabled factory instance using /info.savva_contracts map
-      const factory = await getSavvaContract(app, "SavvaNPOFactory", { write: true }); // cloneSavvaNPO(first_admin)
-      await factory.write.cloneSavvaNPO([admin]); // no args aside from first_admin
+      const factory = await getSavvaContract(app, "SavvaNPOFactory", { write: true });
+      await factory.write.cloneSavvaNPO([admin]);
       pushToast({ type: "success", message: t("npo.list.createdTx") });
-
-      // Refresh the list. Keep current filters; the new NPO may be pending confirmation.
-      // If it doesn’t show under “only confirmed”, user can toggle that switch.
       await fetchPage(true);
     } catch (err) {
       pushErrorToast({ message: err?.message || t("errors.updateFailed") });
@@ -140,7 +138,7 @@ export default function NpoListPage() {
             class="accent-[hsl(var(--primary))]"
             aria-label={t("npo.list.onlyConfirmed")}
           />
-        <span>{t("npo.list.onlyConfirmed")}</span>
+          <span>{t("npo.list.onlyConfirmed")}</span>
         </label>
 
         <div class="ml-auto">
@@ -160,22 +158,31 @@ export default function NpoListPage() {
         <table class="min-w-full text-sm">
           <colgroup>
             <col />
-            <col class="w-[1%]" />
+            <Show when={showActions()}>
+              <col class="w-[1%]" />
+            </Show>
             <col class="w-[1%]" />
           </colgroup>
+
           <thead class="bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]">
             <tr>
               <th class="px-4 py-2 text-left">{t("npo.list.col.npo")}</th>
-              <th class="px-4 py-2 text-left">{t("npo.list.col.actions")}</th>
+              <Show when={showActions()}>
+                <th class="px-4 py-2 text-left">{t("npo.list.col.actions")}</th>
+              </Show>
               <th class="px-4 py-2 text-right">{t("npo.list.col.open")}</th>
             </tr>
           </thead>
+
           <tbody>
             <Show
               when={items().length}
               fallback={
                 <tr>
-                  <td colSpan="3" class="px-4 py-8 text-center text-[hsl(var(--muted-foreground))]">
+                  <td
+                    colSpan={showActions() ? 3 : 2}
+                    class="px-4 py-8 text-center text-[hsl(var(--muted-foreground))]"
+                  >
                     {loading() ? t("common.loading") : t("npo.list.empty")}
                   </td>
                 </tr>
@@ -189,9 +196,9 @@ export default function NpoListPage() {
                       <UserCard author={it} />
                     </td>
 
-                    {/* Actions only visible in "my NPOs" mode */}
-                    <td class="px-4 py-3 align-top">
-                      <Show when={onlyMine()}>
+                    {/* Actions only in "Only My NPOs" mode */}
+                    <Show when={showActions()}>
+                      <td class="px-4 py-3 align-top">
                         <div class="flex flex-wrap items-center gap-2">
                           <Show when={!it?.confirmed}>
                             <button
@@ -212,8 +219,8 @@ export default function NpoListPage() {
                             </button>
                           </Show>
                         </div>
-                      </Show>
-                    </td>
+                      </td>
+                    </Show>
 
                     {/* Open link */}
                     <td class="px-2 py-2 align-top">

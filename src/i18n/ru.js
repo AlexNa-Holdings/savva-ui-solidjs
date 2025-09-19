@@ -399,6 +399,7 @@ export default {
   "npo.page.members.editRoles": "Редактировать роли участников",
   "npo.page.members.empty": "Пока нет участников.",
   "npo.page.members.title": "Члены",
+  "npo.page.members.unconfirm": "Отменить членство",
   "npo.page.tabs.roles": "Роли",
   "npo.page.tabs.tokens": "Токены",
   "npo.page.tabs.users": "Пользователи",

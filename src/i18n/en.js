@@ -399,6 +399,7 @@ export default {
   "npo.page.members.editRoles": "Edit Member Roles",
   "npo.page.members.empty": "No members yet.",
   "npo.page.members.title": "Members",
+  "npo.page.members.unconfirm": "Unconfirm Membership",
   "npo.page.tabs.roles": "Roles",
   "npo.page.tabs.tokens": "Tokens",
   "npo.page.tabs.users": "Users",

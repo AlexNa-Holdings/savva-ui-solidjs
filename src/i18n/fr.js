@@ -399,6 +399,7 @@ export default {
   "npo.page.members.editRoles": "Modifier les rôles des membres",
   "npo.page.members.empty": "Pas encore de membres.",
   "npo.page.members.title": "Membres",
+  "npo.page.members.unconfirm": "Annuler l'adhésion",
   "npo.page.tabs.roles": "Rôles",
   "npo.page.tabs.tokens": "Jetons",
   "npo.page.tabs.users": "Utilisateurs",
