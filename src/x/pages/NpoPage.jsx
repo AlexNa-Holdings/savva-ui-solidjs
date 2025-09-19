@@ -66,6 +66,7 @@ export default function NpoPage() {
 
   const [refreshEpoch, setRefreshEpoch] = createSignal(0);
 
+  // busy for admin toggle (existing)
   const [adminToggling, setAdminToggling] = createSignal(new Set());
   const setAdminBusy = (addr, on) =>
     setAdminToggling((prev) => {
@@ -75,6 +76,17 @@ export default function NpoPage() {
       return next;
     });
   const isAdminBusy = (addr) => adminToggling().has(norm(addr));
+
+  // busy for row actions (confirm/delete)
+  const [actionBusySet, setActionBusySet] = createSignal(new Set());
+  const setActionBusy = (addr, on) =>
+    setActionBusySet((prev) => {
+      const key = norm(addr);
+      const next = new Set(prev);
+      if (on) next.add(key); else next.delete(key);
+      return next;
+    });
+  const isActionBusy = (addr) => actionBusySet().has(norm(addr));
 
   const [showAdd, setShowAdd] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
@@ -179,6 +191,51 @@ export default function NpoPage() {
     }
   }
 
+  // NEW: confirm membership (self)
+  async function handleConfirmMembership(addr) {
+    const me = app.authorizedUser?.()?.address;
+    if (!sameAddr(addr, me)) return; // only self can confirm
+    try {
+      setActionBusy(addr, true);
+      const client = await app.getGuardedWalletClient?.();
+      if (!client) throw new Error(t("errors.walletRequired"));
+      const c = getContract({ address: npoAddr(), abi: SavvaNPOAbi, client });
+      const txHash = await c.write.confirmMembership([]);
+      const pc = publicClient();
+      if (pc && txHash) await pc.waitForTransactionReceipt({ hash: txHash });
+      await refreshMembers();
+      setRefreshEpoch((e) => e + 1);
+    } catch (e) {
+      dbg.log("NPO:confirmMembership:error", String(e?.message || e));
+      pushErrorToast?.({ message: e?.message || t("errors.updateFailed") });
+    } finally {
+      setActionBusy(addr, false);
+    }
+  }
+
+  // NEW: remove member (admin)
+  async function handleRemoveMember(addr) {
+    const me = app.authorizedUser?.()?.address;
+    if (sameAddr(addr, me)) return; // do not remove yourself from here
+    if (!selfIsAdmin()) return;
+    try {
+      setActionBusy(addr, true);
+      const client = await app.getGuardedWalletClient?.();
+      if (!client) throw new Error(t("errors.walletRequired"));
+      const c = getContract({ address: npoAddr(), abi: SavvaNPOAbi, client });
+      const txHash = await c.write.removeMember([addr]);
+      const pc = publicClient();
+      if (pc && txHash) await pc.waitForTransactionReceipt({ hash: txHash });
+      await refreshMembers();
+      setRefreshEpoch((e) => e + 1);
+    } catch (e) {
+      dbg.log("NPO:removeMember:error", String(e?.message || e));
+      pushErrorToast?.({ message: e?.message || t("errors.updateFailed") });
+    } finally {
+      setActionBusy(addr, false);
+    }
+  }
+
   onMount(async () => {
     try {
       await ensureWallet();
@@ -243,10 +300,13 @@ export default function NpoPage() {
               members={members()}
               membersLoading={membersLoading()}
               isAdminBusy={isAdminBusy}
+              isActionBusy={isActionBusy}             // <— NEW
               refreshEpoch={refreshEpoch()}
               onOpenAdd={() => setShowAdd(true)}
               onOpenEdit={(addr, user) => { setEditTarget({ address: addr, user }); setEditOpen(true); }}
               onToggleAdmin={handleAdminToggle}
+              onConfirmMembership={handleConfirmMembership} // <— NEW
+              onRemoveMember={handleRemoveMember}           // <— NEW
             />
           </Show>
 

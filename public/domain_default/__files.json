@@ -1,35 +1,39 @@
-{
-  "files": [
-    "config.yaml",
-    "domain.css",
-    "favicon/android-chrome-192x192.png",
-    "favicon/android-chrome-512x512.png",
-    "favicon/apple-touch-icon.png",
-    "favicon/browserconfig.xml",
-    "favicon/favicon-16x16.png",
-    "favicon/favicon-32x32.png",
-    "favicon/favicon.ico",
-    "favicon/mstile-144x144.png",
-    "favicon/mstile-150x150.png",
-    "favicon/mstile-310x150.png",
-    "favicon/mstile-310x310.png",
-    "favicon/mstile-70x70.png",
-    "favicon/safari-pinned-tab.svg",
-    "favicon/site.webmanifest",
-    "html/info_block.html",
-    "html/info_block_en.html",
-    "html/info_block_fr.html",
-    "html/info_block_ru.html",
-    "html/info_block_ua.html",
-    "i18n/en.yaml",
-    "i18n/fr.yaml",
-    "i18n/ru.yaml",
-    "i18n/ua.yaml",
-    "images/logo_dark.png",
-    "images/logo_light.png",
-    "modules/categories.yaml",
-    "modules/content_lists.yaml",
-    "modules/staker_levels.yaml",
-    "modules/tabs.yaml"
-  ]
-}
+[
+  {
+    "name": "favicon",
+    "type": "directory",
+    "mtime": "Fri, 24 Jan 2025 21:39:36 GMT"
+  },
+  {
+    "name": "html",
+    "type": "directory",
+    "mtime": "Fri, 24 Jan 2025 21:39:36 GMT"
+  },
+  {
+    "name": "i18n",
+    "type": "directory",
+    "mtime": "Mon, 08 Sep 2025 00:19:59 GMT"
+  },
+  {
+    "name": "images",
+    "type": "directory",
+    "mtime": "Mon, 08 Sep 2025 00:19:59 GMT"
+  },
+  {
+    "name": "modules",
+    "type": "directory",
+    "mtime": "Mon, 08 Sep 2025 00:19:59 GMT"
+  },
+  {
+    "name": "config.yaml",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 1165
+  },
+  {
+    "name": "domain.css",
+    "type": "file",
+    "mtime": "Mon, 15 Sep 2025 22:09:13 GMT",
+    "size": 1747
+  }
+]

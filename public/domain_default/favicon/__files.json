@@ -1,0 +1,86 @@
+[
+  {
+    "name": "android-chrome-192x192.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 4831
+  },
+  {
+    "name": "android-chrome-512x512.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 22463
+  },
+  {
+    "name": "apple-touch-icon.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 4568
+  },
+  {
+    "name": "browserconfig.xml",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 246
+  },
+  {
+    "name": "favicon-16x16.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 925
+  },
+  {
+    "name": "favicon-32x32.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 1441
+  },
+  {
+    "name": "favicon.ico",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 15086
+  },
+  {
+    "name": "mstile-144x144.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 3888
+  },
+  {
+    "name": "mstile-150x150.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 3856
+  },
+  {
+    "name": "mstile-310x150.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 4023
+  },
+  {
+    "name": "mstile-310x310.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 6873
+  },
+  {
+    "name": "mstile-70x70.png",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 2933
+  },
+  {
+    "name": "safari-pinned-tab.svg",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 3083
+  },
+  {
+    "name": "site.webmanifest",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 428
+  }
+]

@@ -1,8 +1,9 @@
 // src/x/npo/NpoUsers.jsx
-import { Show, For } from "solid-js";
+import { Show, For, createSignal } from "solid-js";
 import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
-import { EditIcon } from "../ui/icons/ActionIcons.jsx";
+import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
+import Modal from "../modals/Modal.jsx";
 
 function Badge({ ok }) {
   return (
@@ -21,6 +22,32 @@ function Badge({ ok }) {
 
 export default function NpoUsers(props) {
   const { t } = props;
+
+  const [confirmOpen, setConfirmOpen] = createSignal(false);
+  const [confirmAddr, setConfirmAddr] = createSignal("");
+
+  const isActionBusy = (addr) =>
+    (props.isActionBusy && props.isActionBusy(addr)) ||
+    (props.isAdminBusy && props.isAdminBusy(addr)) ||
+    false;
+
+  const openDeleteConfirm = (addr) => {
+    setConfirmAddr(addr);
+    setConfirmOpen(true);
+  };
+  const closeDeleteConfirm = () => {
+    setConfirmOpen(false);
+    setConfirmAddr("");
+  };
+  const confirmDelete = async () => {
+    const addr = confirmAddr();
+    if (!addr) return;
+    try {
+      await props.onRemoveMember?.(addr); // parent should call NPO.removeMember(address) as current user
+    } finally {
+      closeDeleteConfirm();
+    }
+  };
 
   return (
     <>
@@ -48,15 +75,14 @@ export default function NpoUsers(props) {
               <th class="px-3 py-2 text-left">{t("npo.page.members.col.roles")}</th>
               <th class="px-3 py-2 text-left">{t("npo.page.members.col.tokenLimits")}</th>
               <th class="px-3 py-2 text-left">{t("npo.page.members.col.admin")}</th>
-              <Show when={props.selfIsAdmin}>
-                <th class="px-3 py-2 text-left">{t("npo.page.members.col.actions")}</th>
-              </Show>
+              <th class="px-3 py-2 text-left">{t("npo.page.members.col.actions")}</th>
             </tr>
           </thead>
+
           <tbody>
             <Show when={!props.membersLoading && props.members.length === 0}>
               <tr>
-                <td colSpan={props.selfIsAdmin ? 6 : 5} class="px-3 py-8 text-center text-[hsl(var(--muted-foreground))]">
+                <td colSpan={6} class="px-3 py-8 text-center text-[hsl(var(--muted-foreground))]">
                   {t("npo.page.members.empty")}
                 </td>
               </tr>
@@ -65,15 +91,22 @@ export default function NpoUsers(props) {
             <For each={props.members}>
               {(m) => {
                 const addr = m.user?.address || m.address;
-                const isSelf = String(addr || "").toLowerCase() === String(props.meAddr || "").toLowerCase();
-                const busy = props.isAdminBusy(addr);
-                const disabledSwitch = isSelf || !props.selfIsAdmin || busy;
-                const _epoch = props.refreshEpoch; // used to recompute after refresh
+                const isSelf =
+                  String(addr || "").toLowerCase() === String(props.meAddr || "").toLowerCase();
+                const adminToggleBusy = props.isAdminBusy && props.isAdminBusy(addr);
+                const disabledSwitch = isSelf || !props.selfIsAdmin || adminToggleBusy;
+                const actionBusy = isActionBusy(addr);
 
                 return (
                   <tr class="border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]">
                     <td class="px-3 py-2"><UserCard author={m.user} compact /></td>
-                    <td class="px-3 py-2"><Badge ok={m.confirmed} /></td>
+
+                    {/* Confirmed */}
+                    <td class="px-3 py-2">
+                      <Badge ok={m.confirmed} />
+                    </td>
+
+                    {/* Roles */}
                     <td class="px-3 py-2">
                       <Show when={(m.roles?.length || 0) > 0} fallback={<span class="opacity-60">—</span>}>
                         <div class="flex flex-wrap items-center gap-1">
@@ -90,7 +123,7 @@ export default function NpoUsers(props) {
                               class="ml-2 p-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
                               title={t("npo.page.members.editRoles")}
                               aria-label={t("npo.page.members.editRoles")}
-                              onClick={() => props.onOpenEdit(addr, m.user || null)}
+                              onClick={() => props.onOpenEdit?.(addr, m.user || null)}
                             >
                               <EditIcon class="w-4 h-4" />
                             </button>
@@ -110,15 +143,47 @@ export default function NpoUsers(props) {
                         aria-label={t("npo.page.members.adminFlag")}
                         checked={!!m.isAdmin}
                         disabled={disabledSwitch}
-                        onChange={(e) => props.onToggleAdmin(addr, e.currentTarget.checked)}
+                        onChange={(e) => props.onToggleAdmin?.(addr, e.currentTarget.checked)}
                       />
                     </td>
 
-                    <Show when={props.selfIsAdmin}>
-                      <td class="px-3 py-2">
-                        <span class="opacity-60">—</span>
-                      </td>
-                    </Show>
+                    {/* Actions */}
+                    <td class="px-3 py-2">
+                      <div class="flex items-center gap-2">
+                        {/* Self-confirm when not confirmed */}
+                        <Show when={isSelf && !m.confirmed}>
+                          <button
+                            type="button"
+                            class="px-2 py-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+                            disabled={actionBusy}
+                            title={t("npo.page.members.confirm")}
+                            aria-label={t("npo.page.members.confirm")}
+                            onClick={() => props.onConfirmMembership?.(addr)}
+                          >
+                            {t("common.confirm")}
+                          </button>
+                        </Show>
+
+                        {/* Admin-only delete; never show for self */}
+                        <Show when={props.selfIsAdmin && !isSelf}>
+                          <button
+                            type="button"
+                            class="p-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
+                            disabled={actionBusy}
+                            title={t("npo.page.members.delete")}
+                            aria-label={t("npo.page.members.delete")}
+                            onClick={() => openDeleteConfirm(addr)}
+                          >
+                            <TrashIcon class="w-4 h-4" />
+                          </button>
+                        </Show>
+
+                        {/* Idle placeholder when no actions apply */}
+                        <Show when={!((isSelf && !m.confirmed) || (props.selfIsAdmin && !isSelf))}>
+                          <span class="opacity-60">—</span>
+                        </Show>
+                      </div>
+                    </td>
                   </tr>
                 );
               }}
@@ -130,6 +195,33 @@ export default function NpoUsers(props) {
           <div class="flex justify-center p-4"><Spinner /></div>
         </Show>
       </div>
+
+      {/* Confirm Delete Modal */}
+      <Modal isOpen={confirmOpen()} onClose={closeDeleteConfirm}>
+        <div class="p-4 space-y-3">
+          <div class="text-lg font-semibold">{t("npo.page.members.deleteTitle")}</div>
+          <div class="text-sm opacity-80">
+            {t("npo.page.members.deleteConfirmText")}
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+              onClick={closeDeleteConfirm}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+              disabled={isActionBusy(confirmAddr())}
+              onClick={confirmDelete}
+            >
+              {t("common.delete")}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

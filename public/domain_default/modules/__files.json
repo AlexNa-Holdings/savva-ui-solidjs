@@ -1,0 +1,26 @@
+[
+  {
+    "name": "categories.yaml",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 401
+  },
+  {
+    "name": "content_lists.yaml",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 320
+  },
+  {
+    "name": "staker_levels.yaml",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 2892
+  },
+  {
+    "name": "tabs.yaml",
+    "type": "file",
+    "mtime": "Mon, 08 Sep 2025 00:28:54 GMT",
+    "size": 926
+  }
+]
