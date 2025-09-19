@@ -19,7 +19,9 @@ function isDirMark(v) {
 }
 
 function normalizeName(n) {
-  return String(n || "").replace(/^[.][/]/, "").replace(/\/+$/, "");
+  return String(n || "")
+    .replace(/^[.][/]/, "")
+    .replace(/\/+$/, "");
 }
 
 function parseJsonListing(json = {}) {
@@ -35,7 +37,8 @@ function parseJsonListing(json = {}) {
   if (Array.isArray(json?.items)) items = json.items;
   if (Array.isArray(json?.list)) items = json.list;
 
-  const files = [], dirs = [];
+  const files = [],
+    dirs = [];
   for (const it of items) {
     const name = normalizeName(toName(it));
     if (!name) continue;
@@ -51,11 +54,16 @@ function parseHtmlListing(html = "") {
     .filter(Boolean);
   const cleaned = hrefs
     .map((h) => decodeURIComponent(h))
-    .filter((h) => !h.startsWith("?") && !h.startsWith("#") && h !== "../" && h !== "/")
+    .filter(
+      (h) =>
+        !h.startsWith("?") && !h.startsWith("#") && h !== "../" && h !== "/"
+    )
     .filter((h) => !/^https?:\/\//i.test(h))
     .map((h) => (h.startsWith("./") ? h.slice(2) : h));
-  const files = [], dirs = [];
-  for (const h of cleaned) (h.endsWith("/") ? dirs : files).push(h.replace(/\/+$/, ""));
+  const files = [],
+    dirs = [];
+  for (const h of cleaned)
+    (h.endsWith("/") ? dirs : files).push(h.replace(/\/+$/, ""));
   return { files, dirs };
 }
 
@@ -71,7 +79,12 @@ async function fetchMaybeJson(url) {
   const ctRaw = r.headers.get("content-type") || "";
   const ct = ctRaw.toLowerCase();
 
-  dbg.log("DomainConfigPage", "fetch/status", { url, ok, status: r.status, contentType: ctRaw });
+  dbg.log("DomainConfigPage", "fetch/status", {
+    url,
+    ok,
+    status: r.status,
+    contentType: ctRaw,
+  });
 
   if (!ok) return null;
 
@@ -80,7 +93,10 @@ async function fetchMaybeJson(url) {
     try {
       return { kind: "json", data: await r.json() };
     } catch (e) {
-      dbg.log("DomainConfigPage", "fetch/json-parse-fail", { url, error: String(e) });
+      dbg.log("DomainConfigPage", "fetch/json-parse-fail", {
+        url,
+        error: String(e),
+      });
       return null;
     }
   }
@@ -103,12 +119,17 @@ async function fetchMaybeJson(url) {
   const trimmed = raw.trim();
 
   // Heuristic: looks like JSON
-  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+  if (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  ) {
     try {
       return { kind: "json", data: JSON.parse(trimmed) };
     } catch (e) {
-      dbg.log("DomainConfigPage", "fetch/heuristic-json-fail", { url, error: String(e) });
+      dbg.log("DomainConfigPage", "fetch/heuristic-json-fail", {
+        url,
+        error: String(e),
+      });
     }
   }
 
@@ -138,24 +159,40 @@ async function listDirectoryPreferJson(prefixUrl, subPath) {
 
       if (res.kind === "json") {
         const { files, dirs } = parseJsonListing(res.data);
-        dbg.log("DomainConfigPage", "listing/json", { url, files: files.length, dirs: dirs.length });
+        dbg.log("DomainConfigPage", "listing/json", {
+          url,
+          files: files.length,
+          dirs: dirs.length,
+        });
         if (files.length || dirs.length) return { files, dirs };
       } else if (res.kind === "html") {
         const { files, dirs } = parseHtmlListing(res.data);
-        dbg.log("DomainConfigPage", "listing/html", { url, files: files.length, dirs: dirs.length });
+        dbg.log("DomainConfigPage", "listing/html", {
+          url,
+          files: files.length,
+          dirs: dirs.length,
+        });
         if (files.length || dirs.length) return { files, dirs };
       } else if (res.kind === "text" || res.kind === "other") {
         // Try both parsers on unknown content
         const asHtml = parseHtmlListing(String(res.data || ""));
         if (asHtml.files.length || asHtml.dirs.length) {
-          dbg.log("DomainConfigPage", "listing/other-as-html", { url, files: asHtml.files.length, dirs: asHtml.dirs.length });
+          dbg.log("DomainConfigPage", "listing/other-as-html", {
+            url,
+            files: asHtml.files.length,
+            dirs: asHtml.dirs.length,
+          });
           return asHtml;
         }
         try {
           const maybe = JSON.parse(String(res.data || ""));
           const asJson = parseJsonListing(maybe);
           if (asJson.files.length || asJson.dirs.length) {
-            dbg.log("DomainConfigPage", "listing/other-as-json", { url, files: asJson.files.length, dirs: asJson.dirs.length });
+            dbg.log("DomainConfigPage", "listing/other-as-json", {
+              url,
+              files: asJson.files.length,
+              dirs: asJson.dirs.length,
+            });
             return asJson;
           }
         } catch (_) {}
@@ -169,8 +206,14 @@ async function listDirectoryPreferJson(prefixUrl, subPath) {
   return { files: [], dirs: [] };
 }
 
-
-async function tryListDirectory(prefixUrl, subPath, depth, maxDepth, cap, opts) {
+async function tryListDirectory(
+  prefixUrl,
+  subPath,
+  depth,
+  maxDepth,
+  cap,
+  opts
+) {
   const { files, dirs } = await listDirectoryPreferJson(prefixUrl, subPath);
   if (!files.length && !dirs.length) return [];
 
@@ -207,7 +250,7 @@ export async function discoverEntriesOrThrow(
   const url = ensureSlash(prefixUrl) + subPath;
   if (depth > maxDepth) return [];
 
-    // 1) Manifests first (optional but ON by default)
+  // 1) Manifests first (optional but ON by default)
   if (opts.tryManifests) {
     for (const mf of ["__files.json", "files.json", "_files.json"]) {
       const mfUrl = ensureSlash(url) + mf;
@@ -291,34 +334,55 @@ export async function discoverEntriesOrThrow(
           return out;
         } else {
           // Quiet 404/403 unless explicitly requested
-          if (!opts.quietManifest404 || (r.status !== 404 && r.status !== 403)) {
-            dbg.log("DomainConfigPage", "manifest/miss", { url: mfUrl, status: r.status });
+          if (
+            !opts.quietManifest404 ||
+            (r.status !== 404 && r.status !== 403)
+          ) {
+            dbg.log("DomainConfigPage", "manifest/miss", {
+              url: mfUrl,
+              status: r.status,
+            });
           }
         }
       } catch (e) {
-        dbg.log("DomainConfigPage", "manifest/error", { url: mfUrl, error: String(e) });
+        dbg.log("DomainConfigPage", "manifest/error", {
+          url: mfUrl,
+          error: String(e),
+        });
       }
     }
   }
 
-
   // 2) Directory listing (JSON/HTML/heuristics)
-  const listed = await tryListDirectory(prefixUrl, subPath, depth, maxDepth, cap, opts);
+  const listed = await tryListDirectory(
+    prefixUrl,
+    subPath,
+    depth,
+    maxDepth,
+    cap,
+    opts
+  );
   if (listed.length) {
-    dbg.log("DomainConfigPage", "listing/used", { url, files: listed.length, depth, subPath });
+    dbg.log("DomainConfigPage", "listing/used", {
+      url,
+      files: listed.length,
+      depth,
+      subPath,
+    });
     return listed;
   }
 
   // 3) Root-only error
   if (depth === 0) {
-    const err = new Error(`No manifest or directory listing available at ${url}`);
+    const err = new Error(
+      `No manifest or directory listing available at ${url}`
+    );
     err.code = "NO_LISTING";
     dbg.log("DomainConfigPage", "listing/none", { url, error: err.message });
     throw err;
   }
   return [];
 }
-
 
 /**
  * High-level helper:
@@ -338,17 +402,24 @@ export async function scanAndDownload(prefixUrl, saveFile, opts = {}) {
   const maxDepth = opts.maxDepth ?? 16;
   const cap = { count: 0, max: opts.cap ?? 10000 };
 
-  dbg.log("DomainConfigPage", "scan/start", { prefixUrl, maxDepth, cap: cap.max });
+  dbg.log("DomainConfigPage", "scan/start", {
+    prefixUrl,
+    maxDepth,
+    cap: cap.max,
+  });
 
   const discovered = await discoverEntriesOrThrow(
-  prefixUrl,
-  "",
-  0,
-  maxDepth,
-  cap,
-  { tryManifests: true, quietManifest404: true, ...(opts || {}) }
-);
-  dbg.log("DomainConfigPage", "scan/discovered", { count: discovered.length, sample: discovered.slice(0, 10) });
+    prefixUrl,
+    "",
+    0,
+    maxDepth,
+    cap,
+    { tryManifests: true, quietManifest404: true, ...(opts || {}) }
+  );
+  dbg.log("DomainConfigPage", "scan/discovered", {
+    count: discovered.length,
+    sample: discovered.slice(0, 10),
+  });
 
   let saved = 0;
   let idx = 0;
@@ -357,11 +428,20 @@ export async function scanAndDownload(prefixUrl, saveFile, opts = {}) {
     idx++;
     const fileUrl = ensureSlash(prefixUrl) + rel;
     try {
-      dbg.log("DomainConfigPage", "download/begin", { i: idx, of: discovered.length, rel, url: fileUrl });
+      dbg.log("DomainConfigPage", "download/begin", {
+        i: idx,
+        of: discovered.length,
+        rel,
+        url: fileUrl,
+      });
 
       const r = await fetch(fileUrl, { cache: "no-store" });
       if (!r.ok) {
-        dbg.log("DomainConfigPage", "download/failed", { rel, url: fileUrl, status: r.status });
+        dbg.log("DomainConfigPage", "download/failed", {
+          rel,
+          url: fileUrl,
+          status: r.status,
+        });
         continue;
       }
 
@@ -372,7 +452,11 @@ export async function scanAndDownload(prefixUrl, saveFile, opts = {}) {
       try {
         storagePath = await saveFile(rel, blob); // expect storagePath or void
       } catch (e) {
-        dbg.log("DomainConfigPage", "save/error", { rel, size, error: String(e) });
+        dbg.log("DomainConfigPage", "save/error", {
+          rel,
+          size,
+          error: String(e),
+        });
         continue;
       }
 
@@ -383,12 +467,25 @@ export async function scanAndDownload(prefixUrl, saveFile, opts = {}) {
         storagePath: storagePath ?? "(saveFile returned no path)",
       });
 
-      opts.onProgress?.({ idx, total: discovered.length, rel, size, storagePath });
+      opts.onProgress?.({
+        idx,
+        total: discovered.length,
+        rel,
+        size,
+        storagePath,
+      });
     } catch (e) {
-      dbg.log("DomainConfigPage", "download/error", { rel, url: fileUrl, error: String(e) });
+      dbg.log("DomainConfigPage", "download/error", {
+        rel,
+        url: fileUrl,
+        error: String(e),
+      });
     }
   }
 
-  dbg.log("DomainConfigPage", "scan/complete", { discovered: discovered.length, saved });
+  dbg.log("DomainConfigPage", "scan/complete", {
+    discovered: discovered.length,
+    saved,
+  });
   return { discovered, saved };
 }
