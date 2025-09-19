@@ -87,7 +87,7 @@ export default function DonatorsList(props) {
                     {(donator) => (
                         <div class="flex items-center justify-between text-sm p-1.5 rounded hover:bg-[hsl(var(--accent))]">
                             <UserCard author={donator.user} compact={true} />
-                            <TokenValue amount={donator.amount} tokenAddress={props.savvaTokenAddress} />
+                            <TokenValue amount={donator.amount} format="vertical"tokenAddress={props.savvaTokenAddress} />
                         </div>
                     )}
                 </For>

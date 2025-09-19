@@ -10,7 +10,7 @@ export default function CampaignContributeModal(props) {
   };
 
   return (
-    <Modal isOpen={props.isOpen} onClose={handleClose} size="xl" noPadding>
+    <Modal isOpen={props.isOpen} onClose={handleClose} size="4xl" noPadding>
       <ContributeView
         campaignId={props.campaignId}
         onSuccess={handleSuccess}
