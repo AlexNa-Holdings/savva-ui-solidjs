@@ -1,4 +1,9 @@
-import { Show, For, createSignal } from "solid-js";
+// src/x/npo/NpoUsers.jsx
+import { Show, For, createSignal, createEffect, createMemo } from "solid-js";
+import { useApp } from "../../context/AppContext.jsx";
+import { createPublicClient, http, getContract } from "viem";
+import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
+
 import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
@@ -19,8 +24,45 @@ function Badge({ ok }) {
   );
 }
 
+const norm = (a) => String(a || "").toLowerCase();
+
 export default function NpoUsers(props) {
+  const app = useApp();
   const { t } = props;
+
+  // Local admin resolution (fallback if parent didn't pass selfIsAdmin)
+  const [localIsAdmin, setLocalIsAdmin] = createSignal(false);
+  const [adminResolving, setAdminResolving] = createSignal(false);
+
+  const me = createMemo(() => norm(props.meAddr));
+  const npo = createMemo(() => props.npoAddr || ""); // optional but preferred when self-resolving
+
+  const effIsAdmin = createMemo(() =>
+    typeof props.selfIsAdmin === "boolean" ? props.selfIsAdmin : localIsAdmin()
+  );
+
+  // Resolve admin locally if parent didn't provide it
+  createEffect(async () => {
+    if (typeof props.selfIsAdmin === "boolean") return; // trust parent
+    const meAddr = me();
+    const npoAddr = npo();
+    if (!meAddr || !npoAddr) {
+      setLocalIsAdmin(false);
+      return;
+    }
+    try {
+      setAdminResolving(true);
+      const chain = app.desiredChain?.();
+      const pc = createPublicClient({ chain, transport: http(chain?.rpcUrls?.[0] ?? undefined) });
+      const c = getContract({ address: npoAddr, abi: SavvaNPOAbi, client: pc });
+      const yes = await c.read.isAdmin([meAddr]);
+      setLocalIsAdmin(!!yes);
+    } catch {
+      setLocalIsAdmin(false);
+    } finally {
+      setAdminResolving(false);
+    }
+  });
 
   const [confirmOpen, setConfirmOpen] = createSignal(false);
   const [confirmAddr, setConfirmAddr] = createSignal("");
@@ -42,13 +84,14 @@ export default function NpoUsers(props) {
     <>
       <div class="flex items-center justify-between px-3 py-2 border-b border-[hsl(var(--border))]">
         <div class="text-sm opacity-80">{t("npo.page.members.title")}</div>
-        <Show when={props.selfIsAdmin}>
+        <Show when={effIsAdmin()}>
           <button
             type="button"
             class="w-8 h-8 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))] text-lg leading-none"
             title={t("npo.page.members.add")}
             aria-label={t("npo.page.members.add")}
             onClick={props.onOpenAdd}
+            disabled={adminResolving()}
           >
             +
           </button>
@@ -80,9 +123,10 @@ export default function NpoUsers(props) {
             <For each={props.members}>
               {(m) => {
                 const addr = m.user?.address || m.address;
-                const isSelf = String(addr || "").toLowerCase() === String(props.meAddr || "").toLowerCase();
+                const isSelf = norm(addr) === me();
                 const adminToggleBusy = props.isAdminBusy && props.isAdminBusy(addr);
-                const disabledSwitch = isSelf || !props.selfIsAdmin || adminToggleBusy; // only for admin toggle
+                // Admin switch disabled if: acting on self, not admin, or resolving/tx busy
+                const disabledSwitch = isSelf || !effIsAdmin() || adminToggleBusy || adminResolving();
                 const actionBusy = isActionBusy(addr);
 
                 return (
@@ -101,13 +145,14 @@ export default function NpoUsers(props) {
                               </span>
                             )}
                           </For>
-                          <Show when={props.selfIsAdmin}>
+                          <Show when={effIsAdmin()}>
                             <button
                               type="button"
                               class="ml-2 p-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
                               title={t("npo.page.members.editRoles")}
                               aria-label={t("npo.page.members.editRoles")}
                               onClick={() => props.onOpenEdit?.(addr, m.user || null)}
+                              disabled={adminResolving()}
                             >
                               <EditIcon class="w-4 h-4" />
                             </button>
@@ -131,7 +176,7 @@ export default function NpoUsers(props) {
 
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-2">
-                        {/* Self: Confirm/Unconfirm (available even if self is admin) */}
+                        {/* Self: Confirm/Unconfirm (even if admin) */}
                         <Show when={isSelf && !m.confirmed}>
                           <button
                             type="button"
@@ -158,12 +203,12 @@ export default function NpoUsers(props) {
                           </button>
                         </Show>
 
-                        {/* Admin-only delete; never show for self */}
-                        <Show when={props.selfIsAdmin && !isSelf}>
+                        {/* Admin-only delete; never self */}
+                        <Show when={effIsAdmin() && !isSelf}>
                           <button
                             type="button"
                             class="p-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
-                            disabled={actionBusy}
+                            disabled={actionBusy || adminResolving()}
                             title={t("npo.page.members.delete")}
                             aria-label={t("npo.page.members.delete")}
                             onClick={() => openDeleteConfirm(addr)}
@@ -172,8 +217,8 @@ export default function NpoUsers(props) {
                           </button>
                         </Show>
 
-                        {/* Idle dash when no actions apply */}
-                        <Show when={!((isSelf) || (props.selfIsAdmin && !isSelf))}>
+                        {/* Idle dash */}
+                        <Show when={!((isSelf) || (effIsAdmin() && !isSelf))}>
                           <span class="opacity-60">—</span>
                         </Show>
                       </div>
