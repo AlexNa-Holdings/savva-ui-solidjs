@@ -26,6 +26,7 @@ const dwarn = (evt, obj) => {
 };
 
 const OVERRIDE_KEY = "connect_override";
+const ASSETS_ENV_KEY = "assets_env_choice";
 
 const norm = (s) => (s ?? "").toString().trim();
 const ensureSlash = (s) => {
@@ -54,6 +55,22 @@ function saveOverride(obj) {
   try {
     if (!obj) localStorage.removeItem(OVERRIDE_KEY);
     else localStorage.setItem(OVERRIDE_KEY, JSON.stringify(pickPersistable(obj)));
+  } catch {}
+}
+
+function loadAssetsEnvPreference() {
+  try {
+    const stored = localStorage.getItem(ASSETS_ENV_KEY);
+    return stored === "test" ? "test" : "prod";
+  } catch {
+    return "prod";
+  }
+}
+
+function persistAssetsEnvPreference(value) {
+  try {
+    if (!value) localStorage.removeItem(ASSETS_ENV_KEY);
+    else localStorage.setItem(ASSETS_ENV_KEY, value);
   } catch {}
 }
 
@@ -96,7 +113,13 @@ export function useAppOrchestrator({ auth, i18n }) {
   const [info, setInfo] = createSignal(null);
 
   // Asset state
-  const [assetsEnv, setAssetsEnv] = createSignal("prod");
+  const initialAssetsEnv = typeof window === "undefined" ? "prod" : loadAssetsEnvPreference();
+  const [assetsEnv, setAssetsEnvState] = createSignal(initialAssetsEnv);
+  const setAssetsEnv = (next) => {
+    const normalized = next === "test" ? "test" : "prod";
+    setAssetsEnvState(normalized);
+    if (typeof window !== "undefined") persistAssetsEnvPreference(normalized);
+  };
   const [assetsBaseUrl, setAssetsBaseUrl] = createSignal("");
   const [domainAssetsPrefix, setDomainAssetsPrefix] = createSignal("/domain_default/");
   const [domainAssetsSource, setDomainAssetsSource] = createSignal(null);
@@ -106,6 +129,7 @@ export function useAppOrchestrator({ auth, i18n }) {
     setLoading(true);
     setError(null);
     const isSwitching = !!newSettings;
+    const skipNavigateHome = !!newSettings?.noNavigate;
 
     try {
       const prevCfg = config() || {};
@@ -204,7 +228,7 @@ export function useAppOrchestrator({ auth, i18n }) {
 
       // 6) Assets: choose base and try domain pack; fallback to default only for assets
       const base =
-        (assetsEnv() === "test" ? infoData?.temp_assets_url : infoData?.assets_url) || "/";
+        (assetsEnv() === "test" ? (infoData?.temp_assets_url || infoData?.assets_url) : infoData?.assets_url) || "/";
       const assetsBase = ensureSlash(base);
       setAssetsBaseUrl(assetsBase);
       dlog("assets:env", {
@@ -261,7 +285,7 @@ export function useAppOrchestrator({ auth, i18n }) {
       if (isSwitching) {
         const current = (typeof window !== "undefined" ? window.location.hash.slice(1) : "/") || "/";
         dlog("nav:post-switch", { current, target: "/" });
-        if (current !== "/") navigate("/");
+        if (!skipNavigateHome && current !== "/") navigate("/");
       }
 
       dlog("switch:done", nextCfg);
@@ -283,10 +307,22 @@ export function useAppOrchestrator({ auth, i18n }) {
     initializeOrSwitch();
   };
 
+  const refreshDomainAssets = (opts = {}) => {
+    const current = config();
+    if (!current) return initializeOrSwitch();
+    const payload = {
+      backendLink: current.backendLink,
+      domain: current.domain,
+      noNavigate: opts.noNavigate ?? true,
+    };
+    return initializeOrSwitch(payload);
+  };
+
   return {
     config, info, error, loading,
     initializeOrSwitch, setDomain, clearConnectOverride,
     assetsEnv, setAssetsEnv, assetsBaseUrl,
     domainAssetsPrefix, domainAssetsSource, domainAssetsConfig,
+    refreshDomainAssets,
   };
 }

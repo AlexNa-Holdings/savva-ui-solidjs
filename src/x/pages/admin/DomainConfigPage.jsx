@@ -13,6 +13,8 @@ import { MaximizeIcon, MinimizeIcon } from "../../ui/icons/ToolbarIcons.jsx";
 import { dbg } from "../../../utils/debug.js";
 import { uploadFilesToTempAssets } from "./domain_config/publishToTest.js";
 import { collectOpfsDomainFiles } from "./domain_config/collectDomainFiles.js";
+import { httpBase } from "../../../net/endpoints.js";
+import { setDomainAssetsCid } from "../../../blockchain/adminCommands.js";
 
 /* small helpers */
 const LS_KEY = (d) => `sv_domain_config_dir:${d}`;
@@ -102,6 +104,8 @@ export default function DomainConfigPage() {
   const [showCreateModal, setShowCreateModal] = createSignal(false);
   const [isDownloading, setIsDownloading] = createSignal(false);
   const [refreshKey, setRefreshKey] = createSignal(0);
+  const [busyPublishTest, setBusyPublishTest] = createSignal(false);
+  const [busyPublishProd, setBusyPublishProd] = createSignal(false);
 
   const [canSave, setCanSave] = createSignal(false);
   let viewerApi = null;
@@ -123,6 +127,16 @@ export default function DomainConfigPage() {
     }
   });
   onMount(() => {
+    const isEditableTarget = (el) => {
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      const tag = (el.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return true;
+      const role = (el.getAttribute?.("role") || "").toLowerCase();
+      if (role === "textbox" || role === "combobox" || role === "spinbutton") return true;
+      return false;
+    };
+
     const onKey = (e) => {
       const key = (e.key || "").toLowerCase();
       if (key === "escape" && maximized()) setMaximized(false);
@@ -130,7 +144,11 @@ export default function DomainConfigPage() {
         e.preventDefault();
         setMaximized((v) => !v);
       }
-      if (key === "delete") onDeleteSelected();
+      if (key === "delete") {
+        const target = e.target || document.activeElement;
+        if (isEditableTarget(target)) return;
+        onDeleteSelected();
+      }
     };
     window.addEventListener("keydown", onKey);
     onCleanup(() => window.removeEventListener("keydown", onKey));
@@ -288,11 +306,46 @@ export default function DomainConfigPage() {
   };
 
   const onPublish = async () => {
+    if (busyPublishTest() || busyPublishProd()) return;
     const ok = window.confirm(app.t("admin.domain.publish.confirm_test"));
     if (!ok) return;
-    const domain = domainName();
-    const files = await collectOpfsDomainFiles(currentConfigDir());
-    await uploadFilesToTempAssets(app, domain, files);
+    setBusyPublishTest(true);
+    try {
+      const domain = domainName();
+      const files = await collectOpfsDomainFiles(currentConfigDir());
+      await uploadFilesToTempAssets(app, domain, files);
+      pushToast({ type: "success", message: t("admin.domain.publish.success_test") });
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domain.publish.error") });
+    } finally {
+      setBusyPublishTest(false);
+    }
+  };
+
+  const onPublishToProduction = async () => {
+    if (busyPublishProd() || busyPublishTest()) return;
+    const ok = window.confirm(app.t("admin.domain.publish.confirm_prod"));
+    if (!ok) return;
+    setBusyPublishProd(true);
+    try {
+      const domain = domainName();
+      const base = httpBase();
+      const url = `${base}ipfs-assets?domain=${encodeURIComponent(domain)}`;
+      const res = await fetch(url, { method: "GET", credentials: "include", cache: "no-store" });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `${res.status} ${res.statusText}`);
+      }
+      const json = await res.json().catch(() => ({}));
+      const cid = json?.cid;
+      if (!cid) throw new Error(t("admin.domain.publish.noCid"));
+      await setDomainAssetsCid(app, { domain, cid });
+      pushToast({ type: "success", message: t("admin.domain.publish.success_prod") });
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domain.publish.error") });
+    } finally {
+      setBusyPublishProd(false);
+    }
   };
 
 
@@ -376,7 +429,18 @@ export default function DomainConfigPage() {
           onUpload={onUploadFiles}   // <— fixed: uses onChange under the hood
           onDelete={onDeleteSelected}
           onPublish={onPublish}
+          isPublishing={busyPublishTest()}
         />
+      </div>
+
+      <div class="mt-4">
+        <button
+          class="w-full px-3 py-2 rounded-md border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+          onClick={onPublishToProduction}
+          disabled={busyPublishProd() || busyPublishTest()}
+        >
+          {busyPublishProd() ? t("common.working") : t("admin.domainConfig.publishProd.button")}
+        </button>
       </div>
 
       <DownloadConfigModal isOpen={showDownloadModal()} onClose={() => setShowDownloadModal(false)} onSelect={handleDownloadSelect} />

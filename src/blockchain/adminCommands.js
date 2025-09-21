@@ -88,3 +88,14 @@ export async function listUnpinPost(app, { listId, savvaCid }) {
     p2: String(savvaCid),
   });
 }
+
+export async function setDomainAssetsCid(app, { domain, cid }) {
+  const targetDomain = String(domain || domainFromApp(app) || "");
+  if (!targetDomain) throw new Error("domain is required");
+  if (!cid) throw new Error("cid is required");
+  return await sendAdminCommand(app, {
+    cmd: "set_domain_assets_cid",
+    p1: targetDomain,
+    p2: String(cid),
+  });
+}

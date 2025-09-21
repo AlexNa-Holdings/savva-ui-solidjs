@@ -70,10 +70,11 @@ export default function CommanderActionBar(props) {
       </button>
 
       <button
-        class="px-3 py-2 rounded-md border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90 w-full"
+        class="px-3 py-2 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] w-full disabled:opacity-60 disabled:cursor-not-allowed"
         onClick={props.onPublish}
+        disabled={props.isPublishing}
       >
-        {t("admin.domainConfig.actions.publish")}
+        {props.isPublishing ? t("common.working") : t("admin.domainConfig.actions.publish")}
       </button>
 
       {/* hidden picker – onChange (not onInput) */}
