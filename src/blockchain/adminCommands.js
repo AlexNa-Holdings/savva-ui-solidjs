@@ -95,7 +95,6 @@ export async function setDomainAssetsCid(app, { domain, cid }) {
   if (!cid) throw new Error("cid is required");
   return await sendAdminCommand(app, {
     cmd: "set_domain_assets_cid",
-    p1: targetDomain,
-    p2: String(cid),
+    p1: String(cid),
   });
 }
