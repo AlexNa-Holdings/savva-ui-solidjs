@@ -921,5 +921,12 @@ export default {
   "wallet.unstake.notice": "Unstaking starts a cooldown. Your tokens will become claimable in {days} days.",
   "wallet.unstake.submit": "Unstake Now",
   "wallet.unstake.title": "Unstake Funds",
-  "wallet.unstaked.availableNow": "Available Now"
+  "wallet.unstaked.availableNow": "Available Now",
+  "admin.domain.publish.button_test": "Publish to TEST",
+  "admin.domain.publish.confirm_test": "Are you sure you want to publish this domain configuration into TEST environment?",
+  "admin.domain.publish.in_progress": "Publishing…",
+  "admin.domain.publish.done": "Published to TEST.",
+  "admin.domain.publish.error": "Publish failed: {message}",
+  "admin.domain.publish.no_domain": "Cannot publish: domain is not selected.",
+
 };

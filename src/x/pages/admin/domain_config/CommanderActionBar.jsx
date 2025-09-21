@@ -55,8 +55,15 @@ export default function CommanderActionBar(props) {
       </button>
 
       <button
+        type="button"
         class="px-3 py-2 rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] w-full disabled:opacity-60 disabled:cursor-not-allowed"
         onClick={props.onDelete}
+        onKeyDown={(e) => {
+          if (e.key === "Delete") { e.preventDefault(); e.stopPropagation(); }
+        }}
+        onKeyUp={(e) => {
+          if (e.key === "Delete") { e.preventDefault(); e.stopPropagation(); }
+        }}
         disabled={!props.canDelete}
       >
         {t("admin.domainConfig.actions.delete")}

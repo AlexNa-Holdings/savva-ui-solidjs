@@ -11,6 +11,8 @@ import { discoverEntriesOrThrow } from "./domain_config/remoteScan.js";
 import { pushToast, pushErrorToast } from "../../../ui/toast.js";
 import { MaximizeIcon, MinimizeIcon } from "../../ui/icons/ToolbarIcons.jsx";
 import { dbg } from "../../../utils/debug.js";
+import { uploadFilesToTempAssets } from "./domain_config/publishToTest.js";
+import { collectOpfsDomainFiles } from "./domain_config/collectDomainFiles.js";
 
 /* small helpers */
 const LS_KEY = (d) => `sv_domain_config_dir:${d}`;
@@ -83,9 +85,10 @@ async function downloadAllDomainFiles(app, sourceType) {
 
   try {
     localStorage.setItem(LS_KEY(domain || "default"), targetDirName);
-  } catch {}
+  } catch { }
   return { targetDirName, ok, total: fileList.length, skipped };
 }
+
 
 export default function DomainConfigPage() {
   const app = useApp();
@@ -283,7 +286,15 @@ export default function DomainConfigPage() {
       pushErrorToast(e, { context: t("admin.domainConfig.editor.saveErr") });
     }
   };
-  const onPublish = () => pushToast({ type: "info", message: t("common.comingSoon") });
+
+  const onPublish = async () => {
+    const ok = window.confirm(app.t("admin.domain.publish.confirm_test"));
+    if (!ok) return;
+    const domain = domainName();
+    const files = await collectOpfsDomainFiles(currentConfigDir());
+    await uploadFilesToTempAssets(app, domain, files);
+  };
+
 
   const handleDownloadSelect = async (sourceType) => {
     const proceed = await confirmAndMaybeSave();
@@ -297,7 +308,7 @@ export default function DomainConfigPage() {
       setCurrentConfigDir(targetDirName);
       try {
         localStorage.setItem(LS_KEY(domainName() || "default"), targetDirName);
-      } catch {}
+      } catch { }
       setCurrentPath("/");
       setSelectedItem(null);
       setRefreshKey((k) => k + 1);

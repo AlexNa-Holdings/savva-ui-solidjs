@@ -154,3 +154,12 @@
 .sv-leftnav__scroll:hover::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Leftnav: never underline (categories included) */
+.sv-leftnav .sv-leftnav__list a,
+.sv-leftnav .sv-leftnav__list a:hover,
+.sv-leftnav .sv-leftnav__list a:focus,
+.sv-leftnav .sv-leftnav__list a:active,
+.sv-leftnav .sv-leftnav__list a:visited {
+  text-decoration: none !important;
+}

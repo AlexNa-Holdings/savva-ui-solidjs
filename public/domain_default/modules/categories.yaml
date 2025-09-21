@@ -1,7 +1,6 @@
 required: false
 locales:
   en:
-    - SAVVA
     - SAVVA/Announcements
     - SAVVA/Platform Updates
     - SAVVA/Status & Incidents
@@ -19,8 +18,6 @@ locales:
     - SAVVA/Promotions/Announcements Block
     - SAVVA/Grants & Bounties
     - SAVVA/Roadmap & Feedback
-    - Announcements
-    - Introductions
     - PulseChain/News
     - PulseChain/Upgrades
     - PulseChain/Validators & Staking
@@ -60,7 +57,6 @@ locales:
     - Lounge/Off-topic
     - Lounge/Showcase & Feedback
   ru:
-    - SAVVA
     - SAVVA/Анонсы
     - SAVVA/Обновления платформы
     - SAVVA/Статус и инциденты
@@ -78,8 +74,6 @@ locales:
     - SAVVA/Промо/Блок анонсов
     - SAVVA/Гранты и баунти
     - SAVVA/Дорожная карта и фидбек
-    - Анонсы
-    - Знакомства
     - PulseChain/Новости
     - PulseChain/Обновления
     - PulseChain/Валидаторы и стейкинг
@@ -119,7 +113,6 @@ locales:
     - Кухня/Оффтоп
     - Кухня/Шоукейс и отзывы
   fr:
-    - SAVVA
     - SAVVA/Annonces
     - SAVVA/Mises à jour de la plateforme
     - SAVVA/Statut & Incidents
@@ -137,8 +130,6 @@ locales:
     - SAVVA/Promotions/Bloc d’annonces
     - SAVVA/Subventions & Bounties
     - SAVVA/Roadmap & Feedback
-    - Annonces
-    - Présentations
     - PulseChain/Nouvelles
     - PulseChain/Mises à jour
     - PulseChain/Validateurs & Staking
@@ -178,7 +169,6 @@ locales:
     - Salon/Hors sujet
     - Salon/Showcase & Retours
   ua:
-    - SAVVA
     - SAVVA/Оголошення
     - SAVVA/Оновлення платформи
     - SAVVA/Статус та інциденти
@@ -196,8 +186,6 @@ locales:
     - SAVVA/Промо/Блок анонсів
     - SAVVA/Гранти та баунті
     - SAVVA/Дорожня карта та відгуки
-    - Оголошення
-    - Знайомства
     - PulseChain/Новини
     - PulseChain/Оновлення
     - PulseChain/Валідатори та стейкінг
