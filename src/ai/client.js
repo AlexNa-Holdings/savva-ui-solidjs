@@ -1,5 +1,6 @@
 // src/ai/client.js
 import { getAiConfig } from "./storage.js";
+import { findProvider } from "./registry.js";
 import { fetchWithTimeout } from "../utils/net.js";
 
 const DEFAULT_AI_TIMEOUT_MS = 60_000; // 60s default for LLM calls
@@ -7,10 +8,6 @@ const DEFAULT_AI_TIMEOUT_MS = 60_000; // 60s default for LLM calls
 function trimSlash(s = "") {
   return String(s || "").replace(/\/+$/, "");
 }
-function safeModel(cfg) {
-  return cfg.model || "gpt-4o-mini";
-}
-
 function parseJsonStrict(s) {
   const raw = String(s || "").trim();
   try { return JSON.parse(raw); } catch {}
@@ -124,8 +121,9 @@ async function callGemini({ baseUrl, apiKey, model, messages, timeoutMs }) {
 export function createAiClient(explicitCfg) {
   const cfg = explicitCfg || getAiConfig();
   const providerId = cfg?.providerId || "openai";
-  const model = safeModel(cfg);
-  const baseUrl = cfg.baseUrl;
+  const provider = findProvider(providerId);
+  const model = cfg.model || provider?.defaultModel || "gpt-4o-mini";
+  const baseUrl = cfg.baseUrl || provider?.defaultBaseUrl || "";
   const apiKey = cfg.apiKey;
   const apiVersion = cfg.extra?.apiVersion;
   const REQUEST_TIMEOUT_MS =

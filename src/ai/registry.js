@@ -3,20 +3,20 @@ import { fetchWithTimeout } from "../utils/net.js";
 
 export const AI_PROVIDERS = [
   // OpenAI & compatibles
-  { id: "openai",             labelKey: "settings.ai.providers.openai",           kind: "openai",        defaultBaseUrl: "https://api.openai.com/v1",        modelHint: "gpt-4o, gpt-4.1, o4-mini" },
-  { id: "openai-compatible",  labelKey: "settings.ai.providers.openaiCompatible", kind: "openai",        defaultBaseUrl: "https://api.example.com/v1",       modelHint: "OpenAI-compatible path, e.g. /v1" },
-  { id: "groq",               labelKey: "settings.ai.providers.groq",             kind: "openai",        defaultBaseUrl: "https://api.groq.com/openai/v1",   modelHint: "llama-3.1-70b-versatile" },
-  { id: "together",           labelKey: "settings.ai.providers.together",         kind: "openai",        defaultBaseUrl: "https://api.together.xyz/v1",      modelHint: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo" },
-  { id: "mistral",            labelKey: "settings.ai.providers.mistral",          kind: "openai",        defaultBaseUrl: "https://api.mistral.ai/v1",        modelHint: "open-mixtral-8x7b" },
+  { id: "openai",             labelKey: "settings.ai.providers.openai",           kind: "openai",        defaultBaseUrl: "https://api.openai.com/v1",        defaultModel: "gpt-4o-mini",                      modelHint: "gpt-4o, gpt-4.1, o4-mini" },
+  { id: "openai-compatible",  labelKey: "settings.ai.providers.openaiCompatible", kind: "openai",        defaultBaseUrl: "https://api.example.com/v1",       defaultModel: "gpt-4o-mini",                      modelHint: "OpenAI-compatible path, e.g. /v1" },
+  { id: "groq",               labelKey: "settings.ai.providers.groq",             kind: "openai",        defaultBaseUrl: "https://api.groq.com/openai/v1",   defaultModel: "llama-3.1-70b-versatile",           modelHint: "llama-3.1-70b-versatile" },
+  { id: "together",           labelKey: "settings.ai.providers.together",         kind: "openai",        defaultBaseUrl: "https://api.together.xyz/v1",      defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", modelHint: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo" },
+  { id: "mistral",            labelKey: "settings.ai.providers.mistral",          kind: "openai",        defaultBaseUrl: "https://api.mistral.ai/v1",        defaultModel: "open-mixtral-8x7b",                modelHint: "open-mixtral-8x7b" },
 
   // Anthropic
-  { id: "anthropic",          labelKey: "settings.ai.providers.anthropic",        kind: "anthropic",     defaultBaseUrl: "https://api.anthropic.com/v1",     modelHint: "claude-3-5-sonnet-20240620", anthropicVersion: "2023-06-01" },
+  { id: "anthropic",          labelKey: "settings.ai.providers.anthropic",        kind: "anthropic",     defaultBaseUrl: "https://api.anthropic.com/v1",     defaultModel: "claude-3-5-sonnet-20240620",         modelHint: "claude-3-5-sonnet-20240620", anthropicVersion: "2023-06-01" },
 
   // Google Gemini
-  { id: "gemini",             labelKey: "settings.ai.providers.gemini",           kind: "gemini",        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1", modelHint: "gemini-1.5-pro" },
+  { id: "gemini",             labelKey: "settings.ai.providers.gemini",           kind: "gemini",        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1", defaultModel: "gemini-1.5-pro", modelHint: "gemini-1.5-pro" },
 
   // Azure OpenAI
-  { id: "azure-openai",       labelKey: "settings.ai.providers.azure",            kind: "azure_openai",  defaultBaseUrl: "",                                 apiVersion: "2024-02-15-preview", modelHint: "gpt-4o (deployed name)" },
+  { id: "azure-openai",       labelKey: "settings.ai.providers.azure",            kind: "azure_openai",  defaultBaseUrl: "",                                 defaultModel: "", apiVersion: "2024-02-15-preview", modelHint: "gpt-4o (deployed name)" },
 ];
 
 export function findProvider(id) {

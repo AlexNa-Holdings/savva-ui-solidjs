@@ -719,6 +719,8 @@ export default {
   "settings.ai.model": "Модель",
   "settings.ai.privacyNote": "Ваши API ключи хранятся локально в этом браузере и используются только для запросов, которые вы инициируете.",
   "settings.ai.providerLabel": "Поставщик",
+  "settings.ai.useAi": "Использовать ИИ",
+  "settings.ai.useAiHint": "Включите или отключите ИИ-помощники в редакторе.",
   "settings.ai.providers.anthropic": "Anthropic",
   "settings.ai.providers.azure": "Azure",
   "settings.ai.providers.gemini": "Gemini",

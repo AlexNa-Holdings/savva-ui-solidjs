@@ -15,38 +15,97 @@ export default function AISettingsSection() {
   const [showAdvanced, setShowAdvanced] = createSignal(false);
   const provider = createMemo(() => findProvider(cfg().providerId));
 
+  const persistConfig = (nextCfg) => {
+    try {
+      const normalizedUseAi = nextCfg.useAi === false ? false : true;
+      saveAiConfig({ ...nextCfg, auto: !!nextCfg.auto, useAi: normalizedUseAi });
+    } catch {
+      /* ignore */
+    }
+  };
+
   createEffect(() => {
     const p = provider();
     if (!p) return;
     setCfg((prev) => {
       const next = { ...prev };
-      if (!prev.baseUrl) next.baseUrl = p.defaultBaseUrl || "";
+      let changed = false;
+      if (!prev.baseUrl && p.defaultBaseUrl !== undefined) {
+        next.baseUrl = p.defaultBaseUrl || "";
+        changed = true;
+      }
+      if (!prev.model && p.defaultModel !== undefined) {
+        next.model = p.defaultModel || "";
+        changed = true;
+      }
       if (p.kind === "azure_openai" && !prev.extra?.apiVersion) {
         next.extra = { ...(prev.extra || {}), apiVersion: p.apiVersion || "2024-02-15-preview" };
+        changed = true;
       }
+      if (!changed) return prev;
+      persistConfig(next);
       return next;
     });
   });
 
-  function update(field, value) { setCfg((prev) => ({ ...prev, [field]: value })); }
-  function updateExtra(field, value) { setCfg((prev) => ({ ...prev, extra: { ...(prev.extra || {}), [field]: value } })); }
+  function update(field, value) {
+    setCfg((prev) => {
+      const next = { ...prev, [field]: value };
+      persistConfig(next);
+      return next;
+    });
+  }
+  function updateExtra(field, value) {
+    setCfg((prev) => {
+      const next = { ...prev, extra: { ...(prev.extra || {}), [field]: value } };
+      persistConfig(next);
+      return next;
+    });
+  }
+
+  function handleProviderChange(nextId) {
+    const p = findProvider(nextId);
+    setCfg((prev) => {
+      const next = { ...prev, providerId: nextId };
+      next.baseUrl = p?.defaultBaseUrl !== undefined ? (p.defaultBaseUrl || "") : "";
+      next.model = p?.defaultModel !== undefined ? (p.defaultModel || "") : "";
+
+      if (p?.kind === "azure_openai") {
+        next.extra = { ...(prev.extra || {}), apiVersion: p.apiVersion || "2024-02-15-preview" };
+      } else if (prev.extra) {
+        const cloned = { ...prev.extra };
+        delete cloned.apiVersion;
+        if (Object.keys(cloned).length) next.extra = cloned;
+        else delete next.extra;
+      } else {
+        delete next.extra;
+      }
+      persistConfig(next);
+      return next;
+    });
+  }
 
   // Persist AUTO immediately when toggled so the editor can pick it up
-  function onToggleAuto(e) {
-    const v = !!e.currentTarget.checked;
-    setCfg((prev) => ({ ...prev, auto: v }));
-    try {
-      const toSave = { ...cfg(), auto: v };
-      saveAiConfig(toSave);
-      pushToast({ type: "success", message: t("settings.ai.saved") });
-    } catch { /* ignore */ }
-  }
-
-  function handleSave() {
-    const toSave = { ...cfg(), auto: !!cfg().auto };
-    saveAiConfig(toSave);
+  function onToggleFlag(field, value) {
+    setCfg((prev) => {
+      const next = { ...prev, [field]: value };
+      persistConfig(next);
+      return next;
+    });
     pushToast({ type: "success", message: t("settings.ai.saved") });
   }
+
+  function onToggleAuto(e) {
+    const v = !!e.currentTarget.checked;
+    onToggleFlag("auto", v);
+  }
+
+  function onToggleUseAi(e) {
+    const v = !!e.currentTarget.checked;
+    onToggleFlag("useAi", v);
+  }
+
+  const usingAi = createMemo(() => cfg().useAi !== false);
 
   async function handleTest() {
     setBusyTest(true);
@@ -136,12 +195,6 @@ export default function AISettingsSection() {
         <h3 class="text-lg font-medium">{t("settings.ai.title")}</h3>
         <div class="flex items-center gap-2">
           <button
-            class="px-3 py-1.5 text-sm rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
-            onClick={handleSave}
-          >
-            {t("settings.ai.save")}
-          </button>
-          <button
             class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] disabled:opacity-50"
             disabled={busyTest()}
             onClick={handleTest}
@@ -151,89 +204,99 @@ export default function AISettingsSection() {
         </div>
       </div>
 
-      <div class="grid gap-4 sm:grid-cols-2">
-        <label class="grid gap-1">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.providerLabel")}</span>
-          <select
-            class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
-            value={cfg().providerId}
-            onInput={(e) => update("providerId", e.currentTarget.value)}
-          >
-            {AI_PROVIDERS.map((p) => (
-              <option value={p.id}>{t(p.labelKey)}</option>
-            ))}
-          </select>
-        </label>
-
-        <label class="grid gap-1">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.model")}</span>
-          <input
-            type="text"
-            class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
-            placeholder={modelPlaceholder()}
-            value={cfg().model || ""}
-            onInput={(e) => update("model", e.currentTarget.value)}
-          />
-        </label>
-
-        <label class="grid gap-1 sm:col-span-2">
-          <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiKey")}</span>
-          <input
-            type="password"
-            autocomplete="off"
-            class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5 w-full"
-            placeholder={t("settings.ai.apiKey.placeholder")}
-            value={cfg().apiKey || ""}
-            onInput={(e) => update("apiKey", e.currentTarget.value)}
-          />
-        </label>
-      </div>
-
       <div class="flex items-center gap-2">
         <label class="flex items-center gap-2">
-          <input type="checkbox" checked={!!cfg().auto} onInput={onToggleAuto} />
-          <span>{t("settings.ai.auto")}</span>
+          <input type="checkbox" checked={usingAi()} onInput={onToggleUseAi} />
+          <span>{t("settings.ai.useAi")}</span>
         </label>
-        <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.autoHint")}</span>
+        <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.useAiHint")}</span>
       </div>
 
-      <div class="flex items-center gap-2">
-        <label class="flex items-center gap-2">
-          <input type="checkbox" checked={showAdvanced()} onInput={(e) => setShowAdvanced(e.currentTarget.checked)} />
-          <span>{t("settings.ai.advanced")}</span>
-        </label>
-        <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.advancedHint")}</span>
-      </div>
-
-      <Show when={showAdvanced()}>
+      <Show when={usingAi()}>
         <div class="grid gap-4 sm:grid-cols-2">
-          <label class="grid gap-1 sm:col-span-2">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.baseUrl")}</span>
+          <label class="grid gap-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.providerLabel")}</span>
+            <select
+              class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
+              value={cfg().providerId}
+              onInput={(e) => handleProviderChange(e.currentTarget.value)}
+            >
+              {AI_PROVIDERS.map((p) => (
+                <option value={p.id}>{t(p.labelKey)}</option>
+              ))}
+            </select>
+          </label>
+
+          <label class="grid gap-1">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.model")}</span>
             <input
               type="text"
-              class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5 w-full"
-              placeholder={provider()?.defaultBaseUrl || "https://api.example.com/v1"}
-              value={cfg().baseUrl || ""}
-              onInput={(e) => update("baseUrl", e.currentTarget.value)}
+              class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
+              placeholder={modelPlaceholder()}
+              value={cfg().model || ""}
+              onInput={(e) => update("model", e.currentTarget.value)}
             />
           </label>
 
-          <Show when={provider()?.kind === "azure_openai"}>
-            <label class="grid gap-1">
-              <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiVersion")}</span>
+          <label class="grid gap-1 sm:col-span-2">
+            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiKey")}</span>
+            <input
+              type="password"
+              autocomplete="off"
+              class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5 w-full"
+              placeholder={t("settings.ai.apiKey.placeholder")}
+              value={cfg().apiKey || ""}
+              onInput={(e) => update("apiKey", e.currentTarget.value)}
+            />
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" checked={!!cfg().auto} onInput={onToggleAuto} />
+            <span>{t("settings.ai.auto")}</span>
+          </label>
+          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.autoHint")}</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" checked={showAdvanced()} onInput={(e) => setShowAdvanced(e.currentTarget.checked)} />
+            <span>{t("settings.ai.advanced")}</span>
+          </label>
+          <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.advancedHint")}</span>
+        </div>
+
+        <Show when={showAdvanced()}>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-1 sm:col-span-2">
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.baseUrl")}</span>
               <input
                 type="text"
-                class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
-                placeholder="2024-02-15-preview"
-                value={cfg().extra?.apiVersion || ""}
-                onInput={(e) => updateExtra("apiVersion", e.currentTarget.value)}
+                class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5 w-full"
+                placeholder={provider()?.defaultBaseUrl || "https://api.example.com/v1"}
+                value={cfg().baseUrl || ""}
+                onInput={(e) => update("baseUrl", e.currentTarget.value)}
               />
             </label>
-          </Show>
-        </div>
-      </Show>
 
-      <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.privacyNote")}</p>
+            <Show when={provider()?.kind === "azure_openai"}>
+              <label class="grid gap-1">
+                <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiVersion")}</span>
+                <input
+                  type="text"
+                  class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
+                  placeholder="2024-02-15-preview"
+                  value={cfg().extra?.apiVersion || ""}
+                  onInput={(e) => updateExtra("apiVersion", e.currentTarget.value)}
+                />
+              </label>
+            </Show>
+          </div>
+        </Show>
+
+        <p class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.privacyNote")}</p>
+      </Show>
     </section>
   );
 }

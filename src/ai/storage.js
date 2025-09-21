@@ -8,6 +8,7 @@ export function loadAiConfig() {
       const parsed = JSON.parse(raw);
       // ensure new fields exist
       if (typeof parsed.auto !== "boolean") parsed.auto = false;
+      if (typeof parsed.useAi !== "boolean") parsed.useAi = true;
       return parsed;
     }
   } catch {}
@@ -18,6 +19,7 @@ export function loadAiConfig() {
     model: "",
     extra: {},
     auto: false,
+    useAi: true,
   };
 }
 

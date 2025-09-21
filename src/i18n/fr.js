@@ -719,6 +719,8 @@ export default {
   "settings.ai.model": "Modèle",
   "settings.ai.privacyNote": "Vos clés API sont stockées localement dans ce navigateur et utilisées uniquement pour les requêtes que vous initiez.",
   "settings.ai.providerLabel": "Fournisseur",
+  "settings.ai.useAi": "Utiliser l'IA",
+  "settings.ai.useAiHint": "Activer ou désactiver les assistants IA dans l'éditeur.",
   "settings.ai.providers.anthropic": "Anthropic",
   "settings.ai.providers.azure": "Azure",
   "settings.ai.providers.gemini": "Gemini",

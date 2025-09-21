@@ -719,6 +719,8 @@ export default {
   "settings.ai.model": "Model",
   "settings.ai.privacyNote": "Your API keys are stored locally in this browser and used only for requests you initiate.",
   "settings.ai.providerLabel": "Provider",
+  "settings.ai.useAi": "Use AI",
+  "settings.ai.useAiHint": "Enable or disable AI-powered helpers in the editor.",
   "settings.ai.providers.anthropic": "Anthropic",
   "settings.ai.providers.azure": "Azure",
   "settings.ai.providers.gemini": "Gemini",

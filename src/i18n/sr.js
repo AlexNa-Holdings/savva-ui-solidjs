@@ -719,6 +719,8 @@ export default {
   "settings.ai.model": "Model",
   "settings.ai.privacyNote": "Vaši API ključevi se čuvaju lokalno u ovom pretraživaču i koriste se samo za zahteve koje inicirate.",
   "settings.ai.providerLabel": "Provajder",
+  "settings.ai.useAi": "Koristi AI",
+  "settings.ai.useAiHint": "Uključite ili isključite AI asistente u editoru.",
   "settings.ai.providers.anthropic": "Anthropic",
   "settings.ai.providers.azure": "Azure",
   "settings.ai.providers.gemini": "Gemini",

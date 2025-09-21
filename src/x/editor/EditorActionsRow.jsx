@@ -10,8 +10,14 @@ export default function EditorActionsRow(props) {
   const { t } = app;
 
   const aiCfg = createMemo(() => getAiConfig());
-  const aiConfigured = createMemo(() => !!aiCfg()?.apiKey && !!aiCfg()?.providerId);
-  const aiAuto = createMemo(() => !!aiCfg()?.auto);
+  const aiEnabled = createMemo(() => aiCfg()?.useAi !== false);
+  const aiConfigured = createMemo(
+    () =>
+      aiEnabled() &&
+      !!aiCfg()?.apiKey &&
+      !!aiCfg()?.providerId
+  );
+  const aiAuto = createMemo(() => aiConfigured() && !!aiCfg()?.auto);
 
   const isPending = () => !!props.aiPending;
   const isRunning = () => !!props.aiRunning;
