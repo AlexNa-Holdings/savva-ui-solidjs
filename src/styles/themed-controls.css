@@ -283,6 +283,50 @@ html.dark .sv-docs code[data-theme*=" "] span {
   :root { --sv-switch-anim: 0ms; }
 }
 
+/* Generic themed links (skip buttons and anything explicitly unstyled) */
+a:not(.btn):not(.unstyled-link) {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 0.08em;
+  text-decoration-color: color-mix(in hsl, hsl(var(--primary)) 70%, currentColor);
+  transition: color 120ms ease, text-decoration-thickness 120ms ease, opacity 120ms ease;
+}
+
+a:not(.btn):not(.unstyled-link):hover {
+  text-decoration-thickness: 0.12em;
+  opacity: 0.9;
+}
+
+a:not(.btn):not(.unstyled-link):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.4);
+  border-radius: 0.25rem;
+}
+
+a:not(.btn):not(.unstyled-link):active {
+  opacity: 0.85;
+}
+
+/* Optional: slightly mute visited links while keeping them readable */
+a:not(.btn):not(.unstyled-link):visited {
+  color: color-mix(in hsl, hsl(var(--primary)) 85%, hsl(var(--muted-foreground)));
+}
+
+/* Markdown/Docs area: ensure links inherit the generic style */
+.sv-docs a { color: hsl(var(--primary)); }
+
+/* Utility class for subtle, inline links when needed */
+.link-quiet {
+  color: hsl(var(--muted-foreground));
+  text-decoration-color: hsl(var(--border));
+}
+.link-quiet:hover {
+  color: hsl(var(--foreground));
+  text-decoration-color: hsl(var(--foreground));
+}
+
+
 /* --- Global checkbox → themed switch --- */
 
 /* sizing + tokens */

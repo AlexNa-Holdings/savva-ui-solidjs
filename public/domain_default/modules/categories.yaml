@@ -1,18 +1,238 @@
 required: false
 locales:
-  ru:
-    - SAVVA Платформа
-    - SAVVA Документация
-    - Вопросы и ответы
   en:
-    - SAVVA Talk
-    - SAVVA Documentation
-    - Q&A
+    - SAVVA
+    - SAVVA/Announcements
+    - SAVVA/Platform Updates
+    - SAVVA/Status & Incidents
+    - SAVVA/Token (SAVVA)/Economics
+    - SAVVA/Token (SAVVA)/Buy & Burn
+    - SAVVA/NPOs/Setup & Governance
+    - SAVVA/NPOs/Spending & Reports
+    - SAVVA/Builders/SDKs & APIs
+    - SAVVA/Builders/Contracts & ABI
+    - SAVVA/Apps & Domains/Network Launches
+    - SAVVA/Apps & Domains/Paris.Camp
+    - SAVVA/Apps & Domains/Stihi.io
+    - SAVVA/Creators/Guides & Monetization
+    - SAVVA/Promotions/Promo Codes
+    - SAVVA/Promotions/Announcements Block
+    - SAVVA/Grants & Bounties
+    - SAVVA/Roadmap & Feedback
+    - Announcements
+    - Introductions
+    - PulseChain/News
+    - PulseChain/Upgrades
+    - PulseChain/Validators & Staking
+    - PulseChain/Bridges & Onboarding
+    - DeFi/PulseX/Trading
+    - DeFi/PulseX/Liquidity & Farming
+    - DeFi/Yield & Strategies
+    - Wallets/Setup & Security
+    - Wallets/Hardware (Ledger, Trezor)
+    - Wallets/Smart Wallets (Safe, Argent)
+    - Security/Scams & Phishing Alerts
+    - Security/Best Practices
+    - Builders/Solidity & Smart Contracts
+    - Builders/Subgraphs & Indexing
+    - Builders/Backends & APIs
+    - Builders/Frontends (React, SolidJS)
+    - Builders/Tools & DevOps
+    - NFTs/Collections
+    - NFTs/Minting & Marketplaces
+    - NFTs/Art & Media
+    - Markets/TA & Strategies
+    - Markets/On-chain Analytics
+    - Markets/Signals & Bots
+    - Airdrops/Opportunities
+    - Airdrops/Proof & Claims
+    - Community/Events & Meetups
+    - Community/Grants & Bounties
+    - Community/Charity & NPOs
+    - Governance/Proposals
+    - Governance/Delegation & Voting
+    - Learn/Beginners
+    - Learn/Guides & FAQs
+    - Learn/Glossary
+    - Support/Q&A
+    - Support/Bug Reports
+    - Support/Feature Requests
+    - Lounge/Off-topic
+    - Lounge/Showcase & Feedback
+  ru:
+    - SAVVA
+    - SAVVA/Анонсы
+    - SAVVA/Обновления платформы
+    - SAVVA/Статус и инциденты
+    - SAVVA/Токен (SAVVA)/Токеномика
+    - SAVVA/Токен (SAVVA)/Покупка и сжигание
+    - SAVVA/НКО/Настройка и управление
+    - SAVVA/НКО/Расходы и отчёты
+    - SAVVA/Разработчикам/SDK и API
+    - SAVVA/Разработчикам/Контракты и ABI
+    - SAVVA/Приложения и домены/Запуски сетей
+    - SAVVA/Приложения и домены/Paris.Camp
+    - SAVVA/Приложения и домены/Stihi.io
+    - SAVVA/Создателям/Гайды и монетизация
+    - SAVVA/Промо/Промокоды
+    - SAVVA/Промо/Блок анонсов
+    - SAVVA/Гранты и баунти
+    - SAVVA/Дорожная карта и фидбек
+    - Анонсы
+    - Знакомства
+    - PulseChain/Новости
+    - PulseChain/Обновления
+    - PulseChain/Валидаторы и стейкинг
+    - PulseChain/Мосты и онбординг
+    - DeFi/PulseX/Трейдинг
+    - DeFi/PulseX/Ликвидность и фарминг
+    - DeFi/Доходность и стратегии
+    - Кошельки/Настройка и безопасность
+    - Кошельки/Аппаратные (Ledger, Trezor)
+    - Кошельки/Смарт-кошельки (Safe, Argent)
+    - Безопасность/Скамы и фишинг
+    - Безопасность/Лучшие практики
+    - Разработчикам/Solidity и смарт-контракты
+    - Разработчикам/Сабграфы и индексация
+    - Разработчикам/Бэкенды и API
+    - Разработчикам/Фронтенд (React, SolidJS)
+    - Разработчикам/Инструменты и DevOps
+    - NFT/Коллекции
+    - NFT/Минтинг и маркетплейсы
+    - NFT/Искусство и медиа
+    - Рынок/Теханализ и стратегии
+    - Рынок/Ончейн-аналитика
+    - Рынок/Сигналы и боты
+    - Эирдропы/Возможности
+    - Эирдропы/Доказательства и клеймы
+    - Сообщество/События и митапы
+    - Сообщество/Гранты и баунти
+    - Сообщество/Благотворительность и НКО
+    - Управление/Предложения
+    - Управление/Делегирование и голосование
+    - Обучение/Новичкам
+    - Обучение/Гайды и FAQ
+    - Обучение/Глоссарий
+    - Поддержка/Вопросы и ответы
+    - Поддержка/Баг-репорты
+    - Поддержка/Запросы функций
+    - Кухня/Оффтоп
+    - Кухня/Шоукейс и отзывы
   fr:
-    - Plateforme SAVVA
-    - Documentation SAVVA
-    - Questions et Réponses
+    - SAVVA
+    - SAVVA/Annonces
+    - SAVVA/Mises à jour de la plateforme
+    - SAVVA/Statut & Incidents
+    - SAVVA/Token (SAVVA)/Économie
+    - SAVVA/Token (SAVVA)/Achat & Burn
+    - SAVVA/OSBL (NPO)/Mise en place & Gouvernance
+    - SAVVA/OSBL (NPO)/Dépenses & Rapports
+    - SAVVA/Développeurs/SDKs & APIs
+    - SAVVA/Développeurs/Contrats & ABI
+    - SAVVA/Apps & Domaines/Lancements de réseaux
+    - SAVVA/Apps & Domaines/Paris.Camp
+    - SAVVA/Apps & Domaines/Stihi.io
+    - SAVVA/Créateurs/Guides & Monétisation
+    - SAVVA/Promotions/Codes promo
+    - SAVVA/Promotions/Bloc d’annonces
+    - SAVVA/Subventions & Bounties
+    - SAVVA/Roadmap & Feedback
+    - Annonces
+    - Présentations
+    - PulseChain/Nouvelles
+    - PulseChain/Mises à jour
+    - PulseChain/Validateurs & Staking
+    - PulseChain/Ponts & Onboarding
+    - DeFi/PulseX/Trading
+    - DeFi/PulseX/Liquidité & Farming
+    - DeFi/Rendement & Stratégies
+    - Portefeuilles/Configuration & Sécurité
+    - Portefeuilles/Materiels (Ledger, Trezor)
+    - Portefeuilles/Smart wallets (Safe, Argent)
+    - Sécurité/Arnaques & Phishing
+    - Sécurité/Bonnes pratiques
+    - Développeurs/Solidity & smart contracts
+    - Développeurs/Sous-graphes & indexation
+    - Développeurs/Backends & APIs
+    - Développeurs/Frontends (React, SolidJS)
+    - Développeurs/Outils & DevOps
+    - NFTs/Collections
+    - NFTs/Mint & Places de marché
+    - NFTs/Art & Médias
+    - Marchés/AT & Stratégies
+    - Marchés/Analyse on-chain
+    - Marchés/Signaux & Bots
+    - Airdrops/Opportunités
+    - Airdrops/Preuves & Réclamations
+    - Communauté/Événements & meetups
+    - Communauté/Subventions & Bounties
+    - Communauté/Charité & OSBL
+    - Gouvernance/Propositions
+    - Gouvernance/Délégation & Vote
+    - Apprendre/Débutants
+    - Apprendre/Guides & FAQ
+    - Apprendre/Glossaire
+    - Support/Questions & Réponses
+    - Support/Rapports de bugs
+    - Support/Demandes de fonctionnalités
+    - Salon/Hors sujet
+    - Salon/Showcase & Retours
   ua:
-    - Платформа SAVVA
-    - Документація SAVVA
-    - Запитання та Відповіді
+    - SAVVA
+    - SAVVA/Оголошення
+    - SAVVA/Оновлення платформи
+    - SAVVA/Статус та інциденти
+    - SAVVA/Токен (SAVVA)/Економіка
+    - SAVVA/Токен (SAVVA)/Покупка та спалювання
+    - SAVVA/НУО/Налаштування та управління
+    - SAVVA/НУО/Витрати та звіти
+    - SAVVA/Розробникам/SDK та API
+    - SAVVA/Розробникам/Контракти та ABI
+    - SAVVA/Додатки та домени/Запуски мереж
+    - SAVVA/Додатки та домени/Paris.Camp
+    - SAVVA/Додатки та домени/Stihi.io
+    - SAVVA/Творцям/Гайди та монетизація
+    - SAVVA/Промо/Промокоди
+    - SAVVA/Промо/Блок анонсів
+    - SAVVA/Гранти та баунті
+    - SAVVA/Дорожня карта та відгуки
+    - Оголошення
+    - Знайомства
+    - PulseChain/Новини
+    - PulseChain/Оновлення
+    - PulseChain/Валідатори та стейкінг
+    - PulseChain/Мости та онбординг
+    - DeFi/PulseX/Трейдинг
+    - DeFi/PulseX/Ліквідність і фармінг
+    - DeFi/Дохідність і стратегії
+    - Гаманці/Налаштування та безпека
+    - Гаманці/Апаратні (Ledger, Trezor)
+    - Гаманці/Смарт-гаманці (Safe, Argent)
+    - Безпека/Шахрайства та фішинг
+    - Безпека/Найкращі практики
+    - Розробникам/Solidity та смарт-контракти
+    - Розробникам/Сабграфи та індексація
+    - Розробникам/Бекенди та API
+    - Розробникам/Фронтенд (React, SolidJS)
+    - Розробникам/Інструменти та DevOps
+    - NFT/Колекції
+    - NFT/Мінтинг і маркетплейси
+    - NFT/Мистецтво та медіа
+    - Ринки/Теханаліз і стратегії
+    - Ринки/Ончейн-аналітика
+    - Ринки/Сигнали та боти
+    - Ейрдропи/Можливості
+    - Ейрдропи/Докази та клейми
+    - Спільнота/Події та мітапи
+    - Спільнота/Гранти та баунті
+    - Спільнота/Благодійність та НУО
+    - Управління/Пропозиції
+    - Управління/Делегування та голосування
+    - Навчання/Початківцям
+    - Навчання/Гайди та FAQ
+    - Навчання/Глосарій
+    - Підтримка/Питання та відповіді
+    - Підтримка/Звіти про помилки
+    - Підтримка/Запити функцій
+    - Лаунж/Оф-топік
+    - Лаунж/Шоукейс та фідбек
