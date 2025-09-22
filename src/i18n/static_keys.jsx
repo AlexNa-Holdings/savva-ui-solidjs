@@ -80,5 +80,9 @@ t("admin.domainConfig.navTitle")
 t("delete.confirm.post.title")
 t("delete.confirm.comment.title")
 
+t("profile.history.range.month")
+t("profile.history.range.twoMonths")
+t("profile.history.range.threeMonths")
+
 
 */
