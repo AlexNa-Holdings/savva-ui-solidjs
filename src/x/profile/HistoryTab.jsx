@@ -102,8 +102,9 @@ export default function HistoryTab(props) {
     () => {
       const domain = app.selectedDomainName?.();
       const userAddr = profileAddressChecksum();
-      if (!domain || !userAddr) return null;
-      return { domain, userAddr, timeFrom: timeFromIso() };
+      const timeFrom = timeFromIso();
+      if (!domain || !userAddr || !timeFrom) return null;
+      return { domain, userAddr, timeFrom };
     },
     async (params) => {
       try {
