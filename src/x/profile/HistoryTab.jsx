@@ -181,6 +181,8 @@ export default function HistoryTab(props) {
                   const isCredit = toAddr && toAddr === profileAddressLc();
                   const isDebit = fromAddr && fromAddr === profileAddressLc();
                   const tokenAddress = resolveTokenAddress(record.token);
+                  const contractLabel = record.contract || "—";
+                  const typeLabel = record.type || record.info || "—";
                   return (
                     <tr class="align-top">
                       <td class="py-3 pr-4 text-xs text-[hsl(var(--muted-foreground))] whitespace-nowrap">
@@ -194,9 +196,12 @@ export default function HistoryTab(props) {
                         <HistoryUser user={record.to} />
                       </td>
                       <td class="py-3 pr-4">
-                        <div class="flex items-center gap-2 text-sm">
-                          <Dynamic component={iconComp} class="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
-                          <span>{record.type || record.info || "—"}</span>
+                        <div class="flex gap-2 text-sm">
+                          <Dynamic component={iconComp} class="w-4 h-4 text-[hsl(var(--muted-foreground))] mt-[2px]" />
+                          <div class="flex flex-col leading-tight">
+                            <span class="text-[hsl(var(--foreground))] font-medium">{contractLabel}</span>
+                            <span class="text-[hsl(var(--muted-foreground))]">{typeLabel}</span>
+                          </div>
                         </div>
                       </td>
                       <td class="py-3 pr-4 text-right">
