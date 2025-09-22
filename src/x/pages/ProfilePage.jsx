@@ -1,5 +1,6 @@
 // src/x/pages/ProfilePage.jsx
 import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, For } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
@@ -9,14 +10,14 @@ import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import StakerLevelIcon from "../ui/StakerLevelIcon.jsx";
 import VerifiedBadge from "../ui/icons/VerifiedBadge.jsx";
 import NpoIcon from "../ui/icons/NpoIcon.jsx";
-import Tabs from "../ui/Tabs.jsx";
 import Address from "../ui/Address.jsx";
 import { ipfs } from "../../ipfs/index.js";
-import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon } from "../ui/icons/ProfileIcons.jsx";
+import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon, HistoryIcon } from "../ui/icons/ProfileIcons.jsx";
 import PostsTab from "../profile/PostsTab.jsx";
 import SubscribersTab from "../profile/SubscribersTab.jsx";
 import SubscriptionsTab from "../profile/SubscriptionsTab.jsx";
 import WalletTab from "../profile/WalletTab.jsx";
+import HistoryTab from "../profile/HistoryTab.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 import SubscribeModal from "../modals/SubscribeModal.jsx";
@@ -95,13 +96,16 @@ export default function ProfilePage() {
   // Tabs (hide Wallet when banned)
   const TABS = createMemo(() => {
     const items = [
-      { id: "posts", label: t("profile.tabs.posts"), icon: <PostsIcon /> },
-      { id: "subscribers", label: t("profile.tabs.subscribers"), icon: <SubscribersIcon /> },
-      { id: "subscriptions", label: t("profile.tabs.subscriptions"), icon: <SubscriptionsIcon /> },
+      { id: "posts", label: t("profile.tabs.posts"), icon: PostsIcon },
+      { id: "subscribers", label: t("profile.tabs.subscribers"), icon: SubscribersIcon },
+      { id: "subscriptions", label: t("profile.tabs.subscriptions"), icon: SubscriptionsIcon },
+      { id: "history", label: t("profile.tabs.history"), icon: HistoryIcon },
     ];
-    if (!isBanned()) items.push({ id: "wallet", label: t("profile.tabs.wallet"), icon: <WalletIcon /> });
+    if (!isBanned()) items.push({ id: "wallet", label: t("profile.tabs.wallet"), icon: WalletIcon });
     return items;
   });
+
+  const activeTabDef = createMemo(() => TABS().find((tab) => tab.id === activeTab()) || TABS()[0]);
 
   const desiredTab = createMemo(() => {
     const path = route() || "";
@@ -371,23 +375,71 @@ export default function ProfilePage() {
               </div>
 
               {/* Tabs */}
-              <div>
-                <Tabs items={TABS()} value={activeTab()} onChange={onTabChange} compactWidth={640} />
-                <div class="py-4 border-x border-b border-[hsl(var(--border))] rounded-b-lg">
-                  <Switch>
-                    <Match when={activeTab() === "posts"}>
-                      <PostsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === "subscribers"}>
-                      <SubscribersTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === "subscriptions"}>
-                      <SubscriptionsTab user={user()} />
-                    </Match>
-                    <Match when={activeTab() === "wallet"}>
-                      <WalletTab user={user()} />
-                    </Match>
-                  </Switch>
+              <div class="mt-4 md:mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)]">
+                <div class="grid gap-3 md:grid-cols-[14rem_minmax(0,1fr)] items-start">
+                  <nav
+                    class="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible border border-[hsl(var(--border))] rounded-lg p-2"
+                    aria-label={t("profile.tabs.navAria") || "Profile sections"}
+                  >
+                    <For each={TABS()}>{(tab) => {
+                      const isActive = () => tab.id === activeTab();
+                      const Icon = tab.icon;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onTabChange(tab.id)}
+                          class={`flex items-center gap-2 px-3 py-2 text-sm rounded-md whitespace-nowrap transition-colors ${isActive()
+                              ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                              : "bg-transparent text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+                            }`}
+                          aria-pressed={isActive() ? "true" : "false"}
+                        >
+                          {Icon ? (
+                            <span class="flex-shrink-0" aria-hidden="true">
+                              <Dynamic component={Icon} class="w-4 h-4" />
+                            </span>
+                          ) : null}
+                          <span class="whitespace-nowrap">{tab.label}</span>
+                        </button>
+                      );
+                    }}</For>
+                  </nav>
+
+                  <div class="py-4 px-4 border border-[hsl(var(--border))] rounded-lg min-h-[200px] space-y-4 bg-[hsl(var(--background))]">
+                    <div class="flex items-center gap-2 text-lg font-semibold">
+                      <Show when={activeTabDef()}>
+                        {(tab) => (
+                          <>
+                            <Show when={tab().icon}>
+                              <span class="flex-shrink-0" aria-hidden="true">
+                                <Dynamic component={tab().icon} class="w-5 h-5" />
+                              </span>
+                            </Show>
+                            <span>{tab().label}</span>
+                          </>
+                        )}
+                      </Show>
+                    </div>
+                    <div>
+                      <Switch>
+                        <Match when={activeTab() === "posts"}>
+                          <PostsTab user={user()} />
+                        </Match>
+                        <Match when={activeTab() === "subscribers"}>
+                          <SubscribersTab user={user()} />
+                        </Match>
+                        <Match when={activeTab() === "subscriptions"}>
+                          <SubscriptionsTab user={user()} />
+                        </Match>
+                        <Match when={activeTab() === "history"}>
+                          <HistoryTab user={user()} />
+                        </Match>
+                        <Match when={activeTab() === "wallet"}>
+                          <WalletTab user={user()} />
+                        </Match>
+                      </Switch>
+                    </div>
+                  </div>
                 </div>
               </div>
 

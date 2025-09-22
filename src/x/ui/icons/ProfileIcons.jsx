@@ -50,3 +50,12 @@ export function WalletIcon(props) {
     </Svg>
   );
 }
+
+export function HistoryIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15 15" />
+    </Svg>
+  );
+}
