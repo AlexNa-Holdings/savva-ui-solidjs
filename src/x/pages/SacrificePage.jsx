@@ -26,7 +26,6 @@ import { toHexBytes32 } from "../../blockchain/utils.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 
 const STAKING_SHARE = 50n;
-const TOKENS_PER_ROUND_FULL = BigInt(240000) * 10n ** 18n;
 
 function trimAmountString(value) {
   if (!value) return "0";
@@ -53,11 +52,45 @@ function StatCard(props) {
   );
 }
 
-function ClaimBlock(props) {
-  const preview = () => props.preview();
+function ClaimSummary(props) {
   const claimable = () => props.claimableAmount();
-  const baseSymbol = props.baseSymbol;
   const isClaiming = props.isClaiming;
+  const { t } = props;
+
+  return (
+    <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.1)] p-4 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+            {t("sacrifice.stats.claimable")}
+          </div>
+          <div class="text-sm text-[hsl(var(--card-foreground))]">
+            <TokenValue amount={claimable()} tokenAddress={props.savvaTokenAddress || ""} />
+          </div>
+          <Show when={claimable() > 0n}>
+            <div class="text-xs text-[hsl(var(--muted-foreground))]">
+              {t("sacrifice.claimReady")}
+            </div>
+          </Show>
+        </div>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-xs rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={props.onClaim}
+          disabled={isClaiming() || claimable() <= 0n}
+        >
+          <Show when={!isClaiming()} fallback={t("sacrifice.actions.claiming")}>
+            {t("sacrifice.actions.claim")}
+          </Show>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DepositPreviewCard(props) {
+  const preview = () => props.preview();
+  const baseSymbol = props.baseSymbol;
   const { t } = props;
 
   const formatAmount = (value) =>
@@ -72,98 +105,68 @@ function ClaimBlock(props) {
   };
 
   return (
-    <div class="space-y-4">
-      <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.1)] p-4 space-y-3">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-              {t("sacrifice.stats.claimable")}
-            </div>
-            <div class="text-sm text-[hsl(var(--card-foreground))]">
-              <TokenValue amount={claimable()} tokenAddress={props.savvaTokenAddress || ""} />
-            </div>
-            <Show when={claimable() > 0n}>
-              <div class="text-xs text-[hsl(var(--muted-foreground))]">
-                {t("sacrifice.claimReady")}
-              </div>
-            </Show>
-          </div>
-          <button
-            type="button"
-            class="px-3 py-1.5 text-xs rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={props.onClaim}
-            disabled={isClaiming() || claimable() <= 0n}
-          >
-            <Show when={!isClaiming()} fallback={t("sacrifice.actions.claiming")}>
-              {t("sacrifice.actions.claim")}
-            </Show>
-          </button>
-        </div>
+    <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-3 h-fit">
+      <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+        {t("sacrifice.preview.title")}
       </div>
 
-      <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-3">
-        <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-          {t("sacrifice.preview.title")}
-        </div>
-
+      <Show
+        when={preview()}
+        fallback={<div class="text-xs text-[hsl(var(--muted-foreground))]">{t("sacrifice.preview.enterAmount")}</div>}
+      >
         <Show
-          when={preview()}
+          when={preview()?.hasPending ?? false}
           fallback={<div class="text-xs text-[hsl(var(--muted-foreground))]">{t("sacrifice.preview.enterAmount")}</div>}
         >
-          <Show
-            when={preview()?.hasPending ?? false}
-            fallback={<div class="text-xs text-[hsl(var(--muted-foreground))]">{t("sacrifice.preview.enterAmount")}</div>}
-          >
-            <div class="space-y-2 text-sm">
-              <div class="flex items-center justify-between gap-3">
-                <span>{t("sacrifice.preview.totalAfter")}</span>
-                <span class="tabular-nums">{flowText(preview().currentTotal, preview().totalAfter)}</span>
-              </div>
-              <div class="flex items-center justify-between gap-3">
-                <span>{t("sacrifice.preview.yourAfter")}</span>
-                <span class="tabular-nums">{flowText(preview().currentUser, preview().userAfter)}</span>
-              </div>
-              <div class="flex flex-col gap-1">
-                <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                  {t("sacrifice.preview.price")}
-                </span>
-                <span class="tabular-nums">
-                  {t("sacrifice.tokenPriceLine", {
-                    base: preview().newPriceBase.toLocaleString(undefined, {
-                      minimumFractionDigits: 6,
-                      maximumFractionDigits: 6,
-                    }),
-                    symbol: baseSymbol,
-                    usd: preview().newPriceUsd.toLocaleString(undefined, {
-                      minimumFractionDigits: 6,
-                      maximumFractionDigits: 6,
-                    }),
-                  })}
-                </span>
-                <span class="text-xs text-[hsl(var(--muted-foreground))]">
-                  {t("sacrifice.preview.currentPrice", {
-                    base: preview().currentPriceBase.toLocaleString(undefined, {
-                      minimumFractionDigits: 6,
-                      maximumFractionDigits: 6,
-                    }),
-                    symbol: baseSymbol,
-                    usd: preview().currentPriceUsd.toLocaleString(undefined, {
-                      minimumFractionDigits: 6,
-                      maximumFractionDigits: 6,
-                    }),
-                  })}
-                </span>
-              </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center justify-between gap-3">
+              <span>{t("sacrifice.preview.totalAfter")}</span>
+              <span class="tabular-nums">{flowText(preview().currentTotal, preview().totalAfter)}</span>
             </div>
+            <div class="flex items-center justify-between gap-3">
+              <span>{t("sacrifice.preview.yourAfter")}</span>
+              <span class="tabular-nums">{flowText(preview().currentUser, preview().userAfter)}</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                {t("sacrifice.preview.price")}
+              </span>
+              <span class="tabular-nums">
+                {t("sacrifice.tokenPriceLine", {
+                  base: preview().newPriceBase.toLocaleString(undefined, {
+                    minimumFractionDigits: 6,
+                    maximumFractionDigits: 6,
+                  }),
+                  symbol: baseSymbol,
+                  usd: preview().newPriceUsd.toLocaleString(undefined, {
+                    minimumFractionDigits: 6,
+                    maximumFractionDigits: 6,
+                  }),
+                })}
+              </span>
+              <span class="text-xs text-[hsl(var(--muted-foreground))]">
+                {t("sacrifice.preview.currentPrice", {
+                  base: preview().currentPriceBase.toLocaleString(undefined, {
+                    minimumFractionDigits: 6,
+                    maximumFractionDigits: 6,
+                  }),
+                  symbol: baseSymbol,
+                  usd: preview().currentPriceUsd.toLocaleString(undefined, {
+                    minimumFractionDigits: 6,
+                    maximumFractionDigits: 6,
+                  }),
+                })}
+              </span>
+            </div>
+          </div>
 
-            <Show when={preview().warnHigher}>
-              <div class="text-xs text-[hsl(var(--destructive))] font-medium">
-                {t("sacrifice.preview.priceWarning")}
-              </div>
-            </Show>
+          <Show when={preview().warnHigher}>
+            <div class="text-xs text-[hsl(var(--destructive))] font-medium">
+              {t("sacrifice.preview.priceWarning")}
+            </div>
           </Show>
         </Show>
-      </div>
+      </Show>
     </div>
   );
 }
@@ -180,10 +183,11 @@ export default function SacrificePage() {
   const [amountWei, setAmountWei] = createSignal(0n);
   const [amountError, setAmountError] = createSignal("");
   const [amountInitialized, setAmountInitialized] = createSignal(false);
+  const [isFinalizing, setIsFinalizing] = createSignal(false);
 
   onMount(() => {
     if (isWalletAvailable()) {
-      eagerConnect().catch(() => {});
+      eagerConnect().catch(() => { });
     }
     const nowTimer = setInterval(() => setNow(Date.now()), 1_000);
     onCleanup(() => {
@@ -213,6 +217,7 @@ export default function SacrificePage() {
           roundTotalDeposits,
           roundTotalDepositors,
           tokensToShare,
+          isRoundFinished,
           minDeposit,
         ] = await Promise.all([
           faucet.read.getRoundLength(),
@@ -222,6 +227,7 @@ export default function SacrificePage() {
           faucet.read.roundTotalDeposits(),
           faucet.read.roundTotalDepositors(),
           faucet.read.TokensToShare(),
+          faucet.read.IsRoundFinished(),
           config.read.getUInt([toHexBytes32("sac_min_deposit")]),
         ]);
 
@@ -242,6 +248,7 @@ export default function SacrificePage() {
           roundTotalDeposits,
           roundTotalDepositors,
           tokensToShare,
+          isRoundFinished,
           minDeposit,
           deposited,
           claimableAmount,
@@ -277,21 +284,23 @@ export default function SacrificePage() {
     const currentRound = roundLengthSec > 0 ? Math.floor(nowSec / roundLengthSec) : null;
     const lastRoundPaid = Number(data.lastRoundPayWeek || 0n);
 
-    let tokensFull = 0n;
-    if (data.roundTokensToShare && data.roundTokensToShare > 0n) {
-      tokensFull = data.roundTokensToShare;
-    } else if (data.tokensToShare && data.tokensToShare > 0n) {
-      tokensFull = data.tokensToShare;
-    } else if (roundLengthSec > 0) {
-      const diff = currentRound != null ? Math.max(1, currentRound - lastRoundPaid) : 1;
-      tokensFull = BigInt(diff) * TOKENS_PER_ROUND_FULL;
-    }
+    const tokensFull = data.tokensToShare && data.tokensToShare > 0n ? data.tokensToShare : 0n;
 
     const tokensForDepositors = tokensFull * (100n - STAKING_SHARE) / 100n;
 
     const roundEndSec = currentRound != null && roundLengthSec > 0 ? (currentRound + 1) * roundLengthSec : null;
 
-    const totalDeposits = data.roundTotalDeposits || 0n;
+    const roundFinished = data.isRoundFinished ?? false;
+    const totalDepositsRaw = data.roundTotalDeposits || 0n;
+    const totalDepositorsRaw = Number(data.roundTotalDepositors || 0n);
+
+    const totalDeposits = roundFinished ? 0n : totalDepositsRaw;
+    const totalDepositors = roundFinished ? 0 : totalDepositorsRaw;
+
+    const finishedRoundTotals = {
+      totalDeposits: totalDepositsRaw,
+      totalDepositors: totalDepositorsRaw,
+    };
 
     const depositsFloat = Number(formatUnits(totalDeposits, 18));
     const distributedFloat = Number(formatUnits(tokensForDepositors, 18));
@@ -303,10 +312,14 @@ export default function SacrificePage() {
       currentRound,
       tokensForDepositors,
       totalDeposits,
-      totalDepositors: Number(data.roundTotalDepositors || 0n),
+      totalDepositors,
       claimableAmount: data.claimableAmount || 0n,
       roundLengthSec,
       lastRoundPaid,
+      isRoundFinished: data.isRoundFinished ?? false,
+      roundTokensToShare: data.roundTokensToShare || 0n,
+      finishedRound: Number(data.roundPayWeek || 0n),
+      finishedRoundTotals,
       roundEndTs: roundEndSec,
       expectedSavvaPriceBase: basePricePerSavva,
       expectedSavvaPriceUsd: usdPricePerSavva,
@@ -316,11 +329,17 @@ export default function SacrificePage() {
   const roundEndTs = createMemo(() => computed()?.roundEndTs ?? null);
   const baseTokenPrice = createMemo(() => Number(app.baseTokenPrice?.()?.price ?? 0));
   const claimableAmount = createMemo(() => computed()?.claimableAmount || 0n);
-  const depositPreview = createMemo(() => {
+  const userDepositedAmount = createMemo(() => {
     const comp = computed();
     const data = state();
+    if (!comp || !data) return 0n;
+    return comp.isRoundFinished ? 0n : (data.deposited || 0n);
+  });
+
+  const depositPreview = createMemo(() => {
+    const comp = computed();
     const totalDeposits = comp?.totalDeposits || 0n;
-    const userDeposited = data?.deposited || 0n;
+    const userDeposited = userDepositedAmount();
     const tokensForDepositors = comp?.tokensForDepositors || 0n;
 
     const totalBase = Number(formatUnits(totalDeposits, 18));
@@ -436,6 +455,28 @@ export default function SacrificePage() {
     }
   };
 
+  const handleFinalizeRound = async () => {
+    if (!computed()?.isRoundFinished) return;
+    if (!walletAccount()) {
+      await handleConnect();
+      return;
+    }
+
+    setIsFinalizing(true);
+    try {
+      await app.ensureWalletOnDesiredChain?.();
+      const faucet = await getSavvaContract(app, "SavvaFaucet", { write: true });
+      await faucet.write.finishRound();
+      pushToast({ type: "success", message: t("sacrifice.toast.finalizeSuccess") });
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error("SacrificePage: finalize failed", err);
+      pushErrorToast(err, { context: t("sacrifice.toast.finalizeError") });
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
   const refresh = () => setRefreshKey((k) => k + 1);
 
   return (
@@ -484,21 +525,23 @@ export default function SacrificePage() {
             </div>
           }
         >
+          {/* Overview stats */}
           <div class="grid gap-6 lg:grid-cols-[2fr,1fr]">
             <section class="space-y-4">
               <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
                 <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                   <div>
-                    <div class="text-sm uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                      {t("sacrifice.round.title")}
+                    <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                      {(() => {
+                        const round = computed()?.currentRound;
+                        if (round == null) return t("sacrifice.round.title");
+                        return t("sacrifice.round.roundLabel", {
+                          round: round.toLocaleString(),
+                        });
+                      })()}
                     </div>
-                    <div class="text-xl font-semibold">
-                      {t("sacrifice.roundLabel", {
-                        round: (() => {
-                          const r = computed()?.currentRound;
-                          return r != null ? r.toLocaleString() : "—";
-                        })(),
-                      })}
+                    <div class="text-sm font-semibold">
+                      {t("sacrifice.round.activeLabel")}
                     </div>
                   </div>
 
@@ -549,90 +592,156 @@ export default function SacrificePage() {
                   </StatCard>
                 </div>
               </div>
-            </section>
 
-            <aside class="space-y-4">
-              <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
-                <div class="space-y-1">
-                  <h2 class="text-lg font-semibold">{t("sacrifice.actions.title")}</h2>
-                  <p class="text-sm opacity-80">{t("sacrifice.actions.subtitle")}</p>
-                </div>
-
-                <Show
-                  when={!!walletAccount()}
-                  fallback={
-                    <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 text-center space-y-3">
-                      <div class="text-sm font-semibold">{t("fundraising.contribute.connectTitle")}</div>
-                      <p class="text-xs opacity-80">{t("wallet.connectPrompt")}</p>
-                      <button
-                        type="button"
-                        class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
-                        onClick={handleConnect}
-                      >
-                        {t("sacrifice.actions.connect")}
-                      </button>
-                    </div>
-                  }
-                >
-                  <div class="space-y-4">
-                    <p class="text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
-                      {t("sacrifice.actions.acceptance")}
-                    </p>
-
-                    <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-3 text-sm">
+              <Show when={computed()?.isRoundFinished}>
+                <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
+                  <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                    <div>
                       <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                        {t("sacrifice.actions.myContribution")}
+                        {(() => {
+                          const round = computed()?.finishedRound;
+                          if (!round || round <= 0) return null;
+                          return t("sacrifice.roundFinisher.roundLabel", {
+                            round: round.toLocaleString(),
+                          });
+                        })()}
                       </div>
-                      <TokenValue amount={state()?.deposited || 0n} tokenAddress="0" format="vertical" />
+                      <h2 class="text-lg font-semibold">{t("sacrifice.roundFinisher.title")}</h2>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                        {t("sacrifice.roundFinisher.description")}
+                      </p>
                     </div>
-
-                    <AmountInput
-                      tokenAddress="0"
-                      value={amountText()}
-                      onChange={(payload) => {
-                        const textValue = payload.text ?? "";
-                        setAmountText(textValue);
-                        if (typeof payload.amountWei === "bigint" && payload.amountWei >= 0n) {
-                          setAmountWei(payload.amountWei);
-                          setAmountError("");
-                        } else {
-                          setAmountWei(0n);
-                          setAmountError(t("common.invalidNumber"));
-                        }
-                      }}
-                      placeholder={t("sacrifice.actions.inputPlaceholder")}
-                      showMax={false}
-                    />
-                    <Show when={amountError()}>
-                      <div class="text-xs text-[hsl(var(--destructive))]">{amountError()}</div>
-                    </Show>
-
                     <button
                       type="button"
-                      class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={handleDeposit}
-                      disabled={isDepositing() || !isAmountValid()}
+                      class="px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleFinalizeRound}
+                      disabled={isFinalizing()}
                     >
-                      <Show when={!isDepositing()} fallback={<Spinner class="w-4 h-4" />}>
-                        {t("sacrifice.actions.deposit")}
+                      <Show when={!isFinalizing()} fallback={<Spinner class="w-4 h-4" />}>
+                        {t("sacrifice.roundFinisher.finalize")}
                       </Show>
                     </button>
-
-                    <ClaimBlock
-                      t={t}
-                      baseSymbol={nativeSymbol()}
-                      preview={depositPreview}
-                      claimableAmount={claimableAmount}
-                      savvaTokenAddress={savvaTokenAddress()}
-                      isClaiming={isClaiming}
-                      onClaim={handleClaim}
-                    />
                   </div>
-                </Show>
 
-              </div>
-            </aside>
+                  <div class="grid gap-4 md:grid-cols-3">
+                    <StatCard label={t("sacrifice.roundFinisher.totalDeposits")}>
+                      <TokenValue amount={computed()?.finishedRoundTotals?.totalDeposits || 0n} tokenAddress="0" />
+                    </StatCard>
+                    <StatCard label={t("sacrifice.roundFinisher.totalDepositors")}>
+                      <div class="text-xl font-semibold">
+                        {(computed()?.finishedRoundTotals?.totalDepositors ?? 0).toLocaleString()}
+                      </div>
+                    </StatCard>
+                    <StatCard label={t("sacrifice.roundFinisher.tokensToShare")}>
+                      <TokenValue amount={computed()?.roundTokensToShare || 0n} tokenAddress={savvaTokenAddress()} />
+                    </StatCard>
+                  </div>
+                </div>
+              </Show>
+            </section>
+
+            <aside class="space-y-4"></aside>
           </div>
+
+          {/* Make a Sacrifice — left: inputs; right: current deposit (top) + preview + min deposit + button */}
+          <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
+            <div class="space-y-1">
+              <h2 class="text-lg font-semibold">{t("sacrifice.actions.title")}</h2>
+              <p class="text-sm opacity-80">{t("sacrifice.actions.subtitle")}</p>
+            </div>
+
+            <Show
+              when={!!walletAccount()}
+              fallback={
+                <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 text-center space-y-3">
+                  <div class="text-sm font-semibold">{t("fundraising.contribute.connectTitle")}</div>
+                  <p class="text-xs opacity-80">{t("wallet.connectPrompt")}</p>
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                    onClick={handleConnect}
+                  >
+                    {t("sacrifice.actions.connect")}
+                  </button>
+                </div>
+              }
+            >
+              <div class="grid gap-6 lg:grid-cols-3 items-start">
+                {/* LEFT: acceptance, amount input, errors (no current-deposit card here) */}
+                <div class="space-y-4 lg:col-span-2">
+                  <p class="text-xs leading-relaxed text-[hsl(var(--muted-foreground))]">
+                    {t("sacrifice.actions.acceptance")}
+                  </p>
+
+                  <AmountInput
+                    tokenAddress="0"
+                    value={amountText()}
+                    onChange={(payload) => {
+                      const textValue = payload.text ?? "";
+                      setAmountText(textValue);
+                      if (typeof payload.amountWei === "bigint" && payload.amountWei >= 0n) {
+                        setAmountWei(payload.amountWei);
+                        setAmountError("");
+                      } else {
+                        setAmountWei(0n);
+                        setAmountError(t("common.invalidNumber"));
+                      }
+                    }}
+                    placeholder={t("sacrifice.actions.inputPlaceholder")}
+                    showMax={false}
+                  />
+                  <Show when={amountError()}>
+                    <div class="text-xs text-[hsl(var(--destructive))]">{amountError()}</div>
+                  </Show>
+
+                  <button
+                    type="button"
+                    class="w-full px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleDeposit}
+                    disabled={isDepositing() || !isAmountValid()}
+                  >
+                    <Show when={!isDepositing()} fallback={<Spinner class="w-4 h-4" />}>
+                      {t("sacrifice.actions.deposit")}
+                    </Show>
+                  </button>
+        
+                          <Show when={minDepositLabel()}>
+                    <div class="text-xs text-[hsl(var(--muted-foreground))]">{minDepositLabel()}</div>
+                  </Show>
+
+                </div>
+
+                {/* RIGHT: current deposit (top) + preview + min deposit + primary action */}
+                <div class="flex flex-col gap-3 self-start">
+                  <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-3 text-sm">
+                    <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                      {t("sacrifice.actions.myContribution")}
+                    </div>
+                    <TokenValue amount={userDepositedAmount()} tokenAddress="0" format="non vertical" />
+                  </div>
+
+                  <DepositPreviewCard
+                    t={t}
+                    baseSymbol={nativeSymbol()}
+                    preview={depositPreview}
+                  />
+
+                </div>
+              </div>
+            </Show>
+          </section>
+
+          {/* Final section: Claim */}
+          <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-4">
+            <h2 class="text-lg font-semibold">{t("sacrifice.claimSectionTitle")}</h2>
+            <ClaimSummary
+              t={t}
+              claimableAmount={claimableAmount}
+              savvaTokenAddress={savvaTokenAddress()}
+              isClaiming={isClaiming}
+              onClaim={handleClaim}
+            />
+          </section>
         </Show>
       </Show>
     </main>

@@ -37,7 +37,11 @@ export default function TokenValue(props) {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
       const num = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
-      return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const maximumFractionDigits = num >= 1 ? 2 : 6;
+      return num.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits,
+      });
     } catch {
       return "0.00";
     }
