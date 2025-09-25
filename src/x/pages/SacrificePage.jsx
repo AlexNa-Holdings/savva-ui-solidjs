@@ -90,23 +90,11 @@ function ClaimSummary(props) {
 
 function DepositPreviewCard(props) {
   const preview = () => props.preview();
-  const baseSymbol = props.baseSymbol;
   const { t } = props;
 
-  const formatAmount = (value) =>
-    value.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
-
-  const flowText = (current, next) => {
-    const p = preview();
-    if (p?.hasPending && next !== current) {
-      return `${formatAmount(current)} → ${formatAmount(next)} ${baseSymbol}`;
-    }
-    return `${formatAmount(current)} ${baseSymbol}`;
-  };
-
   return (
-    <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-3 h-fit">
-      <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+    <div class="border border-[hsl(var(--border))] border-l-[hsl(var(--primary))] border-l-2 bg-[hsl(var(--accent)/0.1)] px-4 pb-4 pt-0 space-y-3 h-fit">
+      <div class="text-lg font-semibold text-[hsl(var(--card-foreground))]">
         {t("sacrifice.preview.title")}
       </div>
 
@@ -115,19 +103,29 @@ function DepositPreviewCard(props) {
         fallback={<div class="text-xs text-[hsl(var(--muted-foreground))]">{t("sacrifice.preview.enterAmount")}</div>}
       >
         <Show
-          when={preview()?.hasPending ?? false}
+          when={preview()?.hasContext ?? false}
           fallback={<div class="text-xs text-[hsl(var(--muted-foreground))]">{t("sacrifice.preview.enterAmount")}</div>}
         >
-          <div class="space-y-2 text-sm">
-            <div class="flex items-center justify-between gap-3">
-              <span>{t("sacrifice.preview.totalAfter")}</span>
-              <span class="tabular-nums">{flowText(preview().currentTotal, preview().totalAfter)}</span>
+          <div class="space-y-3 text-sm">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                {t("sacrifice.preview.totalAfter")}
+              </span>
+              <TokenValue amount={preview().totalAfterWei} tokenAddress="0" format="vertical" />
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <span>{t("sacrifice.preview.yourAfter")}</span>
-              <span class="tabular-nums">{flowText(preview().currentUser, preview().userAfter)}</span>
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                {t("sacrifice.preview.yourAfter")}
+              </span>
+              <TokenValue amount={preview().userAfterWei} tokenAddress="0" format="vertical" />
             </div>
-            <div class="flex flex-col gap-1">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                {t("sacrifice.preview.expectedSavva")}
+              </span>
+              <TokenValue amount={preview().expectedSavvaWei} tokenAddress={props.savvaTokenAddress} format="vertical" />
+            </div>
+            <div class="flex flex-col gap-2">
               <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                 {t("sacrifice.preview.price")}
               </span>
@@ -137,7 +135,7 @@ function DepositPreviewCard(props) {
                     minimumFractionDigits: 6,
                     maximumFractionDigits: 6,
                   }),
-                  symbol: baseSymbol,
+                  symbol: props.baseSymbol,
                   usd: preview().newPriceUsd.toLocaleString(undefined, {
                     minimumFractionDigits: 6,
                     maximumFractionDigits: 6,
@@ -150,7 +148,7 @@ function DepositPreviewCard(props) {
                     minimumFractionDigits: 6,
                     maximumFractionDigits: 6,
                   }),
-                  symbol: baseSymbol,
+                  symbol: props.baseSymbol,
                   usd: preview().currentPriceUsd.toLocaleString(undefined, {
                     minimumFractionDigits: 6,
                     maximumFractionDigits: 6,
@@ -342,31 +340,34 @@ export default function SacrificePage() {
     const userDeposited = userDepositedAmount();
     const tokensForDepositors = comp?.tokensForDepositors || 0n;
 
-    const totalBase = Number(formatUnits(totalDeposits, 18));
-    const userBase = Number(formatUnits(userDeposited, 18));
+    const pending = amountWei() || 0n;
+    const totalAfterWei = totalDeposits + pending;
+    const userAfterWei = userDeposited + pending;
+
     const distributedBase = Number(formatUnits(tokensForDepositors, 18));
-    const currentPriceBase = distributedBase > 0 ? totalBase / distributedBase : 0;
+    const currentTotalBase = Number(formatUnits(totalDeposits, 18));
+    const totalAfterBase = Number(formatUnits(totalAfterWei, 18));
+    const currentPriceBase = distributedBase > 0 ? currentTotalBase / distributedBase : 0;
+    const newPriceBase = distributedBase > 0 ? totalAfterBase / distributedBase : 0;
     const currentPriceUsd = currentPriceBase * baseTokenPrice();
-
-    const pending = amountWei();
-    const pendingFloat = Number(formatUnits(pending || 0n, 18));
-
-    const totalAfter = totalBase + pendingFloat;
-    const userAfter = userBase + pendingFloat;
-    const newPriceBase = distributedBase > 0 ? totalAfter / distributedBase : 0;
     const newPriceUsd = newPriceBase * baseTokenPrice();
 
+    let expectedSavvaWei = 0n;
+    if (tokensForDepositors > 0n && totalAfterWei > 0n) {
+      expectedSavvaWei = tokensForDepositors * userAfterWei / totalAfterWei;
+    }
+
     return {
-      hasPending: pendingFloat > 0,
-      currentTotal: totalBase,
-      totalAfter,
-      currentUser: userBase,
-      userAfter,
+      hasPending: pending > 0n,
+      hasContext: totalAfterWei > 0n,
+      totalAfterWei,
+      userAfterWei,
+      expectedSavvaWei,
       newPriceBase,
       newPriceUsd,
       currentPriceBase,
       currentPriceUsd,
-      warnHigher: pendingFloat > 0 && newPriceUsd > currentPriceUsd + 1e-12,
+      warnHigher: pending > 0n && newPriceUsd > currentPriceUsd + 1e-12,
     };
   });
 
@@ -527,127 +528,133 @@ export default function SacrificePage() {
         >
           {/* Overview stats */}
           <div class="grid gap-6 lg:grid-cols-[2fr,1fr]">
-            <section class="space-y-4">
-              <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
+            <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-4">
+              <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                <div>
+                  <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                    {(() => {
+                      const round = computed()?.currentRound;
+                      if (round == null) return t("sacrifice.round.title");
+                      return t("sacrifice.round.roundLabel", {
+                        round: round.toLocaleString(),
+                      });
+                    })()}
+                  </div>
+                  <div class="text-sm font-semibold">
+                    {t("sacrifice.round.activeLabel")}
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-end">
+                  <Show
+                    when={roundEndTs() != null}
+                    fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("sacrifice.countdownExpired")}</span>}
+                  >
+                    <Countdown
+                      targetTs={Number(roundEndTs())}
+                      size="lg"
+                      labelPosition="top"
+                      labelStyle="short"
+                    />
+                  </Show>
+                </div>
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-3">
+                <StatCard label={t("sacrifice.stats.tokensThisRound")}>
+                  <TokenValue amount={computed()?.tokensForDepositors || 0n} tokenAddress={savvaTokenAddress()} />
+                </StatCard>
+
+                <StatCard label={t("sacrifice.stats.totalDeposits", { n: computed()?.totalDepositors || 0 })}>
+                  <TokenValue amount={computed()?.totalDeposits || 0n} tokenAddress="0" />
+                </StatCard>
+
+                <StatCard label={t("sacrifice.stats.tokenPrice")}
+                  hint={t("sacrifice.stats.tokenPriceHint", { symbol: nativeSymbol() })}
+                >
+                  <div class="text-sm font-semibold">
+                    {(() => {
+                      const base = (computed()?.expectedSavvaPriceBase ?? 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 6,
+                        maximumFractionDigits: 6,
+                      });
+                      const usd = (computed()?.expectedSavvaPriceUsd ?? 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 6,
+                        maximumFractionDigits: 6,
+                      });
+                      return t("sacrifice.tokenPriceLine", {
+                        base,
+                        symbol: nativeSymbol(),
+                        usd,
+                      });
+                    })()}
+                  </div>
+                </StatCard>
+              </div>
+            </section>
+
+            <Show when={computed()?.isRoundFinished}>
+              <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-4">
+
                 <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                   <div>
                     <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                       {(() => {
-                        const round = computed()?.currentRound;
-                        if (round == null) return t("sacrifice.round.title");
-                        return t("sacrifice.round.roundLabel", {
+                        const round = computed()?.finishedRound;
+                        if (!round || round <= 0) return null;
+                        return t("sacrifice.roundFinisher.roundLabel", {
                           round: round.toLocaleString(),
                         });
                       })()}
                     </div>
-                    <div class="text-sm font-semibold">
-                      {t("sacrifice.round.activeLabel")}
-                    </div>
+                    <h2 class="text-lg font-semibold">{t("sacrifice.roundFinisher.title")}</h2>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                      {t("sacrifice.roundFinisher.description")}
+                    </p>
                   </div>
-
-                  <div class="flex items-center justify-end">
-                    <Show
-                      when={roundEndTs() != null}
-                      fallback={<span class="text-sm text-[hsl(var(--muted-foreground))]">{t("sacrifice.countdownExpired")}</span>}
-                    >
-                      <Countdown
-                        targetTs={Number(roundEndTs())}
-                        size="lg"
-                        labelPosition="top"
-                        labelStyle="short"
-                      />
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleFinalizeRound}
+                    disabled={isFinalizing()}
+                  >
+                    <Show when={!isFinalizing()} fallback={<Spinner class="w-4 h-4" />}>
+                      {t("sacrifice.roundFinisher.finalize")}
                     </Show>
-                  </div>
+                  </button>
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-3">
-                  <StatCard label={t("sacrifice.stats.tokensThisRound")}>
-                    <TokenValue amount={computed()?.tokensForDepositors || 0n} tokenAddress={savvaTokenAddress()} />
+                  <StatCard label={t("sacrifice.roundFinisher.totalDeposits")}>
+                    <TokenValue amount={computed()?.finishedRoundTotals?.totalDeposits || 0n} tokenAddress="0" />
                   </StatCard>
-
-                  <StatCard label={t("sacrifice.stats.totalDeposits", { n: computed()?.totalDepositors || 0 })}>
-                    <TokenValue amount={computed()?.totalDeposits || 0n} tokenAddress="0" />
-                  </StatCard>
-
-                  <StatCard label={t("sacrifice.stats.tokenPrice")}
-                    hint={t("sacrifice.stats.tokenPriceHint", { symbol: nativeSymbol() })}
-                  >
-                    <div class="text-sm font-semibold">
-                      {(() => {
-                        const base = (computed()?.expectedSavvaPriceBase ?? 0).toLocaleString(undefined, {
-                          minimumFractionDigits: 6,
-                          maximumFractionDigits: 6,
-                        });
-                        const usd = (computed()?.expectedSavvaPriceUsd ?? 0).toLocaleString(undefined, {
-                          minimumFractionDigits: 6,
-                          maximumFractionDigits: 6,
-                        });
-                        return t("sacrifice.tokenPriceLine", {
-                          base,
-                          symbol: nativeSymbol(),
-                          usd,
-                        });
-                      })()}
+                  <StatCard label={t("sacrifice.roundFinisher.totalDepositors")}>
+                    <div class="text-xl font-semibold">
+                      {(computed()?.finishedRoundTotals?.totalDepositors ?? 0).toLocaleString()}
                     </div>
                   </StatCard>
+                  <StatCard label={t("sacrifice.roundFinisher.tokensToShare")}>
+                    <TokenValue amount={computed()?.roundTokensToShare || 0n} tokenAddress={savvaTokenAddress()} />
+                  </StatCard>
                 </div>
-              </div>
+              </section>
+            </Show>
 
-              <Show when={computed()?.isRoundFinished}>
-                <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
-                  <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                    <div>
-                      <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                        {(() => {
-                          const round = computed()?.finishedRound;
-                          if (!round || round <= 0) return null;
-                          return t("sacrifice.roundFinisher.roundLabel", {
-                            round: round.toLocaleString(),
-                          });
-                        })()}
-                      </div>
-                      <h2 class="text-lg font-semibold">{t("sacrifice.roundFinisher.title")}</h2>
-                      <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                        {t("sacrifice.roundFinisher.description")}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      class="px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={handleFinalizeRound}
-                      disabled={isFinalizing()}
-                    >
-                      <Show when={!isFinalizing()} fallback={<Spinner class="w-4 h-4" />}>
-                        {t("sacrifice.roundFinisher.finalize")}
-                      </Show>
-                    </button>
-                  </div>
-
-                  <div class="grid gap-4 md:grid-cols-3">
-                    <StatCard label={t("sacrifice.roundFinisher.totalDeposits")}>
-                      <TokenValue amount={computed()?.finishedRoundTotals?.totalDeposits || 0n} tokenAddress="0" />
-                    </StatCard>
-                    <StatCard label={t("sacrifice.roundFinisher.totalDepositors")}>
-                      <div class="text-xl font-semibold">
-                        {(computed()?.finishedRoundTotals?.totalDepositors ?? 0).toLocaleString()}
-                      </div>
-                    </StatCard>
-                    <StatCard label={t("sacrifice.roundFinisher.tokensToShare")}>
-                      <TokenValue amount={computed()?.roundTokensToShare || 0n} tokenAddress={savvaTokenAddress()} />
-                    </StatCard>
-                  </div>
-                </div>
-              </Show>
-            </section>
-
-            <aside class="space-y-4"></aside>
           </div>
 
           {/* Make a Sacrifice — left: inputs; right: current deposit (top) + preview + min deposit + button */}
           <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-6 space-y-6">
-            <div class="space-y-1">
-              <h2 class="text-lg font-semibold">{t("sacrifice.actions.title")}</h2>
-              <p class="text-sm opacity-80">{t("sacrifice.actions.subtitle")}</p>
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div class="space-y-1">
+                <h2 class="text-lg font-semibold">{t("sacrifice.actions.title")}</h2>
+                <p class="text-sm opacity-80">{t("sacrifice.actions.subtitle")}</p>
+              </div>
+              <div class="flex items-center gap-2 text-sm rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] px-3 py-2 w-full lg:max-w-xs lg:self-end">
+                <span class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                  {t("sacrifice.actions.myContribution")}
+                </span>
+                <TokenValue amount={userDepositedAmount()} tokenAddress="0" format="vertical" />
+              </div>
             </div>
 
             <Show
@@ -704,26 +711,20 @@ export default function SacrificePage() {
                       {t("sacrifice.actions.deposit")}
                     </Show>
                   </button>
-        
-                          <Show when={minDepositLabel()}>
+
+                  <Show when={minDepositLabel()}>
                     <div class="text-xs text-[hsl(var(--muted-foreground))]">{minDepositLabel()}</div>
                   </Show>
 
                 </div>
 
                 {/* RIGHT: current deposit (top) + preview + min deposit + primary action */}
-                <div class="flex flex-col gap-3 self-start">
-                  <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-3 text-sm">
-                    <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                      {t("sacrifice.actions.myContribution")}
-                    </div>
-                    <TokenValue amount={userDepositedAmount()} tokenAddress="0" format="non vertical" />
-                  </div>
-
+                <div class="flex flex-col gap-3 self-start w-full lg:max-w-xs">
                   <DepositPreviewCard
                     t={t}
                     baseSymbol={nativeSymbol()}
                     preview={depositPreview}
+                    savvaTokenAddress={savvaTokenAddress()}
                   />
 
                 </div>
