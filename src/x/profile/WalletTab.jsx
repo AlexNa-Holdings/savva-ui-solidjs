@@ -1,7 +1,7 @@
 // src/x/profile/WalletTab.jsx
 import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
-import { createMemo, createResource, Show, createSignal, For, createEffect } from "solid-js";
+import { createMemo, createResource, Show, createSignal, For, createEffect, onCleanup } from "solid-js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { createPublicClient, http } from "viem";
 import Spinner from "../ui/Spinner.jsx";
@@ -13,6 +13,9 @@ import IncreaseStakingModal from "../modals/IncreaseStakingModal.jsx";
 import UnstakeModal from "../modals/UnstakeModal.jsx";
 import Countdown from "../ui/Countdown.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import SavvaTokenAbi from "../../blockchain/abi/SavvaToken.json";
+import StakingAbi from "../../blockchain/abi/Staking.json";
+import ContentFundAbi from "../../blockchain/abi/ContentFund.json";
 
 export default function WalletTab(props) {
   const app = useApp();
@@ -95,6 +98,89 @@ export default function WalletTab(props) {
     () => ({ app, user: viewedUser(), refreshKey: refreshKey() }),
     fetchWalletData
   );
+
+  createEffect(() => {
+    if (typeof window === "undefined") return;
+    const info = app.info();
+    const chain = app.desiredChain?.();
+    const user = viewedUser();
+    const rpcUrl = chain?.rpcUrls?.[0];
+    if (!info || !user?.address || !chain || !rpcUrl) return;
+
+    const savvaTokenAddress = info.savva_contracts?.SavvaToken?.address;
+    const stakingAddress = info.savva_contracts?.Staking?.address;
+    const contentFundAddress = info.savva_contracts?.ContentFund?.address;
+    if (!savvaTokenAddress && !stakingAddress && !contentFundAddress) return;
+
+    const client = createPublicClient({ chain, transport: http(rpcUrl) });
+    const target = user.address.toLowerCase();
+
+    const bumpRefresh = () => setRefreshKey((v) => v + 1);
+    const matchesAny = (log, fields) =>
+      fields.some((field) => String(log.args?.[field] || "").toLowerCase() === target);
+
+    const watchers = [];
+
+    if (savvaTokenAddress) {
+      watchers.push(
+        client.watchContractEvent({
+          address: savvaTokenAddress,
+          abi: SavvaTokenAbi,
+          eventName: "Transfer",
+          onLogs: (logs = []) => {
+            if (logs.some((log) => matchesAny(log, ["from", "to"]))) bumpRefresh();
+          },
+        })
+      );
+    }
+
+    if (stakingAddress) {
+      const stakingEvents = [
+        { name: "Staked", fields: ["user"] },
+        { name: "Unstaked", fields: ["user"] },
+        { name: "GainClaimed", fields: ["user"] },
+        { name: "ClaimUnstaked", fields: ["user"] },
+        { name: "Compounded", fields: ["user"] },
+        { name: "Transferred", fields: ["from", "to"] },
+      ];
+
+      stakingEvents.forEach(({ name, fields }) => {
+        watchers.push(
+          client.watchContractEvent({
+            address: stakingAddress,
+            abi: StakingAbi,
+            eventName: name,
+            onLogs: (logs = []) => {
+              if (logs.some((log) => matchesAny(log, fields))) bumpRefresh();
+            },
+          })
+        );
+      });
+    }
+
+    if (contentFundAddress) {
+      watchers.push(
+        client.watchContractEvent({
+          address: contentFundAddress,
+          abi: ContentFundAbi,
+          eventName: "ClaimedNFTGain",
+          onLogs: (logs = []) => {
+            if (logs.some((log) => matchesAny(log, ["nft_owner"]))) bumpRefresh();
+          },
+        })
+      );
+    }
+
+    onCleanup(() => {
+      for (const stop of watchers) {
+        try {
+          stop?.();
+        } catch (err) {
+          console.error("WalletTab: failed to stop event watcher", err);
+        }
+      }
+    });
+  });
 
   const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
   const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";

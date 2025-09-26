@@ -1,6 +1,7 @@
 // src/x/ui/Countdown.jsx
-import { createSignal, onCleanup, createEffect, createMemo } from "solid-js";
+import { createSignal, onCleanup, createEffect, createMemo, untrack } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
+import { dbg } from "../../utils/debug.js";
 
 function clamp(n) { return n > 0 ? n : 0; }
 function split(totalSec) {
@@ -16,9 +17,10 @@ export default function Countdown(props) {
 
   const targetTs = () => Number(props.targetTs || 0);
   const size = () => (props.size === "lg" ? "lg" : "sm");
-  const labelPosition = () => props.labelPosition || 'side';
-  const labelStyle = () => props.labelStyle || 'full';
+  const labelPosition = () => props.labelPosition || "side";
+  const labelStyle = () => props.labelStyle || "full";
   const anim = () => (props.anim === "forward" ? "default-animation" : "reverse-animation");
+  const lockTarget = () => !!props.lockTarget;
 
   const boxWidth = () => (size() === "lg" ? "7.5ch" : "4.5ch");
   const boxPad   = () => (size() === "lg" ? "px-4 py-3" : "px-2 py-1.5");
@@ -30,21 +32,56 @@ export default function Countdown(props) {
   const [m, setM] = createSignal(0), [am, setAm] = createSignal(false);
   const [s, setS] = createSignal(0), [as, setAs] = createSignal(false);
 
+  // Tracing + target locking
   let timer;
+  let firedOnce = false;
+  let lockedTarget = NaN;
+  let lastReportedRemain = Infinity;
+
+  const effectiveTarget = () => (lockTarget() && Number.isFinite(lockedTarget)) ? lockedTarget : targetTs();
+
   const runTick = () => {
-    const remain = Math.max(0, targetTs() - Math.floor(Date.now() / 1000));
+    const tgt = effectiveTarget();
+    const remain = Math.max(0, tgt - Math.floor(Date.now() / 1000));
     const next = split(remain);
+
     if (next.days    !== d()) { setD(next.days);    setAd(true); setTimeout(() => setAd(false), 380); }
     if (next.hours   !== h()) { setH(next.hours);   setAh(true); setTimeout(() => setAh(false), 380); }
     if (next.minutes !== m()) { setM(next.minutes); setAm(true); setTimeout(() => setAm(false), 380); }
     if (next.seconds !== s()) { setS(next.seconds); setAs(true); setTimeout(() => setAs(false), 380); }
-    if (remain === 0 && typeof props.onDone === "function") props.onDone();
+
+    // Trace only near the end, gated by dbg
+    if (dbg.enabled && dbg.enabled() && remain <= 10 && remain !== lastReportedRemain) {
+      dbg.log("Countdown", { target: tgt, remain });
+      lastReportedRemain = remain;
+    }
+
+    if (remain === 0 && !firedOnce) {
+      firedOnce = true;
+      if (dbg.enabled && dbg.enabled()) dbg.warn("Countdown", "onDone fired", { target: tgt });
+      try { typeof props.onDone === "function" && props.onDone(); } catch (e) {
+        if (dbg.enabled && dbg.enabled()) dbg.error("Countdown", "onDone error", e);
+      }
+      clearInterval(timer);
+    }
   };
 
+  // Start/refresh ticking only when the INPUT target changes (avoid re-tracking d/h/m/s)
   createEffect(() => {
-    runTick(); clearInterval(timer);
-    timer = setInterval(runTick, 1000);
+    const inputTarget = targetTs();
+    untrack(() => {
+      if (lockTarget() && !Number.isFinite(lockedTarget)) {
+        lockedTarget = inputTarget;
+        if (dbg.enabled && dbg.enabled()) dbg.log("Countdown", "locked target", { target: lockedTarget });
+      } else if (!lockTarget()) {
+        lockedTarget = NaN;
+      }
+      runTick();
+      clearInterval(timer);
+      timer = setInterval(runTick, 1000);
+    });
   });
+
   onCleanup(() => clearInterval(timer));
 
   const labels = createMemo(() => {
@@ -52,7 +89,7 @@ export default function Countdown(props) {
       d: t("time.days"), h: t("time.hours"),
       m: t("time.minutes"), s: t("time.seconds"),
     };
-    if (labelStyle() === 'short') {
+    if (labelStyle() === "short") {
       return {
         d: (full.d || "D").slice(0, 1).toUpperCase(),
         h: (full.h || "H").slice(0, 1).toUpperCase(),
@@ -64,11 +101,11 @@ export default function Countdown(props) {
   });
 
   const Box = (p) => {
-    if (labelPosition() === 'top') {
+    if (labelPosition() === "top") {
       return (
         <div
           class={`flex flex-col items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] ${boxPad()}`}
-          style={{ "width": boxWidth() }}
+          style={{ width: boxWidth() }}
         >
           <div class={`${labelClass()} opacity-80`}>{p.label}</div>
           <div class={`${numClass()} font-semibold tabular-nums`} classList={{ [anim()]: p.anim }}>
@@ -77,9 +114,8 @@ export default function Countdown(props) {
         </div>
       );
     }
-    // Default to 'side'
     return (
-       <div
+      <div
         class={`flex items-center justify-center rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] ${boxPad()}`}
         style={{ width: boxWidth() }}
       >
