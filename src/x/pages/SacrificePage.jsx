@@ -853,6 +853,7 @@ export default function SacrificePage() {
                     </p>
 
                     <AmountInput
+                      label={t("sacrifice.actions.inputLabel")}
                       tokenAddress="0"
                       value={amountText()}
                       onChange={(payload) => {
