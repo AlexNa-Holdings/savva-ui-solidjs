@@ -1,8 +1,48 @@
 sections:
-  - title: Commencer
+  - title: Général
     items:
-      - label: Aperçu
+      - label: Bienvenue
         file: index.md
+      - label: Ce que nous faisons
+        file: general/what-we-do.md
+  - title: Fonctionnalités
+    items:
+      - label: Réseaux de base
+        file: features/grassroot.md
+      - label: Au-delà des Likes
+        file: features/beyond-likes.md
+      - label: Autorisation
+        file: features/authorization.md
+      - label: Contrôle du contenu
+        file: features/content-control.md
+      - label: Multilingue
+        file: features/multi-lingual.md
+      - label: Format de contenu étendu
+        file: features/content-format.md
+      - label: Contenu chiffré
+        file: features/encrypted-content.md
+  - title: Tokenomics
+    items:
+      - label: Jeton SAVVA
+        file: tokenomics/savva-token.md
+      - label: Sacrifice en cours
+        file: tokenomics/sacrifice.md
+      - label: Staking
+        file: tokenomics/staking.md
+      - label: Miser pour publier
+        file: tokenomics/stake-to-post.md
+      - label: Fonds de publication
+        file: tokenomics/post-funds.md
+      - label: Abonnements de type Patreon
+        file: tokenomics/patreon.md
+      - label: NFTs
+        file: tokenomics/nfts.md
+      - label: Acheter et brûler
+        file: tokenomics/buy-and-burn.md
+      - label: Gouvernance
+        file: tokenomics/governance.md
+  - title: Premiers pas
+    items:
       - label: Configuration
         file: getting-started.md
   - title: Concepts de base
@@ -11,7 +51,7 @@ sections:
         file: core-concepts/index.md
       - label: Initialisation de l'application et connexion au backend
         file: core-concepts/app-init.md
-      - label: Travailler avec des domaines
+      - label: Travailler avec les domaines
         file: core-concepts/domain.md
       - label: Authentification
         file: core-concepts/auth.md
@@ -19,7 +59,19 @@ sections:
         file: core-concepts/showing-posts.md
       - label: Publier des publications
         file: core-concepts/publishing-posts.md
+      - label: Contrat de profil utilisateur
+        file: core-concepts/user-profile.md
       - label: Contrat de configuration
         file: core-concepts/config-contract.md
-      - label: Orchestration de connexion
+      - label: Orchestration de la connexion
         file: core-concepts/connection-orchestration.md
+  - title: Licences
+    items:
+      - label: Licence UI
+        file: licenses/ui.md
+      - label: Licence backend
+        file: licenses/backend.md
+      - label: Licence des contrats
+        file: licenses/contracts.md
+      - label: Adresses officielles des contrats
+        file: licenses/official-contracts.md

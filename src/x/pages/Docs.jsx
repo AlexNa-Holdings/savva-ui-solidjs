@@ -22,22 +22,25 @@ export default function Docs() {
 
   return (
     <div class="sv-container sv-container--no-gutter">
-      <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 px-[var(--sv-container-gutter)] py-6">
-      <ClosePageButton mode="close" />
-        {/* Left sidebar */}
-        <aside class="min-w-0">
-          <div>
-            <div class="flex items-center justify-between">
-              <h2 class="text-sm font-semibold mb-2">{title()}</h2>
-            </div>
-            <DocsIndex active={file()} onPick={onPick} />
-          </div>
-        </aside>
+      <div class="px-[var(--sv-container-gutter)] py-6 space-y-6">
+        <ClosePageButton mode="close" />
 
-        {/* Right content */}
-        <main class="min-w-0">
-          <DocsContent relPath={file()} onPick={onPick} />
-        </main>
+        <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6 items-start">
+          {/* Left sidebar */}
+          <aside class="min-w-0 md:sticky md:top-24 md:self-start">
+            <div class="flex items-center justify-between pb-2">
+              <h2 class="text-sm font-semibold">{title()}</h2>
+            </div>
+            <div class="md:max-h-[calc(100vh-10rem)] md:overflow-y-auto md:pr-1">
+              <DocsIndex active={file()} onPick={onPick} />
+            </div>
+          </aside>
+
+          {/* Right content */}
+          <main class="min-w-0">
+            <DocsContent relPath={file()} onPick={onPick} />
+          </main>
+        </div>
       </div>
     </div>
   );

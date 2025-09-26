@@ -1,0 +1,7 @@
+## Autorisation Blockchain
+
+Tous les auteurs au sein du système sont autorisés grâce à la sécurité cryptographique de la technologie blockchain. Au lieu de confirmer l'identité réelle de l'auteur, l'autorisation blockchain vérifie que l'auteur possède la clé privée associée à son compte. Ce processus cryptographique garantit qu'il est pratiquement impossible pour quiconque de publier du contenu au nom d'une autre personne, à moins de posséder la clé privée authentique.
+
+En essence, l'autorisation blockchain fournit un lien infalsifiable entre un auteur et ses actions sur la plateforme. Lorsqu'un auteur rejoint le système ou contribue du contenu, la blockchain vérifie la propriété de la clé privée, garantissant que seuls ceux qui possèdent réellement la clé peuvent effectuer des actions sur la plateforme en leur nom.
+
+Cette approche cryptographique protège non seulement contre l'usurpation d'identité, mais améliore également la sécurité et l'intégrité globales du réseau. Elle crée un environnement sans confiance où les contributions de contenu et les interactions sont sécurisées et liées au propriétaire légitime de la clé privée, offrant un haut niveau de confiance et d'assurance à tous les participants du réseau.

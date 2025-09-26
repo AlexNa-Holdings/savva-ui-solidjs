@@ -1,25 +1,77 @@
 sections:
-  - title: Uvod
+  - title: Опште
     items:
-      - label: Pregled
+      - label: Добродошли
         file: index.md
-      - label: Podešavanje
-        file: getting-started.md
-  - title: Osnovni koncepti
+      - label: Шта радимо
+        file: general/what-we-do.md
+  - title: Функције
     items:
-      - label: Pregled
+      - label: Мрежа на терену
+        file: features/grassroot.md
+      - label: Више од лајкова
+        file: features/beyond-likes.md
+      - label: Ауторизација
+        file: features/authorization.md
+      - label: Контрола садржаја
+        file: features/content-control.md
+      - label: Вишејезичност
+        file: features/multi-lingual.md
+      - label: Проширени формат садржаја
+        file: features/content-format.md
+      - label: Шифровани садржај
+        file: features/encrypted-content.md
+  - title: Токеномика
+    items:
+      - label: SAVVA токен
+        file: tokenomics/savva-token.md
+      - label: Текућа жртва
+        file: tokenomics/sacrifice.md
+      - label: Стејкинг
+        file: tokenomics/staking.md
+      - label: Стејк за објаву
+        file: tokenomics/stake-to-post.md
+      - label: Средства за објаву
+        file: tokenomics/post-funds.md
+      - label: Претплате у стилу Патреона
+        file: tokenomics/patreon.md
+      - label: NFT-ови
+        file: tokenomics/nfts.md
+      - label: Купи и спали
+        file: tokenomics/buy-and-burn.md
+      - label: Управљање
+        file: tokenomics/governance.md
+  - title: Почетак рада
+    items:
+      - label: Подешавање
+        file: getting-started.md
+  - title: Основни концепти
+    items:
+      - label: Преглед
         file: core-concepts/index.md
-      - label: Inicijalizacija aplikacije i povezivanje sa backend-om
+      - label: Иницијализација апликације и повезивање са позадином
         file: core-concepts/app-init.md
-      - label: Rad sa domenima
+      - label: Рад са доменима
         file: core-concepts/domain.md
-      - label: Autentifikacija
+      - label: Аутентификација
         file: core-concepts/auth.md
-      - label: Prikazivanje postova
+      - label: Приказивање објава
         file: core-concepts/showing-posts.md
-      - label: Objavljivanje postova
+      - label: Објављивање објава
         file: core-concepts/publishing-posts.md
-      - label: Konfiguracija ugovora
+      - label: Уговор корисничког профила
+        file: core-concepts/user-profile.md
+      - label: Конфигурациони уговор
         file: core-concepts/config-contract.md
-      - label: Orkestracija konekcije
+      - label: Оркестрација веза
         file: core-concepts/connection-orchestration.md
+  - title: Лиценце
+    items:
+      - label: Лиценца корисничког интерфејса
+        file: licenses/ui.md
+      - label: Лиценца позадине
+        file: licenses/backend.md
+      - label: Лиценце уговора
+        file: licenses/contracts.md
+      - label: Званичне адресе уговора
+        file: licenses/official-contracts.md

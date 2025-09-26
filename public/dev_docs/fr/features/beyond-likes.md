@@ -1,0 +1,7 @@
+## Réseaux sociaux au-delà des "J’aime"
+
+Les réseaux sociaux basés sur SAVVA offrent aux utilisateurs une gamme variée de moyens pour exprimer leur soutien aux créateurs de contenu. En plus des traditionnels « j’aime » et réactions, les utilisateurs peuvent utiliser le token SAVVA pour différentes formes de contributions et de dons aux auteurs.
+
+La plateforme SAVVA est équipée de plusieurs contrats intelligents qui mettent en œuvre diverses méthodes de monétisation, telles que le Fonds de contenu, les abonnements à la Patreon, les outils de promotion de contenu, le support complet des NFT pour les publications (y compris une place de marché NFT intégrée), et plus encore.
+
+Grâce à la nature ouverte et extensible du système, les administrateurs des réseaux sociaux ont la flexibilité d’introduire des fonctionnalités supplémentaires et des méthodes de monétisation adaptées aux besoins et aux intérêts de leur communauté. Cette adaptabilité garantit que les créateurs et leurs soutiens disposent d’une plateforme dynamique et personnalisable où l’innovation et le soutien communautaire sont au cœur des priorités, reconnaissant et récompensant ainsi les créateurs pour leurs contributions précieuses.

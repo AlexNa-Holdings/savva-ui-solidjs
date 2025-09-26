@@ -50,11 +50,11 @@ export default function DocsIndex(props) {
         <div class="px-3 py-2 text-sm text-[hsl(var(--muted-foreground))]">{app.t("common.loading")}</div>
       }>
         <For each={data()?.sections || []}>
-          {(sec) => (
+          {(sec, index) => (
             <div class="mb-2">
-              <div class="px-3 pb-1 pt-2 text-xs uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                {sec.title || app.t("docs.section")}
-              </div>
+              <h2 class="px-3 pb-1 pt-2 text-sm font-semibold tracking-wide text-[hsl(var(--card-foreground))]">
+                {`${index() + 1}. ${sec.title || app.t("docs.section")}`}
+              </h2>
               <For each={sec.items || []}>{item}</For>
             </div>
           )}

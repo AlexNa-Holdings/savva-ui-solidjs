@@ -1,0 +1,7 @@
+## Distribution de contenu chiffré
+
+SAVVA introduit une fonctionnalité avancée de distribution de contenu chiffré qui permet aux auteurs de contrôler qui peut accéder à leur contenu. Grâce à cette fonctionnalité, les auteurs peuvent spécifier précisément qui bénéficie d’un accès à leur contenu, garantissant ainsi qu’il reste privé ou accessible à un public restreint.
+
+Les auteurs ont la flexibilité de définir des critères d’accès, comme permettre l’accès exclusivement à leurs soutiens, qui peuvent contribuer un certain nombre de tokens de manière hebdomadaire. Cette approche offre un mécanisme puissant aux créateurs pour récompenser et inciter leurs fidèles abonnés tout en protégeant l’exclusivité de leur contenu.
+
+Il est important de noter que, bien que l’infrastructure serveur pour cette fonctionnalité soit entièrement opérationnelle et prête, l’implémentation de l’interface utilisateur (UI) est actuellement en cours de développement et sera disponible dans les prochaines versions. Cette addition passionnante à la plateforme SAVVA améliorera encore les options de distribution de contenu, offrant aux créateurs un outil précieux pour personnaliser et monétiser leur contenu tout en gardant le contrôle sur son accessibilité.

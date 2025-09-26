@@ -1,9 +1,49 @@
 # public/dev_docs/en/sidebar.yaml
 sections:
+  - title: General
+    items:
+      - label: Welcome
+        file: index.md
+      - label: What we do
+        file: general/what-we-do.md
+  - title: Features
+    items:
+      - label: Grassroot Networks
+        file: features/grassroot.md
+      - label: Beyond Likes
+        file: features/beyond-likes.md
+      - label: Authorization
+        file: features/authorization.md
+      - label: Content Control
+        file: features/content-control.md
+      - label: Multi-lingual
+        file: features/multi-lingual.md
+      - label: Extended Content Format
+        file: features/content-format.md
+      - label: Encrypted Content
+        file: features/encrypted-content.md
+  - title: Tokenomics
+    items:
+      - label: SAVVA Token
+        file: tokenomics/savva-token.md
+      - label: Ongoing Sacrifice
+        file: tokenomics/sacrifice.md
+      - label: Staking
+        file: tokenomics/staking.md
+      - label: Stake to Post
+        file: tokenomics/stake-to-post.md
+      - label: Post Funds
+        file: tokenomics/post-funds.md
+      - label: Patreon-style Subscriptions
+        file: tokenomics/patreon.md
+      - label: NFTs
+        file: tokenomics/nfts.md
+      - label: Buy & Burn
+        file: tokenomics/buy-and-burn.md
+      - label: Governance
+        file: tokenomics/governance.md
   - title: Getting Started
     items:
-      - label: Overview
-        file: index.md
       - label: Setup
         file: getting-started.md
 
@@ -21,7 +61,19 @@ sections:
         file: core-concepts/showing-posts.md
       - label: Publishing Posts
         file: core-concepts/publishing-posts.md
+      - label: User Profile Contract
+        file: core-concepts/user-profile.md
       - label: Config Contract
         file: core-concepts/config-contract.md
       - label: Connection Orchestration
         file: core-concepts/connection-orchestration.md
+  - title: Licenses
+    items:
+      - label: UI License 
+        file: licenses/ui.md
+      - label: Backend License 
+        file: licenses/backend.md
+      - label: Contracts License 
+        file: licenses/contracts.md
+      - label: Official Contract Addresses
+        file: licenses/official-contracts.md

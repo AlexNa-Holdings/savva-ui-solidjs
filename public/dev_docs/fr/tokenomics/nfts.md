@@ -1,0 +1,19 @@
+## Les NFT de SAVVA
+
+La plateforme SAVVA permet aux auteurs de créer des jetons non fongibles (NFT) pour leurs publications, ajoutant une couche supplémentaire d’unicité et de valeur à certains contenus sélectionnés. Bien que toutes les publications ne justifient pas la création d’un NFT, il existe des moments particuliers où les auteurs et leurs abonnés souhaitent posséder un actif numérique unique représentant un contenu spécifique. Voici deux aspects clés de la mise en œuvre des NFT :
+
+* `NFT et dons au fonds de publication :` Lorsqu’une publication est associée à un NFT, le propriétaire du NFT reçoit une partie des dons transférés au fonds de publication. Cela signifie que le pourcentage total alloué à la partie don du fonds de publication est augmenté. En pratique, cela se traduit par une plus grande part des dons du fonds de publication allant à l’auteur lorsqu’il crée lui-même un NFT pour sa publication. Cela offre une incitation supplémentaire aux auteurs à créer des NFT, car cela augmente leurs gains potentiels provenant du fonds de publication.
+
+* `Contributions des propriétaires de NFT :` Lorsqu’un propriétaire de NFT contribue des jetons au fonds de publication, la totalité du montant est dirigée vers le fonds. Aucun de ces jetons n’est attribué à l’auteur ni au propriétaire du NFT lui-même. Cette conception encourage les propriétaires de NFT à participer activement à l’augmentation du fonds de publication, ce qui profite finalement à l’auteur. En incitant les propriétaires de NFT à aider à faire croître le fonds de publication, cela favorise un écosystème dynamique où les utilisateurs sont motivés à contribuer à la publication pour avoir une chance de participer au jeu de récompenses, ce qui entraîne une augmentation des dons disponibles pour l’auteur.
+
+Ces fonctionnalités renforcent la valeur des NFT sur la plateforme SAVVA en alignant les intérêts des propriétaires de NFT, des auteurs et de la communauté au sens large. Elles encouragent la création et la possession de NFT tout en favorisant un environnement de soutien où tous les participants peuvent bénéficier d’un engagement et de contributions accrus.
+
+La plateforme SAVVA introduit un marché NFT intégré, permettant aux propriétaires de NFT de vendre facilement leurs actifs numériques au sein du système. De plus, les utilisateurs ont la possibilité de sélectionner et d’organiser leurs collections de NFT. Cette fonctionnalité offre une expérience attrayante et engageante tant pour les propriétaires de NFT que pour leurs abonnés.
+
+Voici comment cela fonctionne :
+
+* `Marché NFT :` Les propriétaires de NFT peuvent mettre leurs NFT en vente directement sur la plateforme SAVVA. Ce marché pratique permet que les transactions de NFT se déroulent au sein de l’écosystème, offrant un processus simplifié et convivial pour l’achat et la vente de collections numériques.
+
+* `Organisation des collections de NFT :` Les utilisateurs ont la possibilité de créer et de gérer des collections de NFT. Cette fonctionnalité transforme le processus d’organisation des NFT en une expérience passionnante et agréable. Elle permet aux utilisateurs de sélectionner leurs NFT préférés, créant ainsi un lien direct et personnel avec leurs auteurs favoris et leurs créations numériques uniques.
+
+En mettant en œuvre ces fonctionnalités, la plateforme SAVVA soutient non seulement l’écosystème NFT, mais améliore également la relation entre les créateurs et leurs abonnés. Les propriétaires de NFT peuvent mettre en valeur leurs œuvres numériques, créations et objets de collection, tandis que les utilisateurs peuvent s’engager plus profondément avec leurs auteurs préférés et leurs collections de NFT, favorisant un sentiment plus fort de communauté et d’appréciation au sein de la plateforme.
