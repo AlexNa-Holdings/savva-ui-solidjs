@@ -26,6 +26,7 @@ import ContributePage from "./pages/ContributePage.jsx";
 import NpoListPage from "./pages/NpoListPage.jsx";
 import NpoPage from "./pages/NpoPage.jsx";
 import SacrificePage from "./pages/SacrificePage.jsx";
+import BuyBurnPage from "./pages/BuyBurnPage.jsx";
 import { closeAllModals } from "../utils/modalBus.js";
 import NavigationPanel from "./navigation/NavigationPanel.jsx";
 import VersionChecker from "./main/VersionChecker.jsx";
@@ -53,6 +54,7 @@ export default function App() {
     if (r.startsWith("/promo-codes")) return "promo-codes";
     if (r.startsWith("/promo-code/")) return "promo-code";
     if (r.startsWith("/sac")) return "sacrifice";
+    if (r.startsWith("/buy-burn")) return "buyburn";
     if (r.startsWith("/fr/")) return "contribute";
     if (r.startsWith("/admin")) return "admin";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
@@ -166,6 +168,7 @@ export default function App() {
                 <Show when={currentView() === "promo-codes"}><PromoCodesPage /></Show>
                 <Show when={currentView() === "promo-code"}><PromoRedeemPage /></Show>
                 <Show when={currentView() === "sacrifice"}><SacrificePage /></Show>
+                <Show when={currentView() === "buyburn"}><BuyBurnPage /></Show>
                 <Show when={currentView() === "admin"}><AdminPage /></Show>
               </main>
             </>

@@ -89,6 +89,29 @@ export default function RightPane({ isOpen, onClose }) {
                 </div>
               </li>
 
+              {/* Buy & Burn link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/buy-burn");
+                    onClose();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      app.setSavedScrollY(window.scrollY);
+                      navigate("/buy-burn");
+                      onClose();
+                    }
+                  }}
+                >
+                  {t("rightPane.buyburn")}
+                </div>
+              </li>
+
               {/* NPO list link */}
               <li>
                 <div
