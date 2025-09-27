@@ -3,7 +3,7 @@ import { getAiConfig } from "./storage.js";
 import { findProvider } from "./registry.js";
 import { fetchWithTimeout } from "../utils/net.js";
 
-const DEFAULT_AI_TIMEOUT_MS = 60_000; // 60s default for LLM calls
+const DEFAULT_AI_TIMEOUT_MS = 120_000; // 120s default for LLM calls
 
 function trimSlash(s = "") {
   return String(s || "").replace(/\/+$/, "");
