@@ -986,7 +986,7 @@ export default {
   "ui.toast.showDetails": "Показать детали",
   "user.banned": "Учетная запись заблокирована.",
   "version.new.message": "Новая версия приложения готова. Обновите сейчас, чтобы насладиться последними функциями и улучшениями.",
-  "version.new.refresh": "Обновить для обновления",
+  "version.new.refresh": "Обновите страницу для загрузки новой версии.",
   "version.new.title": "Доступна новая версия!",
   "wallet.changeChain": "Сменить сеть",
   "wallet.common.max": "Макс",
