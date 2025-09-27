@@ -30,7 +30,7 @@ export default function StepCheckRights(props) {
     if (stakeWei < minStakeWei) {
       const required = parseFloat(formatUnits(minStakeWei, 18)).toLocaleString();
       const actual = parseFloat(formatUnits(stakeWei, 18)).toLocaleString();
-      throw new Error(t("editor.publish.rights.errorInsufficientStake", { n : required }) + ` (yours: ${actual})`);
+      throw new Error(t("editor.publish.rights.errorInsufficientStake", { n : required, actual: actual }) );
     }
   };
 

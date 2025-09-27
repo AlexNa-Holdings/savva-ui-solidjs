@@ -1,8 +1,59 @@
 // src/x/editor/AdditionalParametersPost.jsx
-import { createMemo, createResource, createSignal, For, Show, onMount, onCleanup } from "solid-js";
+import { createMemo, createResource, createSignal, createEffect, For, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
+
+function buildCategoryTree(categories = []) {
+  const root = [];
+  const byPath = new Map();
+  const selectable = new Set(categories.map((c) => c.full));
+
+  categories.forEach((item) => {
+    const parts = String(item.full || "")
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (!parts.length) return;
+
+    let parent = null;
+    const acc = [];
+    parts.forEach((part) => {
+      acc.push(part);
+      const path = acc.join("/");
+
+      let node = byPath.get(path);
+      if (!node) {
+        node = { name: part, path, selectable: false, children: [] };
+        byPath.set(path, node);
+        if (parent) {
+          parent.children.push(node);
+        } else {
+          root.push(node);
+        }
+      }
+
+      if (selectable.has(path)) {
+        node.selectable = true;
+      }
+
+      parent = node;
+    });
+  });
+
+  const ensureSelectable = (nodes) => {
+    nodes.forEach((node) => {
+      if (node.children.length > 0 && !node.selectable) {
+        node.selectable = true;
+      }
+      if (node.children.length > 0) ensureSelectable(node.children);
+    });
+  };
+
+  ensureSelectable(root);
+
+  return root;
+}
 
 export default function AdditionalParametersPost(props) {
   const app = useApp();
@@ -92,6 +143,7 @@ export default function AdditionalParametersPost(props) {
   // Popover (auto-flip)
   const [openCats, setOpenCats] = createSignal(false);
   const [openUp, setOpenUp] = createSignal(false);
+  const [expandedCats, setExpandedCats] = createSignal(new Set());
   let catsRoot;
   function decidePlacement() {
     if (!catsRoot || !openCats()) return;
@@ -112,6 +164,41 @@ export default function AdditionalParametersPost(props) {
   });
   const openToggle = () => { const n = !openCats(); setOpenCats(n); if (n) requestAnimationFrame(decidePlacement); };
 
+  const categoryTree = createMemo(() => buildCategoryTree(categoriesRes() || []));
+
+  createEffect(() => {
+    // Ensure ancestors of selected categories stay expanded
+    const selected = selectedCategories();
+    if (!selected) return;
+    setExpandedCats((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      selected.forEach((full) => {
+        const parts = String(full || "")
+          .split("/")
+          .map((part) => part.trim())
+          .filter(Boolean);
+        for (let i = 1; i < parts.length; i += 1) {
+          const ancestor = parts.slice(0, i).join("/");
+          if (!next.has(ancestor)) {
+            next.add(ancestor);
+            changed = true;
+          }
+        }
+      });
+      return changed ? next : prev;
+    });
+  });
+
+  const toggleExpanded = (path) => {
+    if (!path) return;
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  };
+
   const CatChip = (p) => (
     <span
       class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm border
@@ -122,6 +209,50 @@ export default function AdditionalParametersPost(props) {
       <button type="button" class="ml-0.5 rounded hover:opacity-80" aria-label={app.t("common.remove")} onClick={() => toggleCategory(p.name)}>×</button>
     </span>
   );
+
+  const CategoryOption = (nodeProps) => {
+    const { node, depth } = nodeProps;
+    const isExpanded = () => expandedCats().has(node.path);
+    const isChecked = () => selectedCategories().includes(node.path);
+    const indentPx = () => `${Math.min(depth, 5) * 16}px`;
+
+    return (
+      <li>
+        <div
+          class="flex items-center gap-2 rounded hover:bg-[hsl(var(--accent))]"
+          style={{ padding: "4px 8px", "padding-left": `calc(${indentPx()} + 4px)` }}
+        >
+          <Show when={node.children.length > 0} fallback={<span class="w-6" />}> 
+            <button
+              type="button"
+              class="w-6 h-6 flex items-center justify-center rounded hover:bg-[hsl(var(--secondary))]"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleExpanded(node.path); }}
+            >
+              <ChevronDownIcon class={`w-4 h-4 transition-transform ${isExpanded() ? "rotate-180" : ""}`} />
+            </button>
+          </Show>
+          <label class={`flex items-center gap-2 flex-1 cursor-pointer ${node.selectable ? "" : "opacity-60"}`} title={node.path}>
+            <input
+              type="checkbox"
+              class="accent-current"
+              checked={isChecked()}
+              disabled={!node.selectable}
+              onInput={() => node.selectable && toggleCategory(node.path)}
+              aria-label={node.name}
+            />
+            <span class="text-sm truncate">{node.name}</span>
+          </label>
+        </div>
+        <Show when={node.children.length > 0 && isExpanded()}>
+          <ul class="space-y-0.5 pl-0">
+            <For each={node.children}>
+              {(child) => <CategoryOption node={child} depth={depth + 1} />}
+            </For>
+          </ul>
+        </Show>
+      </li>
+    );
+  };
 
   return (
     <section class="mt-4 p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))]">
@@ -188,29 +319,9 @@ export default function AdditionalParametersPost(props) {
               >
                 <Show when={!categoriesRes.loading} fallback={<div class="text-xs opacity-70 px-2 py-1">{app.t("common.loading")}…</div>}>
                   <Show when={(categoriesRes() || []).length > 0} fallback={<div class="text-xs opacity-70 px-2 py-1">—</div>}>
-                    <ul class="space-y-0.5">
-                      <For each={categoriesRes()}>
-                        {(c) => {
-                          const checked = () => selectedCategories().includes(c.full);
-                          return (
-                            <li>
-                              <label
-                                class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[hsl(var(--accent))] cursor-pointer"
-                                style={{ "padding-left": `${Math.min(5, c.depth) * 16}px` }}
-                                title={c.full}
-                              >
-                                <input
-                                  type="checkbox"
-                                  class="accent-current"
-                                  checked={checked()}
-                                  onInput={() => toggleCategory(c.full)}
-                                  aria-label={c.leaf}
-                                />
-                                <span class="text-sm">{c.leaf}</span>
-                              </label>
-                            </li>
-                          );
-                        }}
+                    <ul class="space-y-0.5 pl-0">
+                      <For each={categoryTree()}>
+                        {(node) => <CategoryOption node={node} depth={0} />}
                       </For>
                     </ul>
                   </Show>
