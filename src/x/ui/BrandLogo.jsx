@@ -70,13 +70,24 @@ export default function BrandLogo(props) {
   });
 
   const src = createMemo(() => (relPath() ? urlFor(relPath()) : ""));
+  const hasLogoImage = createMemo(() => Boolean(src()));
 
   const isSvg = createMemo(() => src().toLowerCase().endsWith(".svg"));
 
   return (
-    <a href="#" class="inline-flex items-center" aria-label={t("brand.logoAlt")} onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+    <a
+      href="#"
+      class="inline-flex items-center"
+      classList={{ "no-underline": !hasLogoImage(), "hover:no-underline": !hasLogoImage() }}
+      style={{ "text-decoration": hasLogoImage() ? undefined : "none" }}
+      aria-label={t("brand.logoAlt")}
+      onClick={(e) => {
+        e.preventDefault();
+        navigate("/");
+      }}
+    >
       <Show 
-        when={src()} 
+        when={hasLogoImage()} 
         fallback={<div class={props.classTitle || "text-xl font-bold select-none"}>{domainTitle()}</div>}
       >
         <Switch>

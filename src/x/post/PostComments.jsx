@@ -1,5 +1,5 @@
 // src/x/editor/PostComments.jsx
-import { createResource, For, Show, createSignal, createEffect } from "solid-js";
+import { createResource, For, Show, createSignal, createEffect, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import Spinner from "../ui/Spinner.jsx";
@@ -18,6 +18,7 @@ export default function PostComments(props) {
   const [nextOffset, setNextOffset] = createSignal(0);
   const [isLoadingMore, setIsLoadingMore] = createSignal(false);
   const { dataStable: profile } = useUserProfile();
+  const canAddComment = createMemo(() => Boolean(app.authorizedUser()?.address));
 
   const showNsfw = () => {
     const pref = selectField(profile(), "nsfw") ?? "h";
@@ -85,12 +86,14 @@ export default function PostComments(props) {
       {/* Header with link only, no counter */}
       <div class="mb-4 flex items-center justify-between">
         <h3 class="text-xl font-semibold">{t("post.comments")}</h3>
-        <button
-          onClick={handleAddComment}
-          class="text-sm underline text-[hsl(var(--foreground))] hover:opacity-80"
-        >
-          {t("post.addComment")}
-        </button>
+        <Show when={canAddComment()}>
+          <button
+            onClick={handleAddComment}
+            class="text-sm underline text-[hsl(var(--foreground))] hover:opacity-80"
+          >
+            {t("post.addComment")}
+          </button>
+        </Show>
       </div>
 
       <Show when={initialData.loading}>

@@ -763,7 +763,7 @@ export default {
   "sacrifice.error.title": "Не удалось загрузить данные о жертвовании",
   "sacrifice.preview.currentPrice": "Текущая цена: {base} {symbol}, ${usd}",
   "sacrifice.preview.enterAmount": "Введите сумму, чтобы увидеть, как это изменит раунд.",
-  "sacrifice.preview.expectedSavva": "Ожидаемый SAVVA",
+  "sacrifice.preview.expectedSavva": "Ожидаемые SAVVA",
   "sacrifice.preview.price": "Цена после депозита",
   "sacrifice.preview.priceWarning": "Цена будет выше текущей рыночной.",
   "sacrifice.preview.title": "Если вы внесёте депозит сейчас",
