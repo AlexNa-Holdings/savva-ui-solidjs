@@ -30,6 +30,7 @@ import CampaignContributeModal from "../modals/CampaignContributeModal.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
 import BannedBanner from "../post/BannedBanner.jsx";
+import PostInfo from "../post/PostInfo.jsx";
 
 // ⬇️ Profile store (same as PostCard)
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
@@ -149,6 +150,8 @@ export default function PostPage() {
     setPostLang(locales.includes(want) ? want : locales[0] || "en");
   });
 
+  const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
+
   const title = createMemo(() => {
     const loc = details()?.descriptor?.locales?.[postLang()];
     return (loc?.title || "").trim();
@@ -243,6 +246,10 @@ export default function PostPage() {
                       </Show>
                     </div>
                     <PostTags postData={postForTags()} />
+                            <div class="flex-1 min-w-0">
+                              {/* Pass actorAddr so child re-renders on actor switch */}
+                              <PostInfo item={post()} hideTopBorder={true} timeFormat="long" actorAddr={actorAddress()} />
+                            </div>
                   </div>
 
                   <div class="w-48 flex flex-col items-center flex-shrink-0 space-y-2">
