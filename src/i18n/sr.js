@@ -834,6 +834,8 @@ export default {
   "settings.ai.providers.openaiCompatible": "OpenAI kompatibilan",
   "settings.ai.providers.together": "Together",
   "settings.ai.saved": "Podešavanja sačuvana.",
+  "settings.ai.temperature": "Temperatura",
+  "settings.ai.temperatureHint": "0–2. Ostavite prazno da biste koristili podrazumevanu vrednost provajdera.",
   "settings.ai.test": "Test",
   "settings.ai.testFailed": "Test neuspešan.",
   "settings.ai.testSuccess": "Test uspešan.",

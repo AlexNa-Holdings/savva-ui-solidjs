@@ -4,6 +4,7 @@ import { findProvider } from "./registry.js";
 import { fetchWithTimeout } from "../utils/net.js";
 
 const DEFAULT_AI_TIMEOUT_MS = 360000; // 360s default for LLM calls
+const DEFAULT_AI_TEMPERATURE = 1; // Provider default unless overridden in settings
 
 function trimSlash(s = "") {
   return String(s || "").replace(/\/+$/, "");
@@ -25,7 +26,20 @@ function parseJsonStrict(s) {
 
 // ---- Provider callers ----
 
-async function callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs }) {
+function buildProviderError({ res, body, url }) {
+  const message =
+    body?.error?.message || body?.message || body?.error_description || res.statusText || "AI request failed";
+  const err = new Error(message);
+  err.status = res.status;
+  err.code = body?.error?.code || body?.code;
+  err.endpoint = url;
+  err.requestId =
+    body?.error?.request_id || body?.request_id || res.headers?.get?.("x-request-id") || undefined;
+  err.body = body;
+  return err;
+}
+
+async function callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs, temperature }) {
   const url = `${trimSlash(baseUrl)}/chat/completions`;
   const res = await fetchWithTimeout(url, {
     method: "POST",
@@ -34,15 +48,15 @@ async function callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs })
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, messages, temperature: 0.2 }),
+    body: JSON.stringify({ model, messages, temperature }),
     timeoutMs,
   });
   const j = await res.json();
-  if (!res.ok) throw new Error(j?.error?.message || res.statusText);
+  if (!res.ok) throw buildProviderError({ res, body: j, url });
   return j?.choices?.[0]?.message?.content ?? "";
 }
 
-async function callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, timeoutMs }) {
+async function callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, timeoutMs, temperature }) {
   const url = `${trimSlash(baseUrl)}/deployments/${encodeURIComponent(
     model
   )}/chat/completions?api-version=${encodeURIComponent(apiVersion || "2024-02-15-preview")}`;
@@ -50,15 +64,15 @@ async function callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, t
     method: "POST",
     cache: "no-store",
     headers: { "api-key": apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, temperature: 0.2 }),
+    body: JSON.stringify({ messages, temperature }),
     timeoutMs,
   });
   const j = await res.json();
-  if (!res.ok) throw new Error(j?.error?.message || res.statusText);
+  if (!res.ok) throw buildProviderError({ res, body: j, url });
   return j?.choices?.[0]?.message?.content ?? "";
 }
 
-async function callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs }) {
+async function callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs, temperature }) {
   const url = `${trimSlash(baseUrl)}/messages`;
   const system = messages.find((m) => m.role === "system")?.content || "";
   const msgs = messages
@@ -79,17 +93,17 @@ async function callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs }) {
       model,
       system,
       messages: msgs,
-      temperature: 0.2,
+      temperature,
       max_tokens: 4096,
     }),
     timeoutMs,
   });
   const j = await res.json();
-  if (!res.ok) throw new Error(j?.error?.message || res.statusText);
+  if (!res.ok) throw buildProviderError({ res, body: j, url });
   return j?.content?.[0]?.text ?? "";
 }
 
-async function callGemini({ baseUrl, apiKey, model, messages, timeoutMs }) {
+async function callGemini({ baseUrl, apiKey, model, messages, timeoutMs, temperature }) {
   const url = `${trimSlash(baseUrl)}/models/${encodeURIComponent(
     model
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -106,11 +120,11 @@ async function callGemini({ baseUrl, apiKey, model, messages, timeoutMs }) {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents, generationConfig: { temperature: 0.2 } }),
+    body: JSON.stringify({ contents, generationConfig: { temperature } }),
     timeoutMs,
   });
   const j = await res.json();
-  if (!res.ok) throw new Error(j?.error?.message || res.statusText);
+  if (!res.ok) throw buildProviderError({ res, body: j, url });
   const content =
     j?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
   return content;
@@ -126,20 +140,27 @@ export function createAiClient(explicitCfg) {
   const baseUrl = cfg.baseUrl || provider?.defaultBaseUrl || "";
   const apiKey = cfg.apiKey;
   const apiVersion = cfg.extra?.apiVersion;
+  const temperature = (() => {
+    const raw = cfg.extra?.temperature;
+    if (raw === undefined || raw === null || String(raw).trim() === "") return DEFAULT_AI_TEMPERATURE;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return DEFAULT_AI_TEMPERATURE;
+    return Math.min(2, Math.max(0, num));
+  })();
   const REQUEST_TIMEOUT_MS =
     Number(cfg?.extra?.aiTimeoutMs) > 0 ? Number(cfg.extra.aiTimeoutMs) : DEFAULT_AI_TIMEOUT_MS;
 
   async function chat(messages) {
     if (!apiKey || !baseUrl || !model) throw new Error("AI not configured");
     if (providerId === "anthropic")
-      return callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS });
+      return callAnthropic({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS, temperature });
     if (providerId === "gemini")
-      return callGemini({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS });
+      return callGemini({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS, temperature });
     if (providerId === "azure-openai" || providerId === "azure_openai") {
-      return callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, timeoutMs: REQUEST_TIMEOUT_MS });
+      return callAzureOpenAI({ baseUrl, apiKey, model, apiVersion, messages, timeoutMs: REQUEST_TIMEOUT_MS, temperature });
     }
     // openai, openai-compatible, groq, together, mistral → OpenAI-compatible
-    return callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS });
+    return callOpenAICompat({ baseUrl, apiKey, model, messages, timeoutMs: REQUEST_TIMEOUT_MS, temperature });
   }
 
   // --- Higher-level helpers used by the app (unchanged interfaces) ---

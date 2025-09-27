@@ -36,6 +36,8 @@ export function loadAiConfig() {
       // Guard against accidental JSON/error objects being saved in place of the key
       if (trimmed.startsWith("{") && trimmed.includes('"context":"ai-test"')) {
         parsed.apiKey = "";
+      } else {
+        parsed.apiKey = trimmed;
       }
     }
     if ((!parsed.apiKey || String(parsed.apiKey).trim() === "") && envKey) {
@@ -44,6 +46,16 @@ export function loadAiConfig() {
     if (typeof parsed.extra !== "object" || parsed.extra === null) parsed.extra = {};
     if (typeof parsed.auto !== "boolean") parsed.auto = false;
     if (typeof parsed.useAi !== "boolean") parsed.useAi = true;
+    if (typeof parsed.extra.temperature === "string") {
+      parsed.extra.temperature = parsed.extra.temperature.trim();
+      if (parsed.extra.temperature === "") delete parsed.extra.temperature;
+    } else if (typeof parsed.extra.temperature === "number") {
+      if (Number.isFinite(parsed.extra.temperature)) {
+        parsed.extra.temperature = String(parsed.extra.temperature);
+      } else {
+        delete parsed.extra.temperature;
+      }
+    }
   }
 
   if (typeof parsed.apiKey === "string") parsed.apiKey = parsed.apiKey.trim();

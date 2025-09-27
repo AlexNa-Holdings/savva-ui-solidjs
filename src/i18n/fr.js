@@ -834,6 +834,8 @@ export default {
   "settings.ai.providers.openaiCompatible": "Compatible avec OpenAI",
   "settings.ai.providers.together": "Ensemble",
   "settings.ai.saved": "Paramètres enregistrés.",
+  "settings.ai.temperature": "Température",
+  "settings.ai.temperatureHint": "0–2. Laissez vide pour utiliser la valeur par défaut du fournisseur.",
   "settings.ai.test": "Tester",
   "settings.ai.testFailed": "Test échoué.",
   "settings.ai.testSuccess": "Test réussi.",

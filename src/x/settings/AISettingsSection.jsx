@@ -57,10 +57,25 @@ export default function AISettingsSection() {
   }
   function updateExtra(field, value) {
     setCfg((prev) => {
-      const next = { ...prev, extra: { ...(prev.extra || {}), [field]: value } };
+      const extra = { ...(prev.extra || {}) };
+      if (value === undefined || value === "") delete extra[field];
+      else extra[field] = value;
+      const next = { ...prev, extra };
       persistConfig(next);
       return next;
     });
+  }
+
+  function onTemperatureInput(e) {
+    const raw = e.currentTarget.value.trim();
+    if (raw === "") {
+      updateExtra("temperature", undefined);
+      return;
+    }
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return;
+    const clamped = Math.min(2, Math.max(0, num));
+    updateExtra("temperature", String(clamped));
   }
 
   function handleProviderChange(nextId) {
@@ -106,6 +121,17 @@ export default function AISettingsSection() {
   }
 
   const usingAi = createMemo(() => cfg().useAi !== false);
+
+  createEffect(() => {
+    const currentCfg = cfg();
+    const p = provider();
+    if (!currentCfg || !p) return;
+    const baseUrl = String(currentCfg.baseUrl || "").trim();
+    const defaultBase = String(p.defaultBaseUrl || "").trim();
+    const hasCustomBase = baseUrl && baseUrl !== defaultBase && baseUrl !== "https://api.openai.com/v1";
+    const hasAdvancedExtras = Boolean(currentCfg.extra?.apiVersion || currentCfg.extra?.temperature);
+    if (hasCustomBase || hasAdvancedExtras) setShowAdvanced(true);
+  });
 
   async function handleTest() {
     setBusyTest(true);
@@ -234,7 +260,7 @@ export default function AISettingsSection() {
               class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
               placeholder={modelPlaceholder()}
               value={cfg().model || ""}
-              onInput={(e) => update("model", e.currentTarget.value)}
+              onInput={(e) => update("model", e.currentTarget.value)} 
             />
           </label>
 
@@ -278,6 +304,21 @@ export default function AISettingsSection() {
                 value={cfg().baseUrl || ""}
                 onInput={(e) => update("baseUrl", e.currentTarget.value)}
               />
+            </label>
+
+            <label class="grid gap-1">
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.temperature")}</span>
+              <input
+                type="number"
+                min="0"
+                max="2"
+                step="0.1"
+                class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
+                placeholder="1"
+                value={cfg().extra?.temperature ?? ""}
+                onInput={onTemperatureInput}
+              />
+              <span class="text-xs text-[hsl(var(--muted-foreground))]">{t("settings.ai.temperatureHint")}</span>
             </label>
 
             <Show when={provider()?.kind === "azure_openai"}>
@@ -351,6 +392,7 @@ async function buildTestErrorDetails(t, err, cfg, app) {
   if (info.code) parts.push(`${t("error.code")}: ${info.code}`);
   if (info.endpoint) parts.push(`${t("error.endpoint")}: ${info.endpoint}`);
   if (info.requestId) parts.push(`x-request-id: ${info.requestId}`);
+  if (info.rawMessage) parts.push(info.rawMessage);
   if (auth?.hasToken === false) parts.push(t("auth.noToken"));
   return parts.join(" · ");
 }
