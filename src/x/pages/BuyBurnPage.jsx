@@ -61,6 +61,9 @@ export default function BuyBurnPage() {
   }));
 
   const claimableGain = createMemo(() => statsData().claimableGain ?? 0n);
+  const hasBalanceToBurn = createMemo(
+    () => (statsData().baseBalance ?? 0n) > 0n || (statsData().savvaBalance ?? 0n) > 0n,
+  );
 
   onMount(() => {
     const available = isWalletAvailable();
@@ -274,7 +277,9 @@ export default function BuyBurnPage() {
                     type="button"
                     class="w-full px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleBuyBurn}
-                    disabled={isProcessing() || stats.loading || !walletAccount()}
+                    disabled={
+                      isProcessing() || stats.loading || !walletAccount() || !hasBalanceToBurn()
+                    }
                   >
                     {isProcessing() ? t("common.working") : t("buyburn.actions.buy")}
                   </button>
