@@ -26,25 +26,6 @@ export default function StepUploadIPFS(props) {
     return "unknown";
   };
 
-  // Extract every `uploads/<name>` reference from all locales
-  const collectContentAssetRefs = (content) => {
-    const refs = new Set();
-    const rx = /(?:!\[[^\]]*\]\(|\[[^\]]*\]\()?\s*(uploads\/[A-Za-z0-9._\-/%]+)\s*\)?/g;
-    Object.keys(content || {}).forEach((lang) => {
-      const d = content[lang] || {};
-      const scan = (txt) => {
-        if (!txt) return;
-        let m;
-        while ((m = rx.exec(String(txt))) !== null) {
-          refs.add(m[1].replace(/^\.?\//, "")); // normalize leading ./ if any
-        }
-      };
-      scan(d.body);
-      (d.chapters || []).forEach((ch) => scan(ch?.body));
-    });
-    return refs;
-  };
-
   const getFilesFromDraft = async () => {
     const { postData, editorMode } = props;
     const files = [];
@@ -84,26 +65,15 @@ export default function StepUploadIPFS(props) {
       }
     }
 
-    // 3) Compare content refs vs actual uploads
-    const contentRefs = collectContentAssetRefs(content);
-    const storageSet = new Set(assetNames.map((n) => `uploads/${n}`));
-    const missing = [...contentRefs].filter((r) => !storageSet.has(r));
-    const extra = [...storageSet].filter((r) => !contentRefs.has(r));
-
     // Log sizes for traceability
-    const filesPreview = await Promise.all(
-      files.map(async (it) => {
-        const size = it.file?.size ?? 0;
-        const type = it.file?.type || "";
-        return { path: it.path, size, type };
-      })
-    );
-
-    dbg.log("StepUploadIPFS", "content refs vs storage delta", {
+    const filesPreview = files.map((it) => ({
+      path: it.path,
+      size: it.file?.size ?? 0,
+      type: it.file?.type || "",
+    }));
+    dbg.log("StepUploadIPFS", "files to be uploaded", {
       baseDir,
-      contentRefs: [...contentRefs],
-      missing, // referenced in markdown but not in storage
-      extra,   // present in storage but not referenced
+      count: files.length,
       filesPreview,
     });
 
@@ -196,14 +166,6 @@ export default function StepUploadIPFS(props) {
         dbg.warn?.("StepUploadIPFS", "backend: missing file object", { baseDir, fileName });
       }
     }
-
-    // compare refs
-    const contentRefs = collectContentAssetRefs(content);
-    const storageSet = new Set(assetFileNames.map((n) => `uploads/${n}`));
-    const missing = [...contentRefs].filter((r) => !storageSet.has(r));
-    const extra = [...storageSet].filter((r) => !contentRefs.has(r));
-
-    dbg.log("StepUploadIPFS", "backend: refs delta", { missing, extra });
 
     return await uploadWithProgress(`${httpBase()}store-dir`, formData, { baseDir, assetCount: assetFileNames.length });
   };
