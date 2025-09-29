@@ -260,7 +260,7 @@ export default function PostCard(props) {
 
       <Show when={base()?.nft?.owner}>
         <div class="absolute -top-2 -right-2 z-10">
-          <NftBadge />
+          <NftBadge width="30" height="30" />
         </div>
       </Show>
 

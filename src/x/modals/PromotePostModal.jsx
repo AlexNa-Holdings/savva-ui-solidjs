@@ -5,6 +5,8 @@ import Modal from "./Modal.jsx";
 import Tabs from "../ui/Tabs.jsx";
 import PromoteAnnounceTab from "../promote/PromoteAnnounceTab.jsx";
 import PromoteNftTab from "../promote/PromoteNftTab.jsx";
+import AnnounceIcon from "../ui/icons/AnnounceIcon.jsx";
+import NftBadge from "../ui/icons/NftBadge.jsx";
 
 export default function PromotePostModal(props) {
   const app = useApp();
@@ -13,8 +15,8 @@ export default function PromotePostModal(props) {
 
   const [tab, setTab] = createSignal("announce");
   const items = () => [
-    { id: "announce", label: t("promote.tab.announce") },
-    { id: "nft", label: t("promote.tab.nft") },
+    { id: "announce", label: t("promote.tab.announce"), icon: <AnnounceIcon class="h-4 w-4" /> },
+    { id: "nft", label: t("promote.tab.nft"), icon: <NftBadge class="h-4 w-4" /> },
   ];
 
   const close = () => { try { props.onClose?.(); } catch {} };
@@ -26,8 +28,9 @@ export default function PromotePostModal(props) {
       size="6xl"
       title={t("promote.title")}
       hint={t("promote.hint")}
+      minWClass="w-full"
+      minWidth="min(90vw, 72rem)"
       showClose={false}                 // no × button
-      minWClass=""                      // use size prop for width
       noPadding={true}            // we handle padding ourselves
       footer={
         <div class="px-2 py-1 flex items-center justify-end gap-3">
@@ -46,7 +49,7 @@ export default function PromotePostModal(props) {
       </div>
 
       {/* Tab content flush with tabs */}
-      <div class="px-6 pt-0 pb-5 max-h-[70vh] overflow-y-auto">
+      <div class="w-full px-6 pt-0 pb-5 max-h-[70vh] overflow-y-auto">
         <Show when={tab() === "announce"}>
           <PromoteAnnounceTab post={post()} />
         </Show>

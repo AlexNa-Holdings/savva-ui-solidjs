@@ -1,107 +1,144 @@
 /* src/styles/tabs.css */
 
 .tabs {
-  --tabs-active-bg: hsl(var(--background));
-  --tabs-active-fg: hsl(var(--foreground));
-  --tabs-inactive-bg: hsl(var(--secondary));
-  --tabs-inactive-fg: hsl(var(--secondary-foreground));
-  --tabs-background: hsl(var(--card));
+  --tabs-border: hsl(var(--border));
+  --tabs-muted: hsl(var(--muted-foreground) / 0.6);
+  --tabs-foreground: hsl(var(--foreground));
+  --tabs-active-fg: hsl(var(--primary));
+  --tabs-disabled: hsl(var(--muted-foreground) / 0.45);
 
+  position: relative;
   list-style: none;
   margin: 0;
-  padding-top: 5px;
-
-  background: var(--tabs-background);
-  background: var(--gradient);
-
+  padding: 0.1rem 1rem ;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
   overflow-x: auto;
+  border-radius: 1rem 1rem 0 0;
+  background: hsl(var(--background));
+  border: 1px solid var(--tabs-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 12px 22px -18px rgba(15, 23, 42, 0.7);
+}
+
+.tabs::after {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.75rem;
+  height: 0px;
+  border-radius: 9999px;
+  background: hsl(var(--border));
+  opacity: 0.7;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tabs li {
   position: relative;
+  display: flex;
+  align-items: stretch;
   flex-shrink: 0;
 }
 
-.tabs a {
-  display: block;
+.tabs li > a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  color: var(--tabs-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  border: none;
+  background: transparent;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.tabs li > a:hover,
+.tabs li > a:focus-visible {
   text-decoration: none;
-  padding: 7px clamp(5px, 5vw, 80px);
-  white-space: nowrap;
-  color: var(--tabs-inactive-fg);
-  background: var(--tabs-inactive-bg);
-  border-top-left-radius: 15px;
-  border-top-right-radius: 15px;
 }
 
-.tabs .active { z-index: 3; }
-.tabs .active a {
-  color: var(--tabs-active-fg);
-  background: var(--tabs-active-bg);
+.tabs li:not(.active) > a {
+  opacity: 0.65;
 }
 
-.tabs li:before,
-.tabs li:after,
-.tabs li a:before,
-.tabs li a:after {
-  position: absolute;
-  bottom: 0;
+.tabs li:not(.active) > a:hover,
+.tabs li:not(.active) > a:focus-visible {
+  opacity: 1;
+  color: var(--tabs-foreground);
 }
 
-.tabs li:last-child:after,
-.tabs li:last-child a:after,
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs .active:after,
-.tabs .active:before,
-.tabs .active a:after,
-.tabs .active a:before {
+.tabs li > a::after {
   content: "";
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 5px;
+  height: 4px;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease,
+    opacity 0.25s ease;
+  opacity: 0;
 }
 
-.tabs .active:before,
-.tabs .active:after {
-  background: var(--tabs-active-bg);
-  z-index: 1;
+.tabs li > a:hover {
+  color: var(--tabs-foreground);
 }
 
-.tabs li:before,
-.tabs li:after {
-  background: var(--tabs-inactive-bg);
-  width: 10px;
-  height: 10px;
-}
-.tabs li:before { left: -10px; }
-.tabs li:after  { right: -10px; }
-
-.tabs li a:before,
-.tabs li a:after {
-  width: 20px;
-  height: 20px;
-  border-radius: 10px;
-  background: var(--tabs-background);
-  z-index: 2;
+.tabs li.active > a {
+  color: var(--tabs-active-fg);
+  opacity: 1;
 }
 
-.tabs .active a:after,
-.tabs .active a:before {
-  background: var(--tabs-inactive-bg);
+.tabs li.active > a::after {
+  background: hsl(var(--primary));
+  transform: scaleX(1);
+  opacity: 1;
 }
 
-.tabs li:first-child.active a:before,
-.tabs li:last-child.active a:after {
-  background: var(--tabs-background);
+.tabs li > a[aria-disabled="true"] {
+  color: var(--tabs-disabled);
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
-.tabs li a:before { left: -20px; }
-.tabs li a:after  { right: -20px; }
+.tabs li > a[aria-disabled="true"]::after {
+  display: none;
+}
 
-.tabs li:first-child:before,
-.tabs li:first-child a:before,
-.tabs li:last-child:after,
-.tabs li:last-child a:after {
-  content: none;
+.tabs a .tab__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  font-size: 1rem;
+}
+
+.tabs a .tab__icon svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.tabs a .tab__label {
+  white-space: nowrap;
 }
 
 .tabs_panel {
@@ -111,23 +148,21 @@
   padding: 1rem;
 }
 
-.tabs a .tab__icon {
-  display: inline-flex;
-  vertical-align: middle;
-  margin-right: 0.5rem;
-  line-height: 0;
-}
-.tabs a .tab__icon svg { width: 18px; height: 18px; }
-
 /* --- compact mode --- */
+.tabs[data-compact="true"] {
+  gap: 0.25rem;
+  padding-inline: 0.5rem;
+}
+
+.tabs[data-compact="true"] li > a {
+  padding: 0.6rem;
+}
+
 .tabs[data-compact="true"] a .tab__icon {
   margin-right: 0;
 }
-.tabs[data-compact="true"] a {
-  padding: 7px clamp(5px, 6vw, 80px);
-}
+
 .tabs[data-compact="true"] a .tab__label {
-  /* Visually hide but keep in accessibility tree */
   position: absolute;
   width: 1px;
   height: 1px;

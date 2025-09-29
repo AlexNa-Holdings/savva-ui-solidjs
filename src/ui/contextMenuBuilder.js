@@ -3,6 +3,7 @@ import { pushToast } from "./toast.js";
 import { getPostContentBaseCid } from "../ipfs/utils.js";
 import { listRemovePost, listPinPost, listUnpinPost } from "../blockchain/adminCommands.js";
 import { dbg } from "../utils/debug.js";
+import AnnounceIcon from "../x/ui/icons/AnnounceIcon.jsx";
 
 // Clipboard helper
 function copyToClipboard(text, label, t) {
@@ -91,6 +92,7 @@ export function getPostAdminItems(post, t) {
   if (!isComment) {
     items.push({
       label: t("admin.announce"),
+      icon: () => AnnounceIcon({ class: "h-4 w-4" }),
       onClick: () =>
         dispatchAdminAction("announce-post", {
           savva_cid: savvaCid,

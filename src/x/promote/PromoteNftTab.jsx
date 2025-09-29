@@ -105,7 +105,7 @@ export default function PromoteNftTab(props) {
   });
 
   return (
-    <div class="bg-[hsl(var(--background))] rounded-b-xl rounded-t-none border border-[hsl(var(--border))] border-t-0 p-6 -mt-px space-y-4">
+    <div class="bg-[hsl(var(--background))] rounded-b-xl rounded-t-none border border-[hsl(var(--border))] border-t-0 p-4 space-y-4 -mt-px">
       <Show when={nftStatus.loading}>
         <div class="flex justify-center p-8"><Spinner /></div>
       </Show>

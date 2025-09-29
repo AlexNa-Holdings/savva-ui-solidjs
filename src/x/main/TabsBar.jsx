@@ -8,6 +8,8 @@ import Tabs from "../ui/Tabs.jsx";
 import { getTabComponent } from "../tabs/index.js";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";
 import TabPanelScaffold from "../tabs/TabPanelScaffold.jsx";
+import AnnounceIcon from "../ui/icons/AnnounceIcon.jsx";
+import NftBadge from "../ui/icons/NftBadge.jsx";
 
 const slug = (s) => String(s || "").trim().toLowerCase();
 const firstSeg = (path) => {
@@ -38,6 +40,8 @@ function iconForType(type) {
   if (k === "comments") return <CommentIcon />;
   if (k === "new") return <SparklesIcon />;
   if (k === "for-you" || k === "foryou") return <HeartIcon />;
+  if (k === "nft" || k === "nfts") return <NftBadge class="w-4 h-4" />;
+  if (k === "announce" || k === "announcements" || k === "announcement") return <AnnounceIcon class="w-4 h-4" />;
   return <FallbackIcon />;
 }
 

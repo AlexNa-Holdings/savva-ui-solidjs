@@ -128,13 +128,18 @@ export default function ContextMenu(props) {
                 <li>
                   <button
                     type="button"
-                    class="block w-full text-left px-4 py-2 text-sm leading-snug hover:bg-[hsl(var(--accent))]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm leading-snug text-left hover:bg-[hsl(var(--accent))]"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); item.onClick?.(); setIsOpen(false); }}
                     role="menuitem"
                     aria-label={String(item.label || "")}
                     title={String(item.label || "")}
                   >
-                    {item.label}
+                    <Show when={item.icon}>
+                      <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[hsl(var(--muted-foreground))]">
+                        {typeof item.icon === "function" ? item.icon() : item.icon}
+                      </span>
+                    </Show>
+                    <span class="flex-1 text-left">{item.label}</span>
                   </button>
                 </li>
               )}
