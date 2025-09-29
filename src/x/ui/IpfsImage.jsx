@@ -30,11 +30,18 @@ export default function IpfsImage(props) {
     }
   });
 
+  const fill = props.fill !== false; // default: fill parent box
+  const containerBase = fill ? "relative w-full h-full" : "relative w-full";
+  const imgClass = fill ? "absolute inset-0 w-full h-full object-cover" : "block w-full h-auto object-cover";
+  const spinnerClass = fill
+    ? "absolute inset-0 flex items-center justify-center bg-[hsl(var(--muted))]"
+    : "flex items-center justify-center py-8";
+
   return (
-    <div class={`relative w-full h-full ${props.class || ""}`}>
+    <div class={`${containerBase} ${props.class || ""}`}>
       <Switch>
         <Match when={loading()}>
-          <div class="absolute inset-0 flex items-center justify-center bg-[hsl(var(--muted))]">
+          <div class={spinnerClass}>
             <Spinner />
           </div>
         </Match>
@@ -42,7 +49,7 @@ export default function IpfsImage(props) {
           <img
             src={imageUrl()}
             alt={props.alt || "IPFS Image"}
-            class="absolute inset-0 w-full h-full object-cover"
+            class={imgClass}
             onError={() => setImageUrl(null)}
           />
         </Match>

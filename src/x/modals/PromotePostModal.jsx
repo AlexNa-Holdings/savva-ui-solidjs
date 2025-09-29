@@ -25,11 +25,9 @@ export default function PromotePostModal(props) {
     <Modal
       isOpen={props.isOpen}
       onClose={close}
-      size="6xl"
+      size="fullscreenpadded"
       title={t("promote.title")}
       hint={t("promote.hint")}
-      minWClass="w-full"
-      minWidth="min(90vw, 72rem)"
       showClose={false}                 // no × button
       noPadding={true}            // we handle padding ourselves
       footer={
@@ -49,7 +47,7 @@ export default function PromotePostModal(props) {
       </div>
 
       {/* Tab content flush with tabs */}
-      <div class="w-full px-6 pt-0 pb-5 max-h-[70vh] overflow-y-auto">
+      <div class="w-full px-6 pt-0 pb-5 flex-1 overflow-y-auto">
         <Show when={tab() === "announce"}>
           <PromoteAnnounceTab post={post()} />
         </Show>

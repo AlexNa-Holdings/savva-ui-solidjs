@@ -175,7 +175,7 @@ export default function PromoteAnnounceTab(props) {
   }
 
   return (
-    <div class="bg-[hsl(var(--background))] rounded-b-xl rounded-t-none border border-[hsl(var(--border))] border-t-0 p-4 space-y-4 -mt-px">
+    <div class="bg-[hsl(var(--background))] rounded-b-xl p-4 space-y-4">
       <p class="text-sm text-[hsl(var(--muted-foreground))]">
         {app.t("promote.announce.intro")}
       </p>

@@ -8,9 +8,14 @@ import { Portal } from "solid-js/web";
 export default function Modal(props) {
   const { t } = useApp();
 
+  const sizeKey = createMemo(() => (props.size || "md").toLowerCase());
+  const isFullscreen = createMemo(() => sizeKey() === "fullscreen");
+  const isFullscreenPadded = createMemo(() => sizeKey() === "fullscreenpadded");
+  const isFullscreenLike = createMemo(() => isFullscreen() || isFullscreenPadded());
+
   // xs, sm, md, lg, xl
   const maxW = createMemo(() => {
-    switch ((props.size || "md").toLowerCase()) {
+    switch (sizeKey()) {
       case "xs": return "max-w-xs";
       case "sm": return "max-w-sm";
       case "lg": return "max-w-lg";
@@ -22,28 +27,53 @@ export default function Modal(props) {
       case "6xl": return "max-w-6xl";
       case "7xl": return "max-w-7xl";
       case "full": return "max-w-full";
-      default:   return "max-w-md";
+      case "fullscreen": return "w-screen h-screen max-w-full rounded-none";
+      case "fullscreenpadded": return "w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh]"; 
+      default: return "max-w-md";
     }
   });
 
   const showClose = props.showClose !== false; // default true
+  const hasCustomFooter = () => !!props.footer;
+  const renderBottomClose = () => showClose && isFullscreenLike() && !hasCustomFooter();
+
+  const chromeRounding = () => (isFullscreen() ? "" : "rounded-lg");
+
+  const computedStyle = () => {
+    const style = {};
+    if (props.minWidth) style['min-width'] = props.minWidth;
+    if (isFullscreen()) style.height = '100%';
+    return Object.keys(style).length ? style : undefined;
+  };
+
+  const bodyClass = () => {
+    const padding = props.noPadding ? '' : 'p-4';
+    return isFullscreenLike() ? `${padding} flex-1 min-h-0 overflow-auto` : padding;
+  };
+
+  const containerAlignClass = () => (isFullscreen() ? "items-stretch" : "items-center");
+
+  const wrapperClass = () =>
+    isFullscreen()
+      ? 'relative z-70 pointer-events-none h-full w-full'
+      : 'relative z-70 pointer-events-none p-4';
 
   return (
     <Show when={props.isOpen}>
       <Portal>
-        <div class="fixed inset-0 z-60 flex items-center justify-center">
+        <div class={`fixed inset-0 z-60 flex justify-center ${containerAlignClass()}`}>
           <ModalBackdrop onClick={props.preventClose ? undefined : props.onClose} />
 
           {/* wrapper shouldn't eat backdrop clicks */}
-          <div class="relative z-70 p-4 pointer-events-none">
+          <div class={wrapperClass()}>
             <ModalAutoCloser onClose={props.onClose} />
 
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby={props.titleId}
-              class={`mx-auto ${maxW()} ${props.minWClass || ""} rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg pointer-events-auto`}
-              style={props.minWidth ? { "min-width": props.minWidth } : undefined}
+              class={`mx-auto ${maxW()} ${props.minWClass || ''} ${isFullscreenLike() ? 'flex flex-col' : ''} ${chromeRounding()} border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg pointer-events-auto`}
+              style={computedStyle()}
             >
               {/* Header: either custom header, or default (title + optional hint + optional close) */}
               <Show when={props.header || props.title}>
@@ -56,7 +86,7 @@ export default function Modal(props) {
                           <p class="mt-1 text-sm opacity-80">{props.hint}</p>
                         </Show>
                       </div>
-                      <Show when={showClose}>
+                      <Show when={showClose && !isFullscreenLike()}>
                         <button
                           type="button"
                           aria-label={t("common.close")}
@@ -73,7 +103,7 @@ export default function Modal(props) {
                 </div>
               </Show>
 
-              <div class={props.noPadding ? "" : "p-4"}>
+              <div class={bodyClass()}>
                 {typeof props.children === "function"
                   ? props.children({ close: props.onClose })
                   : props.children}
@@ -82,6 +112,18 @@ export default function Modal(props) {
               <Show when={props.footer}>
                 <div class="px-4 py-1 border-t border-[hsl(var(--border))]">
                   {props.footer}
+                </div>
+              </Show>
+
+              <Show when={renderBottomClose()}>
+                <div class="px-4 py-4 border-t border-[hsl(var(--border))] flex justify-end">
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center px-4 py-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-sm font-medium hover:bg-[hsl(var(--accent))]"
+                    onClick={props.onClose}
+                  >
+                    {t("common.close")}
+                  </button>
                 </div>
               </Show>
             </div>

@@ -20,6 +20,7 @@ export default function UserCard(props) {
   const { t } = app;
   const author = () => props.author || {};
   const uiLang = () => (app.lang?.() || "en").toLowerCase();
+  const centered = () => !!props.centered;
 
   const textColor = createMemo(() => props.textColorClass || "text-[hsl(var(--foreground))]");
   const mutedTextColor = createMemo(() => props.mutedTextColorClass || "text-[hsl(var(--muted-foreground))]");
@@ -51,10 +52,20 @@ export default function UserCard(props) {
     navigate(targetPath);
   };
 
+  const rootClass = createMemo(() =>
+    `flex items-center ${props.compact ? "h-auto" : "h-10"} ${centered() ? "justify-center" : ""} w-full`
+  );
+
+  const innerWrapperClass = createMemo(() =>
+    `flex items-center gap-2 cursor-pointer min-w-0 ${centered() ? "justify-center" : ""}`
+  );
+
+  const textContainerClass = createMemo(() => `min-w-0 ${centered() ? "text-center" : ""}`);
+
   return (
     <Show when={author()}>
-      <div class={`flex items-center w-full ${props.compact ? "h-auto" : "h-10"}`}>
-        <div class="flex items-center gap-2 cursor-pointer min-w-0" onClick={handleUserClick}>
+      <div class={rootClass()}>
+        <div class={innerWrapperClass()} onClick={handleUserClick}>
           <Show when={!props.compact}>
             <div class="w-9 h-9 rounded-md overflow-hidden shrink-0 bg-[hsl(var(--muted))]">
               <Show when={displayAvatar()} fallback={<UnknownUserIcon class="w-full h-full object-cover" />}>
@@ -67,17 +78,17 @@ export default function UserCard(props) {
             </div>
           </Show>
 
-          <div class="min-w-0">
+          <div class={textContainerClass()}>
             {/* Banned state: red label + address only */}
             <Show when={isBanned()} fallback={
               <>
                 <Show when={displayName() && !props.compact}>
-                  <div class={`text-xs pt-1 truncate ${textColor()} w-full`}>
+                  <div class={`text-xs pt-1 truncate ${textColor()} w-full ${centered() ? "text-center" : ""}`}>
                     {displayName()}
                   </div>
                 </Show>
 
-                <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? "text-[11px]" : "text-xs"} ${mutedTextColor()}`}>
+                <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? "text-[11px]" : "text-xs"} ${mutedTextColor()} ${centered() ? "justify-center" : ""}`}>
                   <Show when={author().name}>
                     <div class="min-w-0 flex items-center">
                       <span class="truncate uppercase font-semibold">{author().name}</span>
@@ -101,7 +112,7 @@ export default function UserCard(props) {
               <div class={`text-xs pt-1 w-full text-[hsl(var(--destructive))] font-semibold`}>
                 {t("user.banned")}
               </div>
-              <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? "text-[11px]" : "text-xs"} ${mutedTextColor()}`}>
+              <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? "text-[11px]" : "text-xs"} ${mutedTextColor()} ${centered() ? "justify-center" : ""}`}>
                 <Show when={author().address}>
                   <span class="font-mono">{shortAddr(author().address)}</span>
                 </Show>
