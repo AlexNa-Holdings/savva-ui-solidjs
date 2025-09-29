@@ -67,6 +67,7 @@ export default function WalletTab(props) {
         stakingReward,
         availableUnstaked,
         unstakeRequests,
+        savvaTotalSupply,
       ] = await Promise.all([
         savvaTokenContract.read.balanceOf([user.address]),
         publicClient.getBalance({ address: user.address }),
@@ -75,6 +76,7 @@ export default function WalletTab(props) {
         stakingContract.read.claimable([user.address]),
         stakingContract.read.getAvailableUnstaked([user.address]),
         stakingContract.read.getUnstakeRequests([user.address]),
+        savvaTokenContract.read.totalSupply(),
       ]);
 
       return {
@@ -85,6 +87,7 @@ export default function WalletTab(props) {
         stakingReward,
         availableUnstaked,
         unstakeRequests,
+        savvaTotalSupply,
         savvaTokenAddress: savvaTokenContract.address,
         stakingTokenAddress: stakingContract.address,
       };
@@ -324,6 +327,20 @@ export default function WalletTab(props) {
     return Number(ts) <= now;
   }
 
+  const stakingApr = createMemo(() => {
+    const totalSupply = walletData()?.savvaTotalSupply;
+    if (!totalSupply || totalSupply <= 0n) return null;
+
+    // Weekly mint for staking is 120,000 tokens.
+    const weeklyMint = 120_000n * (10n ** 18n);
+    const yearlyMint = weeklyMint * 52n;
+
+    const apr = (yearlyMint * 10000n) / totalSupply; // Multiply by 10000 for 2 decimal places
+    const aprString = (Number(apr) / 100).toFixed(2);
+
+    return `${aprString}%`;
+  });
+
   const availableUnstaked = () => walletData()?.availableUnstaked || 0n;
   const unstakeRequests = () => walletData()?.unstakeRequests || [];
 
@@ -346,7 +363,14 @@ export default function WalletTab(props) {
             </WalletRow>
           </WalletSection>
 
-          <WalletSection title={t("profile.wallet.staking.title")}>
+          <WalletSection
+            title={t("profile.wallet.staking.title")}
+            headerAction={
+              <Show when={stakingApr()}>
+                <div class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">APR: {stakingApr()}</div>
+              </Show>
+            }
+          >
             <WalletRow title={t("profile.wallet.staked.title")} description={t("profile.wallet.staked.description")}>
               <ValueWithMenu amount={walletData()?.stakedBalance} tokenAddress={walletData()?.stakingTokenAddress} items={stakedMenuItems()} />
             </WalletRow>

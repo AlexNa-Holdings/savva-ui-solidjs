@@ -23,11 +23,11 @@ export default function PromotePostModal(props) {
     <Modal
       isOpen={props.isOpen}
       onClose={close}
-      size="2xl"
+      size="6xl"
       title={t("promote.title")}
       hint={t("promote.hint")}
       showClose={false}                 // no × button
-      minWClass="sm:min-w-[580px]"     // sensible min width on desktop
+      minWClass=""                      // use size prop for width
       noPadding={true}            // we handle padding ourselves
       footer={
         <div class="px-2 py-1 flex items-center justify-end gap-3">
