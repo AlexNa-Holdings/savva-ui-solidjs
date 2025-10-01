@@ -25,7 +25,7 @@ export default function PromotePostModal(props) {
     <Modal
       isOpen={props.isOpen}
       onClose={close}
-      size="fullscreenpadded"
+      size="4xl-fixed"
       title={t("promote.title")}
       hint={t("promote.hint")}
       showClose={false}                 // no × button

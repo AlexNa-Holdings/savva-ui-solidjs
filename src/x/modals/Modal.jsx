@@ -13,9 +13,35 @@ export default function Modal(props) {
   const isFullscreenPadded = createMemo(() => sizeKey() === "fullscreenpadded");
   const isFullscreenLike = createMemo(() => isFullscreen() || isFullscreenPadded());
 
+  // Check if size ends with "-fixed" for fixed width
+  const isFixed = createMemo(() => sizeKey().endsWith("-fixed"));
+  const baseSizeKey = createMemo(() => isFixed() ? sizeKey().replace("-fixed", "") : sizeKey());
+
   // xs, sm, md, lg, xl
   const maxW = createMemo(() => {
-    switch (sizeKey()) {
+    const size = baseSizeKey();
+
+    // For fixed sizes, use actual pixel widths that match Tailwind's max-w-* values
+    if (isFixed()) {
+      switch (size) {
+        case "xs": return "w-[20rem]"; // 320px
+        case "sm": return "w-[24rem]"; // 384px
+        case "md": return "w-[28rem]"; // 448px
+        case "lg": return "w-[32rem]"; // 512px
+        case "xl": return "w-[36rem]"; // 576px
+        case "2xl": return "w-[42rem]"; // 672px
+        case "3xl": return "w-[48rem]"; // 768px
+        case "4xl": return "w-[56rem]"; // 896px
+        case "5xl": return "w-[64rem]"; // 1024px
+        case "6xl": return "w-[72rem]"; // 1152px
+        case "7xl": return "w-[80rem]"; // 1280px
+        case "full": return "w-full";
+        default: return "w-[28rem]"; // 448px (md)
+      }
+    }
+
+    // For responsive sizes, use max-w-*
+    switch (size) {
       case "xs": return "max-w-xs";
       case "sm": return "max-w-sm";
       case "lg": return "max-w-lg";
@@ -28,7 +54,7 @@ export default function Modal(props) {
       case "7xl": return "max-w-7xl";
       case "full": return "max-w-full";
       case "fullscreen": return "w-screen h-screen max-w-full rounded-none";
-      case "fullscreenpadded": return "w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh]"; 
+      case "fullscreenpadded": return "w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh]";
       default: return "max-w-md";
     }
   });
