@@ -451,6 +451,7 @@ export default {
   "nft.owner.mint.toast.error": "Mintovanje NFT-a nije uspelo.",
   "nft.owner.mint.toast.pending": "Mintovanje NFT-a…",
   "nft.owner.mint.toast.success": "NFT je uspešno mintovan.",
+  "nft.owner.notOwner": "Niste vlasnik ovog NFT-a.",
   "nft.owner.sale.currentPrice": "Trenutna cena",
   "nft.owner.sale.listedBy": "Objavljeno od",
   "nft.owner.sale.notSeller": "Samo prodavac može da upravlja ovom ponudom.",

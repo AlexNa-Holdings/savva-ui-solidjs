@@ -451,6 +451,7 @@ export default {
   "nft.owner.mint.toast.error": "Не вдалося створити NFT.",
   "nft.owner.mint.toast.pending": "Створення NFT…",
   "nft.owner.mint.toast.success": "NFT успішно створено.",
+  "nft.owner.notOwner": "Ви не власник цього NFT.",
   "nft.owner.sale.currentPrice": "Поточна ціна",
   "nft.owner.sale.listedBy": "Розміщено",
   "nft.owner.sale.notSeller": "Керувати цим лістингом може лише продавець.",

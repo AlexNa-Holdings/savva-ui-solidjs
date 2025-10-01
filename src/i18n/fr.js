@@ -451,6 +451,7 @@ export default {
   "nft.owner.mint.toast.error": "Échec de la création du NFT.",
   "nft.owner.mint.toast.pending": "Création du NFT…",
   "nft.owner.mint.toast.success": "NFT créé avec succès !",
+  "nft.owner.notOwner": "Vous n'êtes pas le propriétaire de ce NFT.",
   "nft.owner.sale.currentPrice": "Prix actuel",
   "nft.owner.sale.listedBy": "Listé par",
   "nft.owner.sale.notSeller": "Vous n'êtes pas le vendeur de ce NFT.",

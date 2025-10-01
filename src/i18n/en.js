@@ -451,6 +451,7 @@ export default {
   "nft.owner.mint.toast.error": "Failed to mint NFT.",
   "nft.owner.mint.toast.pending": "Minting NFT…",
   "nft.owner.mint.toast.success": "NFT minted successfully.",
+  "nft.owner.notOwner": "You are not the owner of this NFT.",
   "nft.owner.sale.currentPrice": "Current price",
   "nft.owner.sale.listedBy": "Listed by",
   "nft.owner.sale.notSeller": "Only the seller can manage this listing.",

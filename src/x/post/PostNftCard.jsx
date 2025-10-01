@@ -137,6 +137,7 @@ async function fetchNftStatusFromChain(app, post) {
         owner: { address: auctionData.seller },
         min_bid: auctionData.startingPrice,
         highest_bid: auctionData.highestBid,
+        highest_bidder: auctionData.highestBidder,
         auction_end_time: Number(auctionData.endTime),
       };
     }
@@ -329,10 +330,10 @@ export default function PostNftCard(props) {
     () => {
       const nftData = displayNft();
       if (!nftData?.on_auction) return null;
-      const bidderAddr = nftData.owner?.address; // Note: backend sends highest bidder in a different field if exists
+      const bidderAddr = nftData.highest_bidder;
       const domain = app.selectedDomainName?.();
       // Check if there's actually a bid (highest_bid > 0)
-      if (!bidderAddr || !domain || !nftData.highest_bid || nftData.highest_bid === 0) return null;
+      if (!bidderAddr || !domain || !nftData.highest_bid || nftData.highest_bid === 0n) return null;
       return { addr: bidderAddr, domain };
     },
     async (params) => {
