@@ -1,6 +1,5 @@
 // src/x/promote/NftOwnerOptions.jsx
 import { createMemo, createSignal, Show, createResource, createEffect } from "solid-js";
-import { createPublicClient, http } from "viem";
 import Tabs from "../ui/Tabs.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
@@ -9,6 +8,7 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { getConfigParam } from "../../blockchain/config.js";
 import { dbg } from "../../utils/debug.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 const SECONDS_IN_DAY = 86400;
 
@@ -24,8 +24,6 @@ export default function NftOwnerOptions(props) {
 
   const [activeTab, setActiveTab] = createSignal("sale");
 
-  const chain = createMemo(() => app.desiredChain?.());
-  const rpcUrl = createMemo(() => chain()?.rpcUrls?.[0]);
   const savvaTokenAddress = createMemo(() => app.info?.()?.savva_contracts?.SavvaToken?.address || "");
   const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
 
@@ -39,55 +37,51 @@ export default function NftOwnerOptions(props) {
     e?.preventDefault();
     if (saleDisabled()) return;
 
-    const chainValue = chain();
-    const rpc = rpcUrl();
-    if (!chainValue || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     setSaleBusy(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: t("nft.owner.sale.toast.pending") || "Submitting transaction…",
-      autohideMs: 0,
-    });
+    let approveToastId, listToastId;
 
     try {
-      const publicClient = createPublicClient({ chain: chainValue, transport: http(rpc) });
-      const marketplace = await getSavvaContract(app, "NFTMarketplace", { write: true });
-      const contentNft = await getSavvaContract(app, "ContentNFT", { write: true });
+      const marketplace = await getSavvaContract(app, "NFTMarketplace");
       const price = saleAmountWei();
 
-      // First, approve the marketplace contract to transfer the NFT
-      app.dismissToast?.(pendingToastId);
-      const approvalToastId = pushToast({
+      // Approve NFT transfer
+      approveToastId = pushToast({
         type: "info",
         message: t("nft.owner.sale.toast.approving") || "Approving NFT transfer…",
         autohideMs: 0,
       });
-      const approvalTxHash = await contentNft.write.approve([marketplace.address, props.tokenId]);
-      await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });
 
-      // Then add to market
-      app.dismissToast?.(approvalToastId);
-      const saleToastId = pushToast({
+      await sendAsActor(app, {
+        contractName: "ContentNFT",
+        functionName: "approve",
+        args: [marketplace.address, props.tokenId],
+      });
+
+      // List on market
+      app.dismissToast?.(approveToastId);
+      listToastId = pushToast({
         type: "info",
         message: t("nft.owner.sale.toast.listing") || "Listing NFT for sale…",
         autohideMs: 0,
       });
-      const txHash = await marketplace.write.addToMarket([props.tokenId, price]);
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(saleToastId);
+
+      await sendAsActor(app, {
+        contractName: "NFTMarketplace",
+        functionName: "addToMarket",
+        args: [props.tokenId, price],
+      });
+
+      app.dismissToast?.(listToastId);
       pushToast({ type: "success", message: t("nft.owner.sale.toast.success") || "NFT listed for sale." });
       setSalePriceText("");
       setSaleAmountWei(0n);
-      props.onActionComplete?.({ type: "sale", txHash, price });
+      props.onActionComplete?.({ type: "sale", price });
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, { context: t("nft.owner.sale.toast.error") || "Failed to list NFT." });
       dbg.error?.("NftOwnerOptions:sale", err);
     } finally {
+      if (approveToastId) app.dismissToast?.(approveToastId);
+      if (listToastId) app.dismissToast?.(listToastId);
       setSaleBusy(false);
     }
   };
@@ -189,33 +183,30 @@ export default function NftOwnerOptions(props) {
     e?.preventDefault();
     if (burnDisabled()) return;
 
-    const chainValue = chain();
-    const rpc = rpcUrl();
-    if (!chainValue || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     setBurnBusy(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: t("nft.owner.burn.toast.pending") || "Submitting burn transaction…",
-      autohideMs: 0,
-    });
+    let burnToastId;
 
     try {
-      const publicClient = createPublicClient({ chain: chainValue, transport: http(rpc) });
-      const contentNft = await getSavvaContract(app, "ContentNFT", { write: true });
-      const txHash = await contentNft.write.burn([props.tokenId]);
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(pendingToastId);
+      burnToastId = pushToast({
+        type: "info",
+        message: t("nft.owner.burn.toast.pending") || "Burning NFT…",
+        autohideMs: 0,
+      });
+
+      await sendAsActor(app, {
+        contractName: "ContentNFT",
+        functionName: "burn",
+        args: [props.tokenId],
+      });
+
+      app.dismissToast?.(burnToastId);
       pushToast({ type: "success", message: t("nft.owner.burn.toast.success") || "NFT burned." });
-      props.onActionComplete?.({ type: "burn", txHash });
+      props.onActionComplete?.({ type: "burn" });
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, { context: t("nft.owner.burn.toast.error") || "Failed to burn NFT." });
       dbg.error?.("NftOwnerOptions:burn", err);
     } finally {
+      if (burnToastId) app.dismissToast?.(burnToastId);
       setBurnBusy(false);
     }
   };
@@ -224,58 +215,54 @@ export default function NftOwnerOptions(props) {
     e?.preventDefault();
     if (auctionDisabled()) return;
 
-    const chainValue = chain();
-    const rpc = rpcUrl();
-    if (!chainValue || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     setAuctionBusy(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: t("nft.owner.auction.toast.pending") || "Submitting auction transaction…",
-      autohideMs: 0,
-    });
+    let approveToastId, createToastId;
 
     try {
-      const publicClient = createPublicClient({ chain: chainValue, transport: http(rpc) });
-      const auctionContract = await getSavvaContract(app, "NFTAuction", { write: true });
-      const contentNft = await getSavvaContract(app, "ContentNFT", { write: true });
+      const auctionContract = await getSavvaContract(app, "NFTAuction");
       const price = auctionAmountWei();
       const durationSeconds = auctionDurationSeconds();
 
-      // First, approve the auction contract to transfer the NFT
-      app.dismissToast?.(pendingToastId);
-      const approvalToastId = pushToast({
+      // Approve NFT transfer
+      approveToastId = pushToast({
         type: "info",
         message: t("nft.owner.auction.toast.approving") || "Approving NFT transfer…",
         autohideMs: 0,
       });
-      const approvalTxHash = await contentNft.write.approve([auctionContract.address, props.tokenId]);
-      await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });
 
-      // Then create the auction
-      app.dismissToast?.(approvalToastId);
-      const auctionToastId = pushToast({
+      await sendAsActor(app, {
+        contractName: "ContentNFT",
+        functionName: "approve",
+        args: [auctionContract.address, props.tokenId],
+      });
+
+      // Create auction
+      app.dismissToast?.(approveToastId);
+      createToastId = pushToast({
         type: "info",
         message: t("nft.owner.auction.toast.creating") || "Creating auction…",
         autohideMs: 0,
       });
-      const txHash = await auctionContract.write.createAuction([props.tokenId, price, durationSeconds]);
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(auctionToastId);
+
+      await sendAsActor(app, {
+        contractName: "NFTAuction",
+        functionName: "createAuction",
+        args: [props.tokenId, price, durationSeconds],
+      });
+
+      app.dismissToast?.(createToastId);
       pushToast({ type: "success", message: t("nft.owner.auction.toast.success") || "Auction created." });
       setAuctionPriceText("");
       setAuctionAmountWei(0n);
       const defaultDays = maxDurationDays();
       setAuctionDurationDays(defaultDays && defaultDays < 3 ? defaultDays : 3);
-      props.onActionComplete?.({ type: "auction", txHash, durationSeconds, startingPrice: price });
+      props.onActionComplete?.({ type: "auction", durationSeconds, startingPrice: price });
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, { context: t("nft.owner.auction.toast.error") || "Failed to start auction." });
       dbg.error?.("NftOwnerOptions:auction", err);
     } finally {
+      if (approveToastId) app.dismissToast?.(approveToastId);
+      if (createToastId) app.dismissToast?.(createToastId);
       setAuctionBusy(false);
     }
   };

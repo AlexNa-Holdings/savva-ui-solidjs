@@ -11,8 +11,8 @@ import Countdown from "../ui/Countdown.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import { ipfs } from "../../ipfs/index.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { createPublicClient, http } from "viem";
 import { dbg } from "../../utils/debug.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -271,7 +271,6 @@ export default function NftControlModal(props) {
 
   const savvaTokenAddress = createMemo(() => app.info?.()?.savva_contracts?.SavvaToken?.address || "");
   const summaryImage = createMemo(() => nftMetadata()?.image || "");
-  const desiredChain = createMemo(() => app.desiredChain?.());
 
   const [isRemoving, setIsRemoving] = createSignal(false);
   const [finalizingAuction, setFinalizingAuction] = createSignal(false);
@@ -298,33 +297,30 @@ export default function NftControlModal(props) {
     const status = nftStatus();
     if (!status?.tokenId) return;
 
-    const chain = desiredChain();
-    const rpc = chain?.rpcUrls?.[0];
-    if (!chain || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     setIsRemoving(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: t("nft.owner.sale.remove.toast.pending") || "Submitting removal transaction…",
-      autohideMs: 0,
-    });
+    let removeToastId;
 
     try {
-      const publicClient = createPublicClient({ chain, transport: http(rpc) });
-      const marketplace = await getSavvaContract(app, "NFTMarketplace", { write: true });
-      const txHash = await marketplace.write.removeFromMarket([status.tokenId]);
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(pendingToastId);
+      removeToastId = pushToast({
+        type: "info",
+        message: t("nft.owner.sale.remove.toast.pending") || "Removing from market…",
+        autohideMs: 0,
+      });
+
+      await sendAsActor(app, {
+        contractName: "NFTMarketplace",
+        functionName: "removeFromMarket",
+        args: [status.tokenId],
+      });
+
+      app.dismissToast?.(removeToastId);
       pushToast({ type: "success", message: t("nft.owner.sale.remove.toast.success") || "NFT removed from market." });
       await handleOwnerActionComplete();
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, { context: t("nft.owner.sale.remove.toast.error") || "Failed to remove NFT from market." });
       dbg.error?.("NftControlModal:removeFromMarket", err);
     } finally {
+      if (removeToastId) app.dismissToast?.(removeToastId);
       setIsRemoving(false);
     }
   }
@@ -334,33 +330,30 @@ export default function NftControlModal(props) {
     const status = nftStatus();
     if (!status?.tokenId) return;
 
-    const chain = desiredChain();
-    const rpc = chain?.rpcUrls?.[0];
-    if (!chain || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     setFinalizingAuction(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: t("nft.auction.finalize.toast.pending") || "Finalizing auction…",
-      autohideMs: 0,
-    });
+    let finalizeToastId;
 
     try {
-      const publicClient = createPublicClient({ chain, transport: http(rpc) });
-      const auctionContract = await getSavvaContract(app, "NFTAuction", { write: true });
-      const txHash = await auctionContract.write.finalizeAuction([status.tokenId]);
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(pendingToastId);
+      finalizeToastId = pushToast({
+        type: "info",
+        message: t("nft.auction.finalize.toast.pending") || "Finalizing auction…",
+        autohideMs: 0,
+      });
+
+      await sendAsActor(app, {
+        contractName: "NFTAuction",
+        functionName: "finalizeAuction",
+        args: [status.tokenId],
+      });
+
+      app.dismissToast?.(finalizeToastId);
       pushToast({ type: "success", message: t("nft.auction.finalize.toast.success") || "Auction finalized successfully." });
       await handleOwnerActionComplete();
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, { context: t("nft.auction.finalize.toast.error") || "Failed to finalize auction." });
       dbg.error?.("NftControlModal:finalizeAuction", err);
     } finally {
+      if (finalizeToastId) app.dismissToast?.(finalizeToastId);
       setFinalizingAuction(false);
     }
   }

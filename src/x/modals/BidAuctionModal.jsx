@@ -8,8 +8,9 @@ import TokenValue from "../ui/TokenValue.jsx";
 import { getConfigParam } from "../../blockchain/config.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { createPublicClient, http, maxUint256, formatUnits } from "viem";
+import { maxUint256, formatUnits } from "viem";
 import { dbg } from "../../utils/debug.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 export default function BidAuctionModal(props) {
   const app = useApp();
@@ -128,13 +129,6 @@ export default function BidAuctionModal(props) {
     e?.preventDefault();
     if (!isValid() || isSubmitting()) return;
 
-    const chainValue = chain();
-    const rpc = rpcUrl();
-    if (!chainValue || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     const tokenAddress = savvaTokenAddress();
     if (!tokenAddress) {
       pushErrorToast(new Error("Token address not found"));
@@ -142,16 +136,11 @@ export default function BidAuctionModal(props) {
     }
 
     setIsSubmitting(true);
-    let currentToastId = pushToast({
-      type: "info",
-      message: t("nft.auction.bid.toast.pending") || "Processing bid…",
-      autohideMs: 0,
-    });
+    let approveToastId, bidToastId;
 
     try {
-      const publicClient = createPublicClient({ chain: chainValue, transport: http(rpc) });
-      const savvaToken = await getSavvaContract(app, "SavvaToken", { write: true });
-      const auctionContract = await getSavvaContract(app, "NFTAuction", { write: true });
+      const savvaToken = await getSavvaContract(app, "SavvaToken");
+      const auctionContract = await getSavvaContract(app, "NFTAuction");
       const actorAddr = app.actorAddress?.();
 
       // Check allowance
@@ -160,49 +149,35 @@ export default function BidAuctionModal(props) {
 
       if (allowance < bidAmount) {
         // Request approval
-        app.dismissToast?.(currentToastId);
-        currentToastId = pushToast({
+        approveToastId = pushToast({
           type: "info",
           message: t("nft.auction.bid.toast.approving") || "Approving token spend…",
           autohideMs: 0,
         });
 
-        const approveTxHash = await savvaToken.write.approve([auctionContract.address, maxUint256]);
-        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-
-        app.dismissToast?.(currentToastId);
-        currentToastId = pushToast({
-          type: "info",
-          message: t("nft.auction.bid.toast.placing") || "Placing bid…",
-          autohideMs: 0,
+        await sendAsActor(app, {
+          contractName: "SavvaToken",
+          functionName: "approve",
+          args: [auctionContract.address, maxUint256],
         });
 
-        // Place bid
-        const bidTxHash = await auctionContract.write.placeBid([
-          props.tokenId,
-          bidAmount,
-          tokenAddress
-        ]);
-        await publicClient.waitForTransactionReceipt({ hash: bidTxHash });
-        app.dismissToast?.(currentToastId);
-      } else {
-        // Place bid directly
-        app.dismissToast?.(currentToastId);
-        currentToastId = pushToast({
-          type: "info",
-          message: t("nft.auction.bid.toast.placing") || "Placing bid…",
-          autohideMs: 0,
-        });
-
-        const bidTxHash = await auctionContract.write.placeBid([
-          props.tokenId,
-          bidAmount,
-          tokenAddress
-        ]);
-        await publicClient.waitForTransactionReceipt({ hash: bidTxHash });
-        app.dismissToast?.(currentToastId);
+        app.dismissToast?.(approveToastId);
       }
 
+      // Place bid
+      bidToastId = pushToast({
+        type: "info",
+        message: t("nft.auction.bid.toast.placing") || "Placing bid…",
+        autohideMs: 0,
+      });
+
+      await sendAsActor(app, {
+        contractName: "NFTAuction",
+        functionName: "placeBid",
+        args: [props.tokenId, bidAmount, tokenAddress],
+      });
+
+      app.dismissToast?.(bidToastId);
       pushToast({
         type: "success",
         message: t("nft.auction.bid.toast.success") || "Bid placed successfully!"
@@ -217,11 +192,13 @@ export default function BidAuctionModal(props) {
       props.onSuccess?.();
       props.onClose?.();
     } catch (err) {
-      app.dismissToast?.(currentToastId);
       pushErrorToast(err, {
         context: t("nft.auction.bid.toast.error") || "Failed to place bid."
       });
       dbg.error?.("BidAuctionModal:submit", err);
+    } finally {
+      if (approveToastId) app.dismissToast?.(approveToastId);
+      if (bidToastId) app.dismissToast?.(bidToastId);
       setIsSubmitting(false);
     }
   };

@@ -10,8 +10,9 @@ import BidAuctionModal from "../modals/BidAuctionModal.jsx";
 import NftControlModal from "../modals/NftControlModal.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { createPublicClient, http, maxUint256 } from "viem";
+import { maxUint256 } from "viem";
 import { dbg } from "../../utils/debug.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -222,7 +223,7 @@ export default function PostNftCard(props) {
       setShouldHide(true);
 
       // Call fix API if backend thinks it exists
-      if (backendData) {
+      if (backendData && (backendData.owner || backendData.on_market || backendData.on_auction)) {
         const cid = resolveCid(props.post);
         if (cid) {
           dbg.log("PostNftCard", "Calling fix API for unminted NFT", cid);
@@ -365,26 +366,23 @@ export default function PostNftCard(props) {
       return;
     }
 
-    const chain = app.desiredChain?.();
-    const rpc = chain?.rpcUrls?.[0];
-    if (!chain || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     setFinalizingAuction(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: app.t("nft.auction.finalize.toast.pending") || "Finalizing auction…",
-      autohideMs: 0,
-    });
+    let finalizeToastId;
 
     try {
-      const publicClient = createPublicClient({ chain, transport: http(rpc) });
-      const auctionContract = await getSavvaContract(app, "NFTAuction", { write: true });
-      const txHash = await auctionContract.write.finalizeAuction([tokenId]);
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(pendingToastId);
+      finalizeToastId = pushToast({
+        type: "info",
+        message: app.t("nft.auction.finalize.toast.pending") || "Finalizing auction…",
+        autohideMs: 0,
+      });
+
+      await sendAsActor(app, {
+        contractName: "NFTAuction",
+        functionName: "finalizeAuction",
+        args: [tokenId],
+      });
+
+      app.dismissToast?.(finalizeToastId);
       pushToast({
         type: "success",
         message: app.t("nft.auction.finalize.toast.success") || "Auction finalized successfully."
@@ -393,12 +391,12 @@ export default function PostNftCard(props) {
       // Refetch chain data to update UI
       await refetch();
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, {
         context: app.t("nft.auction.finalize.toast.error") || "Failed to finalize auction."
       });
       dbg.error?.("PostNftCard:finalizeAuction", err);
     } finally {
+      if (finalizeToastId) app.dismissToast?.(finalizeToastId);
       setFinalizingAuction(false);
     }
   }
@@ -471,13 +469,6 @@ export default function PostNftCard(props) {
       return;
     }
 
-    const chain = app.desiredChain?.();
-    const rpc = chain?.rpcUrls?.[0];
-    if (!chain || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     const tokenAddress = savvaTokenAddress();
     if (!tokenAddress) {
       pushErrorToast(new Error("Token address not found"));
@@ -485,16 +476,11 @@ export default function PostNftCard(props) {
     }
 
     setBuyingNft(true);
-    let currentToastId = pushToast({
-      type: "info",
-      message: app.t("nft.market.buy.toast.pending") || "Processing purchase…",
-      autohideMs: 0,
-    });
+    let approveToastId, buyToastId;
 
     try {
-      const publicClient = createPublicClient({ chain, transport: http(rpc) });
-      const savvaToken = await getSavvaContract(app, "SavvaToken", { write: true });
-      const marketplace = await getSavvaContract(app, "NFTMarketplace", { write: true });
+      const savvaToken = await getSavvaContract(app, "SavvaToken");
+      const marketplace = await getSavvaContract(app, "NFTMarketplace");
       const actorAddr = app.actorAddress?.();
 
       // Check allowance
@@ -503,41 +489,35 @@ export default function PostNftCard(props) {
 
       if (allowance < priceBigInt) {
         // Request approval
-        app.dismissToast?.(currentToastId);
-        currentToastId = pushToast({
+        approveToastId = pushToast({
           type: "info",
           message: app.t("nft.market.buy.toast.approving") || "Approving token spend…",
           autohideMs: 0,
         });
 
-        const approveTxHash = await savvaToken.write.approve([marketplace.address, maxUint256]);
-        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-
-        app.dismissToast?.(currentToastId);
-        currentToastId = pushToast({
-          type: "info",
-          message: app.t("nft.market.buy.toast.buying") || "Purchasing NFT…",
-          autohideMs: 0,
+        await sendAsActor(app, {
+          contractName: "SavvaToken",
+          functionName: "approve",
+          args: [marketplace.address, maxUint256],
         });
 
-        // Buy NFT
-        const buyTxHash = await marketplace.write.buy([tokenId, priceBigInt]);
-        await publicClient.waitForTransactionReceipt({ hash: buyTxHash });
-        app.dismissToast?.(currentToastId);
-      } else {
-        // Buy NFT directly
-        app.dismissToast?.(currentToastId);
-        currentToastId = pushToast({
-          type: "info",
-          message: app.t("nft.market.buy.toast.buying") || "Purchasing NFT…",
-          autohideMs: 0,
-        });
-
-        const buyTxHash = await marketplace.write.buy([tokenId, priceBigInt]);
-        await publicClient.waitForTransactionReceipt({ hash: buyTxHash });
-        app.dismissToast?.(currentToastId);
+        app.dismissToast?.(approveToastId);
       }
 
+      // Buy NFT
+      buyToastId = pushToast({
+        type: "info",
+        message: app.t("nft.market.buy.toast.buying") || "Purchasing NFT…",
+        autohideMs: 0,
+      });
+
+      await sendAsActor(app, {
+        contractName: "NFTMarketplace",
+        functionName: "buy",
+        args: [tokenId, priceBigInt],
+      });
+
+      app.dismissToast?.(buyToastId);
       pushToast({
         type: "success",
         message: app.t("nft.market.buy.toast.success") || "NFT purchased successfully!"
@@ -546,12 +526,13 @@ export default function PostNftCard(props) {
       // Refetch chain data to update UI
       await refetch();
     } catch (err) {
-      app.dismissToast?.(currentToastId);
       pushErrorToast(err, {
         context: app.t("nft.market.buy.toast.error") || "Failed to purchase NFT."
       });
       dbg.error?.("PostNftCard:buy", err);
     } finally {
+      if (approveToastId) app.dismissToast?.(approveToastId);
+      if (buyToastId) app.dismissToast?.(buyToastId);
       setBuyingNft(false);
     }
   }

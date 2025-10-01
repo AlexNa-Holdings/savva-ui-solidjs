@@ -11,8 +11,8 @@ import { dbg } from "../../utils/debug.js";
 import { ipfs } from "../../ipfs/index.js";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { createPublicClient, http } from "viem";
 import { httpBase } from "../../net/endpoints.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -421,13 +421,6 @@ export default function PromoteNftTab(props) {
       return;
     }
 
-    const chainValue = desiredChain();
-    const rpc = chainValue?.rpcUrls?.[0];
-    if (!chainValue || !rpc) {
-      pushErrorToast(new Error("Network not configured"));
-      return;
-    }
-
     const origin = globalThis?.location?.origin || `https://${domainName}`;
     const imageUri = resolveMetadataImage(currentPost, summaryImage());
     const slug = currentPost.slug || currentPost.permalink || currentPost.savva_cid || currentPost.guid || status.tokenId.toString();
@@ -438,33 +431,32 @@ export default function PromoteNftTab(props) {
     });
 
     setMintBusy(true);
-    const pendingToastId = pushToast({
-      type: "info",
-      message: t("nft.owner.mint.toast.pending") || "Minting NFT…",
-      autohideMs: 0,
-    });
+    let mintToastId;
 
     try {
-      const metadataCid = await uploadMetadataJson(metadata, status.tokenId);
-      const contentNft = await getSavvaContract(app, "ContentNFT", { write: true });
-      const publicClient = createPublicClient({ chain: chainValue, transport: http(rpc) });
-      const txHash = await contentNft.write.mint([
-        authorAddr,
-        status.tokenId,
-        domainName,
-        guid,
-        `ipfs://${metadataCid}`,
-      ], { value: priceWei });
+      mintToastId = pushToast({
+        type: "info",
+        message: t("nft.owner.mint.toast.pending") || "Minting NFT…",
+        autohideMs: 0,
+      });
 
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(pendingToastId);
+      const metadataCid = await uploadMetadataJson(metadata, status.tokenId);
+
+      await sendAsActor(app, {
+        contractName: "ContentNFT",
+        functionName: "mint",
+        args: [authorAddr, status.tokenId, domainName, guid, `ipfs://${metadataCid}`],
+        valueWei: priceWei,
+      });
+
+      app.dismissToast?.(mintToastId);
       pushToast({ type: "success", message: t("nft.owner.mint.toast.success") || "NFT minted." });
       await handleOwnerActionComplete();
     } catch (err) {
-      app.dismissToast?.(pendingToastId);
       pushErrorToast(err, { context: t("nft.owner.mint.toast.error") || "Failed to mint NFT." });
       dbg.error?.("PromoteNftTab:mint", err);
     } finally {
+      if (mintToastId) app.dismissToast?.(mintToastId);
       setMintBusy(false);
     }
   }

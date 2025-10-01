@@ -1,5 +1,5 @@
 // src/x/pages/PostPage.jsx
-import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal } from "solid-js";
+import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
 
@@ -111,13 +111,36 @@ export default function PostPage() {
   const [showContributeModal, setShowContributeModal] = createSignal(false);
   const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
 
-  const [postResource] = createResource(
+  const [postResource, { refetch: refetchPost }] = createResource(
     () => ({ identifier: identifier(), domain: app.selectedDomainName(), app, lang: uiLang() }),
     fetchPostByIdentifier
   );
 
   const [post, setPost] = createSignal(null);
   createEffect(() => setPost(postResource() || null));
+
+  // Listen for NFT update events to refetch post data
+  onMount(() => {
+    const handleNftUpdate = (event) => {
+      const { contentId, eventType } = event.detail || {};
+      const currentPost = post();
+      if (!currentPost) return;
+
+      // Get the current post's CID
+      const currentCid = currentPost.savva_cid || currentPost.cid || currentPost.id;
+
+      // Only refetch if this event is for our post
+      if (contentId && currentCid && String(contentId) === String(currentCid)) {
+        dbg.log("PostPage", `Received ${eventType} event for this post, refetching data`);
+        refetchPost();
+      }
+    };
+
+    window.addEventListener("nft-update", handleNftUpdate);
+    onCleanup(() => {
+      window.removeEventListener("nft-update", handleNftUpdate);
+    });
+  });
 
   const [details] = createResource(postResource, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
