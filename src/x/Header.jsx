@@ -125,7 +125,7 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
             </Show>
 
             {/* +++ actor badge lives to the left of the user menu */}
-            <Show when={app.authorizedUser()}>
+            <Show when={app.authorizedUser() && (app.npoMemberships?.()?.length ?? 0) > 0}>
               <ActorBadge />
             </Show>
 

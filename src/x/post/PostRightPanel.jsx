@@ -1,6 +1,7 @@
 // src/x/post/PostRightPanel.jsx
 import StickyClamp from "../layout/StickyClamp.jsx";
 import PostFundCard from "./PostFundCard.jsx";
+import PostNftCard from "./PostNftCard.jsx";
 import FundraisingCard from "./FundraisingCard.jsx";
 import { Show } from "solid-js";
 
@@ -13,6 +14,9 @@ export default function PostRightPanel(props) {
             <div class="space-y-2">
                 <Show when={details()?.descriptor?.fundraiser > 0}>
                     <FundraisingCard campaignId={details().descriptor.fundraiser} onContribute={props.onOpenContributeModal} />
+                </Show>
+                <Show when={props.post}>
+                    <PostNftCard post={props.post} />
                 </Show>
                 <Show when={props.post}>
                     <PostFundCard post={props.post} />

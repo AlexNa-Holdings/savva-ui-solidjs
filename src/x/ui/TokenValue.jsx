@@ -92,6 +92,8 @@ export default function TokenValue(props) {
     setTimeout(() => setIsUsdAnimating(false), 400);
   }, { defer: true }));
 
+  const centered = () => !!props.centered;
+
   const Icon = () => (
     <Show when={tokenMeta()?.Icon} keyed>
       {(Comp) => <Comp class="w-4 h-4" />}
@@ -104,7 +106,10 @@ export default function TokenValue(props) {
     <Show
       when={isVertical()}
       fallback={
-        <div class={`flex items-center gap-1.5 text-sm ${props.class || ''}`} data-tv="row">
+        <div
+          class={`flex items-center gap-1.5 text-sm ${centered() ? "justify-center text-center" : ""} ${props.class || ''}`.trim()}
+          data-tv="row"
+        >
           <Icon />
           <span class="font-semibold" classList={{ "default-animation": isAmountAnimating() }}>{displayAmount()}</span>
           <Show when={displayUsdValue()}>
@@ -115,7 +120,10 @@ export default function TokenValue(props) {
         </div>
       }
     >
-      <div class={`flex flex-col items-end text-sm ${props.class || ''}`} data-tv="col">
+      <div
+        class={`flex flex-col ${centered() ? "items-center text-center" : "items-end"} text-sm ${props.class || ''}`.trim()}
+        data-tv="col"
+      >
         <div class="flex items-center gap-1.5">
           <Icon />
           <span class="font-semibold" classList={{ "default-animation": isAmountAnimating() }}>{displayAmount()}</span>
