@@ -569,23 +569,25 @@ export default function PromoteNftTab(props) {
                 ownerLabel={t("nft.owner.sale.listedBy") || "Listed by"}
                 owner={ownerUser}
               />
-              <div class="space-y-4">
+              <div class="space-y-4 text-center">
                 <Show when={isActorOwner()} fallback={<p class="text-sm text-[hsl(var(--muted-foreground))]">{t("nft.owner.sale.notSeller") || "Only the seller can manage this listing."}</p>}>
                   <h3 class="text-base font-semibold">{t("nft.owner.sale.subtitle") || "This NFT is currently on sale."}</h3>
                   <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-2">
                     <div class="text-sm text-[hsl(var(--muted-foreground))]">{t("nft.owner.sale.currentPrice") || "Current price"}</div>
                     <TokenValue amount={nftStatus().price ?? 0n} tokenAddress={savvaTokenAddress() || undefined} centered />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveFromMarket}
-                    disabled={isRemoving()}
-                    class={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-[hsl(var(--destructive-foreground))] bg-[hsl(var(--destructive))] ${isRemoving() ? "opacity-70" : "hover:opacity-90"}`}
-                  >
-                    <Show when={isRemoving()} fallback={t("nft.owner.sale.remove") || "Remove from Market"}>
-                      <Spinner class="w-4 h-4" />
-                    </Show>
-                  </button>
+                  <div class="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleRemoveFromMarket}
+                      disabled={isRemoving()}
+                      class={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-[hsl(var(--destructive-foreground))] bg-[hsl(var(--destructive))] ${isRemoving() ? "opacity-70" : "hover:opacity-90"}`}
+                    >
+                      <Show when={isRemoving()} fallback={t("nft.owner.sale.remove") || "Remove from Market"}>
+                        <Spinner class="w-4 h-4" />
+                      </Show>
+                    </button>
+                  </div>
                 </Show>
               </div>
             </div>

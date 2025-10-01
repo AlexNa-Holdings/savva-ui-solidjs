@@ -1,13 +1,17 @@
 // src/alerts/AlertManager.jsx
 import { onMount } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
-import { alertRegistry } from "./registry.js";
+import { alertRegistry, registerDynamicHandlers } from "./registry.js";
 import { dbg } from "../utils/debug.js";
 
 export default function AlertManager() {
   const app = useApp();
 
   onMount(() => {
+    // Register dynamic handlers (e.g., NFT handlers) that need the app context
+    registerDynamicHandlers(app);
+    dbg.log("AlertManager", "Dynamic handlers registered");
+
     // Subscribe to all events from the WebSocket bus.
     const unsubscribe = app.alertBus.on("*", ({ type, payload }) => {
       const handler = alertRegistry[type];

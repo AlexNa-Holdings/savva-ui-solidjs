@@ -1,5 +1,5 @@
 // src/x/post/PostNftCard.jsx
-import { Show, createMemo, createResource, createSignal, createEffect } from "solid-js";
+import { Show, createMemo, createResource, createSignal, createEffect, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -9,7 +9,7 @@ import Spinner from "../ui/Spinner.jsx";
 import BidAuctionModal from "../modals/BidAuctionModal.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, maxUint256 } from "viem";
 import { dbg } from "../../utils/debug.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -280,6 +280,9 @@ export default function PostNftCard(props) {
   const [finalizingAuction, setFinalizingAuction] = createSignal(false);
   const [showBidModal, setShowBidModal] = createSignal(false);
 
+  // Market-specific state
+  const [buyingNft, setBuyingNft] = createSignal(false);
+
   const isAuctionEnded = createMemo(() => {
     const nftData = displayNft();
     if (!nftData?.on_auction || !nftData.auction_end_time) return false;
@@ -403,6 +406,126 @@ export default function PostNftCard(props) {
     // Refetch chain data to update UI
     await refetch();
   };
+
+  // Listen for NFT update events
+  onMount(() => {
+    const handleNftUpdate = (event) => {
+      const { contentId, eventType } = event.detail || {};
+      const currentCid = resolveCid(props.post);
+
+      // Only refetch if this event is for our NFT
+      if (contentId && currentCid && String(contentId) === String(currentCid)) {
+        dbg.log("PostNftCard", `Received ${eventType} event, refetching data`);
+        refetch();
+      }
+    };
+
+    window.addEventListener("nft-update", handleNftUpdate);
+    onCleanup(() => {
+      window.removeEventListener("nft-update", handleNftUpdate);
+    });
+  });
+
+  async function handleBuy() {
+    if (buyingNft()) return;
+
+    const nftData = displayNft();
+    const price = nftData?.price;
+    if (!price || price === 0n || price === 0) {
+      pushErrorToast(new Error("Invalid NFT price"));
+      return;
+    }
+
+    const tokenId = resolveTokenId(props.post);
+    if (!tokenId) {
+      pushErrorToast(new Error("Invalid NFT token ID"));
+      return;
+    }
+
+    const chain = app.desiredChain?.();
+    const rpc = chain?.rpcUrls?.[0];
+    if (!chain || !rpc) {
+      pushErrorToast(new Error("Network not configured"));
+      return;
+    }
+
+    const tokenAddress = savvaTokenAddress();
+    if (!tokenAddress) {
+      pushErrorToast(new Error("Token address not found"));
+      return;
+    }
+
+    setBuyingNft(true);
+    let currentToastId = pushToast({
+      type: "info",
+      message: app.t("nft.market.buy.toast.pending") || "Processing purchase…",
+      autohideMs: 0,
+    });
+
+    try {
+      const publicClient = createPublicClient({ chain, transport: http(rpc) });
+      const savvaToken = await getSavvaContract(app, "SavvaToken", { write: true });
+      const marketplace = await getSavvaContract(app, "NFTMarketplace", { write: true });
+      const actorAddr = app.actorAddress?.();
+
+      // Check allowance
+      const priceBigInt = BigInt(price);
+      const allowance = await savvaToken.read.allowance([actorAddr, marketplace.address]);
+
+      if (allowance < priceBigInt) {
+        // Request approval
+        app.dismissToast?.(currentToastId);
+        currentToastId = pushToast({
+          type: "info",
+          message: app.t("nft.market.buy.toast.approving") || "Approving token spend…",
+          autohideMs: 0,
+        });
+
+        const approveTxHash = await savvaToken.write.approve([marketplace.address, maxUint256]);
+        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+
+        app.dismissToast?.(currentToastId);
+        currentToastId = pushToast({
+          type: "info",
+          message: app.t("nft.market.buy.toast.buying") || "Purchasing NFT…",
+          autohideMs: 0,
+        });
+
+        // Buy NFT
+        const buyTxHash = await marketplace.write.buy([tokenId, priceBigInt]);
+        await publicClient.waitForTransactionReceipt({ hash: buyTxHash });
+        app.dismissToast?.(currentToastId);
+      } else {
+        // Buy NFT directly
+        app.dismissToast?.(currentToastId);
+        currentToastId = pushToast({
+          type: "info",
+          message: app.t("nft.market.buy.toast.buying") || "Purchasing NFT…",
+          autohideMs: 0,
+        });
+
+        const buyTxHash = await marketplace.write.buy([tokenId, priceBigInt]);
+        await publicClient.waitForTransactionReceipt({ hash: buyTxHash });
+        app.dismissToast?.(currentToastId);
+      }
+
+      pushToast({
+        type: "success",
+        message: app.t("nft.market.buy.toast.success") || "NFT purchased successfully!"
+      });
+
+      // Refetch chain data to update UI
+      await refetch();
+    } catch (err) {
+      app.dismissToast?.(currentToastId);
+      pushErrorToast(err, {
+        context: app.t("nft.market.buy.toast.error") || "Failed to purchase NFT."
+      });
+      dbg.error?.("PostNftCard:buy", err);
+    } finally {
+      setBuyingNft(false);
+    }
+  }
 
   return (
     <Show when={hasNft()}>
@@ -529,12 +652,51 @@ export default function PostNftCard(props) {
           </div>
         </Show>
 
-        {/* Placeholder for market mode */}
+        {/* Market Mode - NFT is on sale */}
         <Show when={displayNft()?.on_market}>
-          <div class="flex-grow flex items-center justify-center">
-            <p class="text-xs text-[hsl(var(--muted-foreground))] text-center leading-relaxed">
-              NFT Card - Market mode implementation in progress
-            </p>
+          <div class="space-y-3">
+            <h4 class="font-semibold uppercase text-center text-sm">
+              {app.t("nft.market.title") || "For Sale"}
+            </h4>
+
+            {/* Seller */}
+            <div class="space-y-1">
+              <div class="text-xs text-[hsl(var(--muted-foreground))] text-center">
+                {app.t("nft.market.seller") || "Seller"}
+              </div>
+              <div class="flex justify-center">
+                <Show when={sellerUser()} fallback={<Spinner class="w-4 h-4" />}>
+                  <UserCard author={sellerUser()} centered />
+                </Show>
+              </div>
+            </div>
+
+            {/* Price */}
+            <div class="space-y-1">
+              <div class="text-xs text-[hsl(var(--muted-foreground))] text-center">
+                {app.t("nft.market.price") || "Price"}
+              </div>
+              <div class="flex justify-center">
+                <TokenValue
+                  amount={displayNft()?.price ?? 0n}
+                  tokenAddress={savvaTokenAddress()}
+                  centered
+                />
+              </div>
+            </div>
+
+            {/* Buy button */}
+            <div class="pt-2">
+              <button
+                onClick={handleBuy}
+                disabled={buyingNft()}
+                class={`w-full px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-sm font-semibold ${buyingNft() ? "opacity-70" : "hover:opacity-90"}`}
+              >
+                <Show when={buyingNft()} fallback={app.t("nft.market.buy") || "Buy"}>
+                  <Spinner class="w-4 h-4" />
+                </Show>
+              </button>
+            </div>
           </div>
         </Show>
       </div>

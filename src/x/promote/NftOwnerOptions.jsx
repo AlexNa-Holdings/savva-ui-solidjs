@@ -56,10 +56,29 @@ export default function NftOwnerOptions(props) {
     try {
       const publicClient = createPublicClient({ chain: chainValue, transport: http(rpc) });
       const marketplace = await getSavvaContract(app, "NFTMarketplace", { write: true });
+      const contentNft = await getSavvaContract(app, "ContentNFT", { write: true });
       const price = saleAmountWei();
+
+      // First, approve the marketplace contract to transfer the NFT
+      app.dismissToast?.(pendingToastId);
+      const approvalToastId = pushToast({
+        type: "info",
+        message: t("nft.owner.sale.toast.approving") || "Approving NFT transfer…",
+        autohideMs: 0,
+      });
+      const approvalTxHash = await contentNft.write.approve([marketplace.address, props.tokenId]);
+      await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });
+
+      // Then add to market
+      app.dismissToast?.(approvalToastId);
+      const saleToastId = pushToast({
+        type: "info",
+        message: t("nft.owner.sale.toast.listing") || "Listing NFT for sale…",
+        autohideMs: 0,
+      });
       const txHash = await marketplace.write.addToMarket([props.tokenId, price]);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
-      app.dismissToast?.(pendingToastId);
+      app.dismissToast?.(saleToastId);
       pushToast({ type: "success", message: t("nft.owner.sale.toast.success") || "NFT listed for sale." });
       setSalePriceText("");
       setSaleAmountWei(0n);

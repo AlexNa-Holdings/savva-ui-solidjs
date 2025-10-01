@@ -13,6 +13,7 @@ const SRC_DIR = path.join(ROOT, "src");
 const I18N_DIR = path.join(SRC_DIR, "i18n");
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || "1");
 const BATCH_SIZE = 60; // how many keys to ask the model about per request
 const targetLang = process.argv[2] || null;
 const onlyEnglish = targetLang === "en";
@@ -93,7 +94,7 @@ async function askJson(prompt, schemaHint = "an object mapping keys to strings")
   if (!openai) return {};
   const res = await openai.chat.completions.create({
     model: OPENAI_MODEL,
-    temperature: 0.2,
+    temperature: OPENAI_TEMPERATURE,
     response_format: { type: "json_object" },
     messages: [
       {

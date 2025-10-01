@@ -1,6 +1,7 @@
 // src/alerts/registry.js
 import * as h from "./handlers.js";
 import * as bh from "./ban_handlers.js";
+import { registerNftHandlers } from "./nft_handlers.js";
 
 
 /**
@@ -27,3 +28,11 @@ export const alertRegistry = {
   list_updated: h.handleListUpdated,
 
 };
+
+/**
+ * Registers dynamic NFT handlers that use the alertManager.
+ * This must be called during app initialization after the AlertManager is available.
+ */
+export function registerDynamicHandlers(app) {
+  registerNftHandlers(app);
+}
