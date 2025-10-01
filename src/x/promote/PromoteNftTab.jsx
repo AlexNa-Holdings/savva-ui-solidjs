@@ -10,7 +10,6 @@ import Countdown from "../ui/Countdown.jsx";
 import { dbg } from "../../utils/debug.js";
 import { ipfs } from "../../ipfs/index.js";
 import IpfsImage from "../ui/IpfsImage.jsx";
-import NftOwnerOptions from "./NftOwnerOptions.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { createPublicClient, http } from "viem";
 import { httpBase } from "../../net/endpoints.js";
@@ -657,23 +656,16 @@ export default function PromoteNftTab(props) {
           </Match>
 
           <Match when={nftStatus().state === 'owned'}>
-            <div class="grid flex-1 min-h-0 grid-cols-1 gap-8 md:grid-cols-[250px_minmax(0,1fr)] items-start">
+            <div class="flex flex-col items-center justify-center space-y-4 py-6">
               <NftInfoPanel
                 loading={nftMetadata.loading}
                 metadata={nftMetadata}
                 image={summaryImage()}
                 owner={ownerUser}
               />
-              <div class="space-y-4">
-                <Show when={isActorOwner()} fallback={<p class="text-sm text-[hsl(var(--muted-foreground))]">{t("nft.owner.notOwner") || "You are not the owner of this NFT."}</p>}>
-                  <NftOwnerOptions
-                    app={app}
-                    tokenId={nftStatus().tokenId}
-                    metadata={nftMetadata() || null}
-                    onActionComplete={handleOwnerActionComplete}
-                  />
-                </Show>
-              </div>
+              <p class="text-sm text-[hsl(var(--muted-foreground))] text-center max-w-md">
+                {t("nft.minted.info") || "NFT has been minted successfully. Use the 'Manage NFT' button on the post page to control this NFT."}
+              </p>
             </div>
           </Match>
         </Switch>

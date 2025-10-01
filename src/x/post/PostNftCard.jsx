@@ -7,6 +7,7 @@ import TokenValue from "../ui/TokenValue.jsx";
 import Countdown from "../ui/Countdown.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import BidAuctionModal from "../modals/BidAuctionModal.jsx";
+import NftControlModal from "../modals/NftControlModal.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { createPublicClient, http, maxUint256 } from "viem";
@@ -283,6 +284,9 @@ export default function PostNftCard(props) {
   // Market-specific state
   const [buyingNft, setBuyingNft] = createSignal(false);
 
+  // Control modal state
+  const [showControlModal, setShowControlModal] = createSignal(false);
+
   const isAuctionEnded = createMemo(() => {
     const nftData = displayNft();
     if (!nftData?.on_auction || !nftData.auction_end_time) return false;
@@ -404,6 +408,30 @@ export default function PostNftCard(props) {
 
   const handleBidSuccess = async () => {
     // Refetch chain data to update UI
+    await refetch();
+  };
+
+  // Check if the current user is the owner/seller of the NFT
+  const isActorOwnerOrSeller = createMemo(() => {
+    const nftData = displayNft();
+    if (!nftData) return false;
+
+    const actorAddr = app.actorAddress?.()?.toLowerCase();
+    if (!actorAddr) return false;
+
+    const ownerAddr = nftData.owner?.address?.toLowerCase();
+    if (!ownerAddr) return false;
+
+    return actorAddr === ownerAddr;
+  });
+
+  const handleManageNft = () => {
+    setShowControlModal(true);
+  };
+
+  const handleControlModalClose = async () => {
+    setShowControlModal(false);
+    // Refetch to get updated NFT state
     await refetch();
   };
 
@@ -699,6 +727,18 @@ export default function PostNftCard(props) {
             </div>
           </div>
         </Show>
+
+        {/* Manage NFT button for owner/seller */}
+        <Show when={isActorOwnerOrSeller()}>
+          <div class="pt-3 border-t border-[hsl(var(--border))]">
+            <button
+              onClick={handleManageNft}
+              class="w-full px-3 py-2 text-xs font-medium text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]/80 hover:bg-[hsl(var(--primary))]/10 rounded transition-colors"
+            >
+              {app.t("nft.manage") || "Manage NFT"}
+            </button>
+          </div>
+        </Show>
       </div>
 
       {/* Bid Modal */}
@@ -708,6 +748,14 @@ export default function PostNftCard(props) {
         tokenId={resolveTokenId(props.post)}
         auctionData={displayNft()}
         onSuccess={handleBidSuccess}
+      />
+
+      {/* NFT Control Modal */}
+      <NftControlModal
+        isOpen={showControlModal()}
+        onClose={handleControlModalClose}
+        tokenId={resolveTokenId(props.post)}
+        onActionComplete={handleControlModalClose}
       />
     </Show>
   );
