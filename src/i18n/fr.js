@@ -948,7 +948,7 @@ export default {
   "settings.dev.assets.source": "Source",
   "settings.dev.assets.title": "Actifs",
   "settings.developer.debug.enable": "Activer la journalisation de débogage",
-  "settings.developer.showKeys": "Afficher les clés API",
+  "settings.developer.showKeys": "Afficher les clés de traduction",
   "settings.developer.title": "Paramètres du développeur",
   "settings.ipfs.localDisabled": "IPFS local désactivé",
   "settings.localIpfs.apiUrl.label": "URL API IPFS local",

@@ -948,7 +948,7 @@ export default {
   "settings.dev.assets.source": "Джерело",
   "settings.dev.assets.title": "Активи",
   "settings.developer.debug.enable": "Увімкнути журнал налагодження",
-  "settings.developer.showKeys": "Показати API ключі",
+  "settings.developer.showKeys": "Показати ключі перекладу",
   "settings.developer.title": "Налаштування розробника",
   "settings.ipfs.localDisabled": "Локальний IPFS вимкнено",
   "settings.localIpfs.apiUrl.label": "URL API локального IPFS",

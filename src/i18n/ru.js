@@ -948,7 +948,7 @@ export default {
   "settings.dev.assets.source": "Источник",
   "settings.dev.assets.title": "Активы",
   "settings.developer.debug.enable": "Включить отладочный логгинг",
-  "settings.developer.showKeys": "Показать ключи перевода",
+  "settings.developer.showKeys": "Показать ключи переводов",
   "settings.developer.title": "Разработчик",
   "settings.ipfs.localDisabled": "Локальный IPFS отключен",
   "settings.localIpfs.apiUrl.label": "URL API локального IPFS",

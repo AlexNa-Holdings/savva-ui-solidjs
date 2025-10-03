@@ -948,7 +948,7 @@ export default {
   "settings.dev.assets.source": "Source",
   "settings.dev.assets.title": "Assets",
   "settings.developer.debug.enable": "Enable debug logging",
-  "settings.developer.showKeys": "Show API Keys",
+  "settings.developer.showKeys": "Show translation Keys",
   "settings.developer.title": "Developer Settings",
   "settings.ipfs.localDisabled": "Local IPFS disabled",
   "settings.localIpfs.apiUrl.label": "Local IPFS API URL",

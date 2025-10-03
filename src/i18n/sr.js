@@ -948,7 +948,7 @@ export default {
   "settings.dev.assets.source": "Izvor",
   "settings.dev.assets.title": "Resursi",
   "settings.developer.debug.enable": "Omogući logovanje grešaka",
-  "settings.developer.showKeys": "Prikaži API ključeve",
+  "settings.developer.showKeys": "Prikaži ključeve prevoda",
   "settings.developer.title": "Podešavanja za programere",
   "settings.ipfs.localDisabled": "Lokalni IPFS onemogućen",
   "settings.localIpfs.apiUrl.label": "Lokalni IPFS API URL",
