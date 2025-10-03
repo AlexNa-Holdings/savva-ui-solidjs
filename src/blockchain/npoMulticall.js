@@ -154,7 +154,7 @@ async function sendViaNpoMulticall(app, spec) {
     // SavvaNPO.multicall((address target, bytes data, uint256 value)[] calls)
     const calls = [{ target: call.target, data: call.data, value: call.value }];
 
-    // Forward msg.value so the underlying payable target receives native coin
+    // The NPO contract will use its own balance to pay for any value in the inner calls
     const hash = await npo.write.multicall([calls]);
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
