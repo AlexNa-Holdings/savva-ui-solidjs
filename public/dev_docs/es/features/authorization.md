@@ -1,0 +1,7 @@
+## Autorización mediante blockchain
+
+Todos los autores dentro del sistema están autorizados a través de la seguridad criptográfica de la tecnología blockchain. En lugar de confirmar la identidad real del autor, la autorización mediante blockchain verifica que el autor posee la clave privada asociada a su cuenta. Este proceso criptográfico garantiza que es prácticamente imposible que alguien publique contenido en nombre de otra persona, a menos que posea la clave privada genuina.
+
+En esencia, la autorización mediante blockchain proporciona un vínculo infalsificable entre un autor y sus acciones en la plataforma. Cuando un autor se incorpora al sistema o aporta contenido, la blockchain verifica la propiedad de la clave privada, garantizando que solo quienes poseen genuinamente la clave pueden realizar acciones en la plataforma en su nombre.
+
+Este enfoque criptográfico no solo protege contra la suplantación, sino que también mejora la seguridad y la integridad general de la red. Crea un entorno trustless (sin confianza) donde las contribuciones de contenido e interacciones están vinculadas de forma segura con el propietario legítimo de la clave privada, ofreciendo un alto nivel de confianza y certidumbre a todos los participantes de la red.

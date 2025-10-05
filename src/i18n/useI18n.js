@@ -5,6 +5,7 @@ import ru from "./ru";
 import sr from "./sr";
 import ua from "./ua";
 import fr from "./fr";
+import es from "./es";
 import { dbg } from "../utils/debug";
 
 export const LANG_INFO = {
@@ -13,9 +14,10 @@ export const LANG_INFO = {
   fr: { code: "FR", name: "Français" },
   ua: { code: "UA", name: "Українська" },
   sr: { code: "SR", name: "Српски" },
+  es: { code: "ES", name: "Español" },
 };
 
-const APP_DICTS = { en, ru, fr, ua, sr };
+const APP_DICTS = { en, ru, fr, ua, sr, es };
 const DEFAULT_LANG = "en";
 const LANG_KEY = "lang";
 const SHOW_KEYS_KEY = "i18n_show_keys";
@@ -56,7 +58,7 @@ export function useI18n() {
         return;
       }
       setLangSignal(v);
-      try { localStorage.setItem(LANG_KEY, v); } catch {}
+      try { localStorage.setItem(LANG_KEY, v); } catch { }
       if (typeof document !== "undefined") {
         document.documentElement.setAttribute("lang", v);
       }
@@ -68,7 +70,7 @@ export function useI18n() {
     function setShowKeys(on) {
       const v = !!on;
       setShowKeysSignal(v);
-      try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch {}
+      try { localStorage.setItem(SHOW_KEYS_KEY, v ? "1" : "0"); } catch { }
     }
 
     const t = (key, params) => {

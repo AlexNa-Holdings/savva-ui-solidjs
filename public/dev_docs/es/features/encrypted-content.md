@@ -1,0 +1,7 @@
+## Distribución de contenido cifrado
+
+SAVVA presenta una función avanzada de distribución de contenido cifrado que permite a los autores controlar quién puede acceder a su contenido. Con esta función, los autores pueden especificar con precisión a quién se le concede acceso a su contenido, garantizando que permanezca privado o accesible solo a una audiencia seleccionada.
+
+Los autores tienen la flexibilidad de definir criterios de acceso, por ejemplo, permitir el acceso exclusivamente a sus patrocinadores, que puedan aportar una cantidad específica de tokens de forma semanal. Este enfoque proporciona un mecanismo potente para que los creadores recompensen e incentiven a sus seguidores leales al tiempo que protegen la exclusividad de su contenido.
+
+Es importante señalar que, aunque la infraestructura de servidor para esta función está completamente operativa y lista, la implementación de la interfaz de usuario (UI) está actualmente en desarrollo y estará disponible en futuras versiones. Esta emocionante adición a la plataforma SAVVA ampliará aún más las opciones de distribución de contenido, ofreciendo a los creadores una herramienta valiosa para personalizar y monetizar su contenido mientras mantienen el control sobre su accesibilidad.

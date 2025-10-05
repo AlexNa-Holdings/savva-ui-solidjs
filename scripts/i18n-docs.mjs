@@ -46,6 +46,7 @@ const DRY_RUN = process.env.DRY_RUN === "1";
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || "1");
 
 if (!OPENAI_KEY) {
   console.error("[i18n-docs] Missing OPENAI_API_KEY");
@@ -152,7 +153,7 @@ async function translateMarkdownTo(langCode, markdown) {
 
   const res = await openai.chat.completions.create({
     model: OPENAI_MODEL,
-    temperature: 0.2,
+    temperature: OPENAI_TEMPERATURE,
     messages: [
       { role: "system", content: sys },
       { role: "user", content: user },
@@ -179,7 +180,7 @@ async function translateSidebarYamlTo(langCode, text) {
   if (!strings.length) return text;
 
   const res = await openai.chat.completions.create({
-    model: OPENAI_MODEL, temperature: 0.2, response_format: { type: "json_object" },
+    model: OPENAI_MODEL, temperature: OPENAI_TEMPERATURE, response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "Translate UI strings. Return JSON { list: [...] } in the same order." },
       { role: "user", content: JSON.stringify({ target_language: langCode, list: strings }) },

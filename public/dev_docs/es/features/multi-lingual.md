@@ -1,0 +1,7 @@
+## Soporte multilingüe
+
+SAVVA presenta con orgullo un sistema de soporte multilingüe altamente innovador y completo que va más allá de la tradicional interfaz multilingüe. Nuestra plataforma ofrece no solo soporte de interfaz multilingüe sino también soporte de contenido multilingüe, abriendo posibilidades emocionantes para creadores de contenido y usuarios por igual.
+
+Lo que distingue a SAVVA es su capacidad para facilitar la creación y el consumo de contenido en varios idiomas. Los autores en nuestra plataforma tienen la notable oportunidad de publicar su contenido en varios idiomas de forma simultánea. Esto significa que una sola pieza de contenido puede hacerse accesible a una audiencia global diversa, derribando barreras lingüísticas y asegurando que la información valiosa y la creatividad puedan compartirse con el mundo en el idioma elegido.
+
+En términos prácticos, esta función empodera a los autores para alcanzar una audiencia más amplia e inclusiva, fomentando conexiones interculturales y permitiendo que usuarios de diversos orígenes lingüísticos interactúen con el contenido sin esfuerzo. Ya sean artículos, publicaciones, videos o debates, el soporte de contenido multilingüe que ofrece SAVVA refleja nuestro compromiso con la promoción de la comunicación y la colaboración a escala global, trascendiendo las limitaciones del idioma.
