@@ -87,7 +87,7 @@ function deploy() {
     return;
   }
   const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
-  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
+  const portOpt = DEPLOY_PORT ? `-p ${DEPLOY_PORT}` : "";
 
   // Ensure path exists, then scp
   sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
