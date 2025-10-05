@@ -14,14 +14,6 @@ function copyToClipboard(text, label, t) {
     .catch((err) => console.error(`Failed to copy ${label}:`, err));
 }
 
-// CID heuristics
-function isProbablyCid(s) {
-  if (typeof s !== "string") return false;
-  if (s.startsWith("Qm") && s.length === 46) return true; // v0
-  if (s.startsWith("bafy")) return true; // v1
-  return false;
-}
-
 // Dispatch to AdminActionsBridge
 export function dispatchAdminAction(action, detail = {}) {
   try {
@@ -49,11 +41,10 @@ export function getPostAdminItems(post, t) {
   const descriptorPathRaw = String(
     raw.finalDescriptorPath || raw.ipfs || post.finalDescriptorPath || post.ipfs || ""
   );
-  const descriptorPath = descriptorPathRaw
-    ? isProbablyCid(descriptorPathRaw)
-      ? `${descriptorPathRaw}/info.yaml`
-      : descriptorPathRaw
-    : "";
+  // Use cached finalDescriptorPath if available (already has correct path from fetchDescriptorWithFallback)
+  // Otherwise use the raw path as-is. Never assume we need to append /info.yaml based solely on isProbablyCid
+  // because the CID might point directly to the info.yaml file (modern format).
+  const descriptorPath = descriptorPathRaw;
 
   const dataCid = getPostContentBaseCid(raw) || getPostContentBaseCid(post);
   const authorAddr =
