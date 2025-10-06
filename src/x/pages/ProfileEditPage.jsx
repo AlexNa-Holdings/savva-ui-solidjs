@@ -22,6 +22,9 @@ import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import LinksEditor from "../profile/LinksEditor.jsx";
 // ✅ import the shared profile store utilities
 import useUserProfile, { applyProfileEditResult } from "../profile/userProfileStore.js";
+import { generateReadingKey, publishReadingKey, fetchReadingKey } from "../crypto/readingKey.js";
+import { storeReadingKey, deleteStoredReadingKeys, countStoredReadingKeys } from "../crypto/readingKeyStorage.js";
+import StoreReadingKeyModal from "../modals/StoreReadingKeyModal.jsx";
 
 async function fetchProfileForEdit(params) {
   const { app, identifier } = params;
@@ -148,7 +151,15 @@ export default function ProfileEditPage() {
   const actorAddress = createMemo(() => (getActorAddress(app) || "").toLowerCase());
   const [links, setLinks] = createStore([]);
 
-  // true only if we’re editing the auth user and we’re acting as the auth user
+  // Reading Key state
+  const [readingKey, setReadingKey] = createSignal(null);
+  const [isLoadingReadingKey, setIsLoadingReadingKey] = createSignal(false);
+  const [isGeneratingReadingKey, setIsGeneratingReadingKey] = createSignal(false);
+  const [showStoreKeyModal, setShowStoreKeyModal] = createSignal(false);
+  const [pendingKeyToStore, setPendingKeyToStore] = createSignal(null);
+  const [storedKeysCount, setStoredKeysCount] = createSignal(0);
+
+  // true only if we're editing the auth user and we're acting as the auth user
   const isSelfActorEditingSelf = createMemo(
     () => subjectAddress() && authAddress() && actorAddress()
       ? subjectAddress() === authAddress() && actorAddress() === authAddress()
@@ -207,6 +218,32 @@ export default function ProfileEditPage() {
       if (authorized.avatar !== avatar()) {
         setAvatar(authorized.avatar);
       }
+    }
+  });
+
+  // Fetch reading key when profile loads
+  createEffect(async () => {
+    const data = profileData();
+    if (data && !data.error && data.address && isSelfActorEditingSelf()) {
+      setIsLoadingReadingKey(true);
+      try {
+        const key = await fetchReadingKey(app, data.address);
+        setReadingKey(key);
+      } catch (error) {
+        console.error("Error fetching reading key:", error);
+        setReadingKey(null);
+      } finally {
+        setIsLoadingReadingKey(false);
+      }
+    }
+  });
+
+  // Update stored keys count when profile loads or changes
+  createEffect(() => {
+    const data = profileData();
+    if (data && !data.error && data.address && isSelfActorEditingSelf()) {
+      const count = countStoredReadingKeys(data.address);
+      setStoredKeysCount(count);
     }
   });
 
@@ -355,6 +392,100 @@ export default function ProfileEditPage() {
   }
 
   // Actor-aware: Save profile JSON (write profile_cid via actor)
+  const handleGenerateReadingKey = async () => {
+    setIsGeneratingReadingKey(true);
+    try {
+      const data = profileData();
+      if (!data?.address) {
+        throw new Error("No address found");
+      }
+
+      // Generate the reading key (includes secretKey)
+      const { nonce, publicKey, secretKey } = await generateReadingKey(data.address);
+
+      // Publish to contract
+      await publishReadingKey(app, publicKey, nonce);
+
+      // Update local state
+      setReadingKey({
+        publicKey,
+        scheme: "x25519-xsalsa20-poly1305",
+        nonce,
+      });
+
+      pushToast({
+        type: "success",
+        message: readingKey()
+          ? t("profile.edit.readingKey.renewSuccess")
+          : t("profile.edit.readingKey.generateSuccess")
+      });
+
+      // Prompt user to store the secret key
+      setPendingKeyToStore({ nonce, publicKey, secretKey, address: data.address });
+      setShowStoreKeyModal(true);
+    } catch (err) {
+      pushErrorToast(err, {
+        context: readingKey()
+          ? t("profile.edit.readingKey.renewError")
+          : t("profile.edit.readingKey.generateError")
+      });
+    } finally {
+      setIsGeneratingReadingKey(false);
+    }
+  };
+
+  const handleConfirmStoreKey = () => {
+    const pending = pendingKeyToStore();
+    if (pending) {
+      const success = storeReadingKey(pending.address, {
+        nonce: pending.nonce,
+        publicKey: pending.publicKey,
+        secretKey: pending.secretKey,
+      });
+
+      if (success) {
+        pushToast({
+          type: "success",
+          message: t("readingKey.store.stored")
+        });
+        // Update count
+        setStoredKeysCount(countStoredReadingKeys(pending.address));
+      } else {
+        pushToast({
+          type: "error",
+          message: t("readingKey.store.storeFailed")
+        });
+      }
+    }
+
+    setShowStoreKeyModal(false);
+    setPendingKeyToStore(null);
+  };
+
+  const handleDeclineStoreKey = () => {
+    setShowStoreKeyModal(false);
+    setPendingKeyToStore(null);
+  };
+
+  const handleDeleteStoredKeys = () => {
+    const data = profileData();
+    if (!data?.address) return;
+
+    const success = deleteStoredReadingKeys(data.address);
+    if (success) {
+      pushToast({
+        type: "success",
+        message: t("readingKey.store.deleted")
+      });
+      setStoredKeysCount(0);
+    } else {
+      pushToast({
+        type: "error",
+        message: t("readingKey.store.deleteFailed")
+      });
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -486,6 +617,97 @@ export default function ProfileEditPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Subsection: Reading Key */}
+                  <Show when={isSelfActorEditingSelf()}>
+                    <div class="pt-6 border-t border-[hsl(var(--border))]">
+                      <h4 class="text-md font-semibold mb-2">{t("profile.edit.readingKey.title")}</h4>
+                      <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+                        {t("profile.edit.readingKey.description")}
+                      </p>
+
+                      <Show when={isLoadingReadingKey()}>
+                        <div class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+                          <Spinner class="w-4 h-4" />
+                          <span>{t("profile.edit.readingKey.loading")}</span>
+                        </div>
+                      </Show>
+
+                      <Show when={!isLoadingReadingKey()}>
+                        <Show
+                          when={readingKey()}
+                          fallback={
+                            <button
+                              class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                              onClick={handleGenerateReadingKey}
+                              disabled={isGeneratingReadingKey()}
+                            >
+                              <Show when={isGeneratingReadingKey()} fallback={t("profile.edit.readingKey.generateButton")}>
+                                <div class="flex items-center gap-2">
+                                  <Spinner class="w-4 h-4" />
+                                  <span>{t("profile.edit.readingKey.generating")}</span>
+                                </div>
+                              </Show>
+                            </button>
+                          }
+                        >
+                          <div class="space-y-3">
+                            <div class="bg-[hsl(var(--muted))] p-3 rounded text-xs font-mono space-y-2">
+                              <div>
+                                <span class="text-[hsl(var(--muted-foreground))]">Public Key: </span>
+                                <span class="break-all">{readingKey()?.publicKey}</span>
+                              </div>
+                              <div>
+                                <span class="text-[hsl(var(--muted-foreground))]">Scheme: </span>
+                                <span>{readingKey()?.scheme}</span>
+                              </div>
+                              <div>
+                                <span class="text-[hsl(var(--muted-foreground))]">Nonce: </span>
+                                <span class="break-all">{readingKey()?.nonce}</span>
+                              </div>
+                            </div>
+                            <button
+                              class="px-4 py-2 text-sm rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
+                              onClick={handleGenerateReadingKey}
+                              disabled={isGeneratingReadingKey()}
+                            >
+                              <Show when={isGeneratingReadingKey()} fallback={t("profile.edit.readingKey.renewButton")}>
+                                <div class="flex items-center gap-2">
+                                  <Spinner class="w-4 h-4" />
+                                  <span>{t("profile.edit.readingKey.renewing")}</span>
+                                </div>
+                              </Show>
+                            </button>
+                          </div>
+                        </Show>
+
+                        {/* Stored Keys Info */}
+                        <div class="mt-4 pt-4 border-t border-[hsl(var(--border))]">
+                          <div class="flex items-center justify-between">
+                            <div class="text-sm">
+                              <span class="text-[hsl(var(--muted-foreground))]">
+                                {t("readingKey.store.keysStored")}:{" "}
+                              </span>
+                              <span class="font-medium">{storedKeysCount()}</span>
+                            </div>
+                            <Show when={storedKeysCount() > 0}>
+                              <button
+                                onClick={handleDeleteStoredKeys}
+                                class="px-3 py-1 text-xs rounded bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90"
+                              >
+                                {t("readingKey.store.deleteButton")}
+                              </button>
+                            </Show>
+                          </div>
+                          <Show when={storedKeysCount() > 0}>
+                            <p class="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+                              {t("readingKey.store.storedInfo")}
+                            </p>
+                          </Show>
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
                 </div>
 
                 {/* Section 2: Domain Specific Parameters */}
@@ -595,6 +817,11 @@ export default function ProfileEditPage() {
         onConfirm={executeSetName}
         title={t("profile.edit.name.confirmChangeTitle")}
         message={t("profile.edit.name.confirmChangeMessage", { name: initialName() })}
+      />
+      <StoreReadingKeyModal
+        isOpen={showStoreKeyModal()}
+        onClose={handleDeclineStoreKey}
+        onConfirm={handleConfirmStoreKey}
       />
     </>
   );
