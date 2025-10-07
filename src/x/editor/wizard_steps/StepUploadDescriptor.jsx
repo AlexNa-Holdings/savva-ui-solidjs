@@ -261,9 +261,21 @@ export default function StepUploadDescriptor(props) {
     setTimeout(async () => {
       L("kickoff");
       try {
-        const descriptorCid = await uploadDescriptor(dataCid);
-        L("onComplete()", { descriptorCid });
-        props.onComplete?.(descriptorCid);
+        const result = await uploadDescriptor(dataCid);
+        L("onComplete()", { result });
+
+        // Store the encryption key if post is encrypted
+        if (result.postEncryptionKey) {
+          const guid = props.postParams?.()?.guid;
+          if (guid) {
+            storePostKey(guid, result.postEncryptionKey.secretKey);
+            L("Stored post encryption key", { guid });
+          } else {
+            E("Cannot store encryption key: no GUID found");
+          }
+        }
+
+        props.onComplete?.(result);
       } catch (e) {
         E("error", e);
         setError(e?.message || t("editor.publish.descriptor.errorTitle"));

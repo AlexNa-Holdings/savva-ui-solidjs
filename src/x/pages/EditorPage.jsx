@@ -31,6 +31,7 @@ import { whenWsOpen } from "../../net/wsRuntime.js";
 import { TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { createAIPostHandler } from "../../ai/AIPostHandler.js";
 import ClaimableRewardHint from "../editor/ClaimableRewardHint.jsx";
+import { preparePostForEditing } from "../../editor/postImporter.js";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
@@ -202,7 +203,36 @@ export default function EditorPage() {
           setPostParams(newPostParams);
         });
       } else {
-        const draft = await loadDraft(baseDir());
+        let draft = await loadDraft(baseDir());
+
+        if (mode === "edit_post") {
+          const targetCid = routeParams().id;
+          const currentCid = draft?.params?.originalSavvaCid;
+          if (!draft || (targetCid && currentCid && currentCid !== targetCid) || (targetCid && !currentCid)) {
+            dbg.log("EditorPage", "Draft missing or mismatched for edit, re-importing post", {
+              targetCid,
+              currentCid,
+              hasDraft: !!draft,
+            });
+            const postObject = await fetchPostByIdentifier({
+              identifier: targetCid,
+              domain: app.selectedDomainName(),
+              app,
+              lang: app.lang(),
+            });
+            if (!postObject) {
+              throw new Error("Post not found for editing.");
+            }
+            await preparePostForEditing(postObject, app);
+            draft = await loadDraft(baseDir());
+            dbg.log("EditorPage", "Draft prepared via importer", {
+              targetCid,
+              hasDraftAfterImport: !!draft,
+              locales: Object.keys(draft?.content || {}),
+            });
+          }
+        }
+
         if (draft && draft.content) {
           const availableLangs = Object.keys(draft.content);
           const currentUiLang = app.lang();

@@ -64,6 +64,13 @@ export default function MarkdownView(props) {
 
       processor.use(remarkRehype, { allowDangerousHtml: true });
 
+      processor
+        .use(rehypeMediaPlayers)
+        .use(rehypeImageSize)
+        .use(rehypeSlug)
+        .use(rehypeCopyButton)
+        .use(rehypeStringify, { allowDangerousHtml: true });
+
       // optional rehype plugins coming from callers (e.g. draft URL resolver)
       if (props.rehypePlugins) {
         for (const entry of (Array.isArray(props.rehypePlugins) ? props.rehypePlugins : [props.rehypePlugins])) {
@@ -71,13 +78,6 @@ export default function MarkdownView(props) {
           processor.use(...arr);
         }
       }
-
-      processor
-        .use(rehypeMediaPlayers)
-        .use(rehypeImageSize)
-        .use(rehypeSlug)
-        .use(rehypeCopyButton)
-        .use(rehypeStringify, { allowDangerousHtml: true });
 
       const file = await processor.process(String(props.markdown || ""));
       const rawHtml = String(file);

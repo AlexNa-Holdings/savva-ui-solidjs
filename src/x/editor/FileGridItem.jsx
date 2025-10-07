@@ -22,7 +22,7 @@ export default function FileGridItem(props) {
   const fileType = createMemo(() => {
     const name = props.file?.name?.toLowerCase() || "";
     if (/\.(jpe?g|png|gif|webp)$/.test(name)) return "image";
-    if (/\.(mp4|webm|ogg)$/.test(name)) return "video";
+    if (/\.(mp4|webm|ogg|mov)$/.test(name)) return "video";
     if (/\.(mp3|wav|m4a)$/.test(name)) return "audio";
     return "other";
   });

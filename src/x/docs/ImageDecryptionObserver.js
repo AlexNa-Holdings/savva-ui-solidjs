@@ -2,6 +2,7 @@
 import { ipfs } from "../../ipfs/index.js";
 import { getEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { decryptFileData } from "../crypto/fileEncryption.js";
+import { swManager } from "../crypto/serviceWorkerManager.js";
 
 /**
  * Observer that watches for images in markdown content and decrypts them on-the-fly
@@ -85,6 +86,13 @@ export class ImageDecryptionObserver {
       return;
     }
 
+    // If Service Worker is active, let it handle decryption transparently
+    // No need for blob-based fallback
+    if (swManager.isReady) {
+      console.log(`[ImageDecryptionObserver] Service Worker is active, skipping blob-based decryption for ${mediaType}:`, originalSrc);
+      return;
+    }
+
     console.log(`[ImageDecryptionObserver] ${mediaType} is from encrypted post, will decrypt:`, originalSrc);
 
     const context = getEncryptedPostContext();
@@ -113,6 +121,7 @@ export class ImageDecryptionObserver {
         if (ext === 'mp4') mimeType = 'video/mp4';
         else if (ext === 'webm') mimeType = 'video/webm';
         else if (ext === 'ogg') mimeType = 'video/ogg';
+        else if (ext === 'mov') mimeType = 'video/quicktime';
       } else if (mediaType === 'audio') {
         if (ext === 'mp3') mimeType = 'audio/mpeg';
         else if (ext === 'wav') mimeType = 'audio/wav';

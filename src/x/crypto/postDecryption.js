@@ -3,6 +3,7 @@
 import { decryptPostKey, decryptText } from "./postEncryption.js";
 import { findStoredSecretKey } from "./readingKeyStorage.js";
 import { recoverReadingKey } from "./readingKey.js";
+import { dbg } from "../../utils/debug.js";
 
 /**
  * Post Decryption Utilities
@@ -52,18 +53,34 @@ export function canDecryptPost(userAddress, encryptionData) {
 export async function getReadingSecretKey(userAddress, nonce, forceRecover = false) {
   if (!userAddress || !nonce) return null;
 
+  dbg.log("PostDecrypt", "getReadingSecretKey:start", { userAddress, nonce, forceRecover });
+
   // Try to find stored key first
   if (!forceRecover) {
     const storedKey = findStoredSecretKey(userAddress, nonce);
-    if (storedKey) return storedKey;
+    if (storedKey) {
+      dbg.log("PostDecrypt", "getReadingSecretKey:stored-key", { userAddress, nonce });
+      return storedKey;
+    }
   }
+  dbg.log("PostDecrypt", "getReadingSecretKey:recovering", { userAddress, nonce });
 
   // Recover the key by signing again
   try {
     const recovered = await recoverReadingKey(userAddress, nonce);
+    dbg.log("PostDecrypt", "getReadingSecretKey:recovered", {
+      userAddress,
+      nonce,
+      hasSecret: !!recovered?.secretKey,
+    });
     return recovered.secretKey;
   } catch (error) {
     console.error("Failed to recover reading key:", error);
+    dbg.warn("PostDecrypt", "getReadingSecretKey:recover-failed", {
+      userAddress,
+      nonce,
+      error: String(error?.message || error),
+    });
     return null;
   }
 }
@@ -81,6 +98,12 @@ export function decryptPostEncryptionKey(encryptionData, readingSecretKey) {
   if (!pass || !pass_nonce || !pass_ephemeral_pub_key) {
     throw new Error("Missing encryption data");
   }
+
+  dbg.log("PostDecrypt", "decryptPostEncryptionKey", {
+    hasPass: !!pass,
+    hasNonce: !!pass_nonce,
+    hasEphemeral: !!pass_ephemeral_pub_key,
+  });
 
   return decryptPostKey(pass, pass_ephemeral_pub_key, pass_nonce, readingSecretKey);
 }

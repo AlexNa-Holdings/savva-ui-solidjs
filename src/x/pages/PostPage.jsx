@@ -40,6 +40,7 @@ import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost } from "../crypto/postDecryption.js";
 import { storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
+import { swManager } from "../crypto/serviceWorkerManager.js";
 
 const getIdentifier = (route) => route().split("/")[2] || "";
 
@@ -180,15 +181,24 @@ export default function PostPage() {
     const dataCid = details()?.dataCidForContent;
 
     if (key && dataCid) {
+      // Set context for both blob-based decryption (fallback) and Service Worker
       setEncryptedPostContext({ dataCid, postSecretKey: key });
+
+      // Also set context in Service Worker for streaming decryption
+      swManager.setEncryptionContext(dataCid, key).catch(err => {
+        console.warn('[PostPage] Failed to set SW encryption context:', err);
+        // Fallback to blob-based decryption will still work
+      });
     } else {
       clearEncryptedPostContext();
+      swManager.clearAllContexts().catch(console.error);
     }
   });
 
   // Clear context on unmount
   onCleanup(() => {
     clearEncryptedPostContext();
+    swManager.clearAllContexts().catch(console.error);
   });
 
   // Auto-decrypt metadata if we have the key stored

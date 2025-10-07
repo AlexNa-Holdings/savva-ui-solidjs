@@ -10,6 +10,7 @@ import ConfirmModal from "../modals/ConfirmModal.jsx";
 import PromotePostModal from "../modals/PromotePostModal.jsx";
 import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
+import { dbg } from "../../utils/debug.js";
 
 export default function PostControls(props) {
   const app = useApp();
@@ -32,10 +33,17 @@ export default function PostControls(props) {
 
   const handleEdit = async () => {
     setIsPreparing(true);
+    dbg.log("PostControls", "handleEdit invoked", {
+      postCid: props.post?.savva_cid,
+      actorAddress: actorAddress(),
+      isAuthor: isAuthor(),
+    });
     try {
       await preparePostForEditing(props.post, app);
+      dbg.log("PostControls", "preparePostForEditing completed", { postCid: props.post?.savva_cid });
       navigate(`/editor/edit/${props.post.savva_cid}`);
     } catch (e) {
+      dbg.warn("PostControls", "preparePostForEditing failed", { error: String(e?.message || e) });
       pushErrorToast(e, { context: t("editor.errors.prepareForEdit") });
     } finally {
       setIsPreparing(false);

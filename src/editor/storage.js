@@ -316,3 +316,37 @@ export async function clearDraft(baseDir) {
     }
   }
 }
+
+/**
+ * Store a post encryption key in localStorage
+ * @param {string} postIdentifier - The post GUID or encryption_data.nonce
+ * @param {string} postSecretKey - The hex-encoded secret key
+ */
+export function storePostKey(postIdentifier, postSecretKey) {
+  try {
+    const storageKey = `savva:post-key:${postIdentifier}`;
+    localStorage.setItem(storageKey, postSecretKey);
+    dbg.log("storage", `Stored post key for: ${postIdentifier}`);
+  } catch (e) {
+    dbg.error("storage", `Failed to store post key for: ${postIdentifier}`, e);
+  }
+}
+
+/**
+ * Retrieve a post encryption key from localStorage
+ * @param {string} postIdentifier - The post GUID or encryption_data.nonce
+ * @returns {string|null} The hex-encoded secret key, or null if not found
+ */
+export function getStoredPostKey(postIdentifier) {
+  try {
+    const storageKey = `savva:post-key:${postIdentifier}`;
+    const key = localStorage.getItem(storageKey);
+    if (key) {
+      dbg.log("storage", `Retrieved post key for: ${postIdentifier}`);
+    }
+    return key;
+  } catch (e) {
+    dbg.error("storage", `Failed to retrieve post key for: ${postIdentifier}`, e);
+    return null;
+  }
+}
