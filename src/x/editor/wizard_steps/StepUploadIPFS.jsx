@@ -8,6 +8,7 @@ import { dbg } from "../../../utils/debug.js";
 import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
 import { pinDirectory } from "../../../ipfs/pinning/manager.js";
 import { fetchWithTimeout } from "../../../utils/net.js";
+import { encryptTextContent, encryptFile } from "../../crypto/fileEncryption.js";
 
 export default function StepUploadIPFS(props) {
   const app = useApp();
@@ -27,39 +28,89 @@ export default function StepUploadIPFS(props) {
   };
 
   const getFilesFromDraft = async () => {
-    const { postData, editorMode } = props;
+    const { postData, editorMode, postParams } = props;
     const files = [];
 
     const baseDir = resolveBaseDir(editorMode);
     const content = postData();
+    const params = postParams();
 
-    dbg.log("StepUploadIPFS", "collect start", { editorMode, baseDir, langs: Object.keys(content || {}) });
+    // Check if encryption is needed (subscribers-only audience)
+    const needsEncryption = params.audience === "subscribers";
+
+    // Generate post encryption key if needed
+    let postEncryptionKey = null;
+    let postSecretKey = null;
+
+    if (needsEncryption) {
+      const { generatePostEncryptionKey } = await import("../../crypto/postEncryption.js");
+      postEncryptionKey = generatePostEncryptionKey();
+      postSecretKey = postEncryptionKey.secretKey;
+      dbg.log("StepUploadIPFS", "Generated post encryption key", { publicKey: postEncryptionKey.publicKey });
+    }
+
+    dbg.log("StepUploadIPFS", "collect start", {
+      editorMode,
+      baseDir,
+      langs: Object.keys(content || {}),
+      needsEncryption
+    });
 
     // 1) Markdown files
     for (const lang in content) {
       const data = content[lang];
       const path = `${lang}/data.md`;
-      files.push({ file: new File([data.body || ""], path, { type: "text/markdown" }), path });
 
+      let fileContent = data.body || "";
+      let file;
+
+      if (needsEncryption && postSecretKey) {
+        // Encrypt the markdown content
+        const encryptedData = encryptTextContent(fileContent, postSecretKey);
+        file = new File([encryptedData], path, { type: "application/octet-stream" });
+        dbg.log("StepUploadIPFS", "encrypted file", { path, originalSize: fileContent.length, encryptedSize: encryptedData.length });
+      } else {
+        file = new File([fileContent], path, { type: "text/markdown" });
+      }
+
+      files.push({ file, path });
+
+      // Handle chapters
       if (Array.isArray(data.chapters)) {
         for (let i = 0; i < data.chapters.length; i++) {
           const chapterPath = `${lang}/chapters/${i + 1}.md`;
-          files.push({
-            file: new File([data.chapters[i].body || ""], chapterPath, { type: "text/markdown" }),
-            path: chapterPath,
-          });
+          const chapterContent = data.chapters[i].body || "";
+          let chapterFile;
+
+          if (needsEncryption && postSecretKey) {
+            const encryptedData = encryptTextContent(chapterContent, postSecretKey);
+            chapterFile = new File([encryptedData], chapterPath, { type: "application/octet-stream" });
+            dbg.log("StepUploadIPFS", "encrypted chapter", { path: chapterPath, originalSize: chapterContent.length, encryptedSize: encryptedData.length });
+          } else {
+            chapterFile = new File([chapterContent], chapterPath, { type: "text/markdown" });
+          }
+
+          files.push({ file: chapterFile, path: chapterPath });
         }
       }
     }
 
-    // 2) Uploads
+    // 2) Uploads (images, etc.)
     const assetNames = await getAllUploadedFileNames(baseDir);
-    dbg.log("StepUploadIPFS", "storage uploads list", { baseDir, assetNames });
+    dbg.log("StepUploadIPFS", "storage uploads list", { baseDir, assetNames, needsEncryption });
 
     for (const name of assetNames) {
       const file = await getUploadedFileAsFileObject(baseDir, name);
       if (file) {
-        files.push({ file, path: `uploads/${name}` });
+        let uploadFile = file;
+
+        if (needsEncryption && postSecretKey) {
+          // Encrypt the uploaded file
+          uploadFile = await encryptFile(file, postSecretKey);
+          dbg.log("StepUploadIPFS", "encrypted upload", { name, originalSize: file.size, encryptedSize: uploadFile.size });
+        }
+
+        files.push({ file: uploadFile, path: `uploads/${name}` });
       } else {
         dbg.warn?.("StepUploadIPFS", "missing file object for", { baseDir, name });
       }
@@ -75,9 +126,10 @@ export default function StepUploadIPFS(props) {
       baseDir,
       count: files.length,
       filesPreview,
+      encrypted: needsEncryption,
     });
 
-    return { files, baseDir, contentRefs, missing, extra };
+    return { files, baseDir, postEncryptionKey };
   };
 
   const uploadToPinningServices = async () => {
@@ -85,8 +137,8 @@ export default function StepUploadIPFS(props) {
     const services = getPinningServices();
     if (services.length === 0) throw new Error(t("editor.publish.ipfs.errorNoServices"));
 
-    const { files, baseDir } = await getFilesFromDraft();
-    dbg.log("StepUploadIPFS", "pin: files count", { count: files.length, baseDir });
+    const { files, baseDir, postEncryptionKey } = await getFilesFromDraft();
+    dbg.log("StepUploadIPFS", "pin: files count", { count: files.length, baseDir, hasEncryptionKey: !!postEncryptionKey });
 
     const progressMap = new Map(services.map((s) => [s.id, 0]));
     const updateTotalProgress = () => {
@@ -129,45 +181,88 @@ export default function StepUploadIPFS(props) {
       dbg.error("StepUploadIPFS", "inconsistent CIDs", { cids });
       throw new Error("Inconsistent CIDs returned from pinning services.");
     }
-    return firstCid;
+    return { ipfsCid: firstCid, postEncryptionKey };
   };
 
   const uploadToBackend = async () => {
-    const { postData, editorMode } = props;
+    const { postData, editorMode, postParams } = props;
     const baseDir = resolveBaseDir(editorMode);
     const formData = new FormData();
     const content = postData();
+    const params = postParams();
 
-    dbg.log("StepUploadIPFS", "backend: start", { editorMode, baseDir, langs: Object.keys(content || {}) });
+    // Check if encryption is needed (subscribers-only audience)
+    const needsEncryption = params.audience === "subscribers";
+
+    // Generate post encryption key if needed
+    let postEncryptionKey = null;
+    let postSecretKey = null;
+
+    if (needsEncryption) {
+      const { generatePostEncryptionKey } = await import("../../crypto/postEncryption.js");
+      postEncryptionKey = generatePostEncryptionKey();
+      postSecretKey = postEncryptionKey.secretKey;
+      dbg.log("StepUploadIPFS", "backend: Generated post encryption key", { publicKey: postEncryptionKey.publicKey });
+    }
+
+    dbg.log("StepUploadIPFS", "backend: start", {
+      editorMode,
+      baseDir,
+      langs: Object.keys(content || {}),
+      needsEncryption
+    });
 
     // markdown
     for (const lang in content) {
       const data = content[lang];
-      formData.append("file", new File([data.body || ""], `${lang}/data.md`, { type: "text/markdown" }));
+      const path = `${lang}/data.md`;
+      const fileContent = data.body || "";
+
+      if (needsEncryption && postSecretKey) {
+        const encryptedData = encryptTextContent(fileContent, postSecretKey);
+        formData.append("file", new File([encryptedData], path, { type: "application/octet-stream" }));
+        dbg.log("StepUploadIPFS", "backend: encrypted file", { path, size: encryptedData.length });
+      } else {
+        formData.append("file", new File([fileContent], path, { type: "text/markdown" }));
+      }
+
       if (Array.isArray(data.chapters)) {
         for (let i = 0; i < data.chapters.length; i++) {
-          formData.append(
-            "file",
-            new File([data.chapters[i].body || ""], `${lang}/chapters/${i + 1}.md`, { type: "text/markdown" })
-          );
+          const chapterPath = `${lang}/chapters/${i + 1}.md`;
+          const chapterContent = data.chapters[i].body || "";
+
+          if (needsEncryption && postSecretKey) {
+            const encryptedData = encryptTextContent(chapterContent, postSecretKey);
+            formData.append("file", new File([encryptedData], chapterPath, { type: "application/octet-stream" }));
+            dbg.log("StepUploadIPFS", "backend: encrypted chapter", { path: chapterPath, size: encryptedData.length });
+          } else {
+            formData.append("file", new File([chapterContent], chapterPath, { type: "text/markdown" }));
+          }
         }
       }
     }
 
     // uploads
     const assetFileNames = await getAllUploadedFileNames(baseDir);
-    dbg.log("StepUploadIPFS", "backend: storage uploads list", { baseDir, assetFileNames });
+    dbg.log("StepUploadIPFS", "backend: storage uploads list", { baseDir, assetFileNames, needsEncryption });
 
     for (const fileName of assetFileNames) {
       const file = await getUploadedFileAsFileObject(baseDir, fileName);
       if (file) {
-        formData.append("file", file, `uploads/${fileName}`);
+        if (needsEncryption && postSecretKey) {
+          const encryptedFile = await encryptFile(file, postSecretKey);
+          formData.append("file", encryptedFile, `uploads/${fileName}`);
+          dbg.log("StepUploadIPFS", "backend: encrypted upload", { fileName, originalSize: file.size, encryptedSize: encryptedFile.size });
+        } else {
+          formData.append("file", file, `uploads/${fileName}`);
+        }
       } else {
         dbg.warn?.("StepUploadIPFS", "backend: missing file object", { baseDir, fileName });
       }
     }
 
-    return await uploadWithProgress(`${httpBase()}store-dir`, formData, { baseDir, assetCount: assetFileNames.length });
+    const cid = await uploadWithProgress(`${httpBase()}store-dir`, formData, { baseDir, assetCount: assetFileNames.length });
+    return { ipfsCid: cid, postEncryptionKey };
   };
 
   const uploadWithProgress = (url, formData, ctx = {}) => {
@@ -209,9 +304,9 @@ export default function StepUploadIPFS(props) {
     setTimeout(async () => {
       try {
         const usePinners = isPinningEnabled();
-        const cid = usePinners ? await uploadToPinningServices() : await uploadToBackend();
-        dbg.log("StepUploadIPFS", "CID ready", { cid });
-        props.onComplete?.({ ipfsCid: cid });
+        const result = usePinners ? await uploadToPinningServices() : await uploadToBackend();
+        dbg.log("StepUploadIPFS", "Upload complete", result);
+        props.onComplete?.(result);
       } catch (e) {
         dbg.error("StepUploadIPFS", "upload process error", { message: e?.message, stack: e?.stack });
         setError(e.message);

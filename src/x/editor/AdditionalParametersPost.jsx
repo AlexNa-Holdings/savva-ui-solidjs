@@ -3,6 +3,12 @@ import { createMemo, createResource, createSignal, createEffect, For, Show, onMo
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
+import AmountInput from "../ui/AmountInput.jsx";
+import Spinner from "../ui/Spinner.jsx";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+
+// LocalStorage key for saved minimum payment preference
+const MIN_PAYMENT_STORAGE_KEY = "savva_editor_min_weekly_payment";
 
 function buildCategoryTree(categories = []) {
   const root = [];
@@ -67,6 +73,129 @@ export default function AdditionalParametersPost(props) {
   const lang = () => (props.activeLang?.() || app.lang?.() || "en").toLowerCase();
 
   const labelCls = "font-medium justify-self-end text-right";
+
+  // Get staking token address for AmountInput
+  const [stakingTokenAddress] = createResource(
+    () => app.desiredChain()?.id,
+    async () => {
+      try {
+        const staking = await getSavvaContract(app, "Staking");
+        return staking.address.toLowerCase();
+      } catch {
+        return "";
+      }
+    }
+  );
+
+  // Fetch all subscribers to calculate eligible count
+  async function fetchAllSponsors() {
+    const authorAddr = app.authorizedUser?.()?.address;
+    console.log(`[AdditionalParametersPost] fetchAllSponsors called for ${authorAddr}`);
+    if (!app.wsMethod || !authorAddr) {
+      console.log(`[AdditionalParametersPost] Skipping fetch - no wsMethod or address`);
+      return [];
+    }
+    try {
+      console.log(`[AdditionalParametersPost] Calling get-sponsors with timeout 30s...`);
+      const getSponsors = app.wsMethod("get-sponsors");
+      const res = await getSponsors(
+        {
+          domain: "",
+          user_addr: authorAddr,
+          n_weeks: 0, // Get all subscribers (active and inactive)
+          limit: 1000,
+          offset: 0,
+        },
+        { timeoutMs: 30000 } // Increase timeout to 30 seconds
+      );
+      console.log(`[AdditionalParametersPost] get-sponsors succeeded:`, res);
+      return Array.isArray(res?.sponsors) ? res.sponsors : [];
+    } catch (e) {
+      console.error("[AdditionalParametersPost] Failed to fetch sponsors:", e);
+      return [];
+    }
+  }
+
+  const [allSponsors] = createResource(
+    () => ({
+      address: app.authorizedUser?.()?.address,
+      audience: props.postParams?.()?.audience
+    }),
+    async ({ address, audience }) => {
+      // Only fetch when audience is "subscribers"
+      if (audience !== "subscribers" || !address) return [];
+      return await fetchAllSponsors();
+    }
+  );
+
+  // Calculate eligible subscribers based on minimum payment
+  const eligibleSubscribersCount = createMemo(() => {
+    const sponsors = allSponsors();
+    if (!sponsors || sponsors.length === 0) return 0;
+
+    const minWei = props.postParams?.()?.minWeeklyPaymentWei;
+
+    // If no minimum set, count all active subscribers (weeks > 0)
+    if (!minWei || minWei === 0n) {
+      return sponsors.filter(s => {
+        const weeks = Number(s.weeks || 0);
+        return weeks > 0;
+      }).length;
+    }
+
+    // Count subscribers with weeks > 0 AND amount >= minimum
+    return sponsors.filter(s => {
+      const weeks = Number(s.weeks || 0);
+      const amount = BigInt(s.amount || 0);
+      return weeks > 0 && amount >= minWei;
+    }).length;
+  });
+
+  // Load saved minimum payment preference when switching to "subscribers" audience
+  createEffect(() => {
+    const audience = props.postParams?.()?.audience;
+    const currentMin = props.postParams?.()?.minWeeklyPayment;
+
+    // Only load saved preference if:
+    // 1. Audience is "subscribers"
+    // 2. No minimum is currently set
+    if (audience === "subscribers" && !currentMin) {
+      try {
+        const saved = localStorage.getItem(MIN_PAYMENT_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.text) {
+            props.setPostParams?.((p) => ({
+              ...(p || {}),
+              minWeeklyPayment: parsed.text,
+              minWeeklyPaymentWei: parsed.wei ? BigInt(parsed.wei) : undefined,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load saved minimum payment:", e);
+      }
+    }
+  });
+
+  // Save minimum payment preference when it changes
+  createEffect(() => {
+    const audience = props.postParams?.()?.audience;
+    const minPayment = props.postParams?.()?.minWeeklyPayment;
+    const minPaymentWei = props.postParams?.()?.minWeeklyPaymentWei;
+
+    // Only save if audience is "subscribers" and there's a value
+    if (audience === "subscribers" && minPayment) {
+      try {
+        localStorage.setItem(MIN_PAYMENT_STORAGE_KEY, JSON.stringify({
+          text: minPayment,
+          wei: minPaymentWei ? minPaymentWei.toString() : null,
+        }));
+      } catch (e) {
+        console.error("Failed to save minimum payment:", e);
+      }
+    }
+  });
 
   // Load categories (localized; supports A/B/C)
   const categoriesRel = createMemo(() => app.domainAssetsConfig?.()?.modules?.categories || null);
@@ -358,6 +487,69 @@ export default function AdditionalParametersPost(props) {
             />
             <div class="text-xs opacity-70">{t("editor.params.publishAsNew.help")}</div>
           </div>
+        </Show>
+
+        {/* Audience */}
+        <Show when={!isCommentMode()}>
+          <label class={labelCls}>{t("editor.params.audience.label")}</label>
+          <select
+            class="w-full max-w-[280px] px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={props.postParams?.()?.audience || "public"}
+            onChange={(e) => {
+              const val = e.currentTarget.value;
+              if (val === "public") {
+                props.setPostParams?.((p) => ({ ...(p || {}), audience: "public", minWeeklyPayment: undefined, minWeeklyPaymentWei: undefined }));
+              } else {
+                props.setPostParams?.((p) => ({ ...(p || {}), audience: val }));
+              }
+            }}
+          >
+            <option value="public">{t("editor.params.audience.public")}</option>
+            <option value="subscribers">{t("editor.params.audience.subscribers")}</option>
+          </select>
+
+          {/* Minimum weekly payment input - only show when subscribers is selected */}
+          <Show when={props.postParams?.()?.audience === "subscribers"}>
+            <>
+              <div class={labelCls}></div>
+              <div class="space-y-2">
+                <AmountInput
+                  label={t("editor.params.audience.minWeeklyPayment")}
+                  tokenAddress={stakingTokenAddress() || ""}
+                  value={props.postParams?.()?.minWeeklyPayment || ""}
+                  showMax={false}
+                  onInput={(text, wei) => {
+                    props.setPostParams?.((p) => ({
+                      ...(p || {}),
+                      minWeeklyPayment: text,
+                      minWeeklyPaymentWei: wei,
+                    }));
+                  }}
+                  helper={t("editor.params.audience.minWeeklyPaymentHelp")}
+                />
+
+                {/* Show eligible subscribers count */}
+                <div class="flex items-center gap-2 text-sm">
+                  <Show
+                    when={!allSponsors.loading}
+                    fallback={
+                      <div class="flex items-center gap-2 text-[hsl(var(--muted-foreground))]">
+                        <Spinner class="w-4 h-4" />
+                        <span>{t("editor.params.audience.loadingSubscribers")}</span>
+                      </div>
+                    }
+                  >
+                    <span class="text-[hsl(var(--muted-foreground))]">
+                      {t("editor.params.audience.eligibleSubscribers")}:
+                    </span>
+                    <span class="font-medium text-[hsl(var(--primary))]">
+                      {eligibleSubscribersCount()}
+                    </span>
+                  </Show>
+                </div>
+              </div>
+            </>
+          </Show>
         </Show>
       </div>
     </section>

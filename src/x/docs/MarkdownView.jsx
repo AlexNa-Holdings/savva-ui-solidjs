@@ -6,12 +6,15 @@ import { rehypeMediaPlayers } from "../../docs/rehype-media-players.js";
 import { rehypeImageSize } from "../../docs/rehype-image-size.js";
 import rehypeSlug from "rehype-slug";
 import remarkBreaks from "remark-breaks";
+import { ImageDecryptionObserver } from "./ImageDecryptionObserver.js";
 
 export default function MarkdownView(props) {
-  const { t } = useApp();
+  const app = useApp();
+  const { t } = app;
   const [html, setHtml] = createSignal("");
   let disposed = false;
   let container;
+  let imageObserver = null;
 
   const renderMd = async () => {
     if (disposed) return;
@@ -124,12 +127,27 @@ export default function MarkdownView(props) {
     props.rehypePlugins;
     await renderMd();
     relabelButtons();
+
+    // Start image decryption observer after content is rendered
+    if (container && !imageObserver) {
+      imageObserver = new ImageDecryptionObserver(app, container);
+      imageObserver.start();
+    } else if (imageObserver) {
+      // Content changed, re-process images
+      imageObserver.processImages();
+    }
   });
 
   onMount(() => container?.addEventListener("click", onClick));
   onCleanup(() => {
     disposed = true;
     container?.removeEventListener("click", onClick);
+
+    // Cleanup image decryption observer
+    if (imageObserver) {
+      imageObserver.stop();
+      imageObserver = null;
+    }
   });
 
   return (

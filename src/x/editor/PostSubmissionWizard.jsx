@@ -55,8 +55,25 @@ export default function PostSubmissionWizard(props) {
   const handleNextStep = (stepResult) => {
     const current = STEPS[currentStepIndex()];
     dbg.log("Wizard:handleNextStep", `Completed step '${current.id}'. Received result:`, stepResult);
-    if (current.id === "ipfs") setPublishedData(prev => ({ ...prev, ipfsCid: stepResult }));
-    else if (current.id === "ipfs_publish") setPublishedData(prev => ({ ...prev, descriptorCid: stepResult }));
+
+    if (current.id === "ipfs") {
+      // StepUploadIPFS returns { ipfsCid, postEncryptionKey }
+      const result = typeof stepResult === 'object' ? stepResult : { ipfsCid: stepResult };
+      setPublishedData(prev => ({
+        ...prev,
+        ipfsCid: result.ipfsCid,
+        postEncryptionKey: result.postEncryptionKey || null,
+      }));
+    } else if (current.id === "ipfs_publish") {
+      // StepUploadDescriptor returns { descriptorCid, postEncryptionKey }
+      const result = typeof stepResult === 'object' ? stepResult : { descriptorCid: stepResult };
+      setPublishedData(prev => ({
+        ...prev,
+        descriptorCid: result.descriptorCid,
+        postEncryptionKey: result.postEncryptionKey || null,
+      }));
+    }
+
     if (currentStepIndex() < STEPS.length - 1) setCurrentStepIndex(currentStepIndex() + 1);
     else props.onSuccess?.();
   };

@@ -7,6 +7,8 @@ import { httpBase } from "../../../net/endpoints.js";
 import { dbg } from "../../../utils/debug.js";
 import { createTextPreview } from "../../../editor/preview-utils.js";
 import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
+import { encryptDescriptorLocale, buildEncryptionSection } from "../../crypto/postEncryption.js";
+import { fetchEligibleSubscribers } from "../../crypto/fetchEligibleSubscribers.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
@@ -100,6 +102,78 @@ export default function StepUploadDescriptor(props) {
       : (app.info()?.ipfs_gateways || []);
     if (gateways.length) descriptor.gateways = gateways;
 
+    // Check if encryption is needed (subscribers-only audience)
+    const needsEncryption = params.audience === "subscribers";
+    let postEncryptionKey = null;
+    let recipients = [];
+
+    if (needsEncryption) {
+      L("Encryption needed - generating post key and fetching subscribers");
+
+      const authorAddress = app.authorizedUser?.()?.address;
+      if (!authorAddress) {
+        throw new Error("Author address not found");
+      }
+
+      // FIRST: Check if author has a reading key (required to decrypt their own posts)
+      const { fetchReadingKey } = await import("../../crypto/readingKey.js");
+      let authorReadingKey;
+
+      try {
+        authorReadingKey = await fetchReadingKey(app, authorAddress);
+      } catch (err) {
+        E("Failed to fetch author reading key", err);
+        throw new Error(t("editor.publish.encryption.authorKeyFetchError"));
+      }
+
+      if (!authorReadingKey || !authorReadingKey.publicKey) {
+        E("Author does not have a reading key");
+        throw new Error(t("editor.publish.encryption.authorNoReadingKey"));
+      }
+
+      L("Author reading key found", { publicKey: authorReadingKey.publicKey });
+
+      // Get the encryption key from publishedData (generated in StepUploadIPFS)
+      const pd = props.publishedData?.();
+      postEncryptionKey = pd?.postEncryptionKey;
+
+      if (!postEncryptionKey) {
+        E("Post encryption key not found in publishedData");
+        throw new Error("Post encryption key not found. This should have been generated in the IPFS upload step.");
+      }
+
+      L("Using post encryption key from StepUploadIPFS", { publicKey: postEncryptionKey.publicKey });
+
+      // Fetch eligible subscribers with their reading keys
+      const minPaymentWei = params.minWeeklyPaymentWei || 0n;
+
+      try {
+        recipients = await fetchEligibleSubscribers(app, authorAddress, minPaymentWei);
+        L(`Found ${recipients.length} eligible subscribers with reading keys`);
+      } catch (err) {
+        E("Failed to fetch subscribers", err);
+        throw new Error("Failed to fetch eligible subscribers: " + err.message);
+      }
+
+      // Check if there are any eligible subscribers with reading keys
+      if (recipients.length === 0) {
+        E("No eligible subscribers with published reading keys found");
+        throw new Error(t("editor.publish.encryption.noRecipientsWithKeys"));
+      }
+
+      // IMPORTANT: Add author to recipients so they can decrypt their own post
+      recipients.push({
+        address: authorAddress,
+        publicKey: authorReadingKey.publicKey,
+        scheme: authorReadingKey.scheme,
+        nonce: authorReadingKey.nonce,
+        amount: 0n,
+        weeks: 0,
+      });
+
+      L(`Total recipients (including author): ${recipients.length}`);
+    }
+
     const langs = [];
     for (const lang in content) {
       const data = content[lang] || {};
@@ -110,7 +184,7 @@ export default function StepUploadDescriptor(props) {
 
       langs.push(lang);
       const langParams = params.locales?.[lang] || {};
-      const locale = {
+      let locale = {
         title: data.title || "",
         text_preview: createTextPreview(data.body || "", contentType),
         tags: langParams.tags || [],
@@ -128,10 +202,28 @@ export default function StepUploadDescriptor(props) {
           });
         }
       }
+
+      // Encrypt locale if needed
+      if (needsEncryption && postEncryptionKey) {
+        L(`Encrypting locale: ${lang}`);
+        locale = encryptDescriptorLocale(locale, postEncryptionKey.secretKey);
+      }
+
       descriptor.locales[lang] = locale;
     }
 
-    L("descriptor composed", { languages: langs, gateways });
+    // Add encryption section if needed
+    if (needsEncryption && postEncryptionKey && recipients.length > 0) {
+      L("Building encryption section");
+      descriptor.encryption = buildEncryptionSection(
+        postEncryptionKey.publicKey,
+        recipients,
+        postEncryptionKey.secretKey
+      );
+      L(`Encryption section added with ${recipients.length} recipients`);
+    }
+
+    L("descriptor composed", { languages: langs, gateways, encrypted: needsEncryption, recipients: recipients.length });
 
     let yamlStr;
     try { yamlStr = toYaml(descriptor); }
@@ -150,7 +242,12 @@ export default function StepUploadDescriptor(props) {
     const cid = extractCid(json);
     if (!cid) throw new Error("API did not return a 'cid' for the uploaded descriptor.");
     L("success", { cid });
-    return cid;
+
+    // Return both the CID and the encryption key (if encrypted)
+    return {
+      descriptorCid: cid,
+      postEncryptionKey: needsEncryption ? postEncryptionKey : null,
+    };
   }
 
   function tryStart() {

@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/hashRouter.js";
 
 import { ipfs } from "../../ipfs/index.js";
+import { fetchBestWithDecryption } from "../../ipfs/encryptedFetch.js";
 import { dbg } from "../../utils/debug.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { getPostContentBaseCid } from "../../ipfs/utils.js";
@@ -34,6 +35,11 @@ import PostInfo from "../post/PostInfo.jsx";
 
 // ⬇️ Profile store (same as PostCard)
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
+
+// ⬇️ Encryption imports
+import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost } from "../crypto/postDecryption.js";
+import { storeReadingKey } from "../crypto/readingKeyStorage.js";
+import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 
 const getIdentifier = (route) => route().split("/")[2] || "";
 
@@ -68,7 +74,7 @@ async function fetchPostDetails(mainPost, app) {
   }
 }
 
-async function fetchMainContent(details, app, lang, chapterIndex) {
+async function fetchMainContent(details, app, lang, chapterIndex, postSecretKey = null) {
   if (!details?.descriptor || !lang) return "";
 
   const { descriptor, dataCidForContent } = details;
@@ -87,8 +93,12 @@ async function fetchMainContent(details, app, lang, chapterIndex) {
   if (contentPath) {
     try {
       const postGateways = descriptor?.gateways || [];
-      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways });
-      return await res.text();
+      // Use fetchBestWithDecryption - it will automatically decrypt if context is set
+      const { res, decrypted } = await fetchBestWithDecryption(app, contentPath, { postGateways });
+      const rawContent = await res.arrayBuffer();
+
+      // Convert to text (already decrypted if needed)
+      return new TextDecoder().decode(rawContent);
     } catch (error) {
       return `## ${app.t("post.loadError")}\n\n\`\`\`\n${error.message}\n\`\`\``;
     }
@@ -146,9 +156,121 @@ export default function PostPage() {
   const [postLang, setPostLang] = createSignal(null);
   const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
 
+  // ---- Encryption state ----
+  const userAddress = createMemo(() => app.authorizedUser?.()?.address || "");
+
+  const content = createMemo(() => post()?.savva_content || post()?.content);
+  const isEncrypted = createMemo(() => !!(content()?.encrypted && !post()?._decrypted));
+  const encryptionData = createMemo(() => content()?.encryption);
+
+  const canDecrypt = createMemo(() => {
+    if (!isEncrypted()) return false;
+    const encData = encryptionData();
+    if (!encData || !encData.reading_key_nonce) return false;
+    return canDecryptPost(userAddress(), encData);
+  });
+
+  const [postSecretKey, setPostSecretKey] = createSignal(null);
+  const [isDecrypting, setIsDecrypting] = createSignal(false);
+  const [decryptError, setDecryptError] = createSignal(null);
+
+  // Set/clear encrypted post context for automatic IPFS decryption
+  createEffect(() => {
+    const key = postSecretKey();
+    const dataCid = details()?.dataCidForContent;
+
+    if (key && dataCid) {
+      setEncryptedPostContext({ dataCid, postSecretKey: key });
+    } else {
+      clearEncryptedPostContext();
+    }
+  });
+
+  // Clear context on unmount
+  onCleanup(() => {
+    clearEncryptedPostContext();
+  });
+
+  // Auto-decrypt metadata if we have the key stored
+  createEffect(async () => {
+    if (!isEncrypted() || post()?._decrypted) return;
+    if (!canDecrypt()) return;
+
+    const encData = encryptionData();
+    if (!encData) return;
+
+    try {
+      setIsDecrypting(true);
+      const userAddr = userAddress();
+
+      // Decrypt the post (metadata)
+      const decrypted = await decryptPost(post(), userAddr);
+      setPost(decrypted);
+
+      // Get the post secret key for content decryption
+      const readingKey = await getReadingSecretKey(userAddr, encData.reading_key_nonce);
+      const postKey = decryptPostEncryptionKey(encData, readingKey);
+      setPostSecretKey(postKey);
+
+      dbg.log("PostPage", "Auto-decrypted post", { hasPostKey: !!postKey });
+    } catch (error) {
+      dbg.error("PostPage", "Auto-decrypt failed", { error });
+      setDecryptError(error.message);
+    } finally {
+      setIsDecrypting(false);
+    }
+  });
+
+  // Manual decryption handler
+  const handleDecrypt = async (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    const encData = encryptionData();
+    if (!encData) return;
+
+    try {
+      setIsDecrypting(true);
+      setDecryptError(null);
+      const userAddr = userAddress();
+
+      // Get reading secret key (will prompt for signature)
+      const readingKey = await getReadingSecretKey(userAddr, encData.reading_key_nonce);
+      if (!readingKey) {
+        throw new Error("Failed to get reading key");
+      }
+
+      // Store the key for future use
+      storeReadingKey(userAddr, {
+        nonce: encData.reading_key_nonce,
+        secretKey: readingKey,
+        publicKey: encData.reading_public_key,
+      });
+
+      // Decrypt the post
+      const decrypted = await decryptPost(post(), userAddr, readingKey);
+      setPost(decrypted);
+
+      // Get post secret key for content decryption
+      const postKey = decryptPostEncryptionKey(encData, readingKey);
+      setPostSecretKey(postKey);
+
+      dbg.log("PostPage", "Manual decrypt successful");
+    } catch (error) {
+      dbg.error("PostPage", "Manual decrypt failed", { error });
+      setDecryptError(error.message);
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
+
+  const shouldCoverEncrypted = createMemo(() => {
+    return isEncrypted() && !post()?._decrypted && !isDecrypting();
+  });
+
   const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex() }),
-    ({ details, lang, chapterIndex }) => fetchMainContent(details, app, lang, chapterIndex)
+    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex(), postSecretKey: postSecretKey() }),
+    ({ details, lang, chapterIndex, postSecretKey }) => fetchMainContent(details, app, lang, chapterIndex, postSecretKey)
   );
 
   // normalize to short CID
@@ -176,7 +298,10 @@ export default function PostPage() {
   const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
 
   const title = createMemo(() => {
-    const loc = details()?.descriptor?.locales?.[postLang()];
+    // Use decrypted content from post() if available, otherwise fall back to descriptor
+    const p = post();
+    const contentLocales = p?.savva_content?.locales || p?.content?.locales;
+    const loc = contentLocales?.[postLang()] || details()?.descriptor?.locales?.[postLang()];
     return (loc?.title || "").trim();
   });
 
@@ -294,6 +419,7 @@ export default function PostPage() {
                   <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_12rem] gap-6 items-start">
                     {/* Left column with optional warning cover */}
                     <div class="relative min-h-[12rem]">
+                      {/* NSFW Warning Overlay */}
                       <Show when={shouldWarn() && !revealed()}>
                         <div class="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-[hsla(var(--background),0.85)] backdrop-blur-sm">
                           <div class="text-center space-y-3 px-6">
@@ -309,7 +435,42 @@ export default function PostPage() {
                         </div>
                       </Show>
 
-                      <div class={shouldWarn() && !revealed() ? "select-none pointer-events-none blur-sm" : ""}>
+                      {/* Encrypted Content Overlay */}
+                      <Show when={shouldCoverEncrypted()}>
+                        <div class="absolute inset-0 z-20 flex items-center justify-center rounded-md">
+                          <div class="absolute inset-0 rounded-md bg-[hsl(var(--card))]/90 backdrop-blur-md" />
+                          <div class="relative z-10 flex flex-col items-center gap-4 text-center px-6 max-w-md">
+                            <svg class="w-16 h-16 text-[hsl(var(--muted-foreground))]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <div class="space-y-2">
+                              <div class="text-lg font-semibold">{t("post.encrypted.title") || "Encrypted Content"}</div>
+                              <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                {t("post.encrypted.description") || "This post is encrypted for subscribers only"}
+                              </p>
+                            </div>
+                            <Show when={userAddress()}>
+                              <button
+                                onClick={handleDecrypt}
+                                disabled={isDecrypting()}
+                                class="px-6 py-3 rounded-md font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                              >
+                                {isDecrypting() ? t("post.encrypted.decrypting") || "Decrypting..." : t("post.encrypted.unlock") || "Unlock Content"}
+                              </button>
+                            </Show>
+                            <Show when={!userAddress()}>
+                              <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                {t("post.encrypted.loginRequired") || "Please connect your wallet to unlock"}
+                              </p>
+                            </Show>
+                            <Show when={decryptError()}>
+                              <p class="text-sm text-[hsl(var(--destructive))]">{decryptError()}</p>
+                            </Show>
+                          </div>
+                        </div>
+                      </Show>
+
+                      <div class={(shouldWarn() && !revealed()) || shouldCoverEncrypted() ? "select-none pointer-events-none blur-sm" : ""}>
                         <Switch>
                           <Match when={details.loading || mainContent.loading}>
                             <div class="flex justify-center p-8"><Spinner /></div>

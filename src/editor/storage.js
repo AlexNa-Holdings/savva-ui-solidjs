@@ -195,6 +195,11 @@ export async function loadDraft(baseDir) {
   const postData = {};
   const params = paramsJson ? JSON.parse(paramsJson) : {};
 
+  // Convert minWeeklyPaymentWei back to BigInt if it exists
+  if (params.minWeeklyPaymentWei && typeof params.minWeeklyPaymentWei === 'string') {
+    params.minWeeklyPaymentWei = BigInt(params.minWeeklyPaymentWei);
+  }
+
   if (descriptorYaml) {
     const descriptor = parse(descriptorYaml);
     for (const lang in descriptor.locales) {
@@ -245,10 +250,16 @@ export async function getDraftParams(baseDir) {
 export async function saveDraft(baseDir, draftData) {
   dbg.log("storage", `Saving draft to '${baseDir}'...`, draftData);
   const dirHandle = await getDirectoryHandle(baseDir);
-  
+
   const { content, params } = draftData;
 
-  const finalParams = JSON.parse(JSON.stringify(params || {}));
+  // Convert BigInt values to strings before JSON serialization
+  const serializableParams = { ...(params || {}) };
+  if (serializableParams.minWeeklyPaymentWei) {
+    serializableParams.minWeeklyPaymentWei = serializableParams.minWeeklyPaymentWei.toString();
+  }
+
+  const finalParams = JSON.parse(JSON.stringify(serializableParams));
   if (!finalParams.locales) finalParams.locales = {};
 
   const descriptor = {

@@ -13,6 +13,7 @@ import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 import { resolvePostCidPath } from "../../ipfs/utils.js";
+import { canDecryptPost, decryptPostMetadata } from "../crypto/postDecryption.js";
 
 function PinIcon(props) {
   return (
@@ -98,6 +99,41 @@ export default function PostCard(props) {
   const fund = () => base()?.fund;
   const isListMode = () => props.mode === "list";
 
+  // Encryption handling
+  const isEncrypted = createMemo(() => !!(content()?.encrypted && !base()?._decrypted));
+  const userAddress = createMemo(() => app.authorizedUser()?.address);
+
+  const canDecrypt = createMemo(() => {
+    if (!isEncrypted()) return false;
+    const addr = userAddress();
+    if (!addr) return false;
+    const encData = content()?.encryption;
+    if (!encData) return false;
+    return canDecryptPost(addr, encData);
+  });
+
+  // Auto-decrypt if we have the key stored
+  createEffect(async () => {
+    if (!isEncrypted() || base()?._decrypted) return;
+    if (!canDecrypt()) return;
+
+    try {
+      const addr = userAddress();
+      const originalBase = base();
+      const decrypted = await decryptPostMetadata(originalBase, addr);
+
+      // Ensure we preserve all original fields (short_cid, savva_cid, etc)
+      const merged = { ...originalBase, ...decrypted };
+
+      // Update the item with decrypted data
+      setItem("_raw", reconcile(merged));
+      setItem(reconcile({ _raw: merged, ...merged }));
+    } catch (error) {
+      console.error("Auto-decryption failed:", error);
+    }
+  });
+
+
   const displayImageSrc = createMemo(() => {
     const thumbnailPath = content()?.thumbnail;
     if (thumbnailPath) return resolvePostCidPath(base(), thumbnailPath);
@@ -115,17 +151,24 @@ export default function PostCard(props) {
   });
   const shouldCover = createMemo(() => isSensitive() && nsfwPref() === "w" && !revealed());
 
+  // Encrypted content cover (takes precedence over NSFW)
+  const shouldCoverEncrypted = createMemo(() => isEncrypted() && !canDecrypt());
+
   // Banned ribbons
   const isBannedPost = createMemo(() => !!base()?.banned);
   const isBannedAuthor = createMemo(() => !!(base()?.author_banned || base()?.author?.banned));
 
   const handleCardClick = (e) => {
+    // Only block navigation for NSFW cover, not encrypted content
+    // (PostPage will handle encrypted content display)
     if (shouldCover()) {
       e.preventDefault();
       e.stopPropagation();
       return;
     }
-    const id = base()?.id ?? item.id;
+    const b = base();
+    // Prefer short_cid, fallback to savva_cid, then id
+    const id = b?.short_cid || b?.savva_cid || b?.id || item.short_cid || item.savva_cid || item.id;
     if (id) {
       app.setSavedScrollY?.(window.scrollY);
       navigate(`/post/${id}`);
@@ -165,8 +208,29 @@ export default function PostCard(props) {
           </div>
         </Show>
 
-        {/* NSFW warning over the image */}
-        <Show when={shouldCover()}>
+        {/* Encrypted content warning (takes precedence) */}
+        <Show when={shouldCoverEncrypted()}>
+          <div
+            class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center cursor-pointer"
+            onClick={handleCardClick}
+          >
+            <div class="absolute inset-0 rounded-[inherit] bg-[hsl(var(--card))]/90 backdrop-blur-md" />
+            <div class="relative z-10 flex flex-col items-center gap-3 text-center px-4">
+              <svg class="w-12 h-12 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <div class="text-sm font-semibold text-[hsl(var(--foreground))]">
+                {t("post.encrypted.title") || "Encrypted Content"}
+              </div>
+              <div class="text-xs text-[hsl(var(--muted-foreground))]">
+                {t("post.encrypted.description") || "Click to view"}
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* NSFW warning over the image (shown if not encrypted) */}
+        <Show when={shouldCover() && !shouldCoverEncrypted()}>
           <div
             class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
             onClick={(e) => {
@@ -215,7 +279,7 @@ export default function PostCard(props) {
       </div>
 
       {/* Thin mask over text area when covered */}
-      <Show when={shouldCover()}>
+      <Show when={shouldCover() || shouldCoverEncrypted()}>
         <div
           class="absolute inset-0 z-10 rounded-md bg-[hsl(var(--card))]/70 backdrop-blur-[2px]"
           onClick={(e) => {
