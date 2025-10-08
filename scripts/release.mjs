@@ -86,12 +86,11 @@ function deploy() {
     console.error("Missing DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH in .env — skipping SCP.");
     return;
   }
-  const keyOpt = DEPLOY_SSH_KEY ? `-i "${DEPLOY_SSH_KEY}"` : "";
-  const portOpt = DEPLOY_PORT ? `-p ${DEPLOY_PORT}` : "";
+  const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
 
   // Ensure path exists, then scp
-  sh(`ssh ${keyOpt} ${portOpt} ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
-  sh(`scp ${keyOpt} ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
+  sh(`ssh ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
+  sh(`scp ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
 }
 
 (async function main() {
