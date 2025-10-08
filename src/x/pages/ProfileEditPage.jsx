@@ -36,7 +36,7 @@ async function fetchProfileForEdit(params) {
 
     if (identifier.startsWith("@")) {
       const userName = identifier.substring(1).toLowerCase();
-      const address = await userProfileContract.read.owners([userName]);
+      const address = await userProfileContract.read.getOwner([userName]);
       if (!address || address === "0x0000000000000000000000000000000000000000") {
         return { error: "User does not exist." };
       }
@@ -46,13 +46,13 @@ async function fetchProfileForEdit(params) {
     }
 
     const [avatarCid, profileCid, name] = await Promise.all([
-      userProfileContract.read.avatars([userAddress]),
+      userProfileContract.read.getAvatar([userAddress]),
       userProfileContract.read.getString([
         userAddress,
         toHexBytes32(app.selectedDomainName()),
         toHexBytes32("profile_cid"),
       ]),
-      userProfileContract.read.names([userAddress]),
+      userProfileContract.read.getName([userAddress]),
     ]);
 
     let ipfsData = {};
@@ -294,7 +294,7 @@ export default function ProfileEditPage() {
       debounceTimer = setTimeout(async () => {
         try {
           const contract = await getSavvaContract(app, "UserProfile");
-          const ownerAddress = await contract.read.owners([lowerValue]);
+          const ownerAddress = await contract.read.getOwner([lowerValue]);
           const checksummedOwner =
             ownerAddress !== "0x0000000000000000000000000000000000000000" ? toChecksumAddress(ownerAddress) : null;
 

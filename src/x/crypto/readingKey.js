@@ -198,36 +198,28 @@ export async function publishReadingKey(app, publicKey, nonce) {
   // 2. reading_key_scheme
   // 3. reading_key_nonce
 
-  // For batch efficiency, we could use multicall, but for simplicity
-  // we'll do three separate calls (or you can combine them)
-
+  // Use the new set() method to batch all three values in a single transaction
   await sendAsActor(app, {
     contractName: "UserProfile",
-    functionName: "setString",
+    functionName: "set",
     args: [
       toHexBytes32(domainName),
-      toHexBytes32("reading_public_key"),
-      publicKey
-    ],
-  });
-
-  await sendAsActor(app, {
-    contractName: "UserProfile",
-    functionName: "setString",
-    args: [
-      toHexBytes32(domainName),
-      toHexBytes32("reading_key_scheme"),
-      READING_KEY_SCHEME
-    ],
-  });
-
-  await sendAsActor(app, {
-    contractName: "UserProfile",
-    functionName: "setString",
-    args: [
-      toHexBytes32(domainName),
-      toHexBytes32("reading_key_nonce"),
-      nonce
+      // stringKeys
+      [
+        toHexBytes32("reading_public_key"),
+        toHexBytes32("reading_key_scheme"),
+        toHexBytes32("reading_key_nonce")
+      ],
+      // stringValues
+      [
+        publicKey,
+        READING_KEY_SCHEME,
+        nonce
+      ],
+      // uintKeys (empty)
+      [],
+      // uintValues (empty)
+      []
     ],
   });
 }

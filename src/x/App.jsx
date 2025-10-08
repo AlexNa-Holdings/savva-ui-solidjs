@@ -34,6 +34,7 @@ import AdminActionsBridge from "./admin/AdminActionsBridge.jsx";
 import PromoCodesPage from "./pages/PromoCodesPage.jsx";
 import PromoRedeemPage from "./pages/PromoRedeemPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
+import ReadingKeyInviteManager from "./main/ReadingKeyInviteManager.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -143,6 +144,7 @@ export default function App() {
           <AlertManager />
           <VersionChecker />
           <AdminActionsBridge />
+          <ReadingKeyInviteManager />
 
           <Show when={domainRevision()} keyed>
             <>

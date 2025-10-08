@@ -12,23 +12,7 @@
   },
   {
     "inputs": [],
-    "name": "FailedDeployment",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "balance",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "needed",
-        "type": "uint256"
-      }
-    ],
-    "name": "InsufficientBalance",
+    "name": "ERC1167FailedCreateClone",
     "type": "error"
   },
   {
