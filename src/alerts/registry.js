@@ -26,6 +26,7 @@ export const alertRegistry = {
   unbanned_user: bh.handleUnbannedUser,
 
   list_updated: h.handleListUpdated,
+  error: h.handleError,
 
 };
 

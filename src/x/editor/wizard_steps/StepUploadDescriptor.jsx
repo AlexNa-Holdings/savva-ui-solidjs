@@ -9,6 +9,7 @@ import { createTextPreview } from "../../../editor/preview-utils.js";
 import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/storage.js";
 import { encryptDescriptorLocale, buildEncryptionSection } from "../../crypto/postEncryption.js";
 import { fetchEligibleSubscribers } from "../../crypto/fetchEligibleSubscribers.js";
+import { storePostKey } from "../../../editor/storage.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
@@ -127,11 +128,40 @@ export default function StepUploadDescriptor(props) {
       }
 
       if (!authorReadingKey || !authorReadingKey.publicKey) {
-        E("Author does not have a reading key");
-        throw new Error(t("editor.publish.encryption.authorNoReadingKey"));
-      }
+        E("Author does not have a reading key - prompting user to generate one");
 
-      L("Author reading key found", { publicKey: authorReadingKey.publicKey });
+        // Prompt user to generate and publish reading key
+        const shouldGenerate = confirm(
+          "To publish encrypted posts, you need to generate a Reading Key. " +
+          "This will require signing a message with your wallet.\n\n" +
+          "Generate Reading Key now?"
+        );
+
+        if (!shouldGenerate) {
+          throw new Error("Publishing encrypted posts requires a Reading Key");
+        }
+
+        // Generate and publish the reading key
+        const { generateReadingKey, publishReadingKey } = await import("../../crypto/readingKey.js");
+
+        try {
+          L("Generating reading key for author");
+          const newReadingKey = await generateReadingKey(authorAddress);
+          L("Reading key generated", { publicKey: newReadingKey.publicKey });
+
+          L("Publishing reading key to blockchain");
+          await publishReadingKey(app, newReadingKey.publicKey, newReadingKey.nonce);
+          L("Reading key published successfully");
+
+          // Use the newly generated key
+          authorReadingKey = newReadingKey;
+        } catch (err) {
+          E("Failed to generate/publish reading key", err);
+          throw new Error("Failed to generate Reading Key: " + err.message);
+        }
+      } else {
+        L("Author reading key found", { publicKey: authorReadingKey.publicKey });
+      }
 
       // Get the encryption key from publishedData (generated in StepUploadIPFS)
       const pd = props.publishedData?.();
@@ -171,7 +201,51 @@ export default function StepUploadDescriptor(props) {
         weeks: 0,
       });
 
-      L(`Total recipients (including author): ${recipients.length}`);
+      // Add big_brothers from domain configuration to recipients
+      const currentDomain = app.selectedDomainName?.();
+      const info = app.info();
+      const domainConfig = info?.domains?.find(d => d.name === currentDomain);
+      const bigBrothers = domainConfig?.big_brothers || [];
+
+      if (bigBrothers.length > 0) {
+        L(`Adding ${bigBrothers.length} big_brothers from domain config to recipients`);
+
+        // Create a set of existing recipient addresses for deduplication
+        const existingAddresses = new Set(
+          recipients.map(r => String(r.address).toLowerCase())
+        );
+
+        for (const bbAddress of bigBrothers) {
+          // Skip if this address is already in the recipient list
+          if (existingAddresses.has(String(bbAddress).toLowerCase())) {
+            L(`Big brother ${bbAddress} is already in recipient list - skipping`);
+            continue;
+          }
+
+          try {
+            const bbReadingKey = await fetchReadingKey(app, bbAddress);
+            if (bbReadingKey && bbReadingKey.publicKey) {
+              recipients.push({
+                address: bbAddress,
+                publicKey: bbReadingKey.publicKey,
+                scheme: bbReadingKey.scheme,
+                nonce: bbReadingKey.nonce,
+                amount: 0n,
+                weeks: 0,
+              });
+              existingAddresses.add(String(bbAddress).toLowerCase());
+              L(`Added big_brother ${bbAddress} to recipients`);
+            } else {
+              E(`Big brother ${bbAddress} does not have a reading key - skipping`);
+            }
+          } catch (err) {
+            E(`Failed to fetch reading key for big_brother ${bbAddress}`, err);
+            // Continue with other big brothers even if one fails
+          }
+        }
+      }
+
+      L(`Total recipients (including author and big_brothers): ${recipients.length}`);
     }
 
     const langs = [];

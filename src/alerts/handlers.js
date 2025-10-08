@@ -256,3 +256,67 @@ export function handleListUpdated(app, payload) {
     dbg.warn?.("Alerts:list_updated", "failed to handle", e);
   }
 }
+
+export function handleError(app, payload) {
+  try {
+    dbg.log("Alerts:error", payload);
+
+    const data = payload?.data || {};
+    const user = data?.user;
+    const errorMessage = data?.error || payload?.error || "";
+
+    if (!user?.address) {
+      dbg.log("Alerts:error", "No user address in error payload, ignoring");
+      return;
+    }
+
+    // Normalize addresses for comparison
+    const errorUserAddress = String(user.address).toLowerCase();
+    const authorizedUserAddress = String(app.authorizedUser?.()?.address || "").toLowerCase();
+
+    // Check if the error is for the current user
+    const isCurrentUser = errorUserAddress === authorizedUserAddress;
+
+    // Check if the error is for one of the user's NPO addresses
+    let isUserNpo = false;
+    const npoMemberships = app.npoMemberships?.() || [];
+    if (npoMemberships.length > 0) {
+      isUserNpo = npoMemberships.some(
+        (npo) => String(npo.address || "").toLowerCase() === errorUserAddress
+      );
+    }
+
+    // Only show toast if it's the current user or one of their NPOs
+    if (!isCurrentUser && !isUserNpo) {
+      dbg.log(
+        "Alerts:error",
+        `Error is for different user (${errorUserAddress}), ignoring`
+      );
+      return;
+    }
+
+    // Build detailed error message
+    let details = errorMessage;
+    if (data.type) {
+      details = `Type: ${data.type}\n${details}`;
+    }
+    if (user.name) {
+      details = `User: ${user.name} (${user.address})\n${details}`;
+    }
+
+    pushToast({
+      type: "error",
+      message: "Error Processing Content",
+      details: details || "An unknown error occurred",
+      autohideMs: 15000,
+    });
+
+    dbg.log("Alerts:error", "Displayed error toast for user", {
+      user: user.address,
+      isCurrentUser,
+      isUserNpo,
+    });
+  } catch (e) {
+    dbg.warn?.("Alerts:error", "failed to handle error alert", e);
+  }
+}

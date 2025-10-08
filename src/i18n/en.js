@@ -248,6 +248,8 @@ export default {
   "editor.params.audience.minWeeklyPaymentHelp": "Only subscribers paying at least this amount per week can view this post.",
   "editor.params.audience.loadingSubscribers": "Loading subscribers...",
   "editor.params.audience.eligibleSubscribers": "Will receive this post",
+  "editor.params.audience.encryptionWarning.title": "Important Notice:",
+  "editor.params.audience.encryptionWarning.message": "Encrypted content is accessible to authorized site administrators for moderation purposes. Distribution of illegal or harmful content is strictly prohibited and may result in legal consequences. By publishing encrypted content, you acknowledge and accept these terms.",
   "editor.preview": "Preview",
   "editor.previewPost": "Preview Post",
   "editor.publish.descriptor.errorTitle": "Descriptor Upload Failed",
