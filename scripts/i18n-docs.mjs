@@ -16,9 +16,9 @@
 //   node scripts/i18n-docs.mjs
 //
 // Env:
-//   OPENAI_API_KEY  (required)
-//   OPENAI_MODEL    (optional, default: gpt-4o-mini)
-//   DRY_RUN=1       (optional)
+//   OPENAI_API_KEY_PATH  (required, path to file containing API key)
+//   OPENAI_MODEL         (optional, default: gpt-4o-mini)
+//   DRY_RUN=1            (optional)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -44,12 +44,23 @@ const EN_DIR = path.join(DEV_DOCS_DIR, "en");
 const STATE_FILE = ".i18n-docs-state.json";
 const DRY_RUN = process.env.DRY_RUN === "1";
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+// Read API key from file path
+const OPENAI_KEY_PATH = process.env.OPENAI_API_KEY_PATH || "";
+let OPENAI_KEY = "";
+if (OPENAI_KEY_PATH) {
+  try {
+    OPENAI_KEY = fs.readFileSync(path.resolve(ROOT, OPENAI_KEY_PATH), "utf8").trim();
+  } catch (err) {
+    console.error(`[i18n-docs] Failed to read OPENAI_API_KEY from path: ${OPENAI_KEY_PATH}`, err.message);
+    process.exit(1);
+  }
+}
+
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || "1");
 
 if (!OPENAI_KEY) {
-  console.error("[i18n-docs] Missing OPENAI_API_KEY");
+  console.error("[i18n-docs] Missing OPENAI_API_KEY_PATH or empty key file");
   process.exit(1);
 }
 

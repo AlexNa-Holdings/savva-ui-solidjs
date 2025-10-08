@@ -11,7 +11,19 @@ dotenv.config({ path: path.join(ROOT, ".env") });
 
 const SRC_DIR = path.join(ROOT, "src");
 const I18N_DIR = path.join(SRC_DIR, "i18n");
-const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+
+// Read API key from file path
+const OPENAI_KEY_PATH = process.env.OPENAI_API_KEY_PATH || "";
+let OPENAI_KEY = "";
+if (OPENAI_KEY_PATH) {
+  try {
+    OPENAI_KEY = fs.readFileSync(path.resolve(ROOT, OPENAI_KEY_PATH), "utf8").trim();
+  } catch (err) {
+    console.error(`[i18n] Failed to read OPENAI_API_KEY from path: ${OPENAI_KEY_PATH}`, err.message);
+    OPENAI_KEY = ""; // Continue without key, warn later
+  }
+}
+
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TEMPERATURE = parseFloat(process.env.OPENAI_TEMPERATURE || "1");
 const BATCH_SIZE = 60; // how many keys to ask the model about per request
