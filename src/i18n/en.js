@@ -121,6 +121,8 @@ export default {
   "clipboard.copy": "Copy",
   "comment.delete": "Delete Comment",
   "comment.edit": "Edit Comment",
+  "comment.encrypted.title": "Encrypted Comment",
+  "comment.encrypted.description": "You don't have access to view this comment",
   "comment.parseDescriptorFailed": "Comment descriptor parsing failed.",
   "comment.prepareEditFailed": "Failed to prepare comment for editing.",
   "comment.reply": "Reply",

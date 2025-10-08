@@ -35,8 +35,28 @@ export default function StepUploadIPFS(props) {
     const content = postData();
     const params = postParams();
 
-    // Check if encryption is needed (subscribers-only audience)
-    const needsEncryption = params.audience === "subscribers";
+    // Check if encryption is needed:
+    // 1. For posts: subscribers-only audience
+    // 2. For comments: parent post is encrypted
+    const isComment = editorMode === "new_comment" || editorMode === "edit_comment";
+    let needsEncryption = params.audience === "subscribers";
+
+    // For comments, check if parent post is encrypted
+    if (isComment && params.root_savva_cid && !needsEncryption) {
+      dbg.log("StepUploadIPFS", "Checking if parent post is encrypted", { root_savva_cid: params.root_savva_cid });
+      try {
+        const { fetchParentPostEncryption } = await import("../../crypto/fetchParentPostEncryption.js");
+        const parentEncryption = await fetchParentPostEncryption(app, params.root_savva_cid);
+
+        if (parentEncryption) {
+          needsEncryption = true;
+          dbg.log("StepUploadIPFS", `Parent post is encrypted - will encrypt comment`);
+        }
+      } catch (err) {
+        dbg.error("StepUploadIPFS", "Failed to check parent post encryption", err);
+        // Don't fail if we can't check - maybe the post is being created concurrently
+      }
+    }
 
     // Generate post encryption key if needed
     let postEncryptionKey = null;
@@ -53,7 +73,8 @@ export default function StepUploadIPFS(props) {
       editorMode,
       baseDir,
       langs: Object.keys(content || {}),
-      needsEncryption
+      needsEncryption,
+      isComment
     });
 
     // 1) Markdown files

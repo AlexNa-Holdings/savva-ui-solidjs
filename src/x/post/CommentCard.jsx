@@ -20,6 +20,7 @@ import { EditIcon, TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 import ReactionInput from "./ReactionInput.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
+import { canDecryptPost, decryptPostMetadata } from "../crypto/postDecryption.js";
 
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
@@ -64,6 +65,39 @@ export default function CommentCard(props) {
   createEffect(() => {
     setComment(reconcile({ _raw: {}, ...(props.comment ?? {}) }));
   });
+
+  // Encryption handling
+  const isEncrypted = createMemo(() => !!(comment?.savva_content?.encrypted && !comment?._decrypted));
+  const userAddress = createMemo(() => app.authorizedUser()?.address);
+
+  const canDecrypt = createMemo(() => {
+    if (!isEncrypted()) return false;
+    const addr = userAddress();
+    if (!addr) return false;
+    const encData = comment?.savva_content?.encryption;
+    if (!encData) return false;
+    return canDecryptPost(addr, encData);
+  });
+
+  // Auto-decrypt if we have the key stored
+  createEffect(async () => {
+    if (!isEncrypted() || comment?._decrypted) return;
+    if (!canDecrypt()) return;
+
+    try {
+      const addr = userAddress();
+      const decrypted = await decryptPostMetadata(comment, addr);
+
+      // Update the comment with decrypted data
+      setComment(reconcile({ ...comment, ...decrypted, _decrypted: true }));
+      console.log("Comment decrypted successfully");
+    } catch (error) {
+      console.error("Failed to auto-decrypt comment:", error);
+    }
+  });
+
+  // Encrypted content cover
+  const shouldCoverEncrypted = createMemo(() => isEncrypted() && !canDecrypt());
 
   // Live updates (author/post banned/unbanned, reactions)
   createEffect(() => {
@@ -224,8 +258,26 @@ export default function CommentCard(props) {
           </Show>
 
           <div class="text-sm prose prose-sm max-w-none relative rounded-[inherit]">
+            {/* Encrypted content cover */}
+            <Show when={shouldCoverEncrypted()}>
+              <div class="absolute inset-0 rounded-[inherit] z-30 flex items-center justify-center">
+                <div class="absolute inset-0 rounded-[inherit] bg-[hsl(var(--card))]/90 backdrop-blur-md" />
+                <div class="relative z-10 flex flex-col items-center gap-3 text-center px-4">
+                  <svg class="w-10 h-10 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <div class="text-sm font-semibold text-[hsl(var(--foreground))]">
+                    {t("comment.encrypted.title") || "Encrypted Comment"}
+                  </div>
+                  <div class="text-xs text-[hsl(var(--muted-foreground))]">
+                    {t("comment.encrypted.description") || "You don't have access to view this comment"}
+                  </div>
+                </div>
+              </div>
+            </Show>
+
             {/* NSFW soft-cover */}
-            <Show when={shouldWarn() && !revealed()}>
+            <Show when={shouldWarn() && !revealed() && !shouldCoverEncrypted()}>
               <div
                 class="absolute inset-0 rounded-[inherit] z-20 flex items-center justify-center"
                 onClick={(e) => {

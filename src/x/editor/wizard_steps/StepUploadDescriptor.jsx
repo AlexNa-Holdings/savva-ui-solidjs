@@ -103,13 +103,41 @@ export default function StepUploadDescriptor(props) {
       : (app.info()?.ipfs_gateways || []);
     if (gateways.length) descriptor.gateways = gateways;
 
-    // Check if encryption is needed (subscribers-only audience)
-    const needsEncryption = params.audience === "subscribers";
+    // Check if encryption is needed:
+    // 1. For posts: subscribers-only audience
+    // 2. For comments: parent post is encrypted
+    const isComment = contentType === "comment";
+    let needsEncryption = params.audience === "subscribers";
+    let isCommentOnEncryptedPost = false;
+    let parentPostRecipients = [];
+
+    // For comments, check if parent post is encrypted
+    if (isComment && params.root_savva_cid) {
+      L("Checking if parent post is encrypted", { root_savva_cid: params.root_savva_cid });
+      try {
+        const { fetchParentPostEncryption } = await import("../../crypto/fetchParentPostEncryption.js");
+        const parentEncryption = await fetchParentPostEncryption(app, params.root_savva_cid);
+
+        if (parentEncryption) {
+          isCommentOnEncryptedPost = true;
+          needsEncryption = true;
+          parentPostRecipients = parentEncryption.recipients;
+          L(`Parent post is encrypted with ${parentPostRecipients.length} recipients`);
+        } else {
+          L("Parent post is not encrypted");
+        }
+      } catch (err) {
+        E("Failed to check parent post encryption", err);
+        // Don't fail the whole publish if we can't check parent encryption
+        // User might be commenting on a post that doesn't exist yet or is inaccessible
+      }
+    }
+
     let postEncryptionKey = null;
     let recipients = [];
 
     if (needsEncryption) {
-      L("Encryption needed - generating post key and fetching subscribers");
+      L("Encryption needed", { isComment, isCommentOnEncryptedPost, hasParentRecipients: parentPostRecipients.length > 0 });
 
       const authorAddress = app.authorizedUser?.()?.address;
       if (!authorAddress) {
@@ -174,32 +202,71 @@ export default function StepUploadDescriptor(props) {
 
       L("Using post encryption key from StepUploadIPFS", { publicKey: postEncryptionKey.publicKey });
 
-      // Fetch eligible subscribers with their reading keys
-      const minPaymentWei = params.minWeeklyPaymentWei || 0n;
+      // Determine recipients based on content type
+      if (isCommentOnEncryptedPost && parentPostRecipients.length > 0) {
+        // For comments on encrypted posts: use parent post's recipients
+        L(`Fetching reading keys for ${parentPostRecipients.length} parent post recipients`);
 
-      try {
-        recipients = await fetchEligibleSubscribers(app, authorAddress, minPaymentWei);
-        L(`Found ${recipients.length} eligible subscribers with reading keys`);
-      } catch (err) {
-        E("Failed to fetch subscribers", err);
-        throw new Error("Failed to fetch eligible subscribers: " + err.message);
+        const recipientPromises = parentPostRecipients.map(async (address) => {
+          try {
+            const readingKey = await fetchReadingKey(app, address);
+            if (readingKey && readingKey.publicKey) {
+              return {
+                address: address,
+                publicKey: readingKey.publicKey,
+                scheme: readingKey.scheme,
+                nonce: readingKey.nonce,
+                amount: 0n,
+                weeks: 0,
+              };
+            }
+            return null;
+          } catch (err) {
+            E(`Failed to fetch reading key for parent recipient ${address}`, err);
+            return null;
+          }
+        });
+
+        recipients = (await Promise.all(recipientPromises)).filter(r => r !== null);
+        L(`Successfully fetched ${recipients.length} reading keys from ${parentPostRecipients.length} parent recipients`);
+
+      } else {
+        // For regular subscriber-only posts: fetch eligible subscribers
+        const minPaymentWei = params.minWeeklyPaymentWei || 0n;
+
+        try {
+          recipients = await fetchEligibleSubscribers(app, authorAddress, minPaymentWei);
+          L(`Found ${recipients.length} eligible subscribers with reading keys`);
+        } catch (err) {
+          E("Failed to fetch subscribers", err);
+          throw new Error("Failed to fetch eligible subscribers: " + err.message);
+        }
+
+        // Check if there are any eligible subscribers with reading keys
+        if (recipients.length === 0) {
+          E("No eligible subscribers with published reading keys found");
+          throw new Error(t("editor.publish.encryption.noRecipientsWithKeys"));
+        }
       }
 
-      // Check if there are any eligible subscribers with reading keys
-      if (recipients.length === 0) {
-        E("No eligible subscribers with published reading keys found");
-        throw new Error(t("editor.publish.encryption.noRecipientsWithKeys"));
-      }
+      // IMPORTANT: Ensure author is in recipients list
+      const authorInRecipients = recipients.some(
+        r => String(r.address).toLowerCase() === String(authorAddress).toLowerCase()
+      );
 
-      // IMPORTANT: Add author to recipients so they can decrypt their own post
-      recipients.push({
-        address: authorAddress,
-        publicKey: authorReadingKey.publicKey,
-        scheme: authorReadingKey.scheme,
-        nonce: authorReadingKey.nonce,
-        amount: 0n,
-        weeks: 0,
-      });
+      if (!authorInRecipients) {
+        L("Adding comment author to recipients");
+        recipients.push({
+          address: authorAddress,
+          publicKey: authorReadingKey.publicKey,
+          scheme: authorReadingKey.scheme,
+          nonce: authorReadingKey.nonce,
+          amount: 0n,
+          weeks: 0,
+        });
+      } else {
+        L("Comment author is already in recipients list");
+      }
 
       // Add big_brothers from domain configuration to recipients
       const currentDomain = app.selectedDomainName?.();
