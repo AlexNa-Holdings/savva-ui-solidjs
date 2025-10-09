@@ -5,6 +5,7 @@ import { pushToast } from "../ui/toast";
 import ContributionToast from "../x/ui/toasts/ContributionToast.jsx";
 import { formatUnits } from "viem";
 import FundraiserContributionToast from "../x/ui/toasts/FundraiserContributionToast.jsx";
+import PrizeToast from "../x/ui/toasts/PrizeToast.jsx";
 
 export function handleTokenPriceChanged(app, payload) {
   dbg.log("Alerts:token_price_changed", payload);

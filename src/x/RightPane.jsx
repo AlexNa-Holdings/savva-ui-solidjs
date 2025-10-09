@@ -112,6 +112,29 @@ export default function RightPane({ isOpen, onClose }) {
                 </div>
               </li>
 
+              {/* Content Fund Rounds link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/content-fund-rounds");
+                    onClose();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      app.setSavedScrollY(window.scrollY);
+                      navigate("/content-fund-rounds");
+                      onClose();
+                    }
+                  }}
+                >
+                  {t("rightPane.contentFundRounds")}
+                </div>
+              </li>
+
               {/* NPO list link */}
               <li>
                 <div
