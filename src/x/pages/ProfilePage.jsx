@@ -435,7 +435,7 @@ export default function ProfilePage() {
                           <HistoryTab user={user()} />
                         </Match>
                         <Match when={activeTab() === "wallet"}>
-                          <WalletTab user={user()} />
+                          <WalletTab user={user()} onStakedCorrected={refetchUser} />
                         </Match>
                       </Switch>
                     </div>

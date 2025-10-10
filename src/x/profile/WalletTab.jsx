@@ -23,6 +23,7 @@ export default function WalletTab(props) {
 
   const viewedUser = () => props.user || app.authorizedUser();
   const [refreshKey, setRefreshKey] = createSignal(0);
+  const [correctedStaked, setCorrectedStaked] = createSignal(null); // Override for staked value if blockchain differs
 
   // 🔁 Refresh data automatically when ACTOR changes (wallet open)
   createEffect(() => {
@@ -68,6 +69,7 @@ export default function WalletTab(props) {
         availableUnstaked,
         unstakeRequests,
         savvaTotalSupply,
+        totalStaked,
       ] = await Promise.all([
         savvaTokenContract.read.balanceOf([user.address]),
         publicClient.getBalance({ address: user.address }),
@@ -77,6 +79,7 @@ export default function WalletTab(props) {
         stakingContract.read.getAvailableUnstaked([user.address]),
         stakingContract.read.getUnstakeRequests([user.address]),
         savvaTokenContract.read.totalSupply(),
+        stakingContract.read.totalSupply(),
       ]);
 
       return {
@@ -88,6 +91,7 @@ export default function WalletTab(props) {
         availableUnstaked,
         unstakeRequests,
         savvaTotalSupply,
+        totalStaked,
         savvaTokenAddress: savvaTokenContract.address,
         stakingTokenAddress: stakingContract.address,
       };
@@ -101,6 +105,61 @@ export default function WalletTab(props) {
     () => ({ app, user: viewedUser(), refreshKey: refreshKey() }),
     fetchWalletData
   );
+
+  // Compare blockchain staked value with backend value and fix if different
+  createEffect(() => {
+    const data = walletData();
+    const user = viewedUser();
+
+    if (!data || data.error || !user || !user.address) return;
+
+    const blockchainStaked = data.stakedBalance;
+    const backendStaked = user.staked;
+
+    // Both should be bigints for comparison
+    if (typeof blockchainStaked !== 'bigint' || typeof backendStaked !== 'bigint') return;
+
+    // If values differ, we need to correct the backend
+    if (blockchainStaked !== backendStaked) {
+      console.warn('[WalletTab] Staked value mismatch detected:', {
+        blockchain: blockchainStaked.toString(),
+        backend: backendStaked.toString(),
+        userAddress: user.address,
+      });
+
+      // Store the corrected value for immediate display update
+      setCorrectedStaked(blockchainStaked);
+
+      // Send fix request to backend - this will update the backend's cached value
+      const fixStakedValue = async () => {
+        try {
+          const wsMethod = app.wsMethod?.("fix");
+          if (wsMethod) {
+            await wsMethod({ user: user.address });
+            console.log('[WalletTab] Sent fix request for user:', user.address);
+
+            // Trigger a wallet data refresh in the app context if available
+            app.triggerWalletDataRefresh?.();
+
+            // Notify parent component (ProfilePage) to refetch user data
+            // so the corrected staked value shows in the profile header
+            if (typeof props.onStakedCorrected === 'function') {
+              props.onStakedCorrected();
+            }
+          } else {
+            console.warn('[WalletTab] wsMethod("fix") not available');
+          }
+        } catch (error) {
+          console.error('[WalletTab] Failed to send fix request:', error);
+        }
+      };
+
+      fixStakedValue();
+    } else {
+      // Values match, clear any correction
+      setCorrectedStaked(null);
+    }
+  });
 
   createEffect(() => {
     if (typeof window === "undefined") return;
@@ -341,6 +400,20 @@ export default function WalletTab(props) {
     return `${aprString}%`;
   });
 
+  const userStakePercentage = createMemo(() => {
+    const userStaked = walletData()?.stakedBalance;
+    const totalStaked = walletData()?.totalStaked;
+
+    if (!userStaked || !totalStaked || totalStaked <= 0n) return null;
+
+    // Calculate percentage with 2 decimal places
+    // Multiply by 10000 to get 2 decimal precision
+    const percentage = (userStaked * 10000n) / totalStaked;
+    const percentageString = (Number(percentage) / 100).toFixed(2);
+
+    return `${percentageString}%`;
+  });
+
   const availableUnstaked = () => walletData()?.availableUnstaked || 0n;
   const unstakeRequests = () => walletData()?.unstakeRequests || [];
 
@@ -366,13 +439,28 @@ export default function WalletTab(props) {
           <WalletSection
             title={t("profile.wallet.staking.title")}
             headerAction={
-              <Show when={stakingApr()}>
-                <div class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">APR: {stakingApr()}</div>
-              </Show>
+              <div class="flex flex-col items-end gap-1">
+                <Show when={stakingApr()}>
+                  <div class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">APR: {stakingApr()}</div>
+                </Show>
+                <Show when={walletData()?.totalStaked}>
+                  <div class="text-xs text-[hsl(var(--muted-foreground))]">
+                    <span class="opacity-70">{t("profile.wallet.staking.totalStaked") || "Total Staked"}:</span>{" "}
+                    <TokenValue amount={walletData()?.totalStaked} tokenAddress={walletData()?.stakingTokenAddress} format="vertical" />
+                  </div>
+                </Show>
+              </div>
             }
           >
             <WalletRow title={t("profile.wallet.staked.title")} description={t("profile.wallet.staked.description")}>
-              <ValueWithMenu amount={walletData()?.stakedBalance} tokenAddress={walletData()?.stakingTokenAddress} items={stakedMenuItems()} />
+              <div class="flex flex-col items-end gap-0.5">
+                <ValueWithMenu amount={walletData()?.stakedBalance} tokenAddress={walletData()?.stakingTokenAddress} items={stakedMenuItems()} />
+                <Show when={userStakePercentage()}>
+                  <div class="text-xs text-[hsl(var(--muted-foreground))] px-2">
+                    {userStakePercentage()} {t("profile.wallet.staking.ofTotal") || "of total"}
+                  </div>
+                </Show>
+              </div>
             </WalletRow>
 
             <WalletRow title={t("profile.wallet.reward.title")} description={t("profile.wallet.reward.description")}>
