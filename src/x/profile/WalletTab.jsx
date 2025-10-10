@@ -444,8 +444,8 @@ export default function WalletTab(props) {
                   <div class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">APR: {stakingApr()}</div>
                 </Show>
                 <Show when={walletData()?.totalStaked}>
-                  <div class="text-xs text-[hsl(var(--muted-foreground))]">
-                    <span class="opacity-70">{t("profile.wallet.staking.totalStaked") || "Total Staked"}:</span>{" "}
+                  <div class="text-xs text-[hsl(var(--muted-foreground))] text-right">
+                    <div class="opacity-70">{t("profile.wallet.staking.totalStaked") || "Total Staked"}:</div>
                     <TokenValue amount={walletData()?.totalStaked} tokenAddress={walletData()?.stakingTokenAddress} format="vertical" />
                   </div>
                 </Show>

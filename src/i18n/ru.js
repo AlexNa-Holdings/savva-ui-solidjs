@@ -721,7 +721,7 @@ export default {
   "profile.stats.paysForSubscriptions": "Оплачивает подписки",
   "profile.stats.perWeek": "в неделю",
   "profile.stats.receivedFromSubscribers": "Получает от подписчиков",
-  "profile.stats.staking": "Ставки",
+  "profile.stats.staking": "Застейкано",
   "profile.subscribe": "Подписаться",
   "profile.subscribers.noResults": "Подписчиков не найдено.",
   "profile.subscribers.showActiveOnly": "Показать только активные",
