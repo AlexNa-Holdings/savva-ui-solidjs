@@ -263,7 +263,7 @@ export default {
   "editor.fullPreview.publish": "Objavi",
   "editor.fullPreview.title": "Završna Provera",
   "editor.params.audience.eligibleSubscribers": "Primaće ovu objavu",
-  "editor.params.audience.encryptionWarning.message": "Šifrovan sadržaj mogu da pregledaju ovlašćeni administratori sajta u svrhu moderacije. Deljenje ilegalnog ili štetnog sadržaja je zabranjeno i može imati pravne posledice. Objavljivanjem šifrovanog sadržaja prihvatate ove uslove.",
+  "editor.params.audience.encryptionWarning.message": "Šifrovani sadržaj je dostupan ovlašćenim administratorima sajta radi moderacije. Distribucija nezakonitog ili štetnog sadržaja strogo je zabranjena i može dovesti do pravnih posledica. Objavom šifrovanog sadržaja potvrđujete da ste upoznati sa ovim uslovima i prihvatate ih. Takođe, imajte na umu da će izabrane oznake i kategorije uvek biti javno vidljive.",
   "editor.params.audience.encryptionWarning.title": "Važna napomena:",
   "editor.params.audience.label": "Publika",
   "editor.params.audience.loadingSubscribers": "Učitavaju se pretplatnici...",

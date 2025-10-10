@@ -263,7 +263,7 @@ export default {
   "editor.fullPreview.publish": "Publier",
   "editor.fullPreview.title": "Vérification Finale",
   "editor.params.audience.eligibleSubscribers": "Recevront cette publication",
-  "editor.params.audience.encryptionWarning.message": "Le contenu chiffré est accessible aux administrateurs autorisés du site à des fins de modération. La diffusion de contenus illégaux ou dangereux est strictement interdite et peut entraîner des poursuites. En publiant du contenu chiffré, vous reconnaissez et acceptez ces conditions.",
+  "editor.params.audience.encryptionWarning.message": "Le contenu chiffré peut être consulté par les administrateurs autorisés du site pour la modération. La diffusion de contenu illégal ou dangereux est interdite et peut entraîner des poursuites. En publiant du contenu chiffré, vous en acceptez les conditions. Notez aussi que les tags et catégories sélectionnés resteront toujours visibles du public.",
   "editor.params.audience.encryptionWarning.title": "Avis important :",
   "editor.params.audience.label": "Audience",
   "editor.params.audience.loadingSubscribers": "Chargement des abonnés...",

@@ -164,15 +164,7 @@ export function encryptDescriptorLocale(locale, postSecretKeyHex) {
     encrypted.text_preview = encryptText(locale.text_preview, postSecretKeyHex, true);
   }
 
-  // Encrypt categories (as JSON string, combined format)
-  if (Array.isArray(locale.categories) && locale.categories.length > 0) {
-    encrypted.categories = encryptText(JSON.stringify(locale.categories), postSecretKeyHex, true);
-  }
-
-  // Encrypt tags (as JSON string, combined format)
-  if (Array.isArray(locale.tags) && locale.tags.length > 0) {
-    encrypted.tags = encryptText(JSON.stringify(locale.tags), postSecretKeyHex, true);
-  }
+  // Categories and tags are NOT encrypted - they remain public for server indexing
 
   // Encrypt chapter titles (combined format)
   if (Array.isArray(locale.chapters)) {

@@ -263,7 +263,7 @@ export default {
   "editor.fullPreview.publish": "Publicar",
   "editor.fullPreview.title": "Revisión final",
   "editor.params.audience.eligibleSubscribers": "Recibirán esta publicación",
-  "editor.params.audience.encryptionWarning.message": "El contenido cifrado puede ser accesible para administradores autorizados del sitio con fines de moderación. La distribución de contenido ilegal o dañino está estrictamente prohibida y puede acarrear consecuencias legales. Al publicar contenido cifrado, reconoces y aceptas estos términos.",
+  "editor.params.audience.encryptionWarning.message": "El contenido cifrado es accesible para administradores autorizados del sitio con fines de moderación. La difusión de contenido ilegal o dañino está estrictamente prohibida y puede acarrear consecuencias legales. Al publicar contenido cifrado, reconoces y aceptas estos términos. Ten en cuenta también que las etiquetas y categorías seleccionadas siempre serán visibles para el público.",
   "editor.params.audience.encryptionWarning.title": "Aviso importante:",
   "editor.params.audience.label": "Audiencia",
   "editor.params.audience.loadingSubscribers": "Cargando suscriptores...",

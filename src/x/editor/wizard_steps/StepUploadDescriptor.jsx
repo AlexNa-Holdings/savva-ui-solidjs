@@ -139,24 +139,33 @@ export default function StepUploadDescriptor(props) {
     if (needsEncryption) {
       L("Encryption needed", { isComment, isCommentOnEncryptedPost, hasParentRecipients: parentPostRecipients.length > 0 });
 
-      const authorAddress = app.authorizedUser?.()?.address;
-      if (!authorAddress) {
-        throw new Error("Author address not found");
+      // Get the actor address (who is posting - could be NPO or user)
+      const actorAddress = app.actorAddress?.() || app.authorizedUser?.()?.address;
+      if (!actorAddress) {
+        throw new Error("Actor address not found");
       }
 
-      // FIRST: Check if author has a reading key (required to decrypt their own posts)
+      // Get the authorized user address (the wallet user signing the transaction)
+      const authorizedUserAddress = app.authorizedUser?.()?.address;
+      if (!authorizedUserAddress) {
+        throw new Error("Authorized user address not found");
+      }
+
+      L("Addresses for encryption", { actorAddress, authorizedUserAddress });
+
+      // FIRST: Check if authorized user has a reading key (required to decrypt their own posts)
       const { fetchReadingKey } = await import("../../crypto/readingKey.js");
-      let authorReadingKey;
+      let authorizedUserReadingKey;
 
       try {
-        authorReadingKey = await fetchReadingKey(app, authorAddress);
+        authorizedUserReadingKey = await fetchReadingKey(app, authorizedUserAddress);
       } catch (err) {
-        E("Failed to fetch author reading key", err);
+        E("Failed to fetch authorized user reading key", err);
         throw new Error(t("editor.publish.encryption.authorKeyFetchError"));
       }
 
-      if (!authorReadingKey || !authorReadingKey.publicKey) {
-        E("Author does not have a reading key - prompting user to generate one");
+      if (!authorizedUserReadingKey || !authorizedUserReadingKey.publicKey) {
+        E("Authorized user does not have a reading key - prompting user to generate one");
 
         // Prompt user to generate and publish reading key
         const shouldGenerate = confirm(
@@ -173,8 +182,8 @@ export default function StepUploadDescriptor(props) {
         const { generateReadingKey, publishReadingKey } = await import("../../crypto/readingKey.js");
 
         try {
-          L("Generating reading key for author");
-          const newReadingKey = await generateReadingKey(authorAddress);
+          L("Generating reading key for authorized user");
+          const newReadingKey = await generateReadingKey(authorizedUserAddress);
           L("Reading key generated", { publicKey: newReadingKey.publicKey });
 
           L("Publishing reading key to blockchain");
@@ -182,13 +191,13 @@ export default function StepUploadDescriptor(props) {
           L("Reading key published successfully");
 
           // Use the newly generated key
-          authorReadingKey = newReadingKey;
+          authorizedUserReadingKey = newReadingKey;
         } catch (err) {
           E("Failed to generate/publish reading key", err);
           throw new Error("Failed to generate Reading Key: " + err.message);
         }
       } else {
-        L("Author reading key found", { publicKey: authorReadingKey.publicKey });
+        L("Authorized user reading key found", { publicKey: authorizedUserReadingKey.publicKey });
       }
 
       // Get the encryption key from publishedData (generated in StepUploadIPFS)
@@ -231,12 +240,12 @@ export default function StepUploadDescriptor(props) {
         L(`Successfully fetched ${recipients.length} reading keys from ${parentPostRecipients.length} parent recipients`);
 
       } else {
-        // For regular subscriber-only posts: fetch eligible subscribers
+        // For regular subscriber-only posts: fetch eligible subscribers for the ACTOR (NPO or user posting)
         const minPaymentWei = params.minWeeklyPaymentWei || 0n;
 
         try {
-          recipients = await fetchEligibleSubscribers(app, authorAddress, minPaymentWei);
-          L(`Found ${recipients.length} eligible subscribers with reading keys`);
+          recipients = await fetchEligibleSubscribers(app, actorAddress, minPaymentWei);
+          L(`Found ${recipients.length} eligible subscribers with reading keys for actor ${actorAddress}`);
         } catch (err) {
           E("Failed to fetch subscribers", err);
           throw new Error("Failed to fetch eligible subscribers: " + err.message);
@@ -249,23 +258,23 @@ export default function StepUploadDescriptor(props) {
         }
       }
 
-      // IMPORTANT: Ensure author is in recipients list
-      const authorInRecipients = recipients.some(
-        r => String(r.address).toLowerCase() === String(authorAddress).toLowerCase()
+      // IMPORTANT: Ensure authorized user (wallet signer) is in recipients list so they can decrypt
+      const authorizedUserInRecipients = recipients.some(
+        r => String(r.address).toLowerCase() === String(authorizedUserAddress).toLowerCase()
       );
 
-      if (!authorInRecipients) {
-        L("Adding comment author to recipients");
+      if (!authorizedUserInRecipients) {
+        L("Adding authorized user to recipients");
         recipients.push({
-          address: authorAddress,
-          publicKey: authorReadingKey.publicKey,
-          scheme: authorReadingKey.scheme,
-          nonce: authorReadingKey.nonce,
+          address: authorizedUserAddress,
+          publicKey: authorizedUserReadingKey.publicKey,
+          scheme: authorizedUserReadingKey.scheme,
+          nonce: authorizedUserReadingKey.nonce,
           amount: 0n,
           weeks: 0,
         });
       } else {
-        L("Comment author is already in recipients list");
+        L("Authorized user is already in recipients list");
       }
 
       // Add big_brothers from domain configuration to recipients

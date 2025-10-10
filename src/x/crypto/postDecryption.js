@@ -165,56 +165,14 @@ export function decryptLocale(locale, postSecretKey) {
     }
   }
 
-  // Decrypt categories
+  // Categories and tags are NOT encrypted - they remain public for server indexing
+  // Just pass them through as-is
   if (locale.categories) {
-    try {
-      let categoriesJson;
-      if (typeof locale.categories === 'string') {
-        // Encrypted - either combined or separate format
-        if (locale.categories.includes(':')) {
-          categoriesJson = decryptText(locale.categories, null, postSecretKey);
-        } else if (locale.categories_nonce) {
-          categoriesJson = decryptText(locale.categories, locale.categories_nonce, postSecretKey);
-          delete decrypted.categories_nonce;
-        } else {
-          // Not encrypted or placeholder
-          categoriesJson = locale.categories;
-        }
-        decrypted.categories = JSON.parse(categoriesJson);
-      } else if (Array.isArray(locale.categories)) {
-        // Already decrypted or plain array
-        decrypted.categories = locale.categories;
-      }
-    } catch (error) {
-      console.error("Failed to decrypt categories:", error);
-      decrypted.categories = [];
-    }
+    decrypted.categories = locale.categories;
   }
 
-  // Decrypt tags
   if (locale.tags) {
-    try {
-      let tagsJson;
-      if (typeof locale.tags === 'string') {
-        // Encrypted - either combined or separate format
-        if (locale.tags.includes(':')) {
-          tagsJson = decryptText(locale.tags, null, postSecretKey);
-        } else if (locale.tags_nonce) {
-          tagsJson = decryptText(locale.tags, locale.tags_nonce, postSecretKey);
-          delete decrypted.tags_nonce;
-        } else {
-          // Not encrypted or placeholder
-          tagsJson = locale.tags;
-        }
-        decrypted.tags = JSON.parse(tagsJson);
-      } else if (Array.isArray(locale.tags)) {
-        // Already decrypted or plain array
-        decrypted.tags = locale.tags;
-      }
-    } catch (error) {
-      console.error("Failed to decrypt tags:", error);
-      decrypted.tags = [];
-    }
+    decrypted.tags = locale.tags;
   }
 
   // Decrypt chapter titles

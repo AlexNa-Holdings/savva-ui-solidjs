@@ -263,7 +263,7 @@ export default {
   "editor.fullPreview.publish": "Publish",
   "editor.fullPreview.title": "Final Check",
   "editor.params.audience.eligibleSubscribers": "Will receive this post",
-  "editor.params.audience.encryptionWarning.message": "Encrypted content is accessible to authorized site administrators for moderation purposes. Distribution of illegal or harmful content is strictly prohibited and may result in legal consequences. By publishing encrypted content, you acknowledge and accept these terms.",
+  "editor.params.audience.encryptionWarning.message": "Encrypted content is accessible to authorized site administrators for moderation purposes. Distribution of illegal or harmful content is strictly prohibited and may result in legal consequences. By publishing encrypted content, you acknowledge and accept these terms. Also note that selected tags and categories will always be visible for the public.",
   "editor.params.audience.encryptionWarning.title": "Important Notice:",
   "editor.params.audience.label": "Audience",
   "editor.params.audience.loadingSubscribers": "Loading subscribers...",
