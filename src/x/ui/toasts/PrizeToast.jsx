@@ -1,14 +1,14 @@
 // src/x/ui/toasts/PrizeToast.jsx
-import { createMemo } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import { useApp } from "../../../context/AppContext.jsx";
 import UserCard from "../../ui/UserCard.jsx";
 import TokenValue from "../../ui/TokenValue.jsx";
 import { navigate } from "../../../routing/hashRouter.js";
-
-function getLocalizedTitle(multiString, lang) {
-  if (!multiString || typeof multiString !== 'object') return "";
-  return multiString[lang] || multiString.en || Object.values(multiString)[0] || "";
-}
+import {
+  selectPostToastTitle,
+  selectPostToastPreview,
+  isPostEncryptedAlert,
+} from "./postToastUtils.js";
 
 export default function PrizeToast(props) {
   const app = useApp();
@@ -16,7 +16,9 @@ export default function PrizeToast(props) {
   const data = () => props.data || {};
 
   const winner = () => data().winner || {};
-  const postTitle = createMemo(() => getLocalizedTitle(data().title, lang()));
+  const postTitle = createMemo(() => selectPostToastTitle(data(), lang(), t));
+  const postPreview = createMemo(() => selectPostToastPreview(data(), lang(), t));
+  const isEncrypted = createMemo(() => isPostEncryptedAlert(data()));
   const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
 
   const handlePostClick = (e) => {
@@ -50,6 +52,16 @@ export default function PrizeToast(props) {
           "{postTitle()}"
         </a>
       </div>
+      <Show
+        when={postPreview()}
+      >
+        <div
+          class="text-xs text-[hsl(var(--muted-foreground))]"
+          classList={{ "italic": isEncrypted() }}
+        >
+          {postPreview()}
+        </div>
+      </Show>
     </div>
   );
 }
