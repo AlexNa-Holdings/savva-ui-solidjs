@@ -315,6 +315,14 @@ export default function PostPage() {
     return (loc?.title || "").trim();
   });
 
+  const chapters = createMemo(() => {
+    // Use decrypted content from post() if available, otherwise fall back to descriptor
+    const p = post();
+    const contentLocales = p?.savva_content?.locales || p?.content?.locales;
+    const loc = contentLocales?.[postLang()] || details()?.descriptor?.locales?.[postLang()];
+    return loc?.chapters || [];
+  });
+
   const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
   const ipfsBaseUrl = createMemo(() => {
     const d = details();
@@ -485,13 +493,13 @@ export default function PostPage() {
                           <Match when={details.loading || mainContent.loading}>
                             <div class="flex justify-center p-8"><Spinner /></div>
                           </Match>
-                          <Match when={localizedMainContent()}>
-                            <Show when={(details()?.descriptor?.locales?.[postLang()]?.chapters || []).length > 0}>
+                          <Match when={!details.loading && !mainContent.loading}>
+                            <Show when={chapters().length > 0}>
                               <div class="flex justify-end mb-4">
                                 <ChapterSelector
                                   chapters={[
                                     { title: t("post.chapters.prologue") },
-                                    ...((details()?.descriptor?.locales?.[postLang()]?.chapters || []).map((ch, i) => ({
+                                    ...(chapters().map((ch, i) => ({
                                       title: ch.title || `${t("post.chapters.chapter")} ${i + 1}`
                                     })))
                                   ]}
@@ -503,11 +511,11 @@ export default function PostPage() {
 
                             <MarkdownView markdown={localizedMainContent()} rehypePlugins={markdownPlugins()} />
 
-                            <Show when={((details()?.descriptor?.locales?.[postLang()]?.chapters || []).length || 0) > 0}>
+                            <Show when={chapters().length > 0}>
                               <ChapterPager
                                 chapters={[
                                   { title: t("post.chapters.prologue") },
-                                  ...((details()?.descriptor?.locales?.[postLang()]?.chapters || []).map((ch, i) => ({
+                                  ...(chapters().map((ch, i) => ({
                                     title: ch.title || `${t("post.chapters.chapter")} ${i + 1}`
                                   })))
                                 ]}

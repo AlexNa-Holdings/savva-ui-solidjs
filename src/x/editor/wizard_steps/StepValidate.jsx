@@ -19,24 +19,62 @@ export default function StepValidate(props) {
 
     for (const langCode in data) {
       const langData = data[langCode];
-      
+
       const hasTitle = langData.title?.trim().length > 0;
       const hasBody = langData.body?.trim().length > 0;
       const hasChapters = langData.chapters?.some(c => c.body?.trim().length > 0);
-      
+
       const hasAnyMeaningfulContent = hasTitle || hasBody || hasChapters;
-      
-      let isComplete;
+
+      // Validate comment
       if (isComment) {
-        // For comments, only a body is required. A title is not.
-        isComplete = hasBody;
-      } else {
-        // For posts, a title and either a body or chapters are required.
-        isComplete = hasTitle && (hasBody || hasChapters);
+        if (!hasBody) {
+          throw new Error(t("editor.publish.validation.errorCommentNoBody", { lang: langCode }));
+        }
+        continue;
       }
 
-      if (hasAnyMeaningfulContent && !isComplete) {
-        throw new Error(t("editor.publish.validation.errorIncomplete", { lang: langCode }));
+      // Validate post
+      if (!hasAnyMeaningfulContent) {
+        continue; // Empty language, skip
+      }
+
+      // Check if title is missing
+      if (!hasTitle) {
+        throw new Error(t("editor.publish.validation.errorNoTitle", { lang: langCode }));
+      }
+
+      // Check if there's neither body nor chapters
+      if (!hasBody && !hasChapters) {
+        throw new Error(t("editor.publish.validation.errorNoContent", { lang: langCode }));
+      }
+
+      // Validate chapters if they exist
+      if (langData.chapters && langData.chapters.length > 0) {
+        for (let i = 0; i < langData.chapters.length; i++) {
+          const chapter = langData.chapters[i];
+          const chapterNum = i + 1;
+
+          const chapterHasTitle = chapter.title?.trim().length > 0;
+          const chapterHasBody = chapter.body?.trim().length > 0;
+
+          // If chapter has any content, it must be complete
+          if (chapterHasTitle || chapterHasBody) {
+            if (!chapterHasTitle) {
+              throw new Error(t("editor.publish.validation.errorChapterNoTitle", {
+                lang: langCode,
+                chapter: chapterNum
+              }));
+            }
+            if (!chapterHasBody) {
+              throw new Error(t("editor.publish.validation.errorChapterNoContent", {
+                lang: langCode,
+                chapter: chapterNum,
+                title: chapter.title
+              }));
+            }
+          }
+        }
       }
     }
   };
