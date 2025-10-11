@@ -1,6 +1,6 @@
 // src/x/pages/ContentFundRoundsPage.jsx
 import { Show, For, createSignal, onMount, createResource, createMemo, createEffect, on } from "solid-js";
-import { createPublicClient, keccak256 } from "viem";
+import { createPublicClient, keccak256, decodeErrorResult } from "viem";
 import { configuredHttp } from "../../blockchain/contracts.js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
@@ -233,124 +233,213 @@ export default function ContentFundRoundsPage() {
                 chain,
                 transport: configuredHttp(chain.rpcUrls[0])
             });
+            const oracleAddress = app.info()?.savva_contracts?.RandomOracle?.address;
+            if (!oracleAddress) {
+                throw new Error("RandomOracle address is not available.");
+            }
+            const readContract = await getSavvaContract(app, "RandomOracle");
 
-            // Get contract data
-            const contract = await getSavvaContract(app, "RandomOracle");
-            const [currentEntropy, difficulty, numberOfPreviousBlocks] = await Promise.all([
-                contract.read.entropy(),
-                contract.read.difficulty(),
-                contract.read.numberOfPreviousBlocks(),
-            ]);
-
-            console.log("Mining with difficulty:", difficulty.toString());
-            console.log("Current entropy:", currentEntropy.toString());
-
-            // Important: We need to test against blocks that will be valid when the TX is mined
-            // The contract will check block.number - i, so we should test the same blocks
-            // However, since blocks advance, we should keep refetching to stay current
-
-            let blocks = [];
-            const refreshBlocks = async () => {
-                const currentBlockNumber = await publicClient.getBlockNumber();
-                blocks = [];
-                for (let i = 1; i <= Number(numberOfPreviousBlocks); i++) {
-                    if (i > currentBlockNumber) break;
-                    const targetBlock = currentBlockNumber - BigInt(i);
-                    const block = await publicClient.getBlock({ blockNumber: targetBlock });
-                    if (block && block.hash) {
-                        blocks.push(block);
-                    }
-                }
-                console.log(`Fetched ${blocks.length} blocks, current block: ${currentBlockNumber}`);
-                return currentBlockNumber;
+            const fetchOracleSnapshot = async () => {
+                const [entropy, difficulty, numberOfPreviousBlocks] = await Promise.all([
+                    readContract.read.entropy(),
+                    readContract.read.difficulty(),
+                    readContract.read.numberOfPreviousBlocks(),
+                ]);
+                const referenceBlock = await publicClient.getBlockNumber();
+                return { entropy, difficulty, numberOfPreviousBlocks, referenceBlock };
             };
 
-            await refreshBlocks();
-
-            // Mine off-chain first to find a valid nonce
-            let nonce = BigInt(Math.floor(Math.random() * 1000000));
-            let found = false;
-            const maxAttempts = 100000;
-
-            // Pre-calculate entropy hex (it doesn't change)
-            const entropyHex = currentEntropy.toString(16).padStart(64, '0');
-            const shift = Number(difficulty);
-            const mask = (1n << BigInt(shift)) - 1n;
-
-            for (let attempt = 0; attempt < maxAttempts && !found; attempt++) {
-                // Update progress every 10 attempts for more responsive UI
-                if (attempt % 10 === 0) {
-                    setMiningProgress(attempt);
+            const fetchRecentBlocks = async (countBigInt) => {
+                const count = Number(countBigInt);
+                if (!Number.isFinite(count) || count <= 0) return [];
+                const currentBlockNumber = await publicClient.getBlockNumber();
+                const collected = [];
+                for (let i = 1; i <= count; i++) {
+                    const offset = BigInt(i);
+                    if (offset > currentBlockNumber) break;
+                    const targetBlock = currentBlockNumber - offset;
+                    const block = await publicClient.getBlock({ blockNumber: targetBlock });
+                    if (block?.hash) {
+                        collected.push(block);
+                    }
                 }
+                return collected;
+            };
 
-                // Refresh blocks every 500 attempts to stay current
-                if (attempt % 500 === 0 && attempt > 0) {
-                    await refreshBlocks();
-                }
+            const checkNonceAgainstSnapshot = async (nonce, snapshot) => {
+                if (snapshot.difficulty === 0n) return true;
+                const blocks = await fetchRecentBlocks(snapshot.numberOfPreviousBlocks);
+                if (blocks.length === 0) return false;
 
-                const nonceHex = nonce.toString(16).padStart(64, '0');
+                const entropyHex = snapshot.entropy.toString(16).padStart(64, "0");
+                const nonceHex = nonce.toString(16).padStart(64, "0");
+                const mask = snapshot.difficulty === 0n ? 0n : (1n << snapshot.difficulty) - 1n;
 
-                // Try this nonce against recent blocks
                 for (const block of blocks) {
-                    // Calculate hash exactly as Solidity does: keccak256(abi.encodePacked(entropy, blockHash, nonce))
-                    // encodePacked concatenates values directly without padding
-                    const blockHashHex = block.hash.slice(2); // Remove 0x prefix
+                    const blockHashHex = block.hash.slice(2);
                     const packed = `0x${entropyHex}${blockHashHex}${nonceHex}`;
-
                     const hash = keccak256(packed);
                     const hashBigInt = BigInt(hash);
-
-                    // Check if hash meets difficulty (has 'difficulty' number of trailing zero BITS, not nibbles)
                     if ((hashBigInt & mask) === 0n) {
-                        console.log(`Found valid nonce: ${nonce} after ${attempt} attempts`);
-                        console.log(`Hash: ${hash}`);
-                        console.log(`Block used: ${block.number} (${block.hash})`);
-                        setMiningProgress(attempt); // Update one final time with exact count
-                        found = true;
-                        break;
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            const mineNonceCandidate = async () => {
+                const snapshot = await fetchOracleSnapshot();
+                console.log("Mining with difficulty:", snapshot.difficulty.toString());
+                console.log("Current entropy:", snapshot.entropy.toString());
+
+                const entropyHex = snapshot.entropy.toString(16).padStart(64, "0");
+                const mask = snapshot.difficulty === 0n ? 0n : (1n << snapshot.difficulty) - 1n;
+                const maxAttempts = 100000;
+
+                let blocks = await fetchRecentBlocks(snapshot.numberOfPreviousBlocks);
+                if (blocks.length === 0) {
+                    if (snapshot.difficulty === 0n) {
+                        console.log("Difficulty is zero and no blocks required; using nonce 0.");
+                        return { nonce: 0n, snapshot, proofBlock: null };
+                    }
+                    throw new Error("Unable to load reference blocks for mining.");
+                }
+
+                let nonce = BigInt(Math.floor(Math.random() * 1_000_000));
+                let minedNonce = null;
+                let proofBlock = null;
+
+                for (let attempt = 0; attempt < maxAttempts && minedNonce === null; attempt++) {
+                    if (attempt % 10 === 0) {
+                        setMiningProgress(attempt);
+                    }
+
+                    if (attempt > 0 && attempt % 500 === 0) {
+                        blocks = await fetchRecentBlocks(snapshot.numberOfPreviousBlocks);
+                    }
+
+                    const nonceHex = nonce.toString(16).padStart(64, "0");
+                    for (const block of blocks) {
+                        const blockHashHex = block.hash.slice(2);
+                        const packed = `0x${entropyHex}${blockHashHex}${nonceHex}`;
+                        const hash = keccak256(packed);
+                        const hashBigInt = BigInt(hash);
+                        if ((hashBigInt & mask) === 0n) {
+                            minedNonce = nonce;
+                            proofBlock = { number: block.number, hash: block.hash };
+                            setMiningProgress(attempt);
+                            console.log(`Found valid nonce: ${nonce} after ${attempt} attempts`);
+                            console.log(`Hash: ${hash}`);
+                            console.log(`Block used: ${block.number} (${block.hash})`);
+                            break;
+                        }
+                    }
+
+                    if (minedNonce === null) {
+                        nonce += 1n;
+                        if (attempt > 0 && attempt % 1000 === 0) {
+                            console.log(`Mining... ${attempt} attempts so far`);
+                        }
                     }
                 }
 
-                if (!found) {
-                    nonce += 1n;
+                if (minedNonce === null) {
+                    throw new Error("Failed to find valid nonce after maximum attempts");
                 }
 
-                // Log progress every 1000 attempts
-                if (attempt > 0 && attempt % 1000 === 0) {
-                    console.log(`Mining... ${attempt} attempts so far`);
+                return { nonce: minedNonce, snapshot, proofBlock };
+            };
+
+            const maxSubmissionAttempts = 3;
+            let lastProofBlock = null;
+            for (let submissionAttempt = 0; submissionAttempt < maxSubmissionAttempts; submissionAttempt++) {
+                if (submissionAttempt > 0) {
+                    console.warn("Retrying entropy submission with a fresh nonce (stale candidate detected).");
+                    setMiningProgress(0);
                 }
+
+                const minedResult = await mineNonceCandidate();
+                const { nonce } = minedResult;
+                lastProofBlock = minedResult.proofBlock;
+
+                const latestSnapshot = await fetchOracleSnapshot();
+                const nonceStillValid = await checkNonceAgainstSnapshot(nonce, latestSnapshot);
+                if (!nonceStillValid) {
+                    console.warn("Nonce became stale before submission; regenerating another candidate.");
+                    continue;
+                }
+
+                try {
+                    await publicClient.simulateContract({
+                        account: walletAccount(),
+                        address: oracleAddress,
+                        abi: RandomOracleAbi,
+                        functionName: "setEntropy",
+                        args: [nonce],
+                    });
+                } catch (simulationError) {
+                    console.warn("setEntropy simulation failed; regenerating nonce.", simulationError);
+                    if (submissionAttempt === maxSubmissionAttempts - 1) {
+                        throw simulationError;
+                    }
+                    continue;
+                }
+
+                const writeContract = await getSavvaContract(app, "RandomOracle", { write: true });
+                console.log(`Submitting nonce ${nonce} to contract...`);
+
+                const hash = await writeContract.write.setEntropy([nonce]);
+                console.log(`Transaction hash: ${hash}`);
+
+                const receipt = await publicClient.waitForTransactionReceipt({ hash });
+                console.log(`Transaction receipt:`, receipt);
+
+                if (receipt.status === 'reverted') {
+                    let extraDetails = "";
+                    if (lastProofBlock) {
+                        const drift = Number(receipt.blockNumber - lastProofBlock.number);
+                        extraDetails = ` | proofBlock=${lastProofBlock.number} receiptBlock=${receipt.blockNumber} drift=${drift}`;
+                        console.warn(`Entropy submission reverted due to potential stale proof${extraDetails}`);
+                    }
+                    try {
+                        const tx = await publicClient.getTransaction({ hash });
+                        await publicClient.call({
+                            to: oracleAddress,
+                            data: tx.input,
+                            blockNumber: receipt.blockNumber,
+                        });
+                    } catch (callError) {
+                        const data = callError?.data;
+                        if (data) {
+                            try {
+                                const decoded = decodeErrorResult({ abi: RandomOracleAbi, data });
+                                console.warn("Decoded revert reason:", decoded);
+                                throw new Error(`${decoded.errorName || "Contract revert"}${extraDetails ? ` (${extraDetails})` : ""}`);
+                            } catch {
+                                throw new Error(`Transaction reverted${extraDetails}`);
+                            }
+                        }
+                    }
+                    throw new Error(`Transaction reverted. Check console for details.`);
+                }
+
+                pushToast({
+                    type: "success",
+                    message: t("contentFundRounds.randomOracle.mineSuccess")
+                });
+                handleRefresh();
+                return;
             }
 
-            if (!found) {
-                throw new Error("Failed to find valid nonce after maximum attempts");
-            }
-
-            // Submit the valid nonce to the contract
-            const writeContract = await getSavvaContract(app, "RandomOracle", { write: true });
-            console.log(`Submitting nonce ${nonce} to contract...`);
-
-            const hash = await writeContract.write.setEntropy([nonce]);
-            console.log(`Transaction hash: ${hash}`);
-
-            const receipt = await publicClient.waitForTransactionReceipt({ hash });
-            console.log(`Transaction receipt:`, receipt);
-
-            if (receipt.status === 'reverted') {
-                throw new Error(`Transaction reverted. Check console for details.`);
-            }
-
-            pushToast({
-                type: "success",
-                message: t("contentFundRounds.randomOracle.mineSuccess")
-            });
-            handleRefresh();
+            throw new Error("Unable to submit entropy after several attempts. Please try again.");
         } catch (err) {
             console.error("Mining error:", err);
 
             // Try to extract revert reason
             let errorMessage = t("contentFundRounds.randomOracle.mineError");
-            if (err.message) {
-                // Check if it's a contract revert
+            if (err?.shortMessage) {
+                errorMessage = err.shortMessage;
+            } else if (err?.message) {
                 if (err.message.includes("Nonce does not meet difficulty")) {
                     errorMessage = "Nonce validation failed on-chain. The mined nonce was rejected by the contract.";
                 } else if (err.message.includes("revert")) {
