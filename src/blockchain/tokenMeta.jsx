@@ -1,5 +1,6 @@
 // src/blockchain/tokenMeta.jsx
-import { createPublicClient, http } from "viem";
+import { createPublicClient } from "viem";
+import { configuredHttp } from "./contracts.js";
 import SavvaTokenIcon from "../x/ui/icons/SavvaTokenIcon.jsx";
 import QuestionTokenIcon from "../x/ui/icons/QuestionTokenIcon.jsx";
 import { getChainLogo } from "./chainLogos.js";
@@ -21,7 +22,7 @@ function _key(chainId, addr) {
 function _publicClient(app) {
   const chain = app?.desiredChain?.();
   const url = chain?.rpcUrls?.[0];
-  return url ? createPublicClient({ chain, transport: http(url) }) : null;
+  return url ? createPublicClient({ chain, transport: configuredHttp(url) }) : null;
 }
 function _nativeSymbol(app) {
   return app?.desiredChain?.().nativeCurrency?.symbol || "PLS";

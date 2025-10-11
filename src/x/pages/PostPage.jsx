@@ -130,6 +130,65 @@ export default function PostPage() {
   const [post, setPost] = createSignal(null);
   createEffect(() => setPost(postResource() || null));
 
+  // Listen for post updates (reactions, comments, etc.)
+  let lastPostUpdate;
+
+  createEffect(() => {
+    const update = app.postUpdate?.();
+    if (!update || update === lastPostUpdate) return;
+    lastPostUpdate = update;
+
+    const currentPost = post();
+    if (!currentPost) return;
+
+    const currentCid = currentPost.savva_cid || currentPost.cid || currentPost.id;
+
+    // Author-level updates: apply to all posts by that author
+    if (update.type === "authorBanned" || update.type === "authorUnbanned") {
+      const myAuthor = (currentPost.author?.address || "").toLowerCase();
+      if (myAuthor && myAuthor === (update.author || "").toLowerCase()) {
+        setPost(prev => ({
+          ...prev,
+          author_banned: update.type === "authorBanned"
+        }));
+      }
+      return;
+    }
+
+    // Post-level updates: gate by cid/id
+    if (update.cid !== currentCid) return;
+
+    if (update.type === "reactionsChanged") {
+      setPost(prev => ({
+        ...prev,
+        reactions: update.data.reactions,
+        my_reaction: app.authorizedUser()?.address?.toLowerCase() === update.data?.user?.toLowerCase()
+          ? update.data.reaction
+          : prev.my_reaction
+      }));
+    } else if (update.type === "commentCountChanged") {
+      setPost(prev => ({
+        ...prev,
+        total_childs: update.data.newTotal
+      }));
+    } else if (update.type === "fundChanged" && update.data.fund) {
+      setPost(prev => ({
+        ...prev,
+        fund: { ...prev.fund, ...update.data.fund }
+      }));
+    } else if (update.type === "postBanned") {
+      setPost(prev => ({
+        ...prev,
+        banned: true
+      }));
+    } else if (update.type === "postUnbanned") {
+      setPost(prev => ({
+        ...prev,
+        banned: false
+      }));
+    }
+  });
+
   // Listen for NFT update events to refetch post data
   onMount(() => {
     const handleNftUpdate = (event) => {

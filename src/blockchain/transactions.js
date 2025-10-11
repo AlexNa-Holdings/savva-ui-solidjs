@@ -1,8 +1,8 @@
 // src/blockchain/transactions.js
 import { pushToast, pushErrorToast } from "../ui/toast.js";
 import { dbg } from "../utils/debug.js";
-import { createPublicClient, http, getContract } from "viem";
-import { getSavvaContract } from "./contracts.js";
+import { createPublicClient, getContract } from "viem";
+import { getSavvaContract, configuredHttp } from "./contracts.js";
 
 // Minimal ABI for ERC20 transfer
 const ERC20_TRANSFER_ABI = [
@@ -54,7 +54,7 @@ export async function performTransfer(app, txData) {
     const walletClient = await app.getGuardedWalletClient();
     const publicClient = createPublicClient({
       chain: app.desiredChain(),
-      transport: http(app.desiredChain().rpcUrls[0]),
+      transport: configuredHttp(app.desiredChain().rpcUrls[0]),
     });
 
     let hash;
@@ -100,7 +100,7 @@ export async function performStake(app, txData) {
     const walletClient = await app.getGuardedWalletClient();
     const publicClient = createPublicClient({
       chain: app.desiredChain(),
-      transport: http(app.desiredChain().rpcUrls[0]),
+      transport: configuredHttp(app.desiredChain().rpcUrls[0]),
     });
 
     const userAddress = walletClient.account.address;

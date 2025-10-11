@@ -20,8 +20,13 @@ export default function ReactionInput(props) {
     props.post?._raw?.my_reaction ?? props.post?.my_reaction ?? -1
   );
 
+  let lastPostUpdate;
+
   createEffect(() => {
     const update = app.postUpdate();
+    if (!update || update === lastPostUpdate) return;
+    lastPostUpdate = update;
+
     const authorizedUserAddress = app.authorizedUser()?.address;
     const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
 
@@ -114,13 +119,17 @@ export default function ReactionInput(props) {
     const postId = props.post?._raw?.savva_cid || props.post?.savva_cid || props.post?.id;
     const actorAddr = getActorAddress();
 
+    dbg.log("ReactionInput", "sendReaction:start", { postId, actorAddr, reactionIndex });
+
     if (!actorAddr) {
+      dbg.warn("ReactionInput", "sendReaction:no-actor");
       pushErrorToast(new Error("no-actor"), { context: t("reactions.noActorSelected") });
       setIsProcessing(false);
       return;
     }
 
     try {
+      dbg.log("ReactionInput", "sendReaction:calling-wsCall");
       await wsCall("react", {
         domain: app.selectedDomainName(),
         "obj-type": 0,
@@ -129,11 +138,13 @@ export default function ReactionInput(props) {
         n: 0,
         reaction: reactionIndex,
       });
+      dbg.log("ReactionInput", "sendReaction:success", { reactionIndex });
       setMyReactionIndex(reactionIndex);
     } catch (e) {
+      dbg.error("ReactionInput", "sendReaction:error", e);
       pushErrorToast(e, { context: t("reactions.submitFailed") });
-      dbg.error("ReactionInput", "Failed to send reaction", e);
     } finally {
+      dbg.log("ReactionInput", "sendReaction:complete");
       setIsProcessing(false);
       setShowPalette(false);
       setIsGracePeriod(false);

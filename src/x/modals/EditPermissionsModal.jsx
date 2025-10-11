@@ -1,7 +1,8 @@
 // src/x/modals/EditPermissionsModal.jsx
 import { createSignal, Show, For, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { createPublicClient, http, getContract } from "viem";
+import { createPublicClient, getContract } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -45,7 +46,7 @@ export default function EditPermissionsModal(props) {
       const chain = app.desiredChain?.();
       const publicClient = createPublicClient({
         chain,
-        transport: http(chain?.rpcUrls?.[0] ?? undefined),
+        transport: configuredHttp(chain?.rpcUrls?.[0] ?? ""),
       });
       const c = getContract({ address: props.npoAddr, abi: SavvaNPOAbi, client: publicClient });
 
@@ -75,7 +76,7 @@ export default function EditPermissionsModal(props) {
       if (!client) throw new Error(t("errors.walletRequired"));
       const c = getContract({ address: props.npoAddr, abi: SavvaNPOAbi, client });
       const hash = await c.write.changeMemberRoles([props.memberAddress, selectedArray()]);
-      const pc = createPublicClient({ chain: app.desiredChain?.(), transport: http(app.desiredChain()?.rpcUrls?.[0] ?? undefined) });
+      const pc = createPublicClient({ chain: app.desiredChain?.(), transport: configuredHttp(app.desiredChain()?.rpcUrls?.[0] ?? "") });
       if (pc && hash) await pc.waitForTransactionReceipt({ hash });
       pushToast({ type: "success", message: t("npo.editPerms.updated") });
       props.onChanged?.();

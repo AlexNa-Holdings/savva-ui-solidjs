@@ -2,6 +2,20 @@
 import { createPublicClient, http, getContract } from "viem";
 import { CHAINS } from "./chains.js";
 
+/**
+ * Creates a configured http transport with proper timeout and retry limits
+ * to prevent infinite RPC loops when the blockchain is slow or unavailable.
+ * @param {string} rpcUrl - The RPC endpoint URL
+ * @returns {ReturnType<typeof http>} A configured viem http transport
+ */
+export function configuredHttp(rpcUrl) {
+  return http(rpcUrl, {
+    timeout: 10_000, // 10 second timeout
+    retryCount: 2, // Maximum 2 retries instead of default 3
+    retryDelay: 500, // 500ms between retries
+  });
+}
+
 // A cache to hold instantiated viem clients per chainId.
 const clientCache = new Map();
 
@@ -22,7 +36,7 @@ function getPublicClient(chainId) {
 
   const client = createPublicClient({
     chain: chainInfo,
-    transport: http(chainInfo.rpcUrls[0]),
+    transport: configuredHttp(chainInfo.rpcUrls[0]),
   });
 
   clientCache.set(chainId, client);

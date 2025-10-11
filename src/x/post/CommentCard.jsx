@@ -100,9 +100,12 @@ export default function CommentCard(props) {
   const shouldCoverEncrypted = createMemo(() => isEncrypted() && !canDecrypt());
 
   // Live updates (author/post banned/unbanned, reactions)
+  let lastPostUpdate;
+
   createEffect(() => {
     const update = app.postUpdate?.();
-    if (!update) return;
+    if (!update || update === lastPostUpdate) return;
+    lastPostUpdate = update;
 
     // Author-level updates
     if (update.type === "authorBanned" || update.type === "authorUnbanned") {

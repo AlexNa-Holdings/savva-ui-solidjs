@@ -1,7 +1,8 @@
 // src/x/ui/AmountInput.jsx
 import { createMemo, createResource, createSignal, Show, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { createPublicClient, http, formatUnits, parseUnits } from "viem";
+import { createPublicClient, formatUnits, parseUnits } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import { walletAccount } from "../../blockchain/wallet.js";
 import TokenValue from "./TokenValue.jsx";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
@@ -23,7 +24,7 @@ export default function AmountInput(props) {
   const rpcUrl = createMemo(() => chain()?.rpcUrls?.[0]);
   const publicClient = createMemo(() => {
     const url = rpcUrl();
-    return url ? createPublicClient({ chain: chain(), transport: http(url) }) : null;
+    return url ? createPublicClient({ chain: chain(), transport: configuredHttp(url) }) : null;
   });
 
   // ── token meta (cached) ──────────────────────────────────────────────────────

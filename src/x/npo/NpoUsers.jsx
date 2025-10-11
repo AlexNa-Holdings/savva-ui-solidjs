@@ -1,7 +1,8 @@
 // src/x/npo/NpoUsers.jsx
 import { Show, For, createSignal, createEffect, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { createPublicClient, http, getContract } from "viem";
+import { createPublicClient, getContract } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 
 import UserCard from "../ui/UserCard.jsx";
@@ -53,7 +54,7 @@ export default function NpoUsers(props) {
     try {
       setAdminResolving(true);
       const chain = app.desiredChain?.();
-      const pc = createPublicClient({ chain, transport: http(chain?.rpcUrls?.[0] ?? undefined) });
+      const pc = createPublicClient({ chain, transport: configuredHttp(chain?.rpcUrls?.[0] ?? "") });
       const c = getContract({ address: npoAddr, abi: SavvaNPOAbi, client: pc });
       const yes = await c.read.isAdmin([meAddr]);
       setLocalIsAdmin(!!yes);

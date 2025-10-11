@@ -7,7 +7,8 @@ import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import Tabs from "../ui/Tabs.jsx";
 import { connectWallet, walletAccount, isWalletAvailable } from "../../blockchain/wallet.js";
-import { createPublicClient, http, getContract } from "viem";
+import { createPublicClient, getContract } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import AddMemberModal from "../modals/AddMemberModal.jsx";
 import EditPermissionsModal from "../modals/EditPermissionsModal.jsx";
@@ -120,7 +121,7 @@ export default function NpoPage() {
 
   function makePublicClient() {
     const chain = app.desiredChain?.();
-    return createPublicClient({ chain, transport: http(chain?.rpcUrls?.[0] ?? undefined) });
+    return createPublicClient({ chain, transport: configuredHttp(chain?.rpcUrls?.[0] ?? "") });
   }
 
   async function fetchSelfAdmin(addr, client) {

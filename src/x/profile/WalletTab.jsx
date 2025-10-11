@@ -2,8 +2,8 @@
 import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { createMemo, createResource, Show, createSignal, For, createEffect, onCleanup } from "solid-js";
-import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
+import { getSavvaContract, configuredHttp } from "../../blockchain/contracts.js";
+import { createPublicClient } from "viem";
 import Spinner from "../ui/Spinner.jsx";
 import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
@@ -54,7 +54,7 @@ export default function WalletTab(props) {
     try {
       const publicClient = createPublicClient({
         chain: app.desiredChain(),
-        transport: http(app.desiredChain().rpcUrls[0]),
+        transport: configuredHttp(app.desiredChain().rpcUrls[0]),
       });
       const savvaTokenContract = await getSavvaContract(app, "SavvaToken");
       const contentFundContract = await getSavvaContract(app, "ContentFund");
@@ -174,7 +174,7 @@ export default function WalletTab(props) {
     const contentFundAddress = info.savva_contracts?.ContentFund?.address;
     if (!savvaTokenAddress && !stakingAddress && !contentFundAddress) return;
 
-    const client = createPublicClient({ chain, transport: http(rpcUrl) });
+    const client = createPublicClient({ chain, transport: configuredHttp(rpcUrl) });
     const target = user.address.toLowerCase();
 
     const bumpRefresh = () => setRefreshKey((v) => v + 1);

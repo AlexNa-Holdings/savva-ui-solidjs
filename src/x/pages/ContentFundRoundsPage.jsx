@@ -1,6 +1,7 @@
 // src/x/pages/ContentFundRoundsPage.jsx
 import { Show, For, createSignal, onMount, createResource, createMemo, createEffect, on } from "solid-js";
-import { createPublicClient, http, keccak256 } from "viem";
+import { createPublicClient, keccak256 } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -230,7 +231,7 @@ export default function ContentFundRoundsPage() {
         try {
             const publicClient = createPublicClient({
                 chain,
-                transport: http(chain.rpcUrls[0])
+                transport: configuredHttp(chain.rpcUrls[0])
             });
 
             // Get contract data
@@ -410,7 +411,7 @@ export default function ContentFundRoundsPage() {
         try {
             const publicClient = createPublicClient({
                 chain,
-                transport: http(chain.rpcUrls[0])
+                transport: configuredHttp(chain.rpcUrls[0])
             });
 
             const writeContract = await getSavvaContract(app, "ContentFund", { write: true });

@@ -1,6 +1,6 @@
 import { createSignal, Show, createResource, createMemo, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { getSavvaContract } from "../../blockchain/contracts.js";
+import { getSavvaContract, configuredHttp } from "../../blockchain/contracts.js";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import ProgressBar from "../ui/ProgressBar.jsx";
@@ -12,7 +12,7 @@ import { connectWallet, walletAccount } from "../../blockchain/wallet.js";
 import { authorize } from "../../blockchain/auth.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import TokenSelector from "./TokenSelector.jsx";
-import { createPublicClient, getContract, http } from "viem";
+import { createPublicClient, getContract } from "viem";
 import { getConfigParam } from "../../blockchain/config.js";
 import DonatorsList from "./DonatorsList.jsx";
 
@@ -139,7 +139,7 @@ export default function ContributeView(props) {
 
         try {
             const walletClient = await app.getGuardedWalletClient();
-            const publicClient = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain().rpcUrls[0]) });
+            const publicClient = createPublicClient({ chain: app.desiredChain(), transport: configuredHttp(app.desiredChain().rpcUrls[0]) });
             const fundraiserContract = await getSavvaContract(app, "Fundraiser", { write: true });
             let txHash;
             const isBase = selectedToken() === "0";

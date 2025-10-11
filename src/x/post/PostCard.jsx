@@ -59,9 +59,12 @@ export default function PostCard(props) {
   const [revealed, setRevealed] = createSignal(false);
 
   // Live updates
+  let lastPostUpdate;
+
   createEffect(() => {
     const update = app.postUpdate?.();
-    if (!update) return;
+    if (!update || update === lastPostUpdate) return;
+    lastPostUpdate = update;
 
     // Author-level updates: apply to all posts by that author
     if (update.type === "authorBanned" || update.type === "authorUnbanned") {

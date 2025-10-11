@@ -1,5 +1,5 @@
 // src/x/post/PostNftCard.jsx
-import { Show, createMemo, createResource, createSignal, createEffect, onMount, onCleanup } from "solid-js";
+import { Show, createMemo, createResource, createSignal, createEffect, onMount, onCleanup, untrack } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -192,8 +192,13 @@ function compareNftData(backendData, chainData) {
 export default function PostNftCard(props) {
   const app = useApp();
 
-  // Backend NFT data
-  const backendNft = () => props.post?.nft;
+  // Capture post reference once at initialization to avoid reactive tracking issues
+  // Since props.post might be a SolidJS store proxy, we need to be very careful
+  // to avoid creating reactive dependencies that could cause infinite loops
+  let postRef = props.post;
+
+  // Backend NFT data - access the captured post reference without reactivity
+  const backendNft = () => postRef?.nft;
 
   // Track if we should hide the card (NFT not actually minted)
   const [shouldHide, setShouldHide] = createSignal(false);
@@ -203,52 +208,59 @@ export default function PostNftCard(props) {
 
   // Fetch NFT status from chain only when wallet is connected
   const [chainNftStatus, { refetch }] = createResource(
-    () => hasWallet() && props.post ? { app, post: props.post } : null,
-    async ({ app, post }) => await fetchNftStatusFromChain(app, post)
+    () => {
+      const wallet = hasWallet();
+      const id = resolveCid(postRef);
+      return wallet && id ? id : null;
+    },
+    async (key) => {
+      return await fetchNftStatusFromChain(app, postRef);
+    }
   );
 
-  // Effect to compare and sync data
-  createEffect(() => {
-    if (!hasWallet()) return; // Only when wallet connected
+  // Effect to compare and sync data - track previous value to prevent infinite loops
+  createEffect((prevChainData) => {
+    if (!hasWallet()) return prevChainData;
 
     const chainData = chainNftStatus();
-    if (chainData === undefined) return; // Still loading
-    if (chainData === null) return; // Error fetching
+    if (chainData === undefined) return prevChainData; // Still loading
+    if (chainData === null) return prevChainData; // Error fetching
+
+    // Check if chainData actually changed by reference
+    if (prevChainData === chainData) {
+      return chainData;
+    }
 
     const backendData = backendNft();
 
     // If chain says NFT doesn't exist, hide the card
     if (!chainData.exists) {
-      dbg.log("PostNftCard", "NFT not minted on chain, hiding card");
       setShouldHide(true);
 
       // Call fix API if backend thinks it exists
       if (backendData && (backendData.owner || backendData.on_market || backendData.on_auction)) {
-        const cid = resolveCid(props.post);
+        const cid = resolveCid(postRef);
         if (cid) {
-          dbg.log("PostNftCard", "Calling fix API for unminted NFT", cid);
           app.wsCall?.("fix", { nft: cid }).catch(err => {
             dbg.warn?.("PostNftCard:fix", "Failed to call fix API", err);
           });
         }
       }
-      return;
+      return chainData;
     }
 
     // Compare data and call fix if different
     const isDifferent = compareNftData(backendData, chainData);
     if (isDifferent) {
-      const cid = resolveCid(props.post);
+      const cid = resolveCid(postRef);
       if (cid) {
-        dbg.log("PostNftCard", "NFT data differs from chain, calling fix API", {
-          backend: backendData,
-          chain: chainData,
-        });
         app.wsCall?.("fix", { nft: cid }).catch(err => {
           dbg.warn?.("PostNftCard:fix", "Failed to call fix API", err);
         });
       }
     }
+
+    return chainData; // Return current value for next iteration
   });
 
   // Determine which data to show: chain data if available and wallet connected, otherwise backend
@@ -360,7 +372,7 @@ export default function PostNftCard(props) {
   async function handleFinalizeAuction() {
     if (finalizingAuction()) return;
 
-    const tokenId = resolveTokenId(props.post);
+    const tokenId = resolveTokenId(postRef);
     if (!tokenId) {
       pushErrorToast(new Error("Invalid NFT token ID"));
       return;
@@ -438,7 +450,7 @@ export default function PostNftCard(props) {
   onMount(() => {
     const handleNftUpdate = (event) => {
       const { contentId, eventType } = event.detail || {};
-      const currentCid = resolveCid(props.post);
+      const currentCid = resolveCid(postRef);
 
       // Only refetch if this event is for our NFT
       if (contentId && currentCid && String(contentId) === String(currentCid)) {
@@ -463,7 +475,7 @@ export default function PostNftCard(props) {
       return;
     }
 
-    const tokenId = resolveTokenId(props.post);
+    const tokenId = resolveTokenId(postRef);
     if (!tokenId) {
       pushErrorToast(new Error("Invalid NFT token ID"));
       return;
@@ -727,7 +739,7 @@ export default function PostNftCard(props) {
       <BidAuctionModal
         isOpen={showBidModal()}
         onClose={() => setShowBidModal(false)}
-        tokenId={resolveTokenId(props.post)}
+        tokenId={resolveTokenId(postRef)}
         auctionData={displayNft()}
         onSuccess={handleBidSuccess}
       />
@@ -736,7 +748,7 @@ export default function PostNftCard(props) {
       <NftControlModal
         isOpen={showControlModal()}
         onClose={handleControlModalClose}
-        tokenId={resolveTokenId(props.post)}
+        tokenId={resolveTokenId(postRef)}
         onActionComplete={handleControlModalClose}
       />
     </Show>

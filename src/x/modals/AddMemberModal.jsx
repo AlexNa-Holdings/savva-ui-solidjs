@@ -1,7 +1,8 @@
 // src/x/modals/AddMemberModal.jsx
 import { createSignal, Show, onMount, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { createPublicClient, http, getContract } from "viem";
+import { createPublicClient, getContract } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import AddressInput from "../ui/AddressInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -50,7 +51,7 @@ export default function AddMemberModal(props) {
       const chain = app.desiredChain?.();
       const publicClient = createPublicClient({
         chain,
-        transport: http(chain?.rpcUrls?.[0] ?? undefined),
+        transport: configuredHttp(chain?.rpcUrls?.[0] ?? ""),
       });
       const c = getContract({ address: props.npoAddr, abi: SavvaNPOAbi, client: publicClient });
       const raw = await c.read.getRoleList();

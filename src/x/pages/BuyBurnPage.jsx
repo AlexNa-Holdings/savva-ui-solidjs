@@ -1,6 +1,7 @@
 // src/x/pages/BuyBurnPage.jsx
 import { Show, onMount, createSignal, createResource, createMemo, createEffect, on } from "solid-js";
-import { createPublicClient, http } from "viem";
+import { createPublicClient } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -120,7 +121,7 @@ export default function BuyBurnPage() {
 
     try {
       const contract = await getSavvaContract(app, "BuyBurn", { write: true });
-      const publicClient = createPublicClient({ chain, transport: http(chain.rpcUrls[0]) });
+      const publicClient = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
 
       const hash = await contract.write.buyAndBurn([]);
       await publicClient.waitForTransactionReceipt({ hash });
@@ -161,7 +162,7 @@ export default function BuyBurnPage() {
 
     try {
       const authorsClubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
-      const publicClient = createPublicClient({ chain, transport: http(chain.rpcUrls[0]) });
+      const publicClient = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
 
       const hash = await authorsClubs.write.claimStakingGain([]);
       await publicClient.waitForTransactionReceipt({ hash });

@@ -4,7 +4,8 @@ import { useApp } from "../../context/AppContext.jsx";
 import Modal from "./Modal.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
-import { createPublicClient, getContract, http, keccak256, stringToBytes } from "viem";
+import { createPublicClient, getContract, keccak256, stringToBytes } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { pushErrorToast, pushToast } from "../../ui/toast.js";
 import { sendAsUser } from "../../blockchain/npoMulticall.js";
@@ -69,7 +70,7 @@ export default function NpoRoleEditModal(props) {
     setLoading(true);
     try {
       const chain = app.desiredChain?.();
-      const pc = createPublicClient({ chain, transport: http(chain?.rpcUrls?.[0] ?? undefined) });
+      const pc = createPublicClient({ chain, transport: configuredHttp(chain?.rpcUrls?.[0] ?? "") });
       const c = getContract({ address: npoAddr(), abi: SavvaNPOAbi, client: pc });
       const raw = await c.read.getRolePermissions([props.role.hex]);
 

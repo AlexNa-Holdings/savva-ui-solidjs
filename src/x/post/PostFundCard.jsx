@@ -61,10 +61,6 @@ export default function PostFundCard(props) {
           </Show>
         </div>
 
-            { 
-              dbg.log("PostFundCard", `fund updated:`, fund())
-            }
-
         <Show when={fund()?.amount > 0 && fund()?.round_time > 0}>
             <div class="space-y-2 flex flex-col justify-center items-center py-1">
                 <Show when={roundTime() > nowInSeconds()}>

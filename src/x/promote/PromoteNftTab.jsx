@@ -1,7 +1,8 @@
 // src/x/promote/PromoteNftTab.jsx
 import { createMemo, createResource, createSignal, Show, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { getSavvaContract } from "../../blockchain/contracts.js";
+import { getSavvaContract, configuredHttp } from "../../blockchain/contracts.js";
+import { createPublicClient } from "viem";
 import { getConfigParam } from "../../blockchain/config.js";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -310,7 +311,7 @@ export default function PromoteNftTab(props) {
     });
 
     try {
-      const publicClient = createPublicClient({ chain, transport: http(rpc) });
+      const publicClient = createPublicClient({ chain, transport: configuredHttp(rpc) });
       const marketplace = await getSavvaContract(app, "NFTMarketplace", { write: true });
       const txHash = await marketplace.write.removeFromMarket([status.tokenId]);
       await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -346,7 +347,7 @@ export default function PromoteNftTab(props) {
     });
 
     try {
-      const publicClient = createPublicClient({ chain, transport: http(rpc) });
+      const publicClient = createPublicClient({ chain, transport: configuredHttp(rpc) });
       const auctionContract = await getSavvaContract(app, "NFTAuction", { write: true });
       const txHash = await auctionContract.write.finalizeAuction([status.tokenId]);
       await publicClient.waitForTransactionReceipt({ hash: txHash });

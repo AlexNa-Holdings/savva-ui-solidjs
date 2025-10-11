@@ -21,8 +21,8 @@ import HistoryTab from "../profile/HistoryTab.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { walletAccount } from "../../blockchain/wallet.js";
 import SubscribeModal from "../modals/SubscribeModal.jsx";
-import { getSavvaContract } from "../../blockchain/contracts.js";
-import { createPublicClient, http } from "viem";
+import { getSavvaContract, configuredHttp } from "../../blockchain/contracts.js";
+import { createPublicClient } from "viem";
 import formSocialLink from "../profile/formSocialLink.jsx";
 
 // Data fetcher for the user profile
@@ -210,7 +210,7 @@ export default function ProfilePage() {
     try {
       const clubs = await getSavvaContract(app, "AuthorsClubs", { write: true });
       const hash = await clubs.write.stop([domainName(), authorAddress]);
-      const pc = createPublicClient({ chain: app.desiredChain(), transport: http(app.desiredChain()?.rpcUrls?.[0]) });
+      const pc = createPublicClient({ chain: app.desiredChain(), transport: configuredHttp(app.desiredChain()?.rpcUrls?.[0]) });
       await pc.waitForTransactionReceipt({ hash });
       await refetchSub();
     } catch (e) {

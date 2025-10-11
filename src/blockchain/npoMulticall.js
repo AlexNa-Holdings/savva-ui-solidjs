@@ -1,7 +1,7 @@
 // src/blockchain/npoMulticall.js
-import { createPublicClient, http, getContract, encodeFunctionData } from "viem";
+import { createPublicClient, getContract, encodeFunctionData } from "viem";
 import SavvaNPOAbi from "./abi/SavvaNPO.json";
-import { getSavvaContract } from "./contracts.js";
+import { getSavvaContract, configuredHttp } from "./contracts.js";
 import { pushToast, pushErrorToast } from "../ui/toast.js";
 
 const toBigInt = (v) => (typeof v === "bigint" ? v : v == null || v === "" ? 0n : BigInt(v));
@@ -47,10 +47,10 @@ async function getClients(app) {
     throw new Error(app.t?.("error.rpcNotConfigured") || "RPC URL is not configured for the current chain.");
   }
 
-  // Match your older, working pattern: pass chain from app and explicit http(rpcUrl)
+  // Match your older, working pattern: pass chain from app and explicit configuredHttp(rpcUrl)
   const publicClient = createPublicClient({
     chain: chainFromApp || walletClient.chain || undefined,
-    transport: http(rpcUrl),
+    transport: configuredHttp(rpcUrl),
   });
 
   return { walletClient, publicClient };

@@ -3,7 +3,8 @@ import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import ConfirmModal from "../modals/ConfirmModal.jsx";
-import { createPublicClient, getContract, http } from "viem";
+import { createPublicClient, getContract } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import { sendAsUser } from "../../blockchain/npoMulticall.js";
 import NpoRoleEditModal from "../modals/NpoRoleEditModal.jsx";
@@ -38,7 +39,7 @@ export default function NpoRoles(props) {
     setLoading(true);
     try {
       const chain = app.desiredChain?.();
-      const pc = createPublicClient({ chain, transport: http(chain?.rpcUrls?.[0] ?? undefined) });
+      const pc = createPublicClient({ chain, transport: configuredHttp(chain?.rpcUrls?.[0] ?? "") });
       const c = getContract({ address: npoAddr(), abi: SavvaNPOAbi, client: pc });
 
       const raw = await c.read.getRoleList();

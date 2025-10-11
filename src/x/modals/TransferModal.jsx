@@ -8,7 +8,8 @@ import { parseUnits } from "viem";
 import Spinner from "../ui/Spinner.jsx";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
-import { createPublicClient, http } from "viem";
+import { createPublicClient } from "viem";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import Modal from "../modals/Modal.jsx";
 
 function TokenTitleIcon({ app, tokenAddress, className = "w-5 h-5" }) {
@@ -177,7 +178,7 @@ export default function TransferModal(props) {
             chain?.rpcUrls?.[0] ||
             chain?.rpcUrls?.default?.http?.[0] ||
             chain?.rpcUrls?.public?.http?.[0];
-          const pc = createPublicClient({ chain, transport: http(rpc) });
+          const pc = createPublicClient({ chain, transport: configuredHttp(rpc) });
           const hash = await wc.sendTransaction({ to: to().trim(), value: v });
           await pc.waitForTransactionReceipt({ hash });
         }

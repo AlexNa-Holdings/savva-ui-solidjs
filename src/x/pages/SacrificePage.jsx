@@ -8,8 +8,9 @@ import {
   createMemo,
   createEffect,
 } from "solid-js";
-import { formatUnits, createPublicClient, http } from "viem";
+import { formatUnits, createPublicClient } from "viem";
 import { useApp } from "../../context/AppContext.jsx";
+import { configuredHttp } from "../../blockchain/contracts.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
@@ -442,7 +443,7 @@ export default function SacrificePage() {
     const faucetAddress = info.savva_contracts?.SavvaFaucet?.address;
     if (!faucetAddress) return;
 
-    const client = createPublicClient({ chain, transport: http(chain.rpcUrls[0]) });
+    const client = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
     const userAddress = account.toLowerCase();
 
     const handleUserLogs = (logs = []) => {
@@ -585,7 +586,7 @@ export default function SacrificePage() {
       const rpcUrl = chain?.rpcUrls?.[0];
       if (chain && rpcUrl) {
         try {
-          const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+          const publicClient = createPublicClient({ chain, transport: configuredHttp(rpcUrl) });
           await publicClient.waitForTransactionReceipt({ hash: txHash });
         } catch (waitErr) {
           console.warn("SacrificePage: wait for finalize receipt failed", waitErr);
