@@ -19,6 +19,12 @@ export default function ProgressBar(props) {
     return p > 100 ? ((p - 100) / p) * 100 : 0;
   });
 
+  const filledPortion = createMemo(() => {
+    const p = percentage();
+    if (!Number.isFinite(p)) return 0;
+    return Math.max(0, Math.min(p, 100));
+  });
+
   // Palette
   const palette = createMemo(() => {
     const reversed = String(props.colors || "normal") === "reversed";
@@ -27,18 +33,22 @@ export default function ProgressBar(props) {
           track: "bg-[hsl(var(--primary))]",
           trackBorder: "border-[hsl(var(--card))]/30",
           fillBase: "bg-[hsl(var(--card))]",
+          textOnTrack: "hsl(var(--card))",
+          textOnFill: "hsl(var(--primary))",
         }
       : {
           track: "bg-[hsl(var(--muted))]",
           trackBorder: "border-[hsl(var(--primary))]/40",
           fillBase: "bg-[hsl(var(--primary))]",
+          textOnTrack: "hsl(var(--primary))",
+          textOnFill: "hsl(var(--muted))",
         };
   });
 
   return (
-    <div class="flex items-center gap-2">
+    <div class="relative">
       <div
-        class={`flex-grow h-4 rounded-full overflow-hidden flex border ${palette().track} ${palette().trackBorder}`}
+        class={`w-full h-6 rounded-full overflow-hidden flex border ${palette().track} ${palette().trackBorder}`}
         role="progressbar"
         aria-valuenow={percentage()}
         aria-valuemin="0"
@@ -66,8 +76,33 @@ export default function ProgressBar(props) {
           </Match>
         </Switch>
       </div>
-      <div class="text-xs w-14 text-right tabular-nums">
-        {percentage().toFixed(1)}%
+      {/* Text visible on the track (unfilled portion) */}
+      <div
+        class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+        style={{
+          "clip-path": `inset(0 0 0 ${filledPortion()}%)`,
+        }}
+      >
+        <span
+          class="text-xs font-semibold tabular-nums whitespace-nowrap"
+          style={{ color: palette().textOnTrack }}
+        >
+          {percentage().toFixed(1)}%
+        </span>
+      </div>
+      {/* Text visible on the fill (filled portion) */}
+      <div
+        class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+        style={{
+          "clip-path": `inset(0 ${100 - filledPortion()}% 0 0)`,
+        }}
+      >
+        <span
+          class="text-xs font-semibold tabular-nums whitespace-nowrap"
+          style={{ color: palette().textOnFill }}
+        >
+          {percentage().toFixed(1)}%
+        </span>
       </div>
     </div>
   );

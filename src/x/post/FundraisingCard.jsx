@@ -157,26 +157,28 @@ export default function FundraisingCard(props) {
               >
                 {campaign().title}
               </FitToLines>
-              <div>
+              <div class="text-center">
                 <div class="text-sm text-[hsl(var(--card))] opacity-80 mb-1">{t("fundraising.card.receiver")}:</div>
-                <UserCard
-                  author={campaign().user}
-                  textColorClass="text-[hsl(var(--card))]"
-                  mutedTextColorClass="text-[hsl(var(--card))] opacity-80"
-                />
+                <div class="flex justify-center">
+                  <UserCard
+                    author={campaign().user}
+                    textColorClass="text-[hsl(var(--card))]"
+                    mutedTextColorClass="text-[hsl(var(--card))] opacity-80"
+                  />
+                </div>
               </div>
             </div>
             <div class="space-y-2 text-sm">
-              <div class="flex justify-between items-center">
-                <span class="text-[hsl(var(--card))] opacity-80">{t("fundraising.card.collected")}:</span>
-                <TokenValue amount={raisedWei()} tokenAddress={savvaTokenAddress()} format="vertical" />
+              <div class="space-y-1 text-center">
+                <div class="text-[hsl(var(--card))] opacity-80">{t("fundraising.card.collected")}:</div>
+                <TokenValue amount={raisedWei()} tokenAddress={savvaTokenAddress()} format="vertical" centered />
               </div>
 
               <ProgressBar value={percentage()} colors="reversed" />
 
-              <div class="flex justify-between items-center">
-                <span class="text-[hsl(var(--card))] opacity-80">{t("fundraising.card.target")}:</span>
-                <TokenValue amount={targetWei()} tokenAddress={savvaTokenAddress()} format="vertical" />
+              <div class="space-y-1 opacity-80 text-[0.65rem] text-center">
+                <div class="text-[hsl(var(--card))]">{t("fundraising.card.target")}:</div>
+                <TokenValue amount={targetWei()} tokenAddress={savvaTokenAddress()} format="vertical" class="!text-[0.65rem]" centered />
               </div>
             </div>
 
