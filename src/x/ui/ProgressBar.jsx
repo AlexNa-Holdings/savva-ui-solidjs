@@ -1,5 +1,5 @@
 // src/x/ui/ProgressBar.jsx
-import { createMemo, Switch, Match } from "solid-js";
+import { createMemo, Switch, Match, Show } from "solid-js";
 
 /**
  * @param {object} props
@@ -99,11 +99,29 @@ export default function ProgressBar(props) {
       >
         <span
           class="text-xs font-semibold tabular-nums whitespace-nowrap"
-          style={{ color: palette().textOnFill }}
+          style={{
+            color: percentage() > 100 ? "#f0fdf4" : palette().textOnFill,
+          }}
         >
           {percentage().toFixed(1)}%
         </span>
       </div>
+      <Show when={percentage() > 100}>
+        {/* Text overlay for overflow portion */}
+        <div
+          class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden"
+          style={{
+            "clip-path": `inset(0 0 0 ${greenPartWidth()}%)`,
+          }}
+        >
+          <span
+            class="text-xs font-semibold tabular-nums whitespace-nowrap"
+            style={{ color: "#f59e0b" }}
+          >
+            {percentage().toFixed(1)}%
+          </span>
+        </div>
+      </Show>
     </div>
   );
 }
