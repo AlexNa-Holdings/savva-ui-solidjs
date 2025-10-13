@@ -12,8 +12,10 @@ import { navigate } from "../../routing/hashRouter.js";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
-import { resolvePostCidPath } from "../../ipfs/utils.js";
-import { canDecryptPost, decryptPostMetadata } from "../crypto/postDecryption.js";
+import { resolvePostCidPath, getPostContentBaseCid } from "../../ipfs/utils.js";
+import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey } from "../crypto/postDecryption.js";
+import { setEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
+import { swManager } from "../crypto/serviceWorkerManager.js";
 
 function PinIcon(props) {
   return (
@@ -57,6 +59,16 @@ export default function PostCard(props) {
   const disableContextMenu = () => !!(props.noContextMenu ?? props["no-context-menu"]);
 
   const [revealed, setRevealed] = createSignal(false);
+
+  // Cleanup encryption context on unmount
+  onCleanup(() => {
+    const dataCid = getPostContentBaseCid(base());
+    if (dataCid && base()?._decrypted) {
+      swManager.clearEncryptionContext(dataCid).catch(() => {
+        // Silently fail - context might already be cleared
+      });
+    }
+  });
 
   // Live updates
   let lastPostUpdate;
@@ -123,7 +135,44 @@ export default function PostCard(props) {
     try {
       const addr = userAddress();
       const originalBase = base();
-      const decrypted = await decryptPostMetadata(originalBase, addr);
+      const content = originalBase?.savva_content || originalBase?.content;
+      const encryptionData = content?.encryption;
+
+      // Get the post secret key for decryption
+      const readingKey = await getReadingSecretKey(addr, encryptionData.reading_key_nonce);
+      if (!readingKey) {
+        console.error("[PostCard] Failed to get reading secret key");
+        return;
+      }
+
+      const postSecretKey = decryptPostEncryptionKey(encryptionData, readingKey);
+      if (!postSecretKey) {
+        console.error("[PostCard] Failed to decrypt post encryption key");
+        return;
+      }
+
+      // Decrypt the metadata
+      const decrypted = await decryptPostMetadata(originalBase, addr, readingKey);
+
+      // Set up encryption context for IPFS fetches (thumbnails, images, etc.)
+      const dataCid = getPostContentBaseCid(originalBase);
+      if (dataCid && postSecretKey) {
+        // Set context for blob-based decryption (fallback)
+        setEncryptedPostContext({ dataCid, postSecretKey });
+
+        // Set context in Service Worker for streaming decryption
+        swManager.setEncryptionContext(dataCid, postSecretKey).catch(err => {
+          console.warn('[PostCard] Failed to set SW encryption context:', err);
+          // Fallback to blob-based decryption will still work
+        });
+
+        console.log("[PostCard] Set encryption context for:", {
+          cid: originalBase?.savva_cid || originalBase?.short_cid,
+          dataCid,
+          hasThumbnail: !!content?.thumbnail,
+          thumbnailPath: content?.thumbnail,
+        });
+      }
 
       // Ensure we preserve all original fields (short_cid, savva_cid, etc)
       const merged = { ...originalBase, ...decrypted };

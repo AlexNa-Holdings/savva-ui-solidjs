@@ -6,6 +6,7 @@ import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
+import { dbg } from "../../utils/debug.js";
 
 // LocalStorage key for saved minimum payment preference
 const MIN_PAYMENT_STORAGE_KEY = "savva_editor_min_weekly_payment";
@@ -328,6 +329,13 @@ export default function AdditionalParametersPost(props) {
     });
   };
 
+  // Debug logging for audience value
+  createEffect(() => {
+    const audience = props.postParams?.()?.audience || "public";
+    const shouldShowWarning = audience !== "public";
+    dbg.log("AdditionalParametersPost", "audience:", audience, "(raw:", props.postParams?.()?.audience, ") shouldShowWarning:", shouldShowWarning);
+  });
+
   const CatChip = (p) => (
     <span
       class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm border
@@ -492,36 +500,40 @@ export default function AdditionalParametersPost(props) {
         {/* Audience */}
         <Show when={!isCommentMode()}>
           <label class={labelCls}>{t("editor.params.audience.label")}</label>
-          <div class="space-y-2">
-            <select
-              class="w-full max-w-[280px] px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-              value={props.postParams?.()?.audience || "public"}
-              onChange={(e) => {
-                const val = e.currentTarget.value;
-                if (val === "public") {
-                  props.setPostParams?.((p) => ({ ...(p || {}), audience: "public", minWeeklyPayment: undefined, minWeeklyPaymentWei: undefined }));
-                } else {
-                  props.setPostParams?.((p) => ({ ...(p || {}), audience: val }));
-                }
-              }}
-            >
-              <option value="public">{t("editor.params.audience.public")}</option>
-              <option value="subscribers">{t("editor.params.audience.subscribers")}</option>
-            </select>
+          <select
+            class="w-full max-w-[280px] px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
+            value={props.postParams?.()?.audience || "public"}
+            onChange={(e) => {
+              const val = e.currentTarget.value;
+              if (val === "public") {
+                props.setPostParams?.((p) => ({ ...(p || {}), audience: "public", minWeeklyPayment: undefined, minWeeklyPaymentWei: undefined }));
+              } else {
+                props.setPostParams?.((p) => ({ ...(p || {}), audience: val }));
+              }
+            }}
+          >
+            <option value="public">{t("editor.params.audience.public")}</option>
+            <option value="subscribers">{t("editor.params.audience.subscribers")}</option>
+          </select>
 
-            {/* Warning for encrypted content */}
-            <Show when={props.postParams?.()?.audience !== "public"}>
-              <div class="flex items-start gap-2 p-3 rounded-md bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
-                <svg class="w-5 h-5 text-[hsl(var(--destructive))] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div class="text-xs text-[hsl(var(--foreground))] leading-relaxed">
-                  <strong class="font-semibold">{t("editor.params.audience.encryptionWarning.title")}</strong>
-                  <p class="mt-1 opacity-90">{t("editor.params.audience.encryptionWarning.message")}</p>
-                </div>
+          {/* Warning for encrypted content */}
+          <Show when={(() => {
+            const audience = props.postParams?.()?.audience || "public";
+            const result = audience !== "public";
+            dbg.log("AdditionalParametersPost [Show condition]", "audience:", audience, "(raw:", props.postParams?.()?.audience, ") showing warning:", result);
+            return result;
+          })()}>
+            <div class={labelCls}></div>
+            <div class="flex items-start gap-2 p-3 rounded-md bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
+              <svg class="w-5 h-5 text-[hsl(var(--destructive))] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div class="text-xs text-[hsl(var(--foreground))] leading-relaxed">
+                <strong class="font-semibold">{t("editor.params.audience.encryptionWarning.title")}</strong>
+                <p class="mt-1 opacity-90">{t("editor.params.audience.encryptionWarning.message")}</p>
               </div>
-            </Show>
-          </div>
+            </div>
+          </Show>
 
           {/* Minimum weekly payment input - only show when subscribers is selected */}
           <Show when={props.postParams?.()?.audience === "subscribers"}>

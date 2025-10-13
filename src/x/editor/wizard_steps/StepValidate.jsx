@@ -9,11 +9,14 @@ export default function StepValidate(props) {
   const [isValidating, setIsValidating] = createSignal(true);
 
   const validate = () => {
-    const { postData, editorMode } = props;
+    const { postData, postParams, editorMode } = props;
     const data = postData();
     if (!data) {
       throw new Error("Post data is missing or not a function.");
     }
+
+    // Get postParams - it might be a function or direct object
+    const params = typeof postParams === 'function' ? postParams() : postParams;
 
     const isComment = editorMode === 'new_comment' || editorMode === 'edit_comment';
 
@@ -55,7 +58,9 @@ export default function StepValidate(props) {
           const chapter = langData.chapters[i];
           const chapterNum = i + 1;
 
-          const chapterHasTitle = chapter.title?.trim().length > 0;
+          // Chapter title is stored in params.locales[langCode].chapters[i].title
+          const chapterTitleFromParams = params?.locales?.[langCode]?.chapters?.[i]?.title;
+          const chapterHasTitle = chapterTitleFromParams?.trim().length > 0;
           const chapterHasBody = chapter.body?.trim().length > 0;
 
           // If chapter has any content, it must be complete
@@ -70,7 +75,7 @@ export default function StepValidate(props) {
               throw new Error(t("editor.publish.validation.errorChapterNoContent", {
                 lang: langCode,
                 chapter: chapterNum,
-                title: chapter.title
+                title: chapterTitleFromParams
               }));
             }
           }

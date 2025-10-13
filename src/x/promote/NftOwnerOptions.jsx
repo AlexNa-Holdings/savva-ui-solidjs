@@ -26,6 +26,8 @@ export default function NftOwnerOptions(props) {
 
   const savvaTokenAddress = createMemo(() => app.info?.()?.savva_contracts?.SavvaToken?.address || "");
   const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
+  const chain = createMemo(() => app.desiredChain?.());
+  const rpcUrl = createMemo(() => chain()?.rpcUrls?.[0]);
 
   // ---------- Sale ----------
   const [salePriceText, setSalePriceText] = createSignal("");

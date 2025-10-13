@@ -513,7 +513,7 @@ export default function EditorPage() {
   const handleInsertFile = (fileName, fileType) => {
     const url = `uploads/${fileName}`;
     let markdown;
-    if (fileType === "image" || fileType === "video") markdown = `![${fileName}](${url})`;
+    if (fileType === "image" || fileType === "video" || fileType === "audio") markdown = `![${fileName}](${url})`;
     else markdown = `[${fileName}](${url})`;
     insertTextAtCursor(textareaRef, markdown, handleEditorInput);
   };
