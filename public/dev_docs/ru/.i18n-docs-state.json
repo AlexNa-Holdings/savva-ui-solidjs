@@ -1,10 +1,10 @@
 {
   "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
   "core-concepts/domain.md": "62cf574a6555e6db6a9dcf96f1b4456a49ab2d5ad1e40ac86c756c4dbc171644",
-  "core-concepts/index.md": "1988a34dc654ca313da81f25d97c40b6d0fc97f4b3e190119af3de83560009a9",
+  "core-concepts/index.md": "b0c25ccb40847affcecbd805a81d552bcf5bceb2081c24d3c3379bfd91ffb7c4",
   "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
   "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "6e8d60dc6336deb70dc451115650fbc95436609d45c053842d8e74134fce75a4",
+  "sidebar.yaml": "f0fcc4910b055c62a5bc618a0632fcbd501b16e3fc153d5092ee5bfebae8aa57",
   "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
   "core-concepts/showing-posts.md": "bc16a41e33c7d807a7e69397b597ebf3674eb142410a527472ff1440504656fb",
   "core-concepts/config-contract.md": "d0390a3d46e6bd6cc6a50b6caa979b608876d04fb9cb174bd67cc2652275e960",
@@ -33,5 +33,6 @@
   "tokenomics/sacrifice.md": "b48570abaab88d55e5af50f049d607b6bc5a950b84171232853bf74dc49f7256",
   "tokenomics/savva-token.md": "968f8d71eef337d583fe98c247ba766f0903137e1faac29d7134774c3512fcc7",
   "tokenomics/stake-to-post.md": "1adc5bfedc077a3b0de706d741e09aaf9df94d62fcf986a5aa90da857b289966",
-  "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319"
+  "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319",
+  "core-concepts/encrypted-posts.md": "89a1ff07c6d37543e4665165cd81d7c769988eff712b80f06bf1d2f07b9fc865"
 }

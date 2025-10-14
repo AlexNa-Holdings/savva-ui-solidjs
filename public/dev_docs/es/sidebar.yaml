@@ -3,11 +3,11 @@ sections:
     items:
       - label: Bienvenido
         file: index.md
-      - label: Qué hacemos
+      - label: Lo que hacemos
         file: general/what-we-do.md
   - title: Características
     items:
-      - label: Redes de base
+      - label: Redes comunitarias
         file: features/grassroot.md
       - label: Más allá de los 'Me gusta'
         file: features/beyond-likes.md
@@ -29,15 +29,15 @@ sections:
         file: tokenomics/sacrifice.md
       - label: Staking
         file: tokenomics/staking.md
-      - label: Stake para publicar
+      - label: Staking para publicar
         file: tokenomics/stake-to-post.md
-      - label: Fondos de publicación
+      - label: Fondos para publicar
         file: tokenomics/post-funds.md
       - label: Suscripciones al estilo Patreon
         file: tokenomics/patreon.md
       - label: NFTs
         file: tokenomics/nfts.md
-      - label: Compra y quema
+      - label: Comprar y quemar
         file: tokenomics/buy-and-burn.md
       - label: Gobernanza
         file: tokenomics/governance.md
@@ -45,7 +45,7 @@ sections:
     items:
       - label: Configuración
         file: getting-started.md
-  - title: Conceptos principales
+  - title: Conceptos básicos
     items:
       - label: Visión general
         file: core-concepts/index.md
@@ -59,6 +59,8 @@ sections:
         file: core-concepts/showing-posts.md
       - label: Publicar publicaciones
         file: core-concepts/publishing-posts.md
+      - label: Publicaciones cifradas
+        file: core-concepts/encrypted-posts.md
       - label: Contrato de perfil de usuario
         file: core-concepts/user-profile.md
       - label: Contrato de configuración
@@ -67,7 +69,7 @@ sections:
         file: core-concepts/connection-orchestration.md
   - title: Licencias
     items:
-      - label: Licencia de la interfaz de usuario
+      - label: Licencia de UI
         file: licenses/ui.md
       - label: Licencia del backend
         file: licenses/backend.md

@@ -378,8 +378,10 @@ export default function PostPage() {
     // Use decrypted content from post() if available, otherwise fall back to descriptor
     const p = post();
     const contentLocales = p?.savva_content?.locales || p?.content?.locales;
-    const loc = contentLocales?.[postLang()] || details()?.descriptor?.locales?.[postLang()];
-    return loc?.chapters || [];
+    const fromContent = contentLocales?.[postLang()]?.chapters;
+    const fromDescriptor = details()?.descriptor?.locales?.[postLang()]?.chapters;
+    // Prefer content chapters if they exist, otherwise use descriptor chapters
+    return fromContent || fromDescriptor || [];
   });
 
   const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);

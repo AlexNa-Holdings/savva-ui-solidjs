@@ -7,15 +7,15 @@ sections:
         file: general/what-we-do.md
   - title: Особенности
     items:
-      - label: Грассрут-сети
+      - label: Низовые сети
         file: features/grassroot.md
-      - label: Вне лайков
+      - label: Больше, чем лайки
         file: features/beyond-likes.md
       - label: Авторизация
         file: features/authorization.md
       - label: Контроль контента
         file: features/content-control.md
-      - label: Многоязычность
+      - label: Многоязычный
         file: features/multi-lingual.md
       - label: Расширенный формат контента
         file: features/content-format.md
@@ -25,15 +25,15 @@ sections:
     items:
       - label: Токен SAVVA
         file: tokenomics/savva-token.md
-      - label: Текущие жертвы
+      - label: Постоянные жертвы
         file: tokenomics/sacrifice.md
       - label: Стейкинг
         file: tokenomics/staking.md
       - label: Стейк для публикации
         file: tokenomics/stake-to-post.md
-      - label: Фонды публикаций
+      - label: Средства постов
         file: tokenomics/post-funds.md
-      - label: Подписки в стиле Patreon
+      - label: Подписки по модели Patreon
         file: tokenomics/patreon.md
       - label: NFT
         file: tokenomics/nfts.md
@@ -45,7 +45,7 @@ sections:
     items:
       - label: Настройка
         file: getting-started.md
-  - title: Основные концепции
+  - title: Основные понятия
     items:
       - label: Обзор
         file: core-concepts/index.md
@@ -55,15 +55,17 @@ sections:
         file: core-concepts/domain.md
       - label: Аутентификация
         file: core-concepts/auth.md
-      - label: Отображение публикаций
+      - label: Отображение постов
         file: core-concepts/showing-posts.md
-      - label: Публикация публикаций
+      - label: Публикация постов
         file: core-concepts/publishing-posts.md
+      - label: Зашифрованные посты
+        file: core-concepts/encrypted-posts.md
       - label: Контракт профиля пользователя
         file: core-concepts/user-profile.md
       - label: Контракт конфигурации
         file: core-concepts/config-contract.md
-      - label: Оркестрация соединений
+      - label: Оркестрация подключений
         file: core-concepts/connection-orchestration.md
   - title: Лицензии
     items:

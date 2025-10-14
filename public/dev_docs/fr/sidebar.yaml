@@ -7,9 +7,9 @@ sections:
         file: general/what-we-do.md
   - title: Fonctionnalités
     items:
-      - label: Réseaux de base
+      - label: Réseaux citoyens
         file: features/grassroot.md
-      - label: Au-delà des Likes
+      - label: Au-delà des mentions « J'aime »
         file: features/beyond-likes.md
       - label: Autorisation
         file: features/authorization.md
@@ -21,13 +21,13 @@ sections:
         file: features/content-format.md
       - label: Contenu chiffré
         file: features/encrypted-content.md
-  - title: Tokenomics
+  - title: Économie des jetons
     items:
       - label: Jeton SAVVA
         file: tokenomics/savva-token.md
-      - label: Sacrifice en cours
+      - label: Sacrifice continu
         file: tokenomics/sacrifice.md
-      - label: Staking
+      - label: Mise en jeu
         file: tokenomics/staking.md
       - label: Miser pour publier
         file: tokenomics/stake-to-post.md
@@ -49,27 +49,29 @@ sections:
     items:
       - label: Aperçu
         file: core-concepts/index.md
-      - label: Initialisation de l'application et connexion au backend
+      - label: Initialisation de l'application et connexion au back-end
         file: core-concepts/app-init.md
-      - label: Travailler avec les domaines
+      - label: Travail avec les domaines
         file: core-concepts/domain.md
       - label: Authentification
         file: core-concepts/auth.md
-      - label: Afficher les publications
+      - label: Affichage des publications
         file: core-concepts/showing-posts.md
-      - label: Publier des publications
+      - label: Publication de contenus
         file: core-concepts/publishing-posts.md
+      - label: Publications chiffrées
+        file: core-concepts/encrypted-posts.md
       - label: Contrat de profil utilisateur
         file: core-concepts/user-profile.md
       - label: Contrat de configuration
         file: core-concepts/config-contract.md
-      - label: Orchestration de la connexion
+      - label: Orchestration des connexions
         file: core-concepts/connection-orchestration.md
   - title: Licences
     items:
-      - label: Licence UI
+      - label: Licence de l'interface utilisateur
         file: licenses/ui.md
-      - label: Licence backend
+      - label: Licence du back-end
         file: licenses/backend.md
       - label: Licence des contrats
         file: licenses/contracts.md

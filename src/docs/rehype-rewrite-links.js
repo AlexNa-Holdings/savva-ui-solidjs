@@ -2,8 +2,9 @@
 import { visit } from "unist-util-visit";
 
 /**
- * A rehype plugin that rewrites relative image and link URLs to be absolute,
+ * A rehype plugin that rewrites relative URLs to be absolute,
  * based on a provided base URL.
+ * Handles <a> href, <img> src, <video> src, and <audio> src attributes.
  * @param {object} options - The options object.
  * @param {string} options.base - The base URL to prepend to relative paths.
  */
@@ -18,11 +19,18 @@ export function rehypeRewriteLinks(options = {}) {
     const isRelative = (url) => !/^(#|\/|[a-z]+:)/i.test(url);
     
     visit(tree, "element", (node) => {
-      if (node.tagName === 'a' || node.tagName === 'img') {
-        const prop = node.tagName === 'a' ? 'href' : 'src';
-        const url = node.properties?.[prop];
+      // Handle links
+      if (node.tagName === 'a') {
+        const url = node.properties?.href;
         if (typeof url === 'string' && isRelative(url)) {
-          node.properties[prop] = base + url;
+          node.properties.href = base + url;
+        }
+      }
+      // Handle images, videos, and audio elements
+      else if (node.tagName === 'img' || node.tagName === 'video' || node.tagName === 'audio') {
+        const url = node.properties?.src;
+        if (typeof url === 'string' && isRelative(url)) {
+          node.properties.src = base + url;
         }
       }
     });

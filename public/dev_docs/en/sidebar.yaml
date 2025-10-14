@@ -61,6 +61,8 @@ sections:
         file: core-concepts/showing-posts.md
       - label: Publishing Posts
         file: core-concepts/publishing-posts.md
+      - label: Encrypted Posts
+        file: core-concepts/encrypted-posts.md
       - label: User Profile Contract
         file: core-concepts/user-profile.md
       - label: Config Contract

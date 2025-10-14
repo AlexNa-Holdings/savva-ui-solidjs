@@ -1,5 +1,5 @@
 {
-  "sidebar.yaml": "6e8d60dc6336deb70dc451115650fbc95436609d45c053842d8e74134fce75a4",
+  "sidebar.yaml": "f0fcc4910b055c62a5bc618a0632fcbd501b16e3fc153d5092ee5bfebae8aa57",
   "tokenomics/buy-and-burn.md": "34de7082651305d8bbc896e448aa2d90cd64dcdbdf001bbdc03bbb89224048a2",
   "tokenomics/governance.md": "fe7e14bb62142114561e7e777d911f99670d5f0eb0332a401bd62268f7f696b0",
   "tokenomics/nfts.md": "4c5c1f39e2922fcd430fb10129e6e308e8a98acee3bf346f397e67f2f02353e9",
@@ -8,5 +8,7 @@
   "tokenomics/sacrifice.md": "b48570abaab88d55e5af50f049d607b6bc5a950b84171232853bf74dc49f7256",
   "tokenomics/savva-token.md": "968f8d71eef337d583fe98c247ba766f0903137e1faac29d7134774c3512fcc7",
   "tokenomics/stake-to-post.md": "1adc5bfedc077a3b0de706d741e09aaf9df94d62fcf986a5aa90da857b289966",
-  "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319"
+  "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319",
+  "core-concepts/encrypted-posts.md": "89a1ff07c6d37543e4665165cd81d7c769988eff712b80f06bf1d2f07b9fc865",
+  "core-concepts/index.md": "b0c25ccb40847affcecbd805a81d552bcf5bceb2081c24d3c3379bfd91ffb7c4"
 }
