@@ -1,8 +1,9 @@
 // src/x/ui/ClosePageButton.jsx
 import { useApp } from "../../context/AppContext.jsx";
+import { navigate } from "../../routing/hashRouter.js";
 
 /**
- * Floating button that simply goes back in history.
+ * Floating button that goes back in history, or navigates to main page if no history.
  */
 export default function ClosePageButton(props) {
   const { t } = useApp();
@@ -11,8 +12,16 @@ export default function ClosePageButton(props) {
 
   const handleClick = () => {
     try {
-      window.history.back();
-    } catch {}
+      // If there's no history (page opened via direct URL), go to main page
+      if (window.history.length <= 1) {
+        navigate("/");
+      } else {
+        window.history.back();
+      }
+    } catch {
+      // Fallback to main page if history.back() fails
+      navigate("/");
+    }
   };
 
   return (

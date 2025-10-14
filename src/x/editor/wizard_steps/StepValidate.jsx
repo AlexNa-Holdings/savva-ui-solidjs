@@ -31,6 +31,11 @@ export default function StepValidate(props) {
 
       // Validate comment
       if (isComment) {
+        // Skip languages with no content at all
+        if (!hasAnyMeaningfulContent) {
+          continue;
+        }
+        // If language has content, it must have a body
         if (!hasBody) {
           throw new Error(t("editor.publish.validation.errorCommentNoBody", { lang: langCode }));
         }
