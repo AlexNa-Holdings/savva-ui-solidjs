@@ -32,6 +32,7 @@ import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
 import BannedBanner from "../post/BannedBanner.jsx";
 import PostInfo from "../post/PostInfo.jsx";
+import StoreReadingKeyModal from "../modals/StoreReadingKeyModal.jsx";
 
 // ⬇️ Profile store (same as PostCard)
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
@@ -121,6 +122,8 @@ export default function PostPage() {
 
   const [showContributeModal, setShowContributeModal] = createSignal(false);
   const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
+  const [showStoreKeyModal, setShowStoreKeyModal] = createSignal(false);
+  const [pendingKeyToStore, setPendingKeyToStore] = createSignal(null);
 
   const [postResource, { refetch: refetchPost }] = createResource(
     () => ({ identifier: identifier(), domain: app.selectedDomainName(), app, lang: uiLang() }),
@@ -309,13 +312,6 @@ export default function PostPage() {
         throw new Error("Failed to get reading key");
       }
 
-      // Store the key for future use
-      storeReadingKey(userAddr, {
-        nonce: encData.reading_key_nonce,
-        secretKey: readingKey,
-        publicKey: encData.reading_public_key,
-      });
-
       // Decrypt the post
       const decrypted = await decryptPost(post(), userAddr, readingKey);
       setPost(decrypted);
@@ -325,12 +321,40 @@ export default function PostPage() {
       setPostSecretKey(postKey);
 
       dbg.log("PostPage", "Manual decrypt successful");
+
+      // Prompt user to store the secret key
+      setPendingKeyToStore({
+        nonce: encData.reading_key_nonce,
+        publicKey: encData.reading_public_key,
+        secretKey: readingKey,
+        address: userAddr,
+      });
+      setShowStoreKeyModal(true);
     } catch (error) {
       dbg.error("PostPage", "Manual decrypt failed", { error });
       setDecryptError(error.message);
     } finally {
       setIsDecrypting(false);
     }
+  };
+
+  const handleConfirmStoreKey = () => {
+    const pending = pendingKeyToStore();
+    if (pending) {
+      storeReadingKey(pending.address, {
+        nonce: pending.nonce,
+        publicKey: pending.publicKey,
+        secretKey: pending.secretKey,
+      });
+    }
+
+    setShowStoreKeyModal(false);
+    setPendingKeyToStore(null);
+  };
+
+  const handleDeclineStoreKey = () => {
+    setShowStoreKeyModal(false);
+    setPendingKeyToStore(null);
   };
 
   const shouldCoverEncrypted = createMemo(() => {
@@ -620,6 +644,12 @@ export default function PostPage() {
         isOpen={showContributeModal()}
         onClose={() => setShowContributeModal(false)}
         campaignId={contributeCampaignId()}
+      />
+
+      <StoreReadingKeyModal
+        isOpen={showStoreKeyModal()}
+        onClose={handleDeclineStoreKey}
+        onConfirm={handleConfirmStoreKey}
       />
     </main>
   );
