@@ -1,7 +1,7 @@
 // src/x/main/NewPostButton.jsx
 // path: src/x/main/NewPostButton.jsx
 import { Show, createSignal, createResource, onMount, onCleanup, createMemo } from "solid-js";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import { useApp } from "../../context/AppContext.jsx";
 import { EditIcon as NewPostIcon } from "../ui/icons/ActionIcons.jsx";
 import SavvaTokenIcon from "../ui/icons/SavvaTokenIcon.jsx";

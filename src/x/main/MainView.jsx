@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import Container from "../layout/Container.jsx";
 import ToTopButton from "../ui/ToTopButton.jsx";
 import NewContentBanner from "./NewContentBanner.jsx";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import { loadAssetResource } from "../../utils/assetLoader.js";
 import { getTabComponent } from "../tabs/index.js";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";

@@ -2,7 +2,7 @@
 import { createSignal, createMemo } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { toHexBytes32 } from "../blockchain/utils.js";
-import { navigate } from "../routing/hashRouter.js";
+import { navigate } from "../routing/smartRouter.js";
 import { pushToast, pushErrorToast } from "../ui/toast.js";
 import { sendAsActor } from "../blockchain/npoMulticall.js";
 

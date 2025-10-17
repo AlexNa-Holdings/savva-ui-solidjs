@@ -3,7 +3,7 @@ import { createMemo, createResource, Show, createSignal, Switch, Match, createEf
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import { walletAccount } from "../../blockchain/wallet.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { toChecksumAddress, toHexBytes32 } from "../../blockchain/utils.js";
@@ -401,15 +401,15 @@ export default function ProfileEditPage() {
       }
 
       // Generate the reading key (includes secretKey)
-      const { nonce, publicKey, secretKey } = await generateReadingKey(data.address);
+      const { nonce, publicKey, secretKey, scheme } = await generateReadingKey(data.address);
 
       // Publish to contract
       await publishReadingKey(app, publicKey, nonce);
 
-      // Update local state
+      // Update local state immediately to reflect the new key
       setReadingKey({
         publicKey,
-        scheme: "x25519-xsalsa20-poly1305",
+        scheme,
         nonce,
       });
 

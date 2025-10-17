@@ -2,7 +2,7 @@
 import { createSignal, onMount, Show, createMemo, createEffect, on } from "solid-js";
 import Header from "./Header.jsx";
 import RightPane from "./RightPane.jsx";
-import { useHashRouter, navigate } from "../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../routing/smartRouter.js";
 import { useApp } from "../context/AppContext.jsx";
 import Toaster from "./Toaster.jsx";
 import MainView from "./main/MainView.jsx";

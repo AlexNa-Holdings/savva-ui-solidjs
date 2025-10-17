@@ -3,7 +3,7 @@ import { createSignal, Show, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
-import { navigate, useHashRouter } from "../../routing/hashRouter.js";
+import { navigate, useHashRouter } from "../../routing/smartRouter.js";
 import ConnectTelegramModal from "../modals/ConnectTelegramModal.jsx";
 
 function ChevronDownIcon(props) {

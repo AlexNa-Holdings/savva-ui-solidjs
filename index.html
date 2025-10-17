@@ -20,12 +20,30 @@
 
   <script>
     (function () {
-      // If there is a real path (e.g., /settings) but no hash, rewrite to hash form
-      if (!location.hash) {
+      // Determine if we should use hash routing
+      function shouldUseHashRouting() {
+        const protocol = location.protocol;
+        const hostname = location.hostname;
+
+        // Use hash routing for:
+        // 1. file:// protocol (local HTML files)
+        // 2. IPFS gateways
+        // 3. localhost or 127.0.0.1
+        if (protocol === "file:") return true;
+        if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") return true;
+        if (hostname.includes("ipfs") || hostname.includes("ipns") ||
+            location.pathname.startsWith("/ipfs/") || location.pathname.startsWith("/ipns/")) {
+          return true;
+        }
+        return false;
+      }
+
+      // Only convert paths to hash if we're in hash routing mode
+      if (shouldUseHashRouting() && !location.hash) {
         let path = location.pathname;
         let newHash = "";
 
-        // NEW: Check for legacy /content/ URL
+        // Check for legacy /content/ URL
         if (path.startsWith("/content/")) {
           const savvaId = path.substring("/content/".length);
           newHash = "#/post/" + savvaId;

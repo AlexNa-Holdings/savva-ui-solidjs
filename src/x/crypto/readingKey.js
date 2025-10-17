@@ -191,7 +191,9 @@ export async function publishReadingKey(app, publicKey, nonce) {
   const { toHexBytes32 } = await import("../../blockchain/utils.js");
   const { sendAsActor } = await import("../../blockchain/npoMulticall.js");
 
-  const domainName = app.selectedDomainName();
+  // Reading keys are cross-domain, so we store them in the empty domain ""
+  // (similar to avatar and registered name)
+  const domainName = "";
 
   // We need to publish three values:
   // 1. reading_public_key
@@ -228,14 +230,14 @@ export async function publishReadingKey(app, publicKey, nonce) {
  * Fetch reading key public information from UserProfile contract
  * @param {object} app - Application context from useApp()
  * @param {string} userAddress - User's Ethereum address
- * @param {string} [domainName] - Optional domain name (defaults to current)
  * @returns {Promise<object|null>} - { publicKey, scheme, nonce } or null if not found
  */
-export async function fetchReadingKey(app, userAddress, domainName = null) {
+export async function fetchReadingKey(app, userAddress) {
   const { getSavvaContract } = await import("../../blockchain/contracts.js");
   const { toHexBytes32 } = await import("../../blockchain/utils.js");
 
-  const domain = domainName || app.selectedDomainName();
+  // Reading keys are stored in the empty domain "" (cross-domain)
+  const domain = "";
   const contract = await getSavvaContract(app, "UserProfile");
 
   try {

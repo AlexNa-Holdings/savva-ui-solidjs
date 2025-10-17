@@ -4,7 +4,7 @@ import ContentFeed from "../feed/ContentFeed.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 export default function ForYouTab(props) {

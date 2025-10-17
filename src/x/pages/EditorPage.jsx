@@ -2,7 +2,7 @@
 import { createMemo, createSignal, Show, onMount, createEffect, on, onCleanup, batch } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../../routing/smartRouter.js";
 import NavigateBack from "../../routing/navigateBack.js";
 import MarkdownInput from "../editor/MarkdownInput.jsx";
 import LangSelector from "../ui/LangSelector.jsx";

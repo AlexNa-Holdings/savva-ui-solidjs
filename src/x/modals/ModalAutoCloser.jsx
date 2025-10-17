@@ -2,7 +2,7 @@
 // src/x/modals/ModalAutoCloser.jsx
 import { onMount, onCleanup, createEffect } from "solid-js";
 import { onCloseAllModals, markModalOpen, markModalClosed } from "../../utils/modalBus.js";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 
 export default function ModalAutoCloser(props) {
   const { route } = useHashRouter();

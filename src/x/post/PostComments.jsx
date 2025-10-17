@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import Spinner from "../ui/Spinner.jsx";
 import CommentCard from "./CommentCard.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 

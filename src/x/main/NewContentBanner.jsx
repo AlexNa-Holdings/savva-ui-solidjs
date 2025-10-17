@@ -1,7 +1,7 @@
 // src/x/main/NewContentBanner.jsx
 import { Show } from "solid-js";
 import { useApp } from "../../context/AppContext";
-import { navigate } from "../../routing/hashRouter";
+import { navigate } from "../../routing/smartRouter";
 
 export default function NewContentBanner() {
   const app = useApp();

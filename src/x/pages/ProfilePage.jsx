@@ -2,7 +2,7 @@
 import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, For } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../../routing/smartRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";

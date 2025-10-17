@@ -8,7 +8,7 @@ import { dbg } from "../../utils/debug.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { getDraftParams, clearDraft, DRAFT_DIRS } from "../../editor/storage.js";
 import { pushToast } from "../../ui/toast.js";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 export default function NewTab(props) {

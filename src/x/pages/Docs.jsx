@@ -1,7 +1,7 @@
 // src/pages/Docs.jsx
 import { createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import DocsIndex from "../docs/DocsIndex.jsx";
 import DocsContent from "../docs/DocsContent.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";

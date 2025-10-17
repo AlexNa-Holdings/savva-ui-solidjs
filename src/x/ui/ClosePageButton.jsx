@@ -1,6 +1,6 @@
 // src/x/ui/ClosePageButton.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 
 /**
  * Floating button that goes back in history, or navigates to main page if no history.

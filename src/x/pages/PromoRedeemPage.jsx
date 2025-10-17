@@ -1,7 +1,7 @@
 // src/x/pages/PromoRedeemPage.jsx
 import { Show, createSignal, createMemo, onMount, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../../routing/smartRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";

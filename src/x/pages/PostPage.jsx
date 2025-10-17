@@ -1,7 +1,7 @@
 // src/x/pages/PostPage.jsx
 import { createMemo, createResource, Show, Match, Switch, createEffect, createSignal, onMount, onCleanup } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../../routing/smartRouter.js";
 
 import { ipfs } from "../../ipfs/index.js";
 import { fetchBestWithDecryption } from "../../ipfs/encryptedFetch.js";

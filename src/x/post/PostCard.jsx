@@ -8,7 +8,7 @@ import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import PostInfo from "./PostInfo.jsx";
 import NftBadge from "../ui/icons/NftBadge.jsx";
 import PostFundBadge from "../ui/PostFundBadge.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";

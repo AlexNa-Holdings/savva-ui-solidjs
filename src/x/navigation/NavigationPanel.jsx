@@ -2,7 +2,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show, onCleanup, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { loadAssetResource } from "../../utils/assetLoader.js";
-import { navigate, useHashRouter } from "../../routing/hashRouter.js";
+import { navigate, useHashRouter } from "../../routing/smartRouter.js";
 import LibraryIcon from "../ui/icons/LibraryIcon.jsx";
 import { useMediaQuery } from "../../hooks/useMediaQuery.js";
 import { tabIconFor } from "../ui/icons/TabIcons.jsx";

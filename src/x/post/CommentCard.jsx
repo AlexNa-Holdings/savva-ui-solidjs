@@ -11,7 +11,7 @@ import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallb
 import Spinner from "../ui/Spinner.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";

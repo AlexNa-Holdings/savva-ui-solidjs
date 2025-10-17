@@ -22,13 +22,17 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
     throw new Error("Missing app.wsMethod or authorAddress");
   }
 
-  // Fetch all subscribers
+  // Get current domain name
+  const currentDomain = app.selectedDomainName?.() || "";
+  console.log(`[fetchEligibleSubscribers] Using domain: ${currentDomain}`);
+
+  // Fetch all subscribers for the current domain
   console.log(`[fetchEligibleSubscribers] Calling app.wsMethod("get-sponsors")...`);
   const getSponsors = app.wsMethod("get-sponsors");
   console.log(`[fetchEligibleSubscribers] wsMethod returned:`, typeof getSponsors, getSponsors);
 
   const params = {
-    domain: "",
+    domain: currentDomain,
     user_addr: authorAddress,
     n_weeks: 0,
     limit: 1000,
@@ -65,7 +69,7 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
       try {
         const userAddress = subscriber.user?.address || subscriber.user_addr;
         console.log(`[fetchEligibleSubscribers] Fetching reading key for ${userAddress}`);
-        const readingKey = await fetchReadingKey(app, userAddress, "");
+        const readingKey = await fetchReadingKey(app, userAddress);
         console.log(`[fetchEligibleSubscribers] Reading key result for ${userAddress}:`, readingKey);
 
         if (!readingKey || !readingKey.publicKey) {

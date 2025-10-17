@@ -1,7 +1,7 @@
 // src/x/post/PostControls.jsx
 import { createSignal, Show, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import { preparePostForEditing } from "../../editor/postImporter.js";
 import { pushErrorToast } from "../../ui/toast.js";
 import PostInfo from "./PostInfo.jsx";

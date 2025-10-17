@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext";
 import { toChecksumAddress } from "../../blockchain/utils";
 import Spinner from "../ui/Spinner";
 import CommentCard from "./CommentCard";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 
 async function fetchComments(params) {
   const { app, postId, offset = 0 } = params;

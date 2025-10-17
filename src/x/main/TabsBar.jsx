@@ -3,7 +3,7 @@ import { createResource, Show, createMemo, createSignal, createEffect, batch, Fo
 import { useApp } from "../../context/AppContext.jsx";
 import { useI18n } from "../../i18n/useI18n.js";
 import { loadAssetResource } from "../../utils/assetLoader.js";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../../routing/smartRouter.js";
 import Tabs from "../ui/Tabs.jsx";
 import { getTabComponent } from "../tabs/index.js";
 import RightRailLayout from "../tabs/RightRailLayout.jsx";

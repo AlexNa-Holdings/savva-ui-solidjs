@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "./IpfsImage.jsx";
 import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
 import UserCard from "./UserCard.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 
 function isHexAddress(s) {
   const v = String(s || "").trim();

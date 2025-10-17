@@ -3,7 +3,7 @@ import { createSignal, onMount } from "solid-js";
 import { parse } from "yaml";
 import { configureEndpoints, httpBase, wsUrl } from "../net/endpoints.js";
 import { getWsClient, whenWsOpen } from "../net/wsRuntime.js";
-import { navigate } from "../routing/hashRouter.js";
+import { navigate } from "../routing/smartRouter.js";
 import dbg from "../utils/debug.js";
 
 // ----- tiny safe wrapper so we always print, even if dbg API shape changes -----

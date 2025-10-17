@@ -5,7 +5,7 @@ import IpfsImage from "./IpfsImage.jsx";
 import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
 import VerifiedBadge from "./icons/VerifiedBadge.jsx";
 import StakerLevelIcon from "./StakerLevelIcon.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 
 function isVerified(a) {
   return Boolean(a && a.name);

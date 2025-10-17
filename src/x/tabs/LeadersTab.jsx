@@ -5,7 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
 
 const TIME_FRAMES = ["month", "week", "year", "all"];

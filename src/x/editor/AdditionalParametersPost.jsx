@@ -91,7 +91,8 @@ export default function AdditionalParametersPost(props) {
   // Fetch all subscribers to calculate eligible count
   async function fetchAllSponsors() {
     const authorAddr = app.authorizedUser?.()?.address;
-    console.log(`[AdditionalParametersPost] fetchAllSponsors called for ${authorAddr}`);
+    const currentDomain = app.selectedDomainName?.() || "";
+    console.log(`[AdditionalParametersPost] fetchAllSponsors called for ${authorAddr}, domain: ${currentDomain}`);
     if (!app.wsMethod || !authorAddr) {
       console.log(`[AdditionalParametersPost] Skipping fetch - no wsMethod or address`);
       return [];
@@ -101,7 +102,7 @@ export default function AdditionalParametersPost(props) {
       const getSponsors = app.wsMethod("get-sponsors");
       const res = await getSponsors(
         {
-          domain: "",
+          domain: currentDomain,
           user_addr: authorAddr,
           n_weeks: 0, // Get all subscribers (active and inactive)
           limit: 1000,

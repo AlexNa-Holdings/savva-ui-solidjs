@@ -11,7 +11,7 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { getWsApi } from "../../net/wsRuntime.js";
 import { ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 
 function bi(v) {
   try {

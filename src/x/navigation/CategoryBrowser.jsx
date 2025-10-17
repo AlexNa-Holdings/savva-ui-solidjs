@@ -2,7 +2,7 @@
 import { createMemo, For, createSignal, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { useDomainCategories } from "../../hooks/useDomainCategories.js";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import { tabPath } from "../../routing/tabRoutes.js";
 import { ChevronDownIcon } from "../ui/icons/ActionIcons.jsx";
 import Spinner from "../ui/Spinner.jsx";

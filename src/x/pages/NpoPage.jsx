@@ -1,7 +1,7 @@
 // src/x/pages/NpoPage.jsx
 import { Show, createMemo, createSignal, onMount, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter, navigate } from "../../routing/hashRouter.js";
+import { useHashRouter, navigate } from "../../routing/smartRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";

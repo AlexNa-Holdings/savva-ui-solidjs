@@ -1,7 +1,7 @@
 // src/x/pages/AdminPage.jsx
 import { createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import AdminIndex from "./admin/AdminIndex.jsx";
 import AdminContent from "./admin/AdminContent.jsx";

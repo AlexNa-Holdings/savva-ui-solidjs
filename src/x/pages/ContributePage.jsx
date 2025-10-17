@@ -1,6 +1,6 @@
 // src/x/pages/ContributePage.jsx
 import { createMemo } from "solid-js";
-import { useHashRouter } from "../../routing/hashRouter.js";
+import { useHashRouter } from "../../routing/smartRouter.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import ContributeView from "../fundraising/ContributeView.jsx";
 import { useApp } from "../../context/AppContext.jsx";

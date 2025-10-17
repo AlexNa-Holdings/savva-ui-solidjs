@@ -1,6 +1,6 @@
 // src/x/RightPane.jsx
 import { createSignal, Show, createMemo } from "solid-js";
-import { navigate } from "../routing/hashRouter.js";
+import { navigate } from "../routing/smartRouter.js";
 import { useApp } from "../context/AppContext.jsx";
 import SwitchConnectModal from "./modals/SwitchConnectModal.jsx";
 import ThemeToggle from "./ui/ThemeToggle.jsx";

@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
-import { navigate } from "../../routing/hashRouter.js";
+import { navigate } from "../../routing/smartRouter.js";
 import { ArrowRightIcon } from "../ui/icons/ArrowIcons.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
