@@ -23,12 +23,11 @@ export default function PostShare(props) {
     const locales = post.savva_content?.locales || post.content?.locales || {};
     const localeCount = Object.keys(locales).length;
 
-    // Build the full URL
+    // Build the full URL without hash for shareable links
     const baseUrl = window.location.origin;
-    const hash = window.location.hash ? "" : "#"; // Add # if not using hash routing
     const langParam = (localeCount > 1 && currentLang) ? `?lang=${currentLang}` : "";
 
-    return `${baseUrl}${hash}/post/${id}${langParam}`;
+    return `${baseUrl}/post/${id}${langParam}`;
   });
 
   const encodedUrl = createMemo(() => encodeURIComponent(postUrl()));
