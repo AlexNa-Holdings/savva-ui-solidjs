@@ -223,7 +223,14 @@ export default function PostCard(props) {
     const id = b?.short_cid || b?.savva_cid || b?.id || item.short_cid || item.savva_cid || item.id;
     if (id) {
       app.setSavedScrollY?.(window.scrollY);
-      navigate(`/post/${id}`);
+
+      // Only add lang param if post has multiple languages
+      const locales = content()?.locales || {};
+      const localeCount = Object.keys(locales).length;
+      const currentLang = (app.lang?.() || "").toLowerCase();
+      const url = (localeCount > 1 && currentLang) ? `/post/${id}?lang=${currentLang}` : `/post/${id}`;
+
+      navigate(url);
     }
   };
 

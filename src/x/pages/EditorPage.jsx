@@ -386,7 +386,11 @@ export default function EditorPage() {
     if (editorMode() === "new_post") {
       navigate("/new");
     } else if (editorMode() === "edit_post") {
-      navigate("/post/" + postParams().savva_cid);
+      // Only add lang param if post has multiple languages
+      const langCount = Object.keys(postData() || {}).length;
+      const currentLang = (app.lang?.() || "").toLowerCase();
+      const url = (langCount > 1 && currentLang) ? `/post/${postParams().savva_cid}?lang=${currentLang}` : `/post/${postParams().savva_cid}`;
+      navigate(url);
     } else {
       NavigateBack("post");
     }

@@ -21,6 +21,19 @@ export function getLocalizedField(multiString, lang) {
   return "";
 }
 
+/**
+ * Checks if the post payload has multiple languages.
+ * Returns true if the title field is a multi-language object with more than one language.
+ */
+export function hasMultipleLanguages(payload) {
+  if (!payload || !payload.title) return false;
+  if (typeof payload.title === "string") return false;
+  if (typeof payload.title !== "object") return false;
+
+  const langCount = Object.keys(payload.title).length;
+  return langCount > 1;
+}
+
 function isTruthyFlag(value) {
   if (value === true) return true;
   if (typeof value === "string") return value.toLowerCase() === "true";

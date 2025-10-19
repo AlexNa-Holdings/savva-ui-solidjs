@@ -8,6 +8,7 @@ import {
   selectPostToastTitle,
   selectPostToastPreview,
   isPostEncryptedAlert,
+  hasMultipleLanguages,
 } from "./postToastUtils.js";
 
 export default function PrizeToast(props) {
@@ -25,7 +26,10 @@ export default function PrizeToast(props) {
     e.preventDefault();
     const cid = data().content_id;
     if (cid) {
-      navigate(`/post/${cid}`);
+      const currentLang = (lang?.() || "").toLowerCase();
+      const isMultilingual = hasMultipleLanguages(data());
+      const url = (isMultilingual && currentLang) ? `/post/${cid}?lang=${currentLang}` : `/post/${cid}`;
+      navigate(url);
       app.dismissToast?.(props.toast.id);
     }
   };

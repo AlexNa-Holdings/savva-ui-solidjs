@@ -43,7 +43,33 @@ import { storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
 
-const getIdentifier = (route) => route().split("/")[2] || "";
+const getIdentifier = (route) => {
+  const path = route().split("?")[0]; // Strip query parameters
+  return path.split("/")[2] || "";
+};
+
+const getLangFromUrl = (route) => {
+  const queryString = route().split("?")[1];
+  if (!queryString) return null;
+  const params = new URLSearchParams(queryString);
+  return params.get("lang");
+};
+
+const updateUrlWithLang = (route, lang) => {
+  const [path, queryString] = route().split("?");
+  const params = new URLSearchParams(queryString || "");
+
+  if (lang) {
+    params.set("lang", lang);
+  } else {
+    params.delete("lang");
+  }
+
+  const newQuery = params.toString();
+  const newPath = newQuery ? `${path}?${newQuery}` : path;
+
+  navigate(newPath, { replace: true });
+};
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
@@ -119,6 +145,7 @@ export default function PostPage() {
 
   const identifier = createMemo(() => getIdentifier(route));
   const uiLang = createMemo(() => (app.lang?.() || "en").toLowerCase());
+  const urlLang = createMemo(() => getLangFromUrl(route));
 
   const [showContributeModal, setShowContributeModal] = createSignal(false);
   const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
@@ -384,9 +411,28 @@ export default function PostPage() {
   const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || {}));
   createEffect(() => {
     const locales = availableLocales();
-    const want = uiLang();
-    setPostLang(locales.includes(want) ? want : locales[0] || "en");
+    const langFromUrl = urlLang();
+    const want = langFromUrl || uiLang();
+
+    // Prioritize URL lang param if available and valid, otherwise use UI lang
+    if (langFromUrl && locales.includes(langFromUrl)) {
+      setPostLang(langFromUrl);
+    } else if (locales.includes(want)) {
+      setPostLang(want);
+    } else {
+      setPostLang(locales[0] || "en");
+    }
   });
+
+  // Handler for language change from selector
+  const handleLangChange = (newLang) => {
+    setPostLang(newLang);
+    // Only update URL with lang param if post has multiple languages
+    const locales = availableLocales();
+    if (locales.length > 1) {
+      updateUrlWithLang(route, newLang);
+    }
+  };
 
   const actorAddress = createMemo(() => app.actorAddress?.() || app.authorizedUser?.()?.address || "");
 
@@ -514,7 +560,7 @@ export default function PostPage() {
                       />
                     </Show>
 
-                    <LangSelector codes={availableLocales()} value={postLang()} onChange={setPostLang} />
+                    <LangSelector codes={availableLocales()} value={postLang()} onChange={handleLangChange} />
                   </div>
                 </header>
 
@@ -631,7 +677,7 @@ export default function PostPage() {
                     </div>
 
                     {/* Right rail always visible */}
-                    <PostRightPanel post={post()} details={details} onOpenContributeModal={openContributeModal} />
+                    <PostRightPanel post={post()} details={details} onOpenContributeModal={openContributeModal} currentLang={postLang()} />
                   </div>
                 </div>
               </article>
