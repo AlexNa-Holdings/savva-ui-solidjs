@@ -282,14 +282,17 @@ export default function FundraisingPage() {
                                   </button>
                                 </Show>
                               </Show>
-                              <a
-                                href={`#/fr/${it.id}`}
-                                onClick={(e) => e.stopPropagation()}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/fr/${it.id}`);
+                                }}
                                 title={t("fundraising.actions.link.tip")}
                                 class="p-1 rounded-md hover:bg-[hsl(var(--accent))]"
                               >
                                 <ArrowRightIcon class="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
-                              </a>
+                              </button>
                             </div>
                           </td>
                         </tr>
