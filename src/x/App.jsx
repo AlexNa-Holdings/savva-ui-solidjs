@@ -36,6 +36,7 @@ import PromoRedeemPage from "./pages/PromoRedeemPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import ContentFundRoundsPage from "./pages/ContentFundRoundsPage.jsx";
 import ReadingKeyInviteManager from "./main/ReadingKeyInviteManager.jsx";
+import PromoPostManager from "./main/PromoPostManager.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -147,6 +148,7 @@ export default function App() {
           <VersionChecker />
           <AdminActionsBridge />
           <ReadingKeyInviteManager />
+          <PromoPostManager />
 
           <Show when={domainRevision()} keyed>
             <>

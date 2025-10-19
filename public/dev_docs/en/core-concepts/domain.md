@@ -89,6 +89,7 @@ favicon:
       content: '#ffffff'
 
 GA_tag: G-XXXXXXXXXX   # Google Analytics (gtag) ID
+promo_post: ''          # savva_cid of a post to show on first site opening
 
 modules:
   tabs: modules/tabs.yaml
@@ -113,6 +114,7 @@ locales:
 * **`logo`** — The app chooses the best variant automatically (dark/light + mobile/desktop) and resolves via the active domain prefix.
 * **`favicon`** — All favicon links & meta tags are applied dynamically; when the config changes, the app replaces the `<link rel="icon">` set.
 * **`GA_tag`** — Enables Google Analytics (gtag.js). When present, the app injects GA scripts and sends SPA `page_view` events on route changes.
+* **`promo_post`** — Optional savva_cid of a post to show on first site opening. Can be used to display a welcome or announcement post to new users.
 * **`modules.tabs`** — Points at the YAML that defines the tabs on the main screen (see below).
 * **`locales`** — Language list for the domain (code/name/title + dictionary path). The app can render localized titles/strings per domain.
 

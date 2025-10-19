@@ -797,6 +797,7 @@ export default {
   "promocodes.new.steps.save": "Save Your Code",
   "promocodes.new.steps.save.help": "Save your changes to apply the promo code.",
   "promocodes.new.title": "New Promo Code",
+  "promo.doNotShowAgain": "Do not show again",
   "promocodes.new.titleSave": "Save Promo Code information",
   "promocodes.open": "Open Promo Code",
   "promocodes.redeem.address": "Your address",
