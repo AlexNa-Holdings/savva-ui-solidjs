@@ -601,6 +601,7 @@ export default {
   "post.encrypted.decrypting": "Расшифровка...",
   "post.encrypted.description": "Этот пост зашифрован и доступен только подписчикам",
   "post.encrypted.loginRequired": "Подключите кошелёк, чтобы разблокировать",
+  "post.encrypted.noAccess": "Этот пост зашифрован. У вас нет прав на его просмотр.",
   "post.encrypted.title": "Зашифрованный контент",
   "post.encrypted.unlock": "Разблокировать контент",
   "post.fund.confirmation": "Внося средства, я подтверждаю, что {n}% моего взноса идет автору поста и владельцу NFT.",

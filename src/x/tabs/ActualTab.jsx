@@ -60,7 +60,8 @@ export default function ActualTab(props) {
         offset,
         lang: lang(),
         order_by: 'fund_amount',
-        show_nsfw: showNsfw()
+        show_nsfw: showNsfw(),
+        show_all_encrypted_posts: true
       };
 
       const cat = category();

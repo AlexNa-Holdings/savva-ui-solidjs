@@ -601,6 +601,7 @@ export default {
   "post.encrypted.decrypting": "Dešifrovanje...",
   "post.encrypted.description": "Ova objava je šifrovana samo za pretplatnike",
   "post.encrypted.loginRequired": "Povežite svoj novčanik da biste otključali",
+  "post.encrypted.noAccess": "Ova objava je šifrovana. Nemate dozvolu da je pogledate.",
   "post.encrypted.title": "Šifrovan sadržaj",
   "post.encrypted.unlock": "Otključaj sadržaj",
   "post.fund.confirmation": "Doprinosom potvrđujem da {n}% mog doprinosa ide autoru posta i vlasniku NFT-a.",

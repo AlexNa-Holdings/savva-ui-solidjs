@@ -155,7 +155,8 @@ export default function ContentFundRoundsPage() {
                             const postResult = await contentListMethod({
                                 id: 0,
                                 savva_cid: savvaCidHex,
-                                limit: 1
+                                limit: 1,
+                                show_all_encrypted_posts: true
                             });
                             console.log("Post result for", fund.domain, fund.guid, "savva_cid:", savvaCidHex, "result:", postResult);
                             if (postResult?.list?.[0]) {

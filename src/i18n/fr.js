@@ -601,6 +601,7 @@ export default {
   "post.encrypted.decrypting": "Déchiffrement en cours...",
   "post.encrypted.description": "Cette publication est chiffrée et réservée aux abonnés",
   "post.encrypted.loginRequired": "Veuillez connecter votre portefeuille pour déverrouiller",
+  "post.encrypted.noAccess": "Cette publication est chiffrée. Vous ne pouvez pas la voir.",
   "post.encrypted.title": "Contenu chiffré",
   "post.encrypted.unlock": "Déverrouiller le contenu",
   "post.fund.confirmation": "En contribuant, je confirme que {n}% de ma contribution va à l'auteur de la publication et au propriétaire de l'NFT.",

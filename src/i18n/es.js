@@ -601,6 +601,7 @@ export default {
   "post.encrypted.decrypting": "Descifrando...",
   "post.encrypted.description": "Esta publicación está cifrada solo para suscriptores",
   "post.encrypted.loginRequired": "Conecta tu billetera para desbloquear",
+  "post.encrypted.noAccess": "Esta publicación está cifrada. No tienes permiso para verla.",
   "post.encrypted.title": "Contenido cifrado",
   "post.encrypted.unlock": "Desbloquear contenido",
   "post.fund.confirmation": "Al contribuir, confirmo que {n}% de mi contribución va al autor de la publicación y al propietario del NFT.",

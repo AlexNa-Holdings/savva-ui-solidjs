@@ -38,7 +38,7 @@ import StoreReadingKeyModal from "../modals/StoreReadingKeyModal.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 
 // ⬇️ Encryption imports
-import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost } from "../crypto/postDecryption.js";
+import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost, isUserInRecipientsList } from "../crypto/postDecryption.js";
 import { storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
@@ -76,7 +76,7 @@ async function fetchPostByIdentifier(params) {
   if (!identifier || !domain || !app.wsMethod) return null;
 
   const contentList = app.wsMethod("content-list");
-  const requestParams = { domain, lang, limit: 1, show_nsfw: true };
+  const requestParams = { domain, lang, limit: 1, show_nsfw: true, show_all_encrypted_posts: true };
 
   if (identifier.startsWith("0x")) requestParams.savva_cid = identifier;
   else requestParams.short_cid = identifier;
@@ -159,6 +159,19 @@ export default function PostPage() {
 
   const [post, setPost] = createSignal(null);
   createEffect(() => setPost(postResource() || null));
+
+  // Refetch post when authorized user changes (for encryption access check)
+  let lastAuthUser = null;
+  createEffect(() => {
+    const currentAuthUser = app.authorizedUser?.()?.address;
+    if (currentAuthUser !== lastAuthUser) {
+      if (lastAuthUser !== null) {
+        // Not the first run, user changed - refetch the post
+        refetchPost();
+      }
+      lastAuthUser = currentAuthUser;
+    }
+  });
 
   // Listen for post updates (reactions, comments, etc.)
   let lastPostUpdate;
@@ -258,6 +271,13 @@ export default function PostPage() {
     const encData = encryptionData();
     if (!encData || !encData.reading_key_nonce) return false;
     return canDecryptPost(userAddress(), encData);
+  });
+
+  const isUserInRecipients = createMemo(() => {
+    if (!isEncrypted()) return false;
+    const encData = encryptionData();
+    if (!encData) return false;
+    return isUserInRecipientsList(userAddress(), encData);
   });
 
   const [postSecretKey, setPostSecretKey] = createSignal(null);
@@ -598,7 +618,7 @@ export default function PostPage() {
                                 {t("post.encrypted.description") || "This post is encrypted for subscribers only"}
                               </p>
                             </div>
-                            <Show when={userAddress()}>
+                            <Show when={userAddress() && isUserInRecipients()}>
                               <button
                                 onClick={handleDecrypt}
                                 disabled={isDecrypting()}
@@ -606,6 +626,11 @@ export default function PostPage() {
                               >
                                 {isDecrypting() ? t("post.encrypted.decrypting") || "Decrypting..." : t("post.encrypted.unlock") || "Unlock Content"}
                               </button>
+                            </Show>
+                            <Show when={userAddress() && !isUserInRecipients()}>
+                              <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                {t("post.encrypted.noAccess") || "You don't have access to this content"}
+                              </p>
                             </Show>
                             <Show when={!userAddress()}>
                               <p class="text-sm text-[hsl(var(--muted-foreground))]">

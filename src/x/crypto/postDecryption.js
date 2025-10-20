@@ -16,6 +16,45 @@ import { dbg } from "../../utils/debug.js";
  */
 
 /**
+ * Check if user is in the recipients list for an encrypted post
+ * @param {string} userAddress - Current user's address
+ * @param {object} encryptionData - Post encryption data from API
+ * @returns {boolean} - True if user is in recipients list
+ */
+export function isUserInRecipientsList(userAddress, encryptionData) {
+  console.log("[isUserInRecipientsList] Checking:", { userAddress, encryptionData });
+
+  if (!userAddress || !encryptionData) {
+    console.log("[isUserInRecipientsList] Missing userAddress or encryptionData");
+    return false;
+  }
+
+  // If the API returned user-specific encryption data (has reading_key_nonce at root),
+  // that means the user IS in the recipients list
+  if (encryptionData.reading_key_nonce) {
+    console.log("[isUserInRecipientsList] User-specific data present - user is in recipients");
+    return true;
+  }
+
+  // Otherwise check the full recipients object
+  const recipients = encryptionData.recipients;
+  console.log("[isUserInRecipientsList] Recipients:", recipients);
+  console.log("[isUserInRecipientsList] Recipients type:", typeof recipients);
+  console.log("[isUserInRecipientsList] Recipients keys:", recipients ? Object.keys(recipients) : 'none');
+
+  if (!recipients || typeof recipients !== 'object') {
+    console.log("[isUserInRecipientsList] No recipients or not an object");
+    return false;
+  }
+
+  // Check if user's address exists in recipients object (case-insensitive)
+  const normalizedAddress = userAddress.toLowerCase();
+  const isInList = normalizedAddress in recipients;
+  console.log("[isUserInRecipientsList] Result:", { normalizedAddress, isInList, recipientKeys: Object.keys(recipients) });
+  return isInList;
+}
+
+/**
  * Check if we can decrypt a post (have the reading key stored)
  * @param {string} userAddress - Current user's address
  * @param {object} encryptionData - Post encryption data from API

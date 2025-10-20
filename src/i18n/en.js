@@ -601,6 +601,7 @@ export default {
   "post.encrypted.decrypting": "Decrypting...",
   "post.encrypted.description": "This post is encrypted for subscribers only",
   "post.encrypted.loginRequired": "Please connect your wallet to unlock",
+  "post.encrypted.noAccess": "This post is encrypted. You don't have permission to view it.",
   "post.encrypted.title": "Encrypted Content",
   "post.encrypted.unlock": "Unlock Content",
   "post.fund.confirmation": "By contributing, I confirm that {n}% of my contribution goes to the post’s author and NFT owner.",
