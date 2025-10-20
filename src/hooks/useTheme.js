@@ -2,10 +2,10 @@
 import { createSignal, onMount } from "solid-js";
 
 export function useTheme() {
-  const [theme, setTheme] = createSignal("light");
+  const [theme, setTheme] = createSignal("dark");
 
   onMount(() => {
-    const savedTheme = localStorage.getItem("theme") || "light";
+    const savedTheme = localStorage.getItem("theme") || "dark";
     setTheme(savedTheme);
     document.documentElement.classList.toggle("dark", savedTheme === "dark");
   });

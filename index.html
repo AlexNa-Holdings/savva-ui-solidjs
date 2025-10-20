@@ -11,8 +11,8 @@
     (function () {
       try {
         const saved = localStorage.getItem("theme");
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved || (systemDark ? "dark" : "light");
+        // Default to dark theme
+        const theme = saved || "dark";
         document.documentElement.classList.toggle("dark", theme === "dark");
       } catch { }
     })();
