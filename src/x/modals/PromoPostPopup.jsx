@@ -127,6 +127,48 @@ export default function PromoPostPopup(props) {
   const [details] = createResource(postResource, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
 
+  // Close popup if post fails to load
+  createEffect(() => {
+    if (!props.isOpen) return;
+
+    // If post resource has an error
+    if (postResource.error) {
+      dbg.error("PromoPostPopup", "Error loading post, closing popup", {
+        promoPostId: props.promoPostId,
+        error: postResource.error
+      });
+      props.onClose?.();
+      return;
+    }
+
+    // If post resource finished loading but returned null/undefined (post not found)
+    if (!postResource.loading && !postResource()) {
+      dbg.error("PromoPostPopup", "Post not found, closing popup", { promoPostId: props.promoPostId });
+      props.onClose?.();
+      return;
+    }
+
+    // If details resource has an error
+    if (details.error) {
+      dbg.error("PromoPostPopup", "Error loading post details, closing popup", {
+        promoPostId: props.promoPostId,
+        error: details.error
+      });
+      props.onClose?.();
+      return;
+    }
+
+    // If details resource finished loading but has an error in descriptor
+    if (!details.loading && details()?.descriptor?.error) {
+      dbg.error("PromoPostPopup", "Failed to load post details, closing popup", {
+        promoPostId: props.promoPostId,
+        error: details().descriptor.error
+      });
+      props.onClose?.();
+      return;
+    }
+  });
+
   const availableLocales = createMemo(() => Object.keys(details()?.descriptor?.locales || {}));
 
   // Auto-select language
