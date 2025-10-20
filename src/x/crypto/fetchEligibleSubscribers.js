@@ -51,13 +51,14 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
     console.log(`[fetchEligibleSubscribers] First sponsor structure:`, JSON.stringify(sponsors[0], null, 2));
   }
 
-  // Filter eligible subscribers (weeks > 0 and amount >= minimum)
+  // Filter eligible subscribers (weeks > 0 and amount >= minimum and not banned)
   const eligible = sponsors.filter(s => {
     const weeks = Number(s.weeks || 0);
     const amount = BigInt(s.amount || 0);
     const userAddress = s.user?.address || s.user_addr;
-    const isEligible = weeks > 0 && amount >= minWeeklyPaymentWei;
-    console.log(`[fetchEligibleSubscribers] Checking ${userAddress}: weeks=${weeks}, amount=${amount}, minRequired=${minWeeklyPaymentWei}, eligible=${isEligible}`);
+    const isBanned = s.user?.banned || false;
+    const isEligible = weeks > 0 && amount >= minWeeklyPaymentWei && !isBanned;
+    console.log(`[fetchEligibleSubscribers] Checking ${userAddress}: weeks=${weeks}, amount=${amount}, minRequired=${minWeeklyPaymentWei}, banned=${isBanned}, eligible=${isEligible}`);
     return isEligible;
   });
 
