@@ -365,6 +365,7 @@ export default {
   "fundraising.card.receiver": "Получатель",
   "fundraising.card.target": "Цель",
   "fundraising.contribute.amount": "Сумма",
+  "fundraising.contribute.campaignClosed": "Эта кампания закрыта и больше не принимает взносы.",
   "fundraising.contribute.connectMessage": "Пожалуйста, подключите свой кошелек, чтобы внести вклад в эту кампанию.",
   "fundraising.contribute.connectTitle": "Подключить кошелёк",
   "fundraising.contribute.donatorsTitle": "Вкладчики",

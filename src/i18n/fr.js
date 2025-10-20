@@ -365,6 +365,7 @@ export default {
   "fundraising.card.receiver": "Destinataire",
   "fundraising.card.target": "Objectif",
   "fundraising.contribute.amount": "Montant",
+  "fundraising.contribute.campaignClosed": "Cette campagne a été clôturée et n'accepte plus de contributions.",
   "fundraising.contribute.connectMessage": "Veuillez connecter votre portefeuille pour contribuer à cette campagne.",
   "fundraising.contribute.connectTitle": "Connecter le portefeuille",
   "fundraising.contribute.donatorsTitle": "Contributeurs",

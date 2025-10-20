@@ -365,6 +365,7 @@ export default {
   "fundraising.card.receiver": "Primalac",
   "fundraising.card.target": "Cilj",
   "fundraising.contribute.amount": "Iznos",
+  "fundraising.contribute.campaignClosed": "Ova kampanja je zatvorena i više ne prima doprinose.",
   "fundraising.contribute.connectMessage": "Molimo povežite svoj novčanik da biste doprineli ovoj kampanji.",
   "fundraising.contribute.connectTitle": "Poveži novčanik",
   "fundraising.contribute.donatorsTitle": "Doprinosioci",

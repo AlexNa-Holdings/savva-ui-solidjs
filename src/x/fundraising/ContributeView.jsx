@@ -35,13 +35,13 @@ async function fetchCampaignData({ app, campaignId, refreshKey }) {
     if (!app || !campaignId) return null;
     try {
         const fundraiserContract = await getSavvaContract(app, "Fundraiser");
-        
+
         const [campaignDetailsArray, acceptedTokensList, fee] = await Promise.all([
             fundraiserContract.read.campaigns([campaignId]),
             fundraiserContract.read.getAcceptedTokens(),
             getConfigParam(app, "fundraising_bb_fee")
         ]);
-        
+
         const campaignDetails = {
             title: campaignDetailsArray[0],
             creator: campaignDetailsArray[1],
@@ -49,7 +49,38 @@ async function fetchCampaignData({ app, campaignId, refreshKey }) {
             totalContributed: campaignDetailsArray[3],
         };
 
+        // If campaign not found in contract, check back DB
         if (!campaignDetails || campaignDetails.targetAmount === 0n) {
+            console.log("[ContributeView] Campaign not found in contract, checking back DB for campaignId:", campaignId);
+            await whenWsOpen();
+            const listFundraisers = app.wsMethod("list-fundraisers");
+            const backDbResult = await listFundraisers({ id: campaignId, show_finished: true });
+            console.log("[ContributeView] Back DB result:", backDbResult);
+
+            // Handle both response formats: array directly or object with list property
+            const list = Array.isArray(backDbResult) ? backDbResult : Array.isArray(backDbResult?.list) ? backDbResult.list : [];
+            console.log("[ContributeView] Parsed list:", list);
+
+            // If found in back DB, it means campaign existed and is now closed
+            if (list.length > 0) {
+                const closedCampaign = list[0];
+                console.log("[ContributeView] Found closed campaign:", closedCampaign);
+                return {
+                    details: {
+                        title: closedCampaign.title,
+                        creator: closedCampaign.user?.address,
+                        targetAmount: BigInt(closedCampaign.target_amount || 0),
+                        totalContributed: BigInt(closedCampaign.raised || 0),
+                        user: closedCampaign.user,
+                        finished: true
+                    },
+                    acceptedTokens: [],
+                    fee: fee,
+                    isClosed: true
+                };
+            }
+
+            console.log("[ContributeView] Campaign not found in back DB either");
             return { error: new Error(app.t("fundraising.contribute.notFoundOrFinished")) };
         }
 
@@ -63,7 +94,7 @@ async function fetchCampaignData({ app, campaignId, refreshKey }) {
             })
         );
         allTokens.push(...acceptedErc20s);
-        
+
         await whenWsOpen();
         const getUser = app.wsMethod("get-user");
         const creatorProfile = await getUser({
@@ -73,10 +104,11 @@ async function fetchCampaignData({ app, campaignId, refreshKey }) {
 
         const creator = { address: campaignDetails.creator, ...creatorProfile };
 
-        return { 
+        return {
             details: { ...campaignDetails, user: creator },
             acceptedTokens: allTokens,
-            fee: fee
+            fee: fee,
+            isClosed: false
         };
     } catch (e) {
         console.error("Failed to fetch campaign data:", e);
@@ -98,6 +130,7 @@ export default function ContributeView(props) {
     const campaignError = createMemo(() => campaignResource()?.error);
     const acceptedTokens = createMemo(() => campaignResource()?.acceptedTokens || []);
     const feePercent = createMemo(() => Number(campaignResource()?.fee || 0n) / 100);
+    const isClosed = createMemo(() => campaignResource()?.isClosed || false);
 
     const [selectedToken, setSelectedToken] = createSignal("0");
     const [amountText, setAmountText] = createSignal("");
@@ -208,8 +241,15 @@ export default function ContributeView(props) {
                                         <div class="text-sm text-[hsl(var(--muted-foreground))] mb-1">{t("fundraising.contribute.receiver")}:</div>
                                         <UserCard author={campaign()?.user} />
                                     </div>
+                                    <Show when={isClosed()}>
+                                        <div class="p-3 rounded bg-[hsl(var(--destructive)/0.15)] border border-[hsl(var(--destructive)/0.4)]">
+                                            <p class="text-sm font-semibold text-[hsl(var(--destructive))] brightness-125">
+                                                {t("fundraising.contribute.campaignClosed")}
+                                            </p>
+                                        </div>
+                                    </Show>
                                 </div>
-                                
+
                                 <div class="space-y-2 text-sm">
                                     <div class="flex justify-between items-center">
                                         <span class="text-[hsl(var(--muted-foreground))]">{t("fundraising.card.collected")}:</span>
@@ -222,21 +262,23 @@ export default function ContributeView(props) {
                                     </div>
                                 </div>
 
-                                <div class="pt-2 border-t border-[hsl(var(--border))] space-y-4">
-                                    <TokenSelector
-                                        label={t("fundraising.contribute.token")}
-                                        tokens={acceptedTokens()}
-                                        selectedValue={selectedToken()}
-                                        onChange={handleTokenSelect}
-                                    />
+                                <Show when={!isClosed()}>
+                                    <div class="pt-2 border-t border-[hsl(var(--border))] space-y-4">
+                                        <TokenSelector
+                                            label={t("fundraising.contribute.token")}
+                                            tokens={acceptedTokens()}
+                                            selectedValue={selectedToken()}
+                                            onChange={handleTokenSelect}
+                                        />
 
-                                    <AmountInput
-                                        label={t("fundraising.contribute.amount")}
-                                        tokenAddress={selectedToken()}
-                                        value={amountText()}
-                                        onInput={(txt, wei) => { setAmountText(txt); setAmountWei(wei ?? 0n); }}
-                                    />
-                                </div>
+                                        <AmountInput
+                                            label={t("fundraising.contribute.amount")}
+                                            tokenAddress={selectedToken()}
+                                            value={amountText()}
+                                            onInput={(txt, wei) => { setAmountText(txt); setAmountWei(wei ?? 0n); }}
+                                        />
+                                    </div>
+                                </Show>
                             </div>
                         </Show>
                     </div>
@@ -252,25 +294,27 @@ export default function ContributeView(props) {
                     <p class="text-sm text-[hsl(var(--destructive))] mt-4">{err()}</p>
                 </Show>
 
-                <div class="pt-4 mt-4 border-t border-[hsl(var(--border))] space-y-3">
-                    <Show when={feePercent() > 0}>
-                        <p class="text-xs text-center text-[hsl(var(--muted-foreground))]">
-                            {t("fundraising.contribute.feeNotice", { n: feePercent() })}
-                        </p>
-                    </Show>
-                    <div class="flex justify-end gap-2">
-                         <Show when={props.showCancel}>
-                            <button type="button" onClick={props.onCancel} class="px-4 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50">
-                                {t("common.cancel")}
-                            </button>
+                <Show when={!isClosed()}>
+                    <div class="pt-4 mt-4 border-t border-[hsl(var(--border))] space-y-3">
+                        <Show when={feePercent() > 0}>
+                            <p class="text-xs text-center text-[hsl(var(--muted-foreground))]">
+                                {t("fundraising.contribute.feeNotice", { n: feePercent() })}
+                            </p>
                         </Show>
-                        <button type="submit" disabled={isProcessing() || amountWei() <= 0n || !selectedToken()} class="px-4 py-2 min-w-[140px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60">
-                            <Show when={isProcessing()} fallback={t("fundraising.card.contribute")}>
-                                <Spinner class="w-5 h-5" />
+                        <div class="flex justify-end gap-2">
+                             <Show when={props.showCancel}>
+                                <button type="button" onClick={props.onCancel} class="px-4 py-2 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50">
+                                    {t("common.cancel")}
+                                </button>
                             </Show>
-                        </button>
+                            <button type="submit" disabled={isProcessing() || amountWei() <= 0n || !selectedToken()} class="px-4 py-2 min-w-[140px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60">
+                                <Show when={isProcessing()} fallback={t("fundraising.card.contribute")}>
+                                    <Spinner class="w-5 h-5" />
+                                </Show>
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </Show>
             </form>
         </Show>
     );

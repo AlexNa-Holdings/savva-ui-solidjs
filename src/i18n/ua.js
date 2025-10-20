@@ -365,6 +365,7 @@ export default {
   "fundraising.card.receiver": "Отримувач",
   "fundraising.card.target": "Ціль",
   "fundraising.contribute.amount": "Сума",
+  "fundraising.contribute.campaignClosed": "Цю кампанію закрито і вона більше не приймає внески.",
   "fundraising.contribute.connectMessage": "Будь ласка, підключіть свій гаманець, щоб внести кошти в цю кампанію.",
   "fundraising.contribute.connectTitle": "Підключити гаманець",
   "fundraising.contribute.donatorsTitle": "Спонсори",

@@ -141,4 +141,6 @@ t("sacrifice.toast.claimSuccess")
 t("sacrifice.toast.claimError")
 t("rightPane.sacrifice")
 
+t("fundraising.contribute.campaignClosed")
+
 */

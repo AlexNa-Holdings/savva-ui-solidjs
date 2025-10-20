@@ -365,6 +365,7 @@ export default {
   "fundraising.card.receiver": "Recipient",
   "fundraising.card.target": "Target",
   "fundraising.contribute.amount": "Amount",
+  "fundraising.contribute.campaignClosed": "This campaign has been closed and is no longer accepting contributions.",
   "fundraising.contribute.connectMessage": "Please connect your wallet to contribute to this campaign.",
   "fundraising.contribute.connectTitle": "Connect Wallet",
   "fundraising.contribute.donatorsTitle": "Contributors",
