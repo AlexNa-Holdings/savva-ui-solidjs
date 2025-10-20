@@ -386,10 +386,17 @@ export default function EditorPage() {
     if (editorMode() === "new_post") {
       navigate("/new");
     } else if (editorMode() === "edit_post") {
+      // Use originalSavvaCid which is set when importing a post for editing
+      const savvaCid = postParams().originalSavvaCid;
+      if (!savvaCid) {
+        dbg.error("EditorPage", "No originalSavvaCid found in postParams after publishing edit", postParams());
+        NavigateBack("post");
+        return;
+      }
       // Only add lang param if post has multiple languages
       const langCount = Object.keys(postData() || {}).length;
       const currentLang = (app.lang?.() || "").toLowerCase();
-      const url = (langCount > 1 && currentLang) ? `/post/${postParams().savva_cid}?lang=${currentLang}` : `/post/${postParams().savva_cid}`;
+      const url = (langCount > 1 && currentLang) ? `/post/${savvaCid}?lang=${currentLang}` : `/post/${savvaCid}`;
       navigate(url);
     } else {
       NavigateBack("post");

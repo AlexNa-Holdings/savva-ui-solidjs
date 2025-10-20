@@ -148,7 +148,7 @@ export default function App() {
           <VersionChecker />
           <AdminActionsBridge />
           <ReadingKeyInviteManager />
-          <PromoPostManager />
+          <PromoPostManager isMainView={currentView() === "main"} />
 
           <Show when={domainRevision()} keyed>
             <>

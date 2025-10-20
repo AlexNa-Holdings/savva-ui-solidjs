@@ -6,14 +6,14 @@ import { dbg } from "../../utils/debug.js";
 
 /**
  * PromoPostManager - Shows promo post popup when:
- * 1. Opening site for the first time for this domain
- * 2. Switching to a different domain
+ * 1. User navigates to the main page for the first time for this domain
+ * 2. User navigates to the main page after switching to a different domain
  *
  * Only shows if promo_post is set in domain config and hasn't been dismissed.
- * Shows once per session (page load) per domain. If user doesn't check "Do not show again",
- * it will show again on next page load.
+ * Shows once per session (page load) per domain when the main page is viewed.
+ * If user doesn't check "Do not show again", it will show again on next page load.
  */
-export default function PromoPostManager() {
+export default function PromoPostManager(props) {
   const app = useApp();
   const [isPromoOpen, setIsPromoOpen] = createSignal(false);
   const [promoPostId, setPromoPostId] = createSignal(null);
@@ -34,6 +34,9 @@ export default function PromoPostManager() {
   };
 
   createEffect(() => {
+    // Only show promo when on the main page
+    if (!props.isMainView) return;
+
     // Wait for app to load and domain config to be available
     if (app.loading()) return;
 
