@@ -131,6 +131,25 @@ export default function PromoPostPopup(props) {
   createEffect(() => {
     if (!props.isOpen) return;
 
+    // Wait for initial loading to complete before checking for errors
+    // This prevents false positives during the loading phase
+    const postLoaded = !postResource.loading && postResource.state === "ready";
+    const detailsLoaded = !details.loading && details.state === "ready";
+
+    dbg.log("PromoPostPopup", "Effect check", {
+      isOpen: props.isOpen,
+      postLoading: postResource.loading,
+      postState: postResource.state,
+      postLoaded,
+      postError: !!postResource.error,
+      hasPost: !!postResource(),
+      detailsLoading: details.loading,
+      detailsState: details.state,
+      detailsLoaded,
+      detailsError: !!details.error,
+      hasDetails: !!details()
+    });
+
     // If post resource has an error
     if (postResource.error) {
       dbg.error("PromoPostPopup", "Error loading post, closing popup", {
@@ -142,7 +161,8 @@ export default function PromoPostPopup(props) {
     }
 
     // If post resource finished loading but returned null/undefined (post not found)
-    if (!postResource.loading && !postResource()) {
+    // Only check this after loading is complete
+    if (postLoaded && !postResource()) {
       dbg.error("PromoPostPopup", "Post not found, closing popup", { promoPostId: props.promoPostId });
       props.onClose?.();
       return;
@@ -159,7 +179,8 @@ export default function PromoPostPopup(props) {
     }
 
     // If details resource finished loading but has an error in descriptor
-    if (!details.loading && details()?.descriptor?.error) {
+    // Only check this after loading is complete
+    if (detailsLoaded && details()?.descriptor?.error) {
       dbg.error("PromoPostPopup", "Failed to load post details, closing popup", {
         promoPostId: props.promoPostId,
         error: details().descriptor.error
