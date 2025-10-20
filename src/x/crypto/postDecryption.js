@@ -118,30 +118,13 @@ export function decryptLocale(locale, postSecretKey) {
   if (!locale) return null;
 
   console.log("[decryptLocale] Input locale:", locale);
-  console.log("[decryptLocale] Title format:", locale.title);
-  console.log("[decryptLocale] Has ':' separator?", locale.title?.includes(':'));
 
   const decrypted = { ...locale };
 
-  // Decrypt title - supports both combined "nonce:ciphertext" and separate nonce field
+  // Title is NOT encrypted - it remains public for display in post cards
+  // Just pass it through as-is
   if (locale.title) {
-    try {
-      if (locale.title.includes(':')) {
-        // Combined format: "nonce:ciphertext"
-        decrypted.title = decryptText(locale.title, null, postSecretKey);
-      } else if (locale.title_nonce) {
-        // Legacy separate format
-        decrypted.title = decryptText(locale.title, locale.title_nonce, postSecretKey);
-        delete decrypted.title_nonce;
-      } else {
-        // No nonce available - likely just a placeholder hash
-        console.warn("[decryptLocale] Title exists but no nonce - showing placeholder");
-        decrypted.title = "[Encrypted Content]";
-      }
-    } catch (error) {
-      console.error("Failed to decrypt title:", error);
-      decrypted.title = "[Decryption Failed]";
-    }
+    decrypted.title = locale.title;
   }
 
   // Decrypt text_preview - supports both combined "nonce:ciphertext" and separate nonce field

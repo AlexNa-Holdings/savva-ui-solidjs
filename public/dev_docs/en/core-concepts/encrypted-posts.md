@@ -233,17 +233,27 @@ const recipients = parentEncryption.recipients;
 
 #### Step 3: Encrypt Post Content
 
-All text content in the descriptor is encrypted with the post secret key:
+Post content is encrypted with the post secret key. **Note**: The title remains unencrypted to allow display in post cards, while preview text and content are encrypted:
 
 ```javascript
 // For each locale:
 {
-  title: encryptText(title, postSecretKey),
+  title: title,  // NOT encrypted - remains public for display
   text_preview: encryptText(preview, postSecretKey),
-  tags: tags.map(t => encryptText(t, postSecretKey)),
-  categories: categories.map(c => encryptText(c, postSecretKey))
+  categories: categories,  // NOT encrypted - public for indexing
+  tags: tags  // NOT encrypted - public for indexing
 }
 ```
+
+**What is encrypted:**
+- ✅ Preview text (`text_preview`)
+- ✅ Chapter titles
+- ✅ All content files (markdown, media)
+
+**What remains public:**
+- ❌ Post title
+- ❌ Categories
+- ❌ Tags
 
 **Encryption Format**: `nonce:ciphertext` (both hex-encoded)
 
@@ -334,13 +344,13 @@ data_cid: QmXXX...
 encrypted: true
 locales:
   en:
-    title: "48c3a1b2:9f8d7e6c5a4b3e2d1c0f9e8d7c6b5a4e3d2c1b0a..."
+    title: "My Post Title"  # NOT encrypted - public for display
     text_preview: "a1b2c3d4:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b..."
     tags:
-      - "nonce1:encrypted_tag1"
-      - "nonce2:encrypted_tag2"
+      - "technology"  # NOT encrypted - public for indexing
+      - "tutorial"
     categories:
-      - "nonce3:encrypted_category1"
+      - "programming"  # NOT encrypted - public for indexing
     data_path: en/data.md
     chapters:
       - title: "nonce4:encrypted_chapter_title"
@@ -460,10 +470,9 @@ When a user views an encrypted post:
 
 5. **Decrypt Metadata**
    ```javascript
-   // Decrypt title, preview, tags, categories
-   post.title = decryptText(post.title, postSecretKey);
+   // Decrypt preview text (title, tags, and categories are public)
    post.text_preview = decryptText(post.text_preview, postSecretKey);
-   post.tags = post.tags.map(t => decryptText(t, postSecretKey));
+   // Title, tags, and categories remain as-is (not encrypted)
    ```
 
 6. **Set Encryption Context**

@@ -1,14 +1,14 @@
-# Trabajando con dominios
+# Working with domains
 
-Un **dominio** es simplemente el nombre de la red social que quieres renderizar. Normalmente es el host DNS del sitio (p. ej. `savva.app`) pero no tiene por qué serlo. Cada dominio tiene un **paquete de dominio**: una carpeta que contiene `config.yaml` además de todos los recursos específicos del dominio (logos, favicon, locales, configuración de pestañas, `domain.css` opcional, etc.).
+Un **dominio** es simplemente el nombre de la red social que quieres renderizar. Normalmente es el host DNS del sitio (p. ej. `savva.app`), pero no tiene por qué serlo. Cada dominio tiene un **paquete de dominio** — una carpeta que contiene `config.yaml` además de todos los recursos específicos del dominio (logos, favicon, locales, configuración de pestañas, `domain.css` opcional, etc.).
 
 ## ¿Dónde se encuentra `config.yaml`?
 
-En tiempo de ejecución la app calcula una **URL base de activos** a partir de `/info`:
+En tiempo de ejecución la app calcula una **URL base de recursos** a partir de `/info`:
 - **Producción:** `assets_url`
 - **Prueba:** `temp_assets_url`
 
-El entorno activo es un simple conmutador prod/test en la app (usado por administradores para probar cambios). Dado el **nombre de dominio seleccionado**, la app construye un prefijo:
+El entorno activo es un sencillo conmutador prod/test en la app (usado por administradores para probar cambios). Dado el **nombre de dominio seleccionado**, la app construye un prefijo:
 
 ```
 
@@ -16,7 +16,7 @@ El entorno activo es un simple conmutador prod/test en la app (usado por adminis
 
 ```
 
-Luego la app intenta cargar:
+Después la app intenta cargar:
 
 ```
 
@@ -24,7 +24,7 @@ Luego la app intenta cargar:
 
 ```
 
-Si eso falla (paquete faltante, 404, etc.), la interfaz **recurre** al paquete predeterminado integrado:
+Si eso falla (paquete ausente, 404, etc.), la IU **recurre** al paquete predeterminado incorporado:
 
 ```
 
@@ -32,21 +32,21 @@ Si eso falla (paquete faltante, 404, etc.), la interfaz **recurre** al paquete p
 
 ```
 
-> Esta búsqueda y las diagnósticas están centralizadas; verás las mismas rutas en la UI de diagnósticos.  
+> Esta búsqueda y la diagnóstico están centralizados; verás las mismas rutas en la IU de diagnósticos.  
 > El `domain.css` activo se carga desde el mismo prefijo y se invalida en caché con una clave de revisión, por lo que los cambios se aplican inmediatamente después de subirlos.
 
 ## ¿Por qué dos entornos (prod / test)?
 
-El backend expone dos URL base para los activos:
+El backend sirve dos URLs base para los recursos:
 
-- **`assets_url`** → paquete de producción para los usuarios finales  
+- **`assets_url`** → paquete de producción para usuarios finales  
 - **`temp_assets_url`** → paquete de prueba para previsualizar cambios
 
-Un administrador (según lo configurado en el backend) puede subir un paquete de dominio modificado bajo la base de **test** y verificar todo (logos, pestañas, GA, colores) sin afectar a los usuarios. Cuando está satisfecho, publica el mismo paquete en **prod**.
+Un administrador (según lo configurado en el backend) puede subir un paquete de dominio modificado bajo la base de **prueba** y verificar todo (logos, pestañas, GA, colores) sin afectar a los usuarios. Cuando esté satisfecho, publica el mismo paquete en **prod**.
 
 ## Estructura del paquete de dominio
 
-Todo lo relativo a un dominio vive bajo una única carpeta:
+Todo lo relacionado con un dominio vive dentro de una sola carpeta:
 
 ```
 
@@ -61,7 +61,7 @@ html/*.html          # arbitrary HTML blocks (optional)
 
 ````
 
-## Ejemplo `config.yaml`
+## Ejemplo de `config.yaml`
 
 A continuación hay un ejemplo recortado que muestra los campos típicos que usa la app:
 
@@ -88,6 +88,7 @@ favicon:
       content: '#ffffff'
 
 GA_tag: G-XXXXXXXXXX   # Google Analytics (gtag) ID
+promo_post: ''          # savva_cid of a post to show on first site opening
 
 modules:
   tabs: modules/tabs.yaml
@@ -110,14 +111,15 @@ locales:
 ### Qué controlan estos campos
 
 * **`logo`** — La app elige automáticamente la mejor variante (oscuro/claro + móvil/escritorio) y la resuelve mediante el prefijo de dominio activo.
-* **`favicon`** — Todos los enlaces de favicon y meta tags se aplican dinámicamente; cuando cambia la configuración, la app reemplaza el conjunto de `<link rel="icon">`.
-* **`GA_tag`** — Activa Google Analytics (gtag.js). Si está presente, la app inyecta los scripts de GA y envía eventos `page_view` de SPA en los cambios de ruta.
-* **`modules.tabs`** — Señala el YAML que define las pestañas en la pantalla principal (ver más abajo).
+* **`favicon`** — Todos los enlaces de favicon y las metaetiquetas se aplican dinámicamente; cuando cambia la configuración, la app reemplaza el conjunto de `<link rel="icon">`.
+* **`GA_tag`** — Activa Google Analytics (gtag.js). Cuando está presente, la app inyecta los scripts de GA y envía eventos SPA `page_view` al cambiar de ruta.
+* **`promo_post`** — savva_cid opcional de una publicación para mostrar en la primera apertura del sitio. Puede usarse para mostrar un post de bienvenida o anuncio a usuarios nuevos.
+* **`modules.tabs`** — Señala al YAML que define las pestañas en la pantalla principal (ver más abajo).
 * **`locales`** — Lista de idiomas para el dominio (código/nombre/título + ruta del diccionario). La app puede renderizar títulos/strings localizados por dominio.
 
 ## Pestañas en la pantalla principal
 
-Las pestañas se configuran en un YAML independiente (referenciado por `modules.tabs` más arriba). Por ejemplo:
+Las pestañas se configuran en un YAML independiente (referenciado por `modules.tabs` arriba). Por ejemplo:
 
 ```yaml
 # modules/tabs.yaml
@@ -142,11 +144,11 @@ tabs:
       ru: Новое
 ```
 
-La UI toma el título de pestaña localizado, elige un icono según el `type` y renderiza bloques opcionales en el panel derecho. Este archivo vive en la **misma carpeta del dominio**, por lo que se versiona y previsualiza junto con `config.yaml`.
+La IU elige el título de pestaña localizado, selecciona un icono según el `type` y renderiza los bloques opcionales del panel derecho. Este archivo vive en la **misma carpeta de dominio**, por lo que se versiona y previsualiza junto con `config.yaml`.
 
 ## Colores del tema mediante `domain.css`
 
-Si está presente, `domain.css` se obtiene desde el mismo prefijo de dominio y se aplica en tiempo de ejecución. Normalmente define propiedades CSS personalizadas que la UI utiliza (fondos, primer plano, acentos, bordes, etc.). Cambiar el **dominio** o el **entorno** recarga este CSS, así que los administradores pueden afinar la identidad visual sin reconstruir la app.
+Si está presente, `domain.css` se obtiene desde el mismo prefijo de dominio y se aplica en tiempo de ejecución. Normalmente define variables CSS personalizadas que usa la IU (fondos, primer plano, acentos, bordes, etc.). Cambiar de **dominio** o **entorno** recarga este CSS, así que los administradores pueden ajustar la identidad visual sin recompilar la app.
 
 Example variables:
 
@@ -165,13 +167,13 @@ Example variables:
 
 ## Google Analytics (GA)
 
-Establece el `GA_tag` en `config.yaml` para habilitar GA. La app inyecta el script de GA e inicializa `gtag(...)` automáticamente, y también rastrea vistas de página en los cambios de ruta por hash. Elimina o borra `GA_tag` para desactivar el análisis para el dominio.
+Configura el `GA_tag` en `config.yaml` para habilitar GA. La app inyecta el script de GA e inicializa `gtag(...)` automáticamente, y también rastrea vistas de página al cambiar rutas basadas en hash. Elimina o borra `GA_tag` para desactivar la analítica para el dominio.
 
 ---
 
 ### Resumen
 
-* La app elige la base de activos **prod** o **test**, luego carga `<base>/<domain>/config.yaml` con una caída segura a `/domain_default/config.yaml`.
-* **Todos** los recursos del dominio (logos, locales, pestañas, `domain.css`) viven bajo la misma carpeta para actualizaciones atómicas.
-* Los administradores pueden previsualizar cambios en **test** antes de publicarlos en **prod**.
-* `config.yaml` controla la identidad visual (logos, favicon), la localización, GA y dónde encontrar módulos de la UI como **tabs**.
+* La app elige la base de recursos **prod** o **test**, y luego carga `<base>/<domain>/config.yaml` con una reserva segura a `/domain_default/config.yaml`.
+* **Todos** los recursos del dominio (logos, locales, pestañas, `domain.css`) viven en la misma carpeta para actualizaciones atómicas.
+* Los administradores pueden previsualizar cambios en **test** antes de publicar en **prod**.
+* `config.yaml` controla la identidad visual (logos, favicon), la localización, GA y dónde encontrar módulos de IU como las **pestañas**.

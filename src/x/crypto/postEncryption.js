@@ -10,7 +10,8 @@ import { x25519 } from "@noble/curves/ed25519";
  *
  * Handles encryption of post content for subscriber-only posts:
  * 1. Generate random post encryption key (X25519 keypair)
- * 2. Encrypt descriptor text fields with post key
+ * 2. Encrypt descriptor text fields (preview, chapter titles) with post key
+ *    Note: Post titles, tags, and categories are NOT encrypted
  * 3. Encrypt post key for each recipient using their reading key
  */
 
@@ -154,10 +155,8 @@ export function decryptPostKey(encryptedKeyHex, ephemeralPublicKeyHex, nonceHex,
 export function encryptDescriptorLocale(locale, postSecretKeyHex) {
   const encrypted = { ...locale };
 
-  // Encrypt title (combined format: nonce:ciphertext)
-  if (locale.title) {
-    encrypted.title = encryptText(locale.title, postSecretKeyHex, true);
-  }
+  // Title is NOT encrypted - it remains public for display in post cards
+  // Only the preview and content are encrypted
 
   // Encrypt text_preview (combined format: nonce:ciphertext)
   if (locale.text_preview) {

@@ -28,13 +28,13 @@ export default function CommentThread(props) {
     // Check explicit encrypted flag
     if (parent?.encrypted) return true;
 
-    // Fallback: detect encryption from title format (nonce:ciphertext pattern)
-    // Encrypted titles are hex strings with : separator, typically >40 chars
+    // Fallback: detect encryption from text_preview format (nonce:ciphertext pattern)
+    // Since titles are no longer encrypted, check text_preview instead
     const locales = parent?.locales;
     if (locales) {
       for (const lang in locales) {
-        const title = locales[lang]?.title;
-        if (title && typeof title === 'string' && title.includes(':') && title.length > 40) {
+        const textPreview = locales[lang]?.text_preview;
+        if (textPreview && typeof textPreview === 'string' && textPreview.includes(':') && textPreview.length > 40) {
           return true;
         }
       }

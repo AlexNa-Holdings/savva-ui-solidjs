@@ -1,20 +1,20 @@
 # Publicaciones cifradas
 
-Savva admite publicaciones cifradas de extremo a extremo que solo pueden ser vistas por suscriptores. Esta función permite a los creadores publicar contenido exclusivo para sus suscriptores de pago garantizando que ni la plataforma ni las pasarelas de IPFS puedan leer el contenido.
+Savva admite publicaciones cifradas de extremo a extremo que solo pueden ser vistas por suscriptores. Esta función permite a los creadores publicar contenido exclusivo para sus suscriptores de pago mientras asegura que ni la plataforma ni las pasarelas IPFS puedan leer el contenido.
 
-## Visión general
+## Resumen
 
-El sistema de cifrado usa un enfoque por capas:
+El sistema de cifrado usa un enfoque multinivel:
 
 1. **Claves de lectura**: Los usuarios generan pares de claves X25519 de forma determinista a partir de firmas de la wallet
 2. **Cifrado de la publicación**: Cada publicación obtiene una clave de cifrado única
 3. **Distribución de claves**: La clave de la publicación se cifra por separado para cada destinatario elegible
-4. **Cifrado del contenido**: Todo el contenido de la publicación (texto, imágenes, vídeos, audio) se cifra con la clave de la publicación
-5. **Descifrado en streaming**: Los medios cifrados se descifran sobre la marcha usando Service Workers
+4. **Cifrado de contenido**: Todo el contenido de la publicación (texto, imágenes, vídeos, audio) se cifra con la clave de la publicación
+5. **Descifrado por streaming**: Los medios cifrados se descifran en tiempo real usando Service Workers
 
 ## Claves de lectura
 
-### ¿Qué es una clave de lectura?
+### ¿Qué es una Clave de Lectura?
 
 Una Clave de Lectura es un par de claves X25519 que permite a los usuarios recibir y descifrar publicaciones cifradas. Consiste en:
 - **Clave pública**: Publicada on-chain en el contrato UserProfile (visible para todos)
@@ -26,13 +26,13 @@ Una Clave de Lectura es un par de claves X25519 que permite a los usuarios recib
 
 Las claves de lectura se generan de forma determinista a partir de firmas de la wallet usando los siguientes pasos:
 
-1. **Generar nonce aleatorio**
+1. **Generar Nonce aleatorio**
    ```javascript
    const nonce = crypto.getRandomValues(new Uint8Array(10));
    // Example: "a1b2c3d4e5f6g7h8i9j0"
    ```
 
-2. **Crear datos tipados EIP-712**
+2. **Crear EIP-712 Typed Data**
    ```javascript
    const typedData = {
      types: {
@@ -59,7 +59,7 @@ Las claves de lectura se generan de forma determinista a partir de firmas de la 
    };
    ```
 
-3. **Solicitar firma de la wallet**
+3. **Solicitar firma a la wallet**
    ```javascript
    const signature = await ethereum.request({
      method: "eth_signTypedData_v4",
@@ -101,15 +101,15 @@ Las claves de lectura se generan de forma determinista a partir de firmas de la 
 
 El enfoque de derivación determinista tiene varias ventajas:
 
-- ✅ **Reproducible**: Mismo nonce + firma siempre producen el mismo par de claves
-- ✅ **No requiere almacenamiento**: La clave secreta se puede volver a derivar cuando sea necesario
+- ✅ **Reproducible**: El mismo nonce + firma siempre produce el mismo par de claves
+- ✅ **No requiere almacenamiento**: La clave secreta puede ser re-derivada cuando sea necesario
 - ✅ **Control del usuario**: Los usuarios pueden elegir si almacenar la clave en localStorage del navegador
 - ✅ **Rotación de claves**: Generar nuevas claves con nonces diferentes
-- ✅ **Multi-dispositivo**: Misma clave en cualquier dispositivo con la misma wallet
+- ✅ **Multidispositivo**: La misma clave en cualquier dispositivo con la misma wallet
 
-### Almacenamiento de claves de lectura (opcional)
+### Almacenamiento de Claves de Lectura (Opcional)
 
-Los usuarios pueden, opcionalmente, guardar su clave secreta de lectura en localStorage del navegador para evitar volver a firmar cada vez que vean contenido cifrado.
+Los usuarios pueden opcionalmente almacenar su clave secreta de lectura en localStorage del navegador para evitar volver a firmar cada vez que vean contenido cifrado.
 
 **Formato de almacenamiento**:
 ```javascript
@@ -128,7 +128,7 @@ localStorage["savva_reading_keys"] = {
 
 **Implementación**: [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js)
 
-### Publicar claves de lectura
+### Publicar Claves de Lectura
 
 Para publicar publicaciones cifradas o recibir contenido cifrado, los usuarios deben publicar su clave pública de lectura en la blockchain:
 
@@ -145,18 +145,18 @@ Para publicar publicaciones cifradas o recibir contenido cifrado, los usuarios d
 
 La clave pública se almacena en el contrato inteligente **UserProfile** y se asocia con la dirección y el dominio del usuario.
 
-## Crear publicaciones cifradas
+## Creación de publicaciones cifradas
 
 ### Cuándo se cifran las publicaciones
 
 Las publicaciones se cifran en los siguientes escenarios:
 
-1. **Publicaciones solo para suscriptores**: El creador selecciona la audiencia "Subscribers Only"
+1. **Publicaciones solo para suscriptores**: El creador selecciona audiencia "Subscribers Only"
 2. **Comentarios en publicaciones cifradas**: Los comentarios heredan el cifrado de la publicación padre
 
 ### Proceso de cifrado de la publicación
 
-#### Paso 1: Generar clave de cifrado de la publicación
+#### Paso 1: Generar la clave de cifrado de la publicación
 
 Cada publicación cifrada obtiene un par de claves X25519 único:
 
@@ -203,7 +203,7 @@ El sistema construye una lista de destinatarios que podrán descifrar la publica
    }
    ```
 
-4. **Agregar Big Brothers** (moderadores de dominio)
+4. **Agregar Big Brothers** (Moderadores del dominio)
    ```javascript
    // Fetch from domain configuration
    const bigBrothers = domain.big_brothers || [];
@@ -233,25 +233,35 @@ const recipients = parentEncryption.recipients;
 
 #### Paso 3: Cifrar el contenido de la publicación
 
-Todo el contenido de texto en el descriptor se cifra con la clave secreta de la publicación:
+El contenido de la publicación se cifra con la clave secreta del post. **Nota**: El título queda sin cifrar para permitir su visualización en las tarjetas de publicaciones, mientras que el texto de vista previa y el contenido sí están cifrados:
 
 ```javascript
 // For each locale:
 {
-  title: encryptText(title, postSecretKey),
+  title: title,  // NOT encrypted - remains public for display
   text_preview: encryptText(preview, postSecretKey),
-  tags: tags.map(t => encryptText(t, postSecretKey)),
-  categories: categories.map(c => encryptText(c, postSecretKey))
+  categories: categories,  // NOT encrypted - public for indexing
+  tags: tags  // NOT encrypted - public for indexing
 }
 ```
 
-**Formato de cifrado**: `nonce:ciphertext` (ambos codificados en hex)
+Qué se cifra:
+- ✅ Texto de vista previa (`text_preview`)
+- ✅ Títulos de capítulo
+- ✅ Todos los archivos de contenido (markdown, medios)
 
-**Algoritmo**: XSalsa20-Poly1305 (cifrado autenticado)
+Qué permanece público:
+- ❌ Título de la publicación
+- ❌ Categorías
+- ❌ Etiquetas
 
-#### Paso 4: Cifrar la clave de la publicación para cada destinatario
+Formato de cifrado: `nonce:ciphertext` (ambos codificados en hex)
 
-Para cada destinatario, cifrar la clave secreta de la publicación usando su clave pública de lectura:
+Algoritmo: XSalsa20-Poly1305 (cifrado autenticado)
+
+#### Paso 4: Cifrar la clave del post para cada destinatario
+
+Para cada destinatario, cifra la clave secreta del post usando su clave pública de lectura:
 
 ```javascript
 for (const recipient of recipients) {
@@ -320,7 +330,7 @@ for each chunk {
 }
 ```
 
-Esto permite el **descifrado en streaming**: los vídeos pueden comenzar a reproducirse antes de que todo el archivo esté descifrado.
+Esto permite el **descifrado por streaming**: los vídeos pueden comenzar a reproducirse antes de que todo el archivo esté descifrado.
 
 **Implementación**: [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js), [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js)
 
@@ -334,13 +344,13 @@ data_cid: QmXXX...
 encrypted: true
 locales:
   en:
-    title: "48c3a1b2:9f8d7e6c5a4b3e2d1c0f9e8d7c6b5a4e3d2c1b0a..."
+    title: "My Post Title"  # NOT encrypted - public for display
     text_preview: "a1b2c3d4:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b..."
     tags:
-      - "nonce1:encrypted_tag1"
-      - "nonce2:encrypted_tag2"
+      - "technology"  # NOT encrypted - public for indexing
+      - "tutorial"
     categories:
-      - "nonce3:encrypted_category1"
+      - "programming"  # NOT encrypted - public for indexing
     data_path: en/data.md
     chapters:
       - title: "nonce4:encrypted_chapter_title"
@@ -364,9 +374,9 @@ encryption:
 
 **Implementación**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:167-211)
 
-## Big Brothers (Moderadores de dominio)
+## Big Brothers (Moderadores del dominio)
 
-Los Big Brothers son direcciones especiales configuradas a nivel de dominio que obtienen acceso automáticamente a **todas las publicaciones cifradas** en ese dominio. Esto permite la moderación de contenido manteniendo el cifrado de extremo a extremo.
+Big Brothers son direcciones especiales configuradas a nivel de dominio que obtienen automáticamente acceso a **todas las publicaciones cifradas** en ese dominio. Esto permite la moderación de contenido manteniendo el cifrado de extremo a extremo.
 
 ### Configuración
 
@@ -391,13 +401,13 @@ Los Big Brothers se configuran en el archivo `config.json`:
 
 1. **Inclusión automática**: Al crear una publicación cifrada, el sistema:
    - Obtiene `big_brothers` desde la configuración del dominio
-   - Obtiene las claves de lectura de cada big brother
+   - Obtiene claves de lectura para cada big brother
    - Los añade a la lista de destinatarios
-   - Cifra la clave de la publicación para cada big brother
+   - Cifra la clave del post para cada big brother
 
 2. **Desduplicación**: Si un big brother ya es suscriptor, no se duplica
 
-3. **Fallo controlado**: Si un big brother no tiene una clave de lectura, se omite (se registra en logs, pero no bloquea la publicación)
+3. **Fallo con gracia**: Si un big brother no tiene clave de lectura, se omite (se registra pero no bloquea la publicación)
 
 **Implementación**: [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:280-322)
 
@@ -405,14 +415,14 @@ Los Big Brothers se configuran en el archivo `config.json`:
 
 - **Moderación de contenido**: Revisar publicaciones cifradas por violaciones de políticas
 - **Soporte al cliente**: Ayudar a usuarios con problemas de contenido cifrado
-- **Cumplimiento legal**: Acceso por parte de las autoridades con la debida autorización
-- **Acceso de respaldo**: Propietarios de dominio mantienen acceso al contenido
+- **Cumplimiento legal**: Acceso por parte de la ley con la debida autorización
+- **Acceso de respaldo**: Propietarios de dominio manteniendo acceso al contenido
 
 ## Descifrado de publicaciones
 
 ### Flujo de descifrado automático
 
-Cuando un usuario visualiza una publicación cifrada:
+Cuando un usuario ve una publicación cifrada:
 
 1. **Comprobar cifrado de la publicación**
    ```javascript
@@ -428,7 +438,7 @@ Cuando un usuario visualiza una publicación cifrada:
    );
    ```
 
-3. **Obtener la clave secreta de lectura**
+3. **Obtener clave secreta de lectura**
    ```javascript
    // Option 1: Retrieve from localStorage
    const storedKey = findStoredSecretKey(userAddress, nonce);
@@ -440,7 +450,7 @@ Cuando un usuario visualiza una publicación cifrada:
    }
    ```
 
-4. **Descifrar la clave secreta de la publicación**
+4. **Descifrar la clave secreta del post**
    ```javascript
    // Find encrypted key for this user
    const keyEntry = encryption.keys.find(
@@ -460,10 +470,9 @@ Cuando un usuario visualiza una publicación cifrada:
 
 5. **Descifrar metadatos**
    ```javascript
-   // Decrypt title, preview, tags, categories
-   post.title = decryptText(post.title, postSecretKey);
+   // Decrypt preview text (title, tags, and categories are public)
    post.text_preview = decryptText(post.text_preview, postSecretKey);
-   post.tags = post.tags.map(t => decryptText(t, postSecretKey));
+   // Title, tags, and categories remain as-is (not encrypted)
    ```
 
 6. **Establecer contexto de cifrado**
@@ -473,7 +482,7 @@ Cuando un usuario visualiza una publicación cifrada:
    swManager.setEncryptionContext(dataCid, postSecretKey);
    ```
 
-7. **Descifrar medios sobre la marcha**
+7. **Descifrar medios en tiempo real**
    ```javascript
    // Service Worker intercepts all IPFS requests
    // For URLs matching dataCid:
@@ -487,9 +496,9 @@ Cuando un usuario visualiza una publicación cifrada:
 
 **Implementación**: [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js), [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx:263-291)
 
-### Descifrado en streaming de medios
+### Descifrado por streaming de medios
 
-Los archivos multimedia cifrados (vídeos, audio) se descifran sobre la marcha usando Service Workers:
+Los archivos de medios cifrados (vídeos, audio) se descifran en tiempo real usando Service Workers:
 
 ```javascript
 // Service Worker intercepts fetch
@@ -528,41 +537,41 @@ async function streamDecrypt(request) {
 }
 ```
 
-Ver [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para documentación detallada sobre el sistema de cifrado en streaming.
+Consulta [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para documentación detallada sobre el sistema de cifrado por streaming.
 
 ## Consideraciones de seguridad
 
 ### Algoritmos de cifrado
 
-- **X25519**: Diffie-Hellman de curva elíptica (seguridad de 256 bits)
+- **X25519**: Elliptic Curve Diffie-Hellman (seguridad de 256 bits)
 - **XSalsa20-Poly1305**: Cifrado autenticado (AEAD)
 - **HKDF-SHA256**: Función de derivación de claves
-- **EIP-712**: Firma de datos estructurados
+- **EIP-712**: Firmas de datos estructurados
 
 ### Gestión de claves
 
 ✅ **Seguro**:
 - Las claves privadas nunca salen del navegador
-- Las claves se derivan de forma determinista a partir de firmas de la wallet
-- El Service Worker se ejecuta en el mismo origen
+- Las claves se derivan determinísticamente de firmas de la wallet
+- El Service Worker se ejecuta en la misma origin
 - Los contextos de cifrado tienen TTL (30 minutos)
 - Las claves se borran al navegar fuera de la página
 
 ⚠️ **Limitaciones**:
 - Vulnerable a ataques XSS (claves en memoria)
-- Extensiones del navegador con acceso completo pueden robar claves
-- Sin protección frente a acceso físico al dispositivo
-- Las pasarelas de IPFS ven los datos cifrados (pero no pueden descifrarlos)
+- Extensiones del navegador con acceso total pueden robar claves
+- No hay protección contra acceso físico al dispositivo
+- Las pasarelas IPFS ven datos cifrados (pero no pueden descifrarlos)
 
 ### Modelo de amenazas
 
-**Protegido contra**:
-- ✅ Espionaje por parte de pasarelas de IPFS
+Protegido contra:
+- ✅ Espionaje por parte de pasarelas IPFS
 - ✅ Ataques man-in-the-middle (HTTPS + AEAD)
 - ✅ Manipulación de datos (autenticación Poly1305)
-- ✅ Ataques de replay (nonces únicos por mensaje)
+- ✅ Ataques de reproducción (nonces únicos por mensaje)
 
-**NO protegido contra**:
+NO protegido contra:
 - ❌ Extensiones maliciosas del navegador
 - ❌ Vulnerabilidades XSS en la aplicación
 - ❌ Dispositivos de usuario comprometidos
@@ -572,21 +581,21 @@ Ver [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para document
 
 1. **Usar siempre HTTPS** en producción
 2. **Almacenar claves de forma segura** - localStorage es opcional, no obligatorio
-3. **Limpiar contextos** al navegar fuera
+3. **Borrar contextos** al navegar fuera
 4. **Validar destinatarios** antes de cifrar
 5. **Usar contraseñas fuertes** para la copia de seguridad de la wallet
-6. **Auditar a los Big Brothers** regularmente
-7. **Monitorizar logs de acceso** por actividad sospechosa
+6. **Auditar Big Brothers** regularmente
+7. **Monitorizar registros de acceso** para actividad sospechosa
 
 ## Archivos de implementación
 
 ### Cifrado central
 - [`src/x/crypto/readingKey.js`](../../../../src/x/crypto/readingKey.js) - Generación y gestión de claves de lectura
-- [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js) - Almacenamiento en navegador de claves de lectura
+- [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js) - Almacenamiento en el navegador para claves de lectura
 - [`src/x/crypto/readingKeyEncryption.js`](../../../../src/x/crypto/readingKeyEncryption.js) - X25519 + XSalsa20-Poly1305 encryption
-- [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js) - Cifrado de contenido de publicaciones
-- [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js) - Descifrado de contenido de publicaciones
-- [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js) - Cifrado de archivos (simple + chunked)
+- [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js) - Cifrado del contenido de la publicación
+- [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js) - Descifrado del contenido de la publicación
+- [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js) - Cifrado de archivos (simple + por chunks)
 - [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js) - Cifrado por chunks para archivos grandes
 
 ### Gestión de destinatarios
@@ -595,16 +604,16 @@ Ver [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para document
 
 ### Flujo de publicación
 - [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx) - Creación del descriptor con cifrado
-- [`src/x/editor/wizard_steps/StepUploadIPFS.jsx`](../../../../src/x/editor/wizard_steps/StepUploadIPFS.jsx) - Cifrado de archivos antes de subir
+- [`src/x/editor/wizard_steps/StepUploadIPFS.jsx`](../../../../src/x/editor/wizard_steps/StepUploadIPFS.jsx) - Cifrado de archivos antes de la subida
 
 ### Flujo de visualización
 - [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx) - Visualización de publicaciones con descifrado automático
-- [`src/ipfs/encryptedFetch.js`](../../../../src/ipfs/encryptedFetch.js) - Fetch a IPFS con descifrado
+- [`src/ipfs/encryptedFetch.js`](../../../../src/ipfs/encryptedFetch.js) - Obtención desde IPFS con descifrado
 
-### Descifrado en streaming
+### Descifrado por streaming
 - [`src/x/crypto/serviceWorkerManager.js`](../../../../src/x/crypto/serviceWorkerManager.js) - Gestión del Service Worker
-- [`public/crypto-sw.js`](../../../../public/crypto-sw.js) - Service Worker para descifrado en streaming
-- [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) - Documentación detallada sobre cifrado en streaming
+- [`public/crypto-sw.js`](../../../../public/crypto-sw.js) - Service Worker para descifrado por streaming
+- [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) - Documentación detallada del cifrado por streaming
 
 ## Flujo de experiencia de usuario
 
@@ -617,18 +626,18 @@ Ver [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para document
 
 2. **Publicar una publicación cifrada**
    - Escribir contenido en el editor
-   - Seleccionar la audiencia "Subscribers Only"
+   - Seleccionar audiencia "Subscribers Only"
    - El sistema automáticamente:
      - Obtiene suscriptores elegibles
-     - Genera clave de cifrado de la publicación
+     - Genera clave de cifrado para la publicación
      - Cifra el contenido
      - Cifra los archivos
      - Sube a IPFS
      - Publica el descriptor en la blockchain
 
-3. **Ver tus propias publicaciones cifradas**
+3. **Ver sus propias publicaciones cifradas**
    - Se descifran automáticamente usando la clave almacenada o re-derivada
-   - Los medios se reproducen sin interrupciones
+   - Los medios se transmiten sin problemas
 
 ### Para suscriptores
 
@@ -642,18 +651,18 @@ Ver [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para document
    - El sistema comprueba la elegibilidad
    - Recupera o re-deriva la clave secreta
    - Descifra la publicación automáticamente
-   - Los medios se reproducen con descifrado en streaming
+   - Los medios se reproducen con descifrado por streaming
 
-3. **Opciones de almacenamiento de claves**
-   - Almacenar en el navegador: no se requiere volver a firmar
-   - No almacenar: firmar mensaje cada vez (más seguro)
+3. **Opciones de almacenamiento de clave**
+   - Almacenar en el navegador: No se requiere volver a firmar
+   - No almacenar: Firmar el mensaje cada vez (más seguro)
 
 ### Para Big Brothers (moderadores)
 
 1. **Configuración**
    - Generar Clave de Lectura
-   - Un administrador de dominio añade la dirección a la lista `big_brothers`
-   - Incluido automáticamente en todas las publicaciones cifradas
+   - El administrador del dominio añade la dirección a la lista `big_brothers`
+   - Se incluye automáticamente en todas las publicaciones cifradas
 
 2. **Moderación**
    - Acceder a todo el contenido cifrado en el dominio
@@ -663,37 +672,37 @@ Ver [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) para document
 ## Solución de problemas
 
 ### "No se encontró clave de lectura"
-- El usuario no ha generado una clave de lectura todavía
-- Solicitar generar y publicar la clave
+- El usuario aún no ha generado una clave de lectura
+- Solicitar generar y publicar
 
 ### "Fallo al descifrar la publicación"
 - La clave de lectura del usuario no está en la lista de destinatarios
-- Comprobar el estado de suscripción
+- Comprobar estado de suscripción
 - Verificar la configuración de `big_brothers`
 
-### "Medios no reproducen"
-- El Service Worker no está registrado (requiere HTTPS)
+### "El medio no se reproduce"
+- Service Worker no registrado (requiere HTTPS)
 - Contexto de cifrado no establecido
 - Revisar la consola del navegador para errores
 
 ### "No hay suscriptores elegibles"
 - Ningún suscriptor ha publicado claves de lectura
-- Informar a los suscriptores para que generen claves de lectura
-- Comprobar umbral mínimo de pago
+- Informar a los suscriptores que generen claves de lectura
+- Comprobar el umbral mínimo de pago
 
 ## Mejoras futuras
 
 - **Rotación de claves**: Soporte para múltiples claves de lectura activas por usuario
-- **Copia de seguridad y recuperación**: Copia de seguridad cifrada de claves con frase de recuperación
-- **Wallets de hardware**: Derivación de clave de lectura con Ledger/Trezor
+- **Copia de seguridad y recuperación**: Respaldo cifrado de claves con frase de recuperación
+- **Wallets hardware**: Derivación de clave de lectura con Ledger/Trezor
 - **Compartición selectiva**: Accesos temporales para publicaciones específicas
 - **Analítica**: Métricas preservando la privacidad para contenido cifrado
 - **Soporte WebAuthn**: Claves de lectura derivadas de credenciales WebAuthn
 
 ## Documentación relacionada
 
-- [Publishing Posts](/docs/core-concepts/publishing-posts) - Flujo general de publicación
-- [Showing Posts](/docs/core-concepts/showing-posts) - Visualización y renderizado de publicaciones
+- [Publishing Posts](/docs/core-concepts/publishing-posts) - Flujo general de publicación de posts
+- [Showing Posts](/docs/core-concepts/showing-posts) - Visualización y renderizado de posts
 - [User Profile](/docs/core-concepts/user-profile) - Contrato de perfil y datos de usuario
-- [Streaming Encryption](../../../../STREAMING_ENCRYPTION.md) - Documentación detallada sobre descifrado en streaming (código fuente)
+- [Streaming Encryption](../../../../STREAMING_ENCRYPTION.md) - Documentación detallada de descifrado por streaming (código fuente)
 - [Content Format](/docs/features/content-format) - Especificación del formato del descriptor

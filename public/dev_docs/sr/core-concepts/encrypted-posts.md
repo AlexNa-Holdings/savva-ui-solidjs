@@ -1,32 +1,32 @@
 # Enkriptovani postovi
 
-Savva podržava end-to-end enkriptovane postove koje mogu da vide samo pretplatnici. Ova funkcija omogućava kreatorima da objavljuju ekskluzivan sadržaj za svoje plaćene pretplatnike, uz garanciju da ni platforma ni IPFS gateway-i ne mogu da pročitaju sadržaj.
+Savva podržava end-to-end enkriptovane postove koji mogu da budu vidljivi samo pretplatnicima. Ova funkcija omogućava kreatorima da objavljuju ekskluzivan sadržaj za svoje plaćene pretplatnike, uz osiguranje da ni platforma ni IPFS gateway-i ne mogu da pročitaju sadržaj.
 
 ## Pregled
 
 Sistem enkripcije koristi višeslojni pristup:
 
-1. **Reading Keys (ključevi za čitanje)**: Korisnici deterministički generišu X25519 parove ključeva iz potpisa novčanika
-2. **Enkripcija posta**: Svaki post dobija jedinstveni ključ za enkripciju
-3. **Distribucija ključeva**: Ključ posta se posebno enkriptuje za svakog podobnog primaoca
-4. **Enkripcija sadržaja**: Sav sadržaj posta (tekst, slike, video, audio) se enkriptuje post ključem
-5. **Streaming dekripcija**: Enkriptovani mediji se dekriptuju u toku reprodukcije koristeći Service Workere
+1. **Reading Keys**: Korisnici generišu X25519 parove ključeva deterministički iz potpisa novčanika
+2. **Post Encryption**: Svaki post dobija jedinstveni ključ za enkripciju
+3. **Key Distribution**: Ključ posta se posebno enkriptuje za svakog kvalifikovanog primaoca
+4. **Content Encryption**: Sav sadržaj posta (tekst, slike, video, audio) je enkriptovan pomoću ključa posta
+5. **Streaming Decryption**: Enkriptovani mediji se dekriptuju u toku reprodukcije koristeći Service Workers
 
 ## Reading Keys
 
 ### Šta je Reading Key?
 
 Reading Key je X25519 par ključeva koji omogućava korisnicima da primaju i dekriptuju enkriptovane postove. Sastoji se od:
-- **Javni ključ**: Objavljen na lancu u UserProfile ugovoru (vidljiv svima)
+- **Javni ključ**: Objavljen na lancu u UserProfile pametnom ugovoru (vidljivo svima)
 - **Privatni ključ**: Izveden deterministički iz potpisa korisnikovog novčanika (nikada ne napušta pregledač)
-- **Nonce**: Nasumična vrednost korišćena za derivaciju ključa (objavljena na lancu)
-- **Shema**: Identifikator šeme enkripcije (`x25519-xsalsa20-poly1305`)
+- **Nonce**: Slučajna vrednost koja se koristi za derivaciju ključa (objavljena na lancu)
+- **Scheme**: Identifikator šeme enkripcije (`x25519-xsalsa20-poly1305`)
 
 ### Proces generisanja ključa
 
-Reading key-jevi se generišu deterministički iz potpisa novčanika koristeći sledeće korake:
+Reading ključevi se generišu deterministički iz potpisa novčanika korišćenjem sledećih koraka:
 
-1. **Generiši nasumični nonce**
+1. **Generiši slučajni nonce**
    ```javascript
    const nonce = crypto.getRandomValues(new Uint8Array(10));
    // Example: "a1b2c3d4e5f6g7h8i9j0"
@@ -59,7 +59,7 @@ Reading key-jevi se generišu deterministički iz potpisa novčanika koristeći 
    };
    ```
 
-3. **Zahtev za potpis iz novčanika**
+3. **Zatraži potpis od novčanika**
    ```javascript
    const signature = await ethereum.request({
      method: "eth_signTypedData_v4",
@@ -68,7 +68,7 @@ Reading key-jevi se generišu deterministički iz potpisa novčanika koristeći 
    // Returns: 0x + 130 hex chars (r: 64, s: 64, v: 2)
    ```
 
-4. **Ekstrakt r||s iz potpisa**
+4. **Ekstrahuj r||s iz potpisa**
    ```javascript
    // Ignore the recovery byte 'v', use only r and s
    const rsBytes = signature.slice(2, 130); // 128 hex chars = 64 bytes
@@ -99,17 +99,17 @@ Reading key-jevi se generišu deterministički iz potpisa novčanika koristeći 
 
 ### Prednosti derivacije ključa
 
-Deterministički pristup derivaciji ima nekoliko prednosti:
+Deterministički pristup derivaciji ključa ima nekoliko prednosti:
 
-- ✅ **Reproduktivno**: Isti nonce + potpis uvek proizvode isti par ključeva
-- ✅ **Nije potrebna skladištenje**: Tajni ključ se može ponovo izvesti po potrebi
-- ✅ **Kontrola korisnika**: Korisnici mogu da odluče da li će skladištiti ključ u localStorage pregledača
-- ✅ **Rotacija ključeva**: Moguće je generisati nove ključeve sa različitim nonce-ovima
-- ✅ **Više uređaja**: Isti ključ na bilo kom uređaju sa istim novčanikom
+- ✅ **Moguće reprodukovati**: Isti nonce + potpis uvek proizvode isti par ključeva
+- ✅ **Nije potrebno skladištenje**: Tajni ključ može da se ponovo izvede po potrebi
+- ✅ **Kontrola korisnika**: Korisnici mogu da odluče da li da sačuvaju ključ u lokalnom skladištu pregledača
+- ✅ **Rotacija ključeva**: Generisanje novih ključeva sa različitim noncem
+- ✅ **Više uređaja**: Isti ključ na bilo kom uređaju koji koristi isti novčanik
 
-### Skladištenje Reading Keys (opciono)
+### Čuvanje Reading ključeva (opciono)
 
-Korisnici opcionalno mogu da skladište svoj tajni ključ za čitanje u localStorage pregledača da bi izbegli ponovno potpisivanje svaki put kada gledaju enkriptovani sadržaj.
+Korisnici opcionalno mogu da sačuvaju svoj tajni reading ključ u localStorage pregledača kako bi izbegli ponovno potpisivanje svaki put kada gledaju enkriptovan sadržaj.
 
 **Format skladištenja**:
 ```javascript
@@ -128,9 +128,9 @@ localStorage["savva_reading_keys"] = {
 
 **Implementacija**: [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js)
 
-### Objavljivanje Reading Keys
+### Objavljivanje Reading ključeva
 
-Da bi objavljivali enkriptovane postove ili primali enkriptovan sadržaj, korisnici moraju da objave svoj javni ključ za čitanje na blockchain:
+Da bi objavljivali enkriptovane postove ili primali enkriptovan sadržaj, korisnici moraju da objave svoj reading javni ključ na blockchain-u:
 
 ```javascript
 // User flow:
@@ -143,20 +143,20 @@ Da bi objavljivali enkriptovane postove ili primali enkriptovan sadržaj, korisn
 4. Public key now discoverable by content creators
 ```
 
-Javni ključ se čuva u pametnom ugovoru **UserProfile** i povezan je sa adresom korisnika i domenom.
+Javni ključ se čuva u **UserProfile** pametnom ugovoru i povezan je sa adresom korisnika i domenom.
 
 ## Kreiranje enkriptovanih postova
 
-### Kada se postovi enkriptuju
+### Kada su postovi enkriptovani
 
 Postovi se enkriptuju u sledećim scenarijima:
 
-1. **Samo za pretplatnike**: Kreator izabere publiku "Subscribers Only"
-2. **Komentari na enkriptovanim postovima**: Komentari nasleđuju enkripciju roditeljskog posta
+1. **Samo za pretplatnike**: Kreator izabere publiku "Samo pretplatnici"
+2. **Komentari na enkriptovane postove**: Komentari nasleđuju enkripciju roditeljskog posta
 
 ### Proces enkripcije posta
 
-#### Korak 1: Generisanje ključa za enkripciju posta
+#### Korak 1: Generiši ključ za enkripciju posta
 
 Svaki enkriptovani post dobija jedinstveni X25519 par ključeva:
 
@@ -167,17 +167,17 @@ const postKey = {
 };
 ```
 
-Ovaj ključ se koristi za enkripciju celog sadržaja za konkretan post.
+Ovaj ključ se koristi za enkripciju celokupnog sadržaja za konkretan post.
 
 **Implementacija**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:23-31)
 
-#### Korak 2: Određivanje primaoca
+#### Korak 2: Odredite primaoce
 
-Sistem pravi listu primalaca koji će moći da dekriptuju post.
+Sistem gradi listu primalaca koji će moći da dekriptuju post.
 
-##### Za uobičajene postove samo za pretplatnike:
+##### Za uobičajene postove "Samo pretplatnici":
 
-1. **Preuzmi podobne pretplatnike**
+1. **Preuzmi kvalifikovane pretplatnike**
    ```javascript
    // Query backend for users who:
    - Have active subscriptions (weeks > 0)
@@ -185,7 +185,7 @@ Sistem pravi listu primalaca koji će moći da dekriptuju post.
    - To the ACTOR (the account posting - could be user or NPO)
    ```
 
-2. **Preuzmi Reading Keys**
+2. **Preuzmi Reading ključeve**
    ```javascript
    // For each subscriber, fetch from UserProfile contract:
    - reading_public_key
@@ -195,7 +195,7 @@ Sistem pravi listu primalaca koji će moći da dekriptuju post.
    // Skip subscribers without reading keys
    ```
 
-3. **Dodaj autorizovanog korisnika**
+3. **Dodaj ovlašćenog korisnika**
    ```javascript
    // Ensure the wallet owner can decrypt their own post
    if (!recipients.includes(authorizedUser)) {
@@ -203,7 +203,7 @@ Sistem pravi listu primalaca koji će moći da dekriptuju post.
    }
    ```
 
-4. **Dodaj Big Brothers** (moderatori domena)
+4. **Dodaj Big Brothers** (domen moderatori)
    ```javascript
    // Fetch from domain configuration
    const bigBrothers = domain.big_brothers || [];
@@ -219,7 +219,7 @@ Sistem pravi listu primalaca koji će moći da dekriptuju post.
 
 **Implementacija**: [`src/x/crypto/fetchEligibleSubscribers.js`](../../../../src/x/crypto/fetchEligibleSubscribers.js)
 
-##### Za komentare na enkriptovanim postovima:
+##### Za komentare na enkriptovane postove:
 
 ```javascript
 // Use the same recipients as the parent post
@@ -231,27 +231,37 @@ const recipients = parentEncryption.recipients;
 
 **Implementacija**: [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:214-259)
 
-#### Korak 3: Enkripcija sadržaja posta
+#### Korak 3: Enkriptuj sadržaj posta
 
-Sav tekstualni sadržaj u descriptor-u se enkriptuje post tajnim ključem:
+Sadržaj posta se enkriptuje pomoću tajnog ključa posta. **Napomena**: Naslov ostaje neenkriptovan kako bi se mogao prikazati u karticama postova, dok su preview tekst i sadržaj enkriptovani:
 
 ```javascript
 // For each locale:
 {
-  title: encryptText(title, postSecretKey),
+  title: title,  // NOT encrypted - remains public for display
   text_preview: encryptText(preview, postSecretKey),
-  tags: tags.map(t => encryptText(t, postSecretKey)),
-  categories: categories.map(c => encryptText(c, postSecretKey))
+  categories: categories,  // NOT encrypted - public for indexing
+  tags: tags  // NOT encrypted - public for indexing
 }
 ```
 
-**Format enkripcije**: `nonce:ciphertext` (oba heksadecimalno kodirana)
+Šta je enkriptovano:
+- ✅ Preview tekst (`text_preview`)
+- ✅ Naslovi poglavlja
+- ✅ Svi fajlovi sadržaja (markdown, media)
 
-**Algoritam**: XSalsa20-Poly1305 (autentifikovana enkripcija)
+Šta ostaje javno:
+- ❌ Naslov posta
+- ❌ Kategorije
+- ❌ Tagovi
 
-#### Korak 4: Enkripcija ključa posta za svakog primaoca
+Format enkripcije: `nonce:ciphertext` (oba u hex formatu)
 
-Za svakog primaoca enkriptuje se tajni ključ posta koristeći njihov javni čitajući ključ:
+Algoritam: XSalsa20-Poly1305 (autentifikovana enkripcija)
+
+#### Korak 4: Enkriptuj ključ posta za svakog primaoca
+
+Za svakog primaoca, enkriptuje se tajni ključ posta koristeći njihov reading javni ključ:
 
 ```javascript
 for (const recipient of recipients) {
@@ -280,13 +290,13 @@ for (const recipient of recipients) {
 }
 ```
 
-Ovo koristi konstrukciju **X25519 + XSalsa20-Poly1305** (slično NaCl `crypto_box`).
+Ovo koristi konstrukciju **X25519 + XSalsa20-Poly1305** (slično NaCl-ovom `crypto_box`).
 
 **Implementacija**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:97-122)
 
-#### Korak 5: Enkripcija fajlova (slike, video, audio)
+#### Korak 5: Enkriptuj fajlove (slike, video, audio)
 
-Svi otpremeljeni fajlovi se enkriptuju pre slanja na IPFS:
+Svi otpremljeni fajlovi se enkriptuju pre slanja na IPFS:
 
 ##### Mali fajlovi (< 1 MB)
 ```javascript
@@ -320,13 +330,13 @@ for each chunk {
 }
 ```
 
-Ovo omogućava **streaming dekripciju** — video snimci mogu da počnu da se reprodukuju pre nego što je ceo fajl dekriptovan.
+Ovo omogućava **streaming decryption** - video snimci mogu početi sa reprodukcijom pre nego što ceo fajl bude dekriptovan.
 
 **Implementacija**: [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js), [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js)
 
-#### Korak 6: Izgradi metadata enkripcije
+#### Korak 6: Sastavi metadata za enkripciju
 
-Descriptor sadrži metadata o enkripciji:
+Deskriptor uključuje metadata o enkripciji:
 
 ```yaml
 savva_spec_version: "2.0"
@@ -334,13 +344,13 @@ data_cid: QmXXX...
 encrypted: true
 locales:
   en:
-    title: "48c3a1b2:9f8d7e6c5a4b3e2d1c0f9e8d7c6b5a4e3d2c1b0a..."
+    title: "My Post Title"  # NOT encrypted - public for display
     text_preview: "a1b2c3d4:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b..."
     tags:
-      - "nonce1:encrypted_tag1"
-      - "nonce2:encrypted_tag2"
+      - "technology"  # NOT encrypted - public for indexing
+      - "tutorial"
     categories:
-      - "nonce3:encrypted_category1"
+      - "programming"  # NOT encrypted - public for indexing
     data_path: en/data.md
     chapters:
       - title: "nonce4:encrypted_chapter_title"
@@ -364,9 +374,9 @@ encryption:
 
 **Implementacija**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:167-211)
 
-## Big Brothers (moderatori domena)
+## Big Brothers (domen moderatori)
 
-Big Brothers su specijalne adrese konfigurisane na nivou domena koje automatski dobijaju pristup **svim enkriptovanim postovima** na tom domenu. Ovo omogućava moderaciju sadržaja uz održavanje end-to-end enkripcije.
+Big Brothers su specijalne adrese konfigurисане na nivou domena koje automatski dobijaju pristup **svim enkriptovanim postovima** u tom domenu. Ovo omogućava moderaciju sadržaja uz održavanje end-to-end enkripcije.
 
 ### Konfiguracija
 
@@ -391,44 +401,44 @@ Big Brothers se konfigurišu u fajlu `config.json`:
 
 1. **Automatsko uključivanje**: Prilikom kreiranja enkriptovanog posta, sistem:
    - Preuzima `big_brothers` iz konfiguracije domena
-   - Preuzima reading key-jeve za svakog big brother-a
-   - Dodaje ih u listu primalaca
+   - Preuzima reading ključeve za svakog big brother-a
+   - Dodaje ih na listu primalaca
    - Enkriptuje ključ posta za svakog big brother-a
 
-2. **Dedupliciranje**: Ako je big brother već pretplatnik, ne dodaje se dva puta
+2. **Deduplication**: Ako je big brother već pretplatnik, ne duplicira se
 
-3. **Graceful Failure**: Ako big brother nema reading key, preskače se (zapisuje se u log, ali ne blokira objavljivanje)
+3. **Graceful Failure**: Ako big brother nema reading ključ, preskače se (loguje se, ali to ne blokira objavljivanje)
 
 **Implementacija**: [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:280-322)
 
 ### Upotrebe
 
-- **Moderacija sadržaja**: Pregled enkriptovanih postova radi kršenja pravila
-- **Korisnička podrška**: Pomoć korisnicima sa problemima oko enkriptovanog sadržaja
-- **Pravne obaveze**: Pristup organima reda uz odgovarajuću autorizaciju
-- **Backup pristup**: Vlasnici domena zadržavaju pristup sadržaju
+- **Moderacija sadržaja**: Pregled enkriptovanih postova radi provere kršenja pravila
+- **Podrška korisnicima**: Pomoć korisnicima sa problemima oko enkriptovanog sadržaja
+- **Pravna usklađenost**: Pristup organima uz odgovarajuću autorizaciju
+- **Backup pristup**: Vlasnici domena čuvaju pristup sadržaju
 
 ## Dekriptovanje postova
 
-### Automatski tok dekripcije
+### Automatizovani tok dekripcije
 
-Kada korisnik pogleda enkriptovani post:
+Kada korisnik pregleda enkriptovan post:
 
-1. **Proveri da li je post enkriptovan**
+1. **Provera enkripcije posta**
    ```javascript
    if (post.content.encrypted && !post._decrypted) {
      // Post is encrypted and not yet decrypted
    }
    ```
 
-2. **Proveri podobnost korisnika**
+2. **Provera da li korisnik može da dekriptuje**
    ```javascript
    const canDecrypt = encryption.keys.some(
      k => k.address.toLowerCase() === userAddress.toLowerCase()
    );
    ```
 
-3. **Preuzmi tajni ključ za čitanje**
+3. **Dobijanje tajnog reading ključa**
    ```javascript
    // Option 1: Retrieve from localStorage
    const storedKey = findStoredSecretKey(userAddress, nonce);
@@ -460,10 +470,9 @@ Kada korisnik pogleda enkriptovani post:
 
 5. **Dekriptuj metadata**
    ```javascript
-   // Decrypt title, preview, tags, categories
-   post.title = decryptText(post.title, postSecretKey);
+   // Decrypt preview text (title, tags, and categories are public)
    post.text_preview = decryptText(post.text_preview, postSecretKey);
-   post.tags = post.tags.map(t => decryptText(t, postSecretKey));
+   // Title, tags, and categories remain as-is (not encrypted)
    ```
 
 6. **Postavi kontekst enkripcije**
@@ -489,7 +498,7 @@ Kada korisnik pogleda enkriptovani post:
 
 ### Streaming dekripcija medija
 
-Enkriptovani medijski fajlovi (video, audio) se dekriptuju u toku reprodukcije koristeći Service Workere:
+Enkriptovani medijski fajlovi (video, audio) se dekriptuju u toku reprodukcije koristeći Service Workers:
 
 ```javascript
 // Service Worker intercepts fetch
@@ -528,61 +537,61 @@ async function streamDecrypt(request) {
 }
 ```
 
-Pogledajte [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) za detaljnu dokumentaciju o sistemu streaming enkripcije.
+Pogledajte [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) za detaljnu dokumentaciju o sistemu za streaming enkripciju.
 
 ## Bezbednosne napomene
 
 ### Algoritmi enkripcije
 
-- **X25519**: Elliptic Curve Diffie-Hellman (bezbednost 256 bita)
+- **X25519**: Elliptic Curve Diffie-Hellman (256-bitna sigurnost)
 - **XSalsa20-Poly1305**: Autentifikovana enkripcija (AEAD)
-- **HKDF-SHA256**: Funkcija za derivaciju ključa
-- **EIP-712**: Strukturisano potpisivanje podataka
+- **HKDF-SHA256**: Funkcija za derivaciju ključeva
+- **EIP-712**: Strukturirano potpisivanje podataka
 
 ### Upravljanje ključevima
 
 ✅ **Sigurno**:
 - Privatni ključevi nikada ne napuštaju pregledač
-- Ključevi derivirani deterministički iz potpisa novčanika
-- Service Worker radi u istom originu
-- Konteksti enkripcije imaju TTL (30 minuta)
+- Ključevi deterministički izvedeni iz potpisa novčanika
+- Service Worker radi u istom origin-u
+- Enkripcioni konteksti imaju TTL (30 minuta)
 - Ključevi se brišu pri navigaciji sa stranice
 
 ⚠️ **Ograničenja**:
-- Ranljivost na XSS napade (ključevi u memoriji)
-- Ekstenzije pregledача sa punim pristupom mogu da ukradu ključeve
+- Ranljivo na XSS napade (ključevi u memoriji)
+- Ekstenzije pregledača sa potpunim pristupom mogu ukrasti ključeve
 - Nema zaštite protiv fizičkog pristupa uređaju
 - IPFS gateway-i vide enkriptovane podatke (ali ih ne mogu dekriptovati)
 
 ### Model pretnji
 
-**Zaštićeno protiv**:
-- ✅ Špijuniranja od strane IPFS gateway-a
-- ✅ Man-in-the-middle napada (HTTPS + AEAD)
-- ✅ Manipulacije podacima (Poly1305 autentikacija)
-- ✅ Replay napada (jedinstveni nonce-ovi po poruci)
+Zaštićeno protiv:
+- ✅ Prikriveno čitanje od strane IPFS gateway-a
+- ✅ MitM napada (HTTPS + AEAD)
+- ✅ Manipulacije podacima (Poly1305 autentifikacija)
+- ✅ Replay napada (unikatni nonces po poruci)
 
-**Nije zaštićeno protiv**:
-- ❌ Zlonamernih ekstenzija pregledča
+Nije zaštićeno protiv:
+- ❌ Malicioznih ekstenzija pregledača
 - ❌ XSS ranjivosti u aplikaciji
 - ❌ Kompromitovanih korisničkih uređaja
-- ❌ Korisnika koji dele svoje tajne ključeve
+- ❌ Deljenja tajnih ključeva od strane korisnika
 
 ### Najbolje prakse
 
 1. **Uvek koristite HTTPS** u produkciji
-2. **Skladištite ključeve bezbedno** - localStorage je opciono, nije obavezno
-3. **Brišite kontekste** pri napuštanju stranice
-4. **Validirajte primaoce** pre enkriptovanja
+2. **Sigurno skladištite ključeve** - localStorage je opciono, nije obavezno
+3. **Brišite kontekste** prilikom napuštanja stranice
+4. **Validirajte primaoce** pre enkripcije
 5. **Koristite jake lozinke** za backup novčanika
-6. **Redovno audituјte Big Brothers**
-7. **Pratite logove pristupa** za sumnjive aktivnosti
+6. **Redovno revidirajte Big Brothers**
+7. **Pratite pristupne zapise** za sumnjive aktivnosti
 
-## Fajlovi implementacije
+## Datoteke implementacije
 
-### Osnovna enkripcija
+### Jezgro enkripcije
 - [`src/x/crypto/readingKey.js`](../../../../src/x/crypto/readingKey.js) - Generisanje i upravljanje reading ključevima
-- [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js) - Skladištenje reading ključeva u pregledaču
+- [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js) - Browser skladište za reading ključeve
 - [`src/x/crypto/readingKeyEncryption.js`](../../../../src/x/crypto/readingKeyEncryption.js) - X25519 + XSalsa20-Poly1305 enkripcija
 - [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js) - Enkripcija sadržaja posta
 - [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js) - Dekripcija sadržaja posta
@@ -594,11 +603,11 @@ Pogledajte [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) za det
 - [`src/x/crypto/fetchParentPostEncryption.js`](../../../../src/x/crypto/fetchParentPostEncryption.js) - Dobijanje primalaca roditeljskog posta
 
 ### Tok objavljivanja
-- [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx) - Kreiranje descriptor-a sa enkripcijom
+- [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx) - Kreiranje deskriptora sa enkripcijom
 - [`src/x/editor/wizard_steps/StepUploadIPFS.jsx`](../../../../src/x/editor/wizard_steps/StepUploadIPFS.jsx) - Enkripcija fajlova pre otpremanja
 
-### Tok pregleda
-- [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx) - Pregled posta sa automatskom dekripcijom
+### Tok prikaza
+- [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx) - Prikaz posta sa automatskom dekripcijom
 - [`src/ipfs/encryptedFetch.js`](../../../../src/ipfs/encryptedFetch.js) - IPFS fetch sa dekripcijom
 
 ### Streaming dekripcija
@@ -611,89 +620,89 @@ Pogledajte [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) za det
 ### Za kreatore sadržaja
 
 1. **Prvo podešavanje**
-   - Generiši Reading Key (potpiši EIP-712 poruku)
-   - Objavi na blockchain
-   - Opcionalno sačuvaj u pregledaču
+   - Generišite Reading Key (potpišite EIP-712 poruku)
+   - Objavite na blockchain-u
+   - Opcionalno sačuvajte u pregledaču
 
 2. **Objavljivanje enkriptovanog posta**
-   - Napiši sadržaj u editoru
-   - Izaberi publiku "Subscribers Only"
+   - Pišite sadržaj u editoru
+   - Izaberite publiku "Samo pretplatnici"
    - Sistem automatski:
-     - Preuzima podobne pretplatnike
+     - Preuzima kvalifikovane pretplatnike
      - Generiše ključ za enkripciju posta
      - Enkriptuje sadržaj
      - Enkriptuje fajlove
      - Otprema na IPFS
-     - Objavljuje descriptor na blockchain
+     - Objavljuje deskriptor na blockchain-u
 
 3. **Pregled sopstvenih enkriptovanih postova**
-   - Automatski dekriptuje koristeći sačuvan ili ponovo izveden ključ
-   - Mediji se reprodukuju neprimetno
+   - Automatski se dekriptuju koristeći sačuvan ili ponovo izveden ključ
+   - Mediji se reprodukuju bez prekida
 
 ### Za pretplatnike
 
 1. **Prvo podešavanje**
-   - Generiši Reading Key
-   - Objavi na blockchain
-   - Pretplati se na kreatora
+   - Generišite Reading Key
+   - Objavite na blockchain-u
+   - Pretplatite se na kreatora
 
 2. **Pregled enkriptovanih postova**
-   - Otvori enkriptovani post
+   - Otvorite enkriptovan post
    - Sistem proverava podobnost
    - Preuzima ili ponovo izvodi tajni ključ
    - Automatski dekriptuje post
    - Mediji se reprodukuju uz streaming dekripciju
 
 3. **Opcije skladištenja ključeva**
-   - Sačuvaj u pregledaču: Nema potrebe za ponovnim potpisivanjem
-   - Ne čuvaj: Potpisuj poruku svaki put (bezbednije)
+   - Sačuvajte u pregledaču: Nije potrebno ponovo potpisivanje
+   - Ne čuvajte: Potpisivanje svaki put (bezbednije)
 
 ### Za Big Brothers (moderatore)
 
 1. **Podešavanje**
-   - Generiši Reading Key
-   - Admin domena doda adresu u listu `big_brothers`
+   - Generišite Reading Key
+   - Admin domena dodaje adresu u listu `big_brothers`
    - Automatski uključeni u sve enkriptovane postove
 
 2. **Moderacija**
-   - Pristup svim enkriptovanim sadržajima na domenu
-   - Pregled radi kršenja pravila
-   - Preduzimanje odgovarajućih mera
+   - Pristupaju svim enkriptovanim sadržajima u domenu
+   - Pregledaju zbog kršenja pravila
+   - Preduzimaju odgovarajuće radnje
 
-## Otklanjanje poteškoća
+## Otklanjanje problema
 
 ### "No Reading Key Found"
-- Korisnik još nije generisao reading key
-- Prompt za generisanje i objavljivanje
+- Korisnik još nije generisao reading ključ
+- Podstaknite ga da generiše i objavi ključ
 
 ### "Failed to Decrypt Post"
-- Korisnikov reading key nije na listi primalaca
-- Proveriti status pretplate
-- Verifikovati konfiguraciju big_brothers
+- Reading ključ korisnika nije na listi primalaca
+- Proverite status pretplate
+- Proverite konfiguraciju big_brothers
 
 ### "Media Not Playing"
 - Service Worker nije registrovan (zahteva HTTPS)
-- Kontekst enkripcije nije postavljen
-- Proveriti konzolu pregledača za greške
+- Enkripcioni kontekst nije postavljen
+- Proverite konzolu pregledača za greške
 
 ### "No Eligible Subscribers"
-- Nema pretplatnika koji su objavili reading key
-- Obavestiti pretplatnike da generišu reading key
-- Proveriti minimalni prag plaćanja
+- Nema pretplatnika koji su objavili reading ključeve
+- Obavestite pretplatnike da generišu reading ključeve
+- Proverite minimalni prag plaćanja
 
 ## Buduća poboljšanja
 
 - **Rotacija ključeva**: Podrška za više aktivnih reading ključeva po korisniku
-- **Backup & Recovery**: Enkriptovani backup ključa sa recovery frazom
+- **Backup i oporavak**: Enkriptovani backup ključeva uz frazu za oporavak
 - **Hardverski novčanici**: Derivacija reading ključeva sa Ledger/Trezor
-- **Selektivno deljenje**: Privremeni pristupi za pojedinačne postove
-- **Analitika**: Privatna metrike za enkriptovani sadržaj
-- **WebAuthn podrška**: Reading key-jevi izvedeni iz WebAuthn kredencijala
+- **Selektivno deljenje**: Privremeni pristupi za konkretne postove
+- **Analitika**: Metrike za enkriptovani sadržaj koje poštuju privatnost
+- **Podrška za WebAuthn**: Reading ključevi izvedeni iz WebAuthn kredencijala
 
 ## Povezana dokumentacija
 
 - [Publishing Posts](/docs/core-concepts/publishing-posts) - Opšti tok objavljivanja postova
 - [Showing Posts](/docs/core-concepts/showing-posts) - Prikaz i renderovanje postova
-- [User Profile](/docs/core-concepts/user-profile) - UserProfile ugovor i korisnički podaci
+- [User Profile](/docs/core-concepts/user-profile) - Profile ugovor i podaci korisnika
 - [Streaming Encryption](../../../../STREAMING_ENCRYPTION.md) - Detaljna dokumentacija o streaming dekripciji (izvorni kod)
-- [Content Format](/docs/features/content-format) - Specifikacija formata descriptor-a
+- [Content Format](/docs/features/content-format) - Specifikacija formata deskriptora

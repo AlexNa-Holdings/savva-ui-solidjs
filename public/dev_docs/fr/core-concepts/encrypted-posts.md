@@ -1,22 +1,22 @@
 # Publications chiffrées
 
-Savva prend en charge les publications chiffrées de bout en bout qui ne peuvent être consultées que par les abonnés. Cette fonctionnalité permet aux créateurs de publier du contenu exclusif pour leurs abonnés payants tout en s'assurant que ni la plateforme ni les passerelles IPFS ne peuvent lire le contenu.
+Savva prend en charge les publications chiffrées de bout en bout qui ne peuvent être consultées que par les abonnés. Cette fonctionnalité permet aux créateurs de publier du contenu exclusif pour leurs abonnés payants tout en garantissant que ni la plateforme ni les passerelles IPFS ne peuvent lire le contenu.
 
 ## Aperçu
 
-Le système de chiffrement utilise une approche à couches multiples :
+Le système de chiffrement utilise une approche multi-couches :
 
-1. **Clés de lecture** : Les utilisateurs génèrent des paires de clés X25519 de manière déterministe à partir de signatures de portefeuille
+1. **Clés de lecture** : Les utilisateurs génèrent des paires de clés X25519 de manière déterministe à partir des signatures de portefeuille
 2. **Chiffrement des publications** : Chaque publication reçoit une clé de chiffrement unique
 3. **Distribution des clés** : La clé de la publication est chiffrée séparément pour chaque destinataire éligible
 4. **Chiffrement du contenu** : Tout le contenu de la publication (texte, images, vidéos, audio) est chiffré avec la clé de la publication
-5. **Déchiffrement en streaming** : Les médias chiffrés sont déchiffrés à la volée à l'aide de Service Workers
+5. **Déchiffrement en streaming** : Les médias chiffrés sont déchiffrés à la volée en utilisant des Service Workers
 
 ## Clés de lecture
 
 ### Qu'est-ce qu'une clé de lecture ?
 
-Une clé de lecture est une paire de clés X25519 qui permet aux utilisateurs de recevoir et de déchiffrer les publications chiffrées. Elle consiste en :
+Une clé de lecture est une paire de clés X25519 qui permet aux utilisateurs de recevoir et de déchiffrer les publications chiffrées. Elle se compose de :
 - **Clé publique** : Publiée on-chain dans le contrat UserProfile (visible par tous)
 - **Clé privée** : Dérivée de manière déterministe à partir de la signature du portefeuille de l'utilisateur (ne quitte jamais le navigateur)
 - **Nonce** : Une valeur aléatoire utilisée pour la dérivation de clé (publiée on-chain)
@@ -24,7 +24,7 @@ Une clé de lecture est une paire de clés X25519 qui permet aux utilisateurs de
 
 ### Processus de génération de clé
 
-Les clés de lecture sont générées de manière déterministe à partir de signatures de portefeuille en suivant les étapes suivantes :
+Les clés de lecture sont générées de manière déterministe à partir des signatures de portefeuille en suivant les étapes suivantes :
 
 1. **Générer un nonce aléatoire**
    ```javascript
@@ -32,7 +32,7 @@ Les clés de lecture sont générées de manière déterministe à partir de sig
    // Example: "a1b2c3d4e5f6g7h8i9j0"
    ```
 
-2. **Créer les données typées EIP-712**
+2. **Créer des EIP-712 Typed Data**
    ```javascript
    const typedData = {
      types: {
@@ -74,14 +74,14 @@ Les clés de lecture sont générées de manière déterministe à partir de sig
    const rsBytes = signature.slice(2, 130); // 128 hex chars = 64 bytes
    ```
 
-5. **Dériver la graine avec HKDF-SHA256**
+5. **Dériver la seed avec HKDF-SHA256**
    ```javascript
    const salt = "SAVVA Reading Key:salt";
    const info = `SAVVA Reading Key:x25519-xsalsa20-poly1305:${nonce}`;
    const seed = hkdf(sha256, rsBytes, salt, info, 32);
    ```
 
-6. **Générer la paire X25519**
+6. **Générer la paire de clés X25519**
    ```javascript
    const secretKey = seed; // 32 bytes (clamped by x25519 library)
    const publicKey = x25519.getPublicKey(secretKey);
@@ -95,21 +95,21 @@ Les clés de lecture sont générées de manière déterministe à partir de sig
    - reading_key_nonce: hex string (20 chars)
    ```
 
-**Implémentation**: [`src/x/crypto/readingKey.js`](../../../../src/x/crypto/readingKey.js)
+**Implémentation** : [`src/x/crypto/readingKey.js`](../../../../src/x/crypto/readingKey.js)
 
 ### Avantages de la dérivation de clé
 
 L'approche de dérivation déterministe présente plusieurs avantages :
 
 - ✅ **Reproductible** : Même nonce + signature produisent toujours la même paire de clés
-- ✅ **Aucun stockage requis** : La clé secrète peut être re-dérivée si nécessaire
-- ✅ **Contrôle utilisateur** : Les utilisateurs peuvent choisir de stocker ou non la clé dans le localStorage du navigateur
-- ✅ **Rotation de clé** : Générer de nouvelles clés avec des nonces différents
-- ✅ **Multi-appareils** : Même clé sur n'importe quel appareil disposant du même portefeuille
+- ✅ **Pas de stockage requis** : La clé secrète peut être re-dérivée lorsque nécessaire
+- ✅ **Contrôle utilisateur** : Les utilisateurs peuvent choisir de stocker la clé dans le localStorage du navigateur
+- ✅ **Rotation des clés** : Générer de nouvelles clés avec des nonces différents
+- ✅ **Multi-appareils** : Même clé sur n'importe quel appareil avec le même portefeuille
 
 ### Stockage des clés de lecture (optionnel)
 
-Les utilisateurs peuvent optionnellement stocker leur clé secrète de lecture dans le localStorage du navigateur pour éviter de re-signer à chaque fois qu'ils consultent du contenu chiffré.
+Les utilisateurs peuvent optionnellement stocker leur clé secrète de lecture dans le localStorage du navigateur pour éviter de devoir re-signer à chaque consultation de contenu chiffré.
 
 **Format de stockage** :
 ```javascript
@@ -126,11 +126,11 @@ localStorage["savva_reading_keys"] = {
 }
 ```
 
-**Implémentation**: [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js)
+**Implémentation** : [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js)
 
 ### Publication des clés de lecture
 
-Pour publier des publications chiffrées ou recevoir du contenu chiffré, les utilisateurs doivent publier leur clé publique de lecture sur la blockchain :
+Pour publier des posts chiffrés ou recevoir du contenu chiffré, les utilisateurs doivent publier leur clé publique de lecture sur la blockchain :
 
 ```javascript
 // User flow:
@@ -158,7 +158,7 @@ Les publications sont chiffrées dans les scénarios suivants :
 
 #### Étape 1 : Générer la clé de chiffrement de la publication
 
-Chaque publication chiffrée reçoit une paire X25519 unique :
+Chaque publication chiffrée reçoit une paire de clés X25519 unique :
 
 ```javascript
 const postKey = {
@@ -169,11 +169,11 @@ const postKey = {
 
 Cette clé est utilisée pour chiffrer tout le contenu de cette publication spécifique.
 
-**Implémentation**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:23-31)
+**Implémentation** : [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:23-31)
 
 #### Étape 2 : Déterminer les destinataires
 
-Le système compile une liste de destinataires qui pourront déchiffrer la publication.
+Le système construit une liste de destinataires qui pourront déchiffrer la publication.
 
 ##### Pour les publications régulières réservées aux abonnés :
 
@@ -217,7 +217,7 @@ Le système compile une liste de destinataires qui pourront déchiffrer la publi
    }
    ```
 
-**Implémentation**: [`src/x/crypto/fetchEligibleSubscribers.js`](../../../../src/x/crypto/fetchEligibleSubscribers.js)
+**Implémentation** : [`src/x/crypto/fetchEligibleSubscribers.js`](../../../../src/x/crypto/fetchEligibleSubscribers.js)
 
 ##### Pour les commentaires sur des publications chiffrées :
 
@@ -229,25 +229,35 @@ const recipients = parentEncryption.recipients;
 // Ensure commenter and big_brothers are included
 ```
 
-**Implémentation**: [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:214-259)
+**Implémentation** : [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:214-259)
 
 #### Étape 3 : Chiffrer le contenu de la publication
 
-Tout le contenu textuel dans le descripteur est chiffré avec la clé secrète de la publication :
+Le contenu de la publication est chiffré avec la clé secrète de la publication. **Remarque** : le titre reste non chiffré pour permettre l'affichage dans les cartes de publication, tandis que le texte de prévisualisation et le contenu sont chiffrés :
 
 ```javascript
 // For each locale:
 {
-  title: encryptText(title, postSecretKey),
+  title: title,  // NOT encrypted - remains public for display
   text_preview: encryptText(preview, postSecretKey),
-  tags: tags.map(t => encryptText(t, postSecretKey)),
-  categories: categories.map(c => encryptText(c, postSecretKey))
+  categories: categories,  // NOT encrypted - public for indexing
+  tags: tags  // NOT encrypted - public for indexing
 }
 ```
 
-**Format de chiffrement** : `nonce:ciphertext` (les deux encodés en hex)
+Ce qui est chiffré :
+- ✅ Texte de prévisualisation (`text_preview`)
+- ✅ Titres de chapitres
+- ✅ Tous les fichiers de contenu (markdown, médias)
 
-**Algorithme** : XSalsa20-Poly1305 (chiffrement authentifié)
+Ce qui reste public :
+- ❌ Titre de la publication
+- ❌ Catégories
+- ❌ Tags
+
+Format de chiffrement : `nonce:ciphertext` (les deux encodés en hex)
+
+Algorithme : XSalsa20-Poly1305 (chiffrement authentifié)
 
 #### Étape 4 : Chiffrer la clé de la publication pour chaque destinataire
 
@@ -282,13 +292,13 @@ for (const recipient of recipients) {
 
 Cela utilise la construction **X25519 + XSalsa20-Poly1305** (similaire à `crypto_box` de NaCl).
 
-**Implémentation**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:97-122)
+**Implémentation** : [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:97-122)
 
 #### Étape 5 : Chiffrer les fichiers (images, vidéos, audio)
 
-Tous les fichiers téléchargés sont chiffrés avant d'être envoyés sur IPFS :
+Tous les fichiers téléchargés sont chiffrés avant d'être envoyés à IPFS :
 
-##### Petits fichiers (< 1 MB)
+##### Petits fichiers (< 1 Mo)
 ```javascript
 // Simple encryption: nonce + encrypted data
 const nonce = randomBytes(24);
@@ -300,7 +310,7 @@ encryptedFile.set(nonce, 0);
 encryptedFile.set(encrypted, 24);
 ```
 
-##### Gros fichiers (≥ 1 MB)
+##### Grands fichiers (≥ 1 Mo)
 ```javascript
 // Chunked encryption for streaming (256 KB chunks)
 // Header format:
@@ -320,9 +330,9 @@ for each chunk {
 }
 ```
 
-Cela permet le **déchiffrement en streaming** — les vidéos peuvent commencer à être lues avant que tout le fichier ne soit déchiffré.
+Cela permet le **déchiffrement en streaming** — les vidéos peuvent commencer à être lues avant que le fichier entier soit déchiffré.
 
-**Implémentation**: [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js), [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js)
+**Implémentation** : [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js), [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js)
 
 #### Étape 6 : Construire les métadonnées de chiffrement
 
@@ -334,13 +344,13 @@ data_cid: QmXXX...
 encrypted: true
 locales:
   en:
-    title: "48c3a1b2:9f8d7e6c5a4b3e2d1c0f9e8d7c6b5a4e3d2c1b0a..."
+    title: "My Post Title"  # NOT encrypted - public for display
     text_preview: "a1b2c3d4:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b..."
     tags:
-      - "nonce1:encrypted_tag1"
-      - "nonce2:encrypted_tag2"
+      - "technology"  # NOT encrypted - public for indexing
+      - "tutorial"
     categories:
-      - "nonce3:encrypted_category1"
+      - "programming"  # NOT encrypted - public for indexing
     data_path: en/data.md
     chapters:
       - title: "nonce4:encrypted_chapter_title"
@@ -362,11 +372,11 @@ encryption:
     # ... one entry per recipient
 ```
 
-**Implémentation**: [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:167-211)
+**Implémentation** : [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js:167-211)
 
 ## Big Brothers (modérateurs de domaine)
 
-Les Big Brothers sont des adresses spéciales configurées au niveau du domaine qui obtiennent automatiquement l'accès à **toutes les publications chiffrées** de ce domaine. Cela permet la modération du contenu tout en maintenant le chiffrement de bout en bout.
+Les Big Brothers sont des adresses spéciales configurées au niveau du domaine qui obtiennent automatiquement l'accès à **toutes les publications chiffrées** de ce domaine. Cela permet la modération de contenu tout en maintenant le chiffrement de bout en bout.
 
 ### Configuration
 
@@ -390,29 +400,29 @@ Les Big Brothers sont configurés dans le fichier `config.json` :
 ### Comment fonctionnent les Big Brothers
 
 1. **Inclusion automatique** : Lors de la création d'une publication chiffrée, le système :
-   - Récupère `big_brothers` à partir de la configuration du domaine
+   - Récupère `big_brothers` depuis la configuration du domaine
    - Récupère les clés de lecture pour chaque big brother
    - Les ajoute à la liste des destinataires
-   - Chiffre la clé de la publication pour chaque big brother
+   - Chiffre la clé de publication pour chaque big brother
 
 2. **Déduplication** : Si un big brother est déjà abonné, il n'est pas dupliqué
 
-3. **Échec tolérant** : Si un big brother n'a pas de clé de lecture, il est ignoré (consigné mais ne bloque pas la publication)
+3. **Tolérance aux échecs** : Si un big brother n'a pas de clé de lecture, il est ignoré (consigné dans les logs mais cela n'empêche pas la publication)
 
-**Implémentation**: [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:280-322)
+**Implémentation** : [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx:280-322)
 
 ### Cas d'utilisation
 
-- **Modération de contenu** : Examiner les publications chiffrées pour détecter les violations de politique
-- **Support client** : Aider les utilisateurs avec des problèmes de contenu chiffré
-- **Conformité légale** : Accès par les autorités avec autorisation appropriée
-- **Accès de sauvegarde** : Propriétaires de domaine conservant l'accès au contenu
+- **Modération de contenu** : Examiner les publications chiffrées pour violations de politique
+- **Support client** : Aider les utilisateurs pour des problèmes liés au contenu chiffré
+- **Conformité légale** : Accès par les forces de l'ordre avec autorisation appropriée
+- **Accès de sauvegarde** : Propriétaires de domaine maintenant l'accès au contenu
 
 ## Déchiffrement des publications
 
 ### Flux de déchiffrement automatique
 
-Lorsqu'un utilisateur consulte une publication chiffrée :
+Quand un utilisateur consulte une publication chiffrée :
 
 1. **Vérifier le chiffrement de la publication**
    ```javascript
@@ -460,10 +470,9 @@ Lorsqu'un utilisateur consulte une publication chiffrée :
 
 5. **Déchiffrer les métadonnées**
    ```javascript
-   // Decrypt title, preview, tags, categories
-   post.title = decryptText(post.title, postSecretKey);
+   // Decrypt preview text (title, tags, and categories are public)
    post.text_preview = decryptText(post.text_preview, postSecretKey);
-   post.tags = post.tags.map(t => decryptText(t, postSecretKey));
+   // Title, tags, and categories remain as-is (not encrypted)
    ```
 
 6. **Définir le contexte de chiffrement**
@@ -485,11 +494,11 @@ Lorsqu'un utilisateur consulte une publication chiffrée :
    // Result: videos play immediately, seeking works
    ```
 
-**Implémentation**: [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js), [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx:263-291)
+**Implémentation** : [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js), [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx:263-291)
 
 ### Déchiffrement des médias en streaming
 
-Les fichiers médias chiffrés (vidéos, audio) sont déchiffrés à la volée à l'aide de Service Workers :
+Les fichiers médias chiffrés (vidéos, audio) sont déchiffrés à la volée en utilisant des Service Workers :
 
 ```javascript
 // Service Worker intercepts fetch
@@ -534,35 +543,35 @@ Voir [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) pour la docu
 
 ### Algorithmes de chiffrement
 
-- **X25519** : Elliptic Curve Diffie-Hellman (sécurité 256 bits)
+- **X25519** : Diffie-Hellman sur courbe elliptique (sécurité 256 bits)
 - **XSalsa20-Poly1305** : Chiffrement authentifié (AEAD)
-- **HKDF-SHA256** : Fonction de dérivation de clé
+- **HKDF-SHA256** : Fonction de dérivation de clés
 - **EIP-712** : Signature de données structurées
 
 ### Gestion des clés
 
 ✅ **Sécurisé** :
 - Les clés privées ne quittent jamais le navigateur
-- Les clés sont dérivées de manière déterministe à partir de signatures de portefeuille
-- Le Service Worker s'exécute dans la même origine
-- Les contextes de chiffrement ont une TTL (30 minutes)
+- Les clés sont dérivées de manière déterministe à partir des signatures du portefeuille
+- Le Service Worker s'exécute sous la même origine
+- Les contextes de chiffrement ont un TTL (30 minutes)
 - Les clés sont effacées lors de la navigation hors page
 
 ⚠️ **Limitations** :
 - Vulnérable aux attaques XSS (clés en mémoire)
 - Les extensions de navigateur avec accès total peuvent voler les clés
-- Aucune protection contre l'accès physique à l'appareil
+- Pas de protection contre l'accès physique à l'appareil
 - Les passerelles IPFS voient les données chiffrées (mais ne peuvent pas les déchiffrer)
 
-### Modèle de menaces
+### Modèle de menace
 
 **Protégé contre** :
-- ✅ Espionnage par les passerelles IPFS
-- ✅ Attaques man-in-the-middle (HTTPS + AEAD)
+- ✅ Reniflage par les passerelles IPFS
+- ✅ Attaques de type "man-in-the-middle" (HTTPS + AEAD)
 - ✅ Altération des données (authentification Poly1305)
 - ✅ Attaques par rejeu (nonces uniques par message)
 
-**NON protégé contre** :
+**Non protégé contre** :
 - ❌ Extensions de navigateur malveillantes
 - ❌ Vulnérabilités XSS dans l'application
 - ❌ Appareils utilisateurs compromis
@@ -571,31 +580,31 @@ Voir [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) pour la docu
 ### Bonnes pratiques
 
 1. **Toujours utiliser HTTPS** en production
-2. **Stocker les clés de manière sécurisée** - le localStorage est optionnel, pas requis
+2. **Stocker les clés en toute sécurité** - localStorage est optionnel, pas requis
 3. **Effacer les contextes** lors de la navigation
 4. **Valider les destinataires** avant de chiffrer
 5. **Utiliser des mots de passe forts** pour la sauvegarde du portefeuille
 6. **Auditer régulièrement les Big Brothers**
-7. **Surveiller les journaux d'accès** pour détecter toute activité suspecte
+7. **Surveiller les journaux d'accès** pour détecter des activités suspectes
 
 ## Fichiers d'implémentation
 
-### Chiffrement central
+### Chiffrement principal
 - [`src/x/crypto/readingKey.js`](../../../../src/x/crypto/readingKey.js) - Génération et gestion des clés de lecture
 - [`src/x/crypto/readingKeyStorage.js`](../../../../src/x/crypto/readingKeyStorage.js) - Stockage navigateur pour les clés de lecture
 - [`src/x/crypto/readingKeyEncryption.js`](../../../../src/x/crypto/readingKeyEncryption.js) - X25519 + XSalsa20-Poly1305 encryption
 - [`src/x/crypto/postEncryption.js`](../../../../src/x/crypto/postEncryption.js) - Chiffrement du contenu des publications
 - [`src/x/crypto/postDecryption.js`](../../../../src/x/crypto/postDecryption.js) - Déchiffrement du contenu des publications
 - [`src/x/crypto/fileEncryption.js`](../../../../src/x/crypto/fileEncryption.js) - Chiffrement des fichiers (simple + chunked)
-- [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js) - Chiffrement chunked pour gros fichiers
+- [`src/x/crypto/chunkedEncryption.js`](../../../../src/x/crypto/chunkedEncryption.js) - Chiffrement en chunks pour les gros fichiers
 
 ### Gestion des destinataires
-- [`src/x/crypto/fetchEligibleSubscribers.js`](../../../../src/x/crypto/fetchEligibleSubscribers.js) - Récupérer les abonnés ayant des clés de lecture
+- [`src/x/crypto/fetchEligibleSubscribers.js`](../../../../src/x/crypto/fetchEligibleSubscribers.js) - Récupérer les abonnés avec clés de lecture
 - [`src/x/crypto/fetchParentPostEncryption.js`](../../../../src/x/crypto/fetchParentPostEncryption.js) - Obtenir les destinataires de la publication parente
 
 ### Flux de publication
 - [`src/x/editor/wizard_steps/StepUploadDescriptor.jsx`](../../../../src/x/editor/wizard_steps/StepUploadDescriptor.jsx) - Création du descripteur avec chiffrement
-- [`src/x/editor/wizard_steps/StepUploadIPFS.jsx`](../../../../src/x/editor/wizard_steps/StepUploadIPFS.jsx) - Chiffrement des fichiers avant l'upload
+- [`src/x/editor/wizard_steps/StepUploadIPFS.jsx`](../../../../src/x/editor/wizard_steps/StepUploadIPFS.jsx) - Chiffrement des fichiers avant upload
 
 ### Flux de consultation
 - [`src/x/pages/PostPage.jsx`](../../../../src/x/pages/PostPage.jsx) - Consultation des publications avec déchiffrement automatique
@@ -604,36 +613,36 @@ Voir [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) pour la docu
 ### Déchiffrement en streaming
 - [`src/x/crypto/serviceWorkerManager.js`](../../../../src/x/crypto/serviceWorkerManager.js) - Gestion du Service Worker
 - [`public/crypto-sw.js`](../../../../public/crypto-sw.js) - Service Worker pour le déchiffrement en streaming
-- [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) - Documentation détaillée sur le chiffrement en streaming
+- [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) - Docs détaillées sur le chiffrement en streaming
 
 ## Flux d'expérience utilisateur
 
 ### Pour les créateurs de contenu
 
 1. **Première configuration**
-   - Générer la clé de lecture (signer le message EIP-712)
+   - Générer une clé de lecture (signer un message EIP-712)
    - Publier sur la blockchain
-   - Optionnellement stocker dans le navigateur
+   - Optionnel : stocker dans le navigateur
 
 2. **Publier une publication chiffrée**
    - Rédiger le contenu dans l'éditeur
    - Sélectionner l'audience "Subscribers Only"
-   - Le système effectue automatiquement :
-     - Récupération des abonnés éligibles
-     - Génération de la clé de chiffrement de la publication
-     - Chiffrement du contenu
-     - Chiffrement des fichiers
+   - Le système fait automatiquement :
+     - Récupère les abonnés éligibles
+     - Génére la clé de chiffrement de la publication
+     - Chiffre le contenu
+     - Chiffre les fichiers
      - Upload sur IPFS
-     - Publication du descripteur sur la blockchain
+     - Publie le descripteur sur la blockchain
 
 3. **Consulter ses propres publications chiffrées**
    - Déchiffrement automatique en utilisant la clé stockée ou re-dérivée
-   - Les médias sont lus de manière fluide
+   - Les médias sont lus de façon fluide grâce au streaming
 
 ### Pour les abonnés
 
 1. **Première configuration**
-   - Générer la clé de lecture
+   - Générer une clé de lecture
    - Publier sur la blockchain
    - S'abonner au créateur
 
@@ -642,29 +651,29 @@ Voir [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) pour la docu
    - Le système vérifie l'éligibilité
    - Récupère ou re-dérive la clé secrète
    - Déchiffre la publication automatiquement
-   - Les médias sont lus via le déchiffrement en streaming
+   - Les médias sont lus avec déchiffrement en streaming
 
 3. **Options de stockage des clés**
-   - Stocker dans le navigateur : plus besoin de re-signer
-   - Ne pas stocker : signer à chaque fois (plus sécurisé)
+   - Stocker dans le navigateur : pas de re-signature nécessaire
+   - Ne pas stocker : signer le message à chaque fois (plus sécurisé)
 
 ### Pour les Big Brothers (modérateurs)
 
 1. **Configuration**
-   - Générer la clé de lecture
-   - L'administrateur du domaine ajoute l'adresse à la liste `big_brothers`
+   - Générer une clé de lecture
+   - L'administrateur de domaine ajoute l'adresse à la liste `big_brothers`
    - Inclus automatiquement dans toutes les publications chiffrées
 
 2. **Modération**
    - Accéder à tout le contenu chiffré du domaine
-   - Examiner pour violations des politiques
+   - Examiner pour violations de politique
    - Prendre les mesures appropriées
 
 ## Dépannage
 
 ### "No Reading Key Found"
 - L'utilisateur n'a pas encore généré de clé de lecture
-- Inviter à générer et publier
+- Inviter à générer et publier la clé
 
 ### "Failed to Decrypt Post"
 - La clé de lecture de l'utilisateur n'est pas dans la liste des destinataires
@@ -672,28 +681,28 @@ Voir [STREAMING_ENCRYPTION.md](../../../../STREAMING_ENCRYPTION.md) pour la docu
 - Vérifier la configuration des big_brothers
 
 ### "Media Not Playing"
-- Service Worker non enregistré (requiert HTTPS)
-- Contexte de chiffrement non défini
+- Le Service Worker n'est pas enregistré (requiert HTTPS)
+- Le contexte de chiffrement n'est pas défini
 - Vérifier la console du navigateur pour les erreurs
 
 ### "No Eligible Subscribers"
-- Aucun abonné n'a publié de clé de lecture
+- Aucun abonné n'a publié de clés de lecture
 - Informer les abonnés de générer des clés de lecture
 - Vérifier le seuil de paiement minimum
 
 ## Améliorations futures
 
-- **Rotation de clés** : Support pour plusieurs clés de lecture actives par utilisateur
+- **Rotation des clés** : Support pour plusieurs clés de lecture actives par utilisateur
 - **Sauvegarde & récupération** : Sauvegarde chiffrée des clés avec phrase de récupération
-- **Portefeuilles matériels** : Dérivation de clés de lecture avec Ledger/Trezor
+- **Portefeuilles matériels** : Dérivation de clé de lecture avec Ledger/Trezor
 - **Partage sélectif** : Accès temporaire pour des publications spécifiques
-- **Analytique** : Indicateurs préservant la vie privée pour le contenu chiffré
-- **Support WebAuthn** : Clés de lecture dérivées de crédentials WebAuthn
+- **Analytique** : Metrics préservant la confidentialité pour le contenu chiffré
+- **Support WebAuthn** : Clés de lecture dérivées des identifiants WebAuthn
 
-## Documentation connexe
+## Documentation associée
 
 - [Publishing Posts](/docs/core-concepts/publishing-posts) - Flux général de publication
 - [Showing Posts](/docs/core-concepts/showing-posts) - Affichage et rendu des publications
 - [User Profile](/docs/core-concepts/user-profile) - Contrat de profil et données utilisateur
-- [Streaming Encryption](../../../../STREAMING_ENCRYPTION.md) - Documentation détaillée sur le déchiffrement en streaming (code source)
-- [Content Format](/docs/features/content-format) - Spécification du format de descripteur
+- [Streaming Encryption](../../../../STREAMING_ENCRYPTION.md) - Docs détaillées sur le déchiffrement en streaming (source)
+- [Content Format](/docs/features/content-format) - Spécification du format du descripteur

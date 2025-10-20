@@ -18,7 +18,7 @@ favicon:
     - name: theme-color
       content: '#ffffff'
 GA_tag: G-XDSTY1ND4P
-promo_post: "0x9f5fbbe55cae6114edb3fb5b622554e7b3c13fdb4cba10e74f3a055c333c08aa"  # savva_cid of a post to show on first site opening
+promo_post: ""  # savva_cid of a post to show on first site opening
 modules:
   content_lists: modules/content_lists.yaml
   categories: modules/categories.yaml

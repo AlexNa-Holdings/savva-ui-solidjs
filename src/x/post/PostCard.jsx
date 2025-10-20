@@ -333,12 +333,24 @@ export default function PostCard(props) {
           <h4 class={`font-semibold line-clamp-3 text-[hsl(var(--foreground))] ${props.compact ? "text-xs" : "text-sm"}`}>{title()}</h4>
         </Show>
         <Show when={textPreview() && !props.compact}>
-          <p class={textPreviewClasses()}>{textPreview()}</p>
+          <div class="relative">
+            <p class={textPreviewClasses()}>{textPreview()}</p>
+            {/* Blur mask only over preview text when encrypted (title stays visible) */}
+            <Show when={shouldCoverEncrypted()}>
+              <div
+                class="absolute inset-0 z-10 rounded-md bg-[hsl(var(--card))]/70 backdrop-blur-[2px]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              />
+            </Show>
+          </div>
         </Show>
       </div>
 
-      {/* Thin mask over text area when covered */}
-      <Show when={shouldCover() || shouldCoverEncrypted()}>
+      {/* Thin mask over entire text area when NSFW (but not encrypted) */}
+      <Show when={shouldCover() && !shouldCoverEncrypted()}>
         <div
           class="absolute inset-0 z-10 rounded-md bg-[hsl(var(--card))]/70 backdrop-blur-[2px]"
           onClick={(e) => {
