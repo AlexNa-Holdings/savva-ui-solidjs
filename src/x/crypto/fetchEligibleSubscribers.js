@@ -1,6 +1,94 @@
 // src/x/crypto/fetchEligibleSubscribers.js
 
 import { fetchReadingKey } from "./readingKey.js";
+import { createPublicClient, getContract } from "viem";
+import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
+import { configuredHttp } from "../../blockchain/contracts.js";
+
+/**
+ * Fetch NPO admins with their reading keys
+ *
+ * @param {object} app - Application context
+ * @param {string} npoAddress - NPO contract address
+ * @returns {Promise<Array<object>>} - Array of { address, publicKey, scheme, nonce }
+ */
+async function fetchNpoAdmins(app, npoAddress) {
+  console.log(`[fetchNpoAdmins] Fetching admins for NPO ${npoAddress}`);
+
+  try {
+    // Get RPC URL from app context
+    const rpcUrl = app.info?.()?.rpc_url || import.meta?.env?.VITE_RPC_URL;
+    if (!rpcUrl) {
+      console.warn(`[fetchNpoAdmins] No RPC URL available`);
+      return [];
+    }
+
+    // Get chain from app
+    const chain = app.desiredChain?.() || undefined;
+
+    // Create public client for blockchain reads
+    const publicClient = createPublicClient({
+      chain,
+      transport: configuredHttp(rpcUrl),
+    });
+
+    // Get NPO contract
+    const npoContract = getContract({
+      address: npoAddress,
+      abi: SavvaNPOAbi,
+      client: publicClient,
+    });
+
+    // Get all members
+    const memberList = await npoContract.read.getMemberList();
+    console.log(`[fetchNpoAdmins] Found ${memberList.length} total members`);
+
+    // Check which members are admins
+    const adminChecks = await Promise.all(
+      memberList.map(memberAddr =>
+        npoContract.read.isAdmin([memberAddr]).catch(() => false)
+      )
+    );
+
+    // Filter to only admin addresses
+    const adminAddresses = memberList.filter((_, i) => adminChecks[i]);
+    console.log(`[fetchNpoAdmins] Found ${adminAddresses.length} admins`);
+
+    // Fetch reading keys for all admins
+    const adminsWithKeys = await Promise.all(
+      adminAddresses.map(async (adminAddr) => {
+        try {
+          console.log(`[fetchNpoAdmins] Fetching reading key for admin ${adminAddr}`);
+          const readingKey = await fetchReadingKey(app, adminAddr);
+
+          if (!readingKey || !readingKey.publicKey) {
+            console.warn(`[fetchNpoAdmins] Admin ${adminAddr} has no reading key`);
+            return null;
+          }
+
+          return {
+            address: adminAddr,
+            publicKey: readingKey.publicKey,
+            scheme: readingKey.scheme,
+            nonce: readingKey.nonce,
+          };
+        } catch (error) {
+          console.error(`[fetchNpoAdmins] Failed to fetch reading key for admin ${adminAddr}:`, error);
+          return null;
+        }
+      })
+    );
+
+    // Filter out admins without reading keys
+    const validAdmins = adminsWithKeys.filter(a => a !== null);
+    console.log(`[fetchNpoAdmins] Found ${validAdmins.length} admins with reading keys`);
+
+    return validAdmins;
+  } catch (error) {
+    console.error(`[fetchNpoAdmins] Error fetching NPO admins:`, error);
+    return [];
+  }
+}
 
 /**
  * Fetch all eligible subscribers with their reading keys
@@ -94,9 +182,39 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
   );
 
   // Filter out subscribers without reading keys
-  const validSubscribers = subscribersWithKeys.filter(s => s !== null);
+  let validSubscribers = subscribersWithKeys.filter(s => s !== null);
 
   console.log(`Eligible subscribers: ${eligible.length}, with reading keys: ${validSubscribers.length}`);
 
-  return validSubscribers;
+  // If acting as NPO, add all NPO admins to the recipients list
+  const isActingAsNpo = app.isActingAsNpo?.() || false;
+  if (isActingAsNpo && authorAddress) {
+    console.log(`[fetchEligibleSubscribers] Acting as NPO, fetching admins for ${authorAddress}`);
+    const npoAdmins = await fetchNpoAdmins(app, authorAddress);
+    console.log(`[fetchEligibleSubscribers] Found ${npoAdmins.length} NPO admins with reading keys`);
+
+    // Combine subscribers and admins
+    validSubscribers = [...validSubscribers, ...npoAdmins];
+  }
+
+  // Deduplicate recipients by address (case-insensitive)
+  const uniqueRecipients = [];
+  const seenAddresses = new Set();
+
+  for (const recipient of validSubscribers) {
+    const normalizedAddr = String(recipient.address || "").toLowerCase();
+    if (normalizedAddr && !seenAddresses.has(normalizedAddr)) {
+      seenAddresses.add(normalizedAddr);
+      uniqueRecipients.push(recipient);
+    }
+  }
+
+  const duplicatesRemoved = validSubscribers.length - uniqueRecipients.length;
+  if (duplicatesRemoved > 0) {
+    console.log(`[fetchEligibleSubscribers] Removed ${duplicatesRemoved} duplicate recipients`);
+  }
+
+  console.log(`[fetchEligibleSubscribers] Final unique recipients: ${uniqueRecipients.length}`);
+
+  return uniqueRecipients;
 }
