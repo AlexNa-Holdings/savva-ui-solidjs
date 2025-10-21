@@ -42,6 +42,10 @@ export function AppProvider(props) {
   const [newFeedItems, setNewFeedItems] = Solid.createSignal([]);
   const [newContentAvailable, setNewContentAvailable] = Solid.createSignal(null);
   const [newTabRefreshKey, setNewTabRefreshKey] = Solid.createSignal(Date.now());
+  const [activeProposalsCount, setActiveProposalsCount] = Solid.createSignal(0);
+
+  // Create a ref to hold the context value so checkActiveProposals can access wsCall
+  let contextValue = null;
 
   const supportedDomains = Solid.createMemo(() => {
     const list = orchestrator.info()?.domains || [];
@@ -82,6 +86,33 @@ export function AppProvider(props) {
       auth.logout();
       pushToast({ type: 'info', message: 'Logged out due to domain change.' });
     }
+  });
+
+  // Check active proposals when domain changes
+  Solid.createEffect(() => {
+    const domain = selectedDomainName();
+    console.log("[AppContext] Domain changed to:", domain);
+    if (domain) {
+      // Delay to allow wsCall to be set by WsConnector
+      setTimeout(() => {
+        console.log("[AppContext] Delayed check for active proposals");
+        checkActiveProposals();
+      }, 1000);
+    }
+  });
+
+  Solid.onMount(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[AppContext] Tab visible, checking active proposals");
+        checkActiveProposals();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    Solid.onCleanup(() => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    });
   });
 
   // Effect to sync domain languages AND validate current selection
@@ -185,7 +216,53 @@ export function AppProvider(props) {
     return prefix + rel;
   };
 
-  const value = {
+  /**
+   * Check for active governance proposals
+   */
+  async function checkActiveProposals() {
+    try {
+      console.log("[checkActiveProposals] Starting check...");
+      const domain = selectedDomainName() || orchestrator.config()?.domain;
+      console.log("[checkActiveProposals] Domain:", domain);
+      if (!domain) {
+        console.log("[checkActiveProposals] No domain, returning");
+        return;
+      }
+
+      const params = {
+        domain,
+        active: true,
+        limit: 1,
+        offset: 0,
+      };
+      console.log("[checkActiveProposals] Calling get-proposals with params:", params);
+      console.log("[checkActiveProposals] wsCall available?", !!contextValue?.wsCall);
+
+      if (!contextValue?.wsCall) {
+        console.log("[checkActiveProposals] wsCall not available yet, skipping");
+        return;
+      }
+
+      const result = await contextValue.wsCall("get-proposals", params);
+      console.log("[checkActiveProposals] Result:", result);
+
+      if (Array.isArray(result)) {
+        const count = result.length;
+        console.log("[checkActiveProposals] Setting count to:", count);
+        setActiveProposalsCount(count);
+      } else if (result?.proposals) {
+        const count = result.proposals.length > 0 ? result.total || result.proposals.length : 0;
+        console.log("[checkActiveProposals] Setting count to:", count);
+        setActiveProposalsCount(count);
+      } else {
+        console.log("[checkActiveProposals] No proposals in result");
+      }
+    } catch (error) {
+      console.error("Failed to check active proposals:", error);
+    }
+  }
+
+  contextValue = {
     ...orchestrator, ...auth, ...ipfs, ...prices,
     assetUrl,
     i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
@@ -196,6 +273,8 @@ export function AppProvider(props) {
     newFeedItems, setNewFeedItems,
     newContentAvailable, setNewContentAvailable,
     newTabRefreshKey, setNewTabRefreshKey,
+    activeProposalsCount,
+    checkActiveProposals,
     supportedDomains, selectedDomain, selectedDomainName,
     desiredChainId, desiredChain, ensureWalletOnDesiredChain,
     remoteIpfsGateways, activeIpfsGateways,
@@ -225,7 +304,7 @@ export function AppProvider(props) {
     refreshNpoMemberships: actor.refreshNpoMemberships,
   };
 
-  return <AppContext.Provider value={value}>{props.children}</AppContext.Provider>;
+  return <AppContext.Provider value={contextValue}>{props.children}</AppContext.Provider>;
 }
 
 export function useApp() {

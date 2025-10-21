@@ -35,6 +35,8 @@ import PromoCodesPage from "./pages/PromoCodesPage.jsx";
 import PromoRedeemPage from "./pages/PromoRedeemPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import ContentFundRoundsPage from "./pages/ContentFundRoundsPage.jsx";
+import GovernancePage from "./pages/GovernancePage.jsx";
+import CreateProposalPage from "./pages/CreateProposalPage.jsx";
 import ReadingKeyInviteManager from "./main/ReadingKeyInviteManager.jsx";
 import PromoPostManager from "./main/PromoPostManager.jsx";
 
@@ -59,6 +61,8 @@ export default function App() {
     if (r.startsWith("/sac")) return "sacrifice";
     if (r.startsWith("/buy-burn")) return "buyburn";
     if (r.startsWith("/content-fund-rounds")) return "content-fund-rounds";
+    if (r.startsWith("/governance/create-proposal")) return "create-proposal";
+    if (r.startsWith("/governance")) return "governance";
     if (r.startsWith("/fr/")) return "contribute";
     if (r.startsWith("/admin")) return "admin";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
@@ -176,6 +180,8 @@ export default function App() {
                 <Show when={currentView() === "sacrifice"}><SacrificePage /></Show>
                 <Show when={currentView() === "buyburn"}><BuyBurnPage /></Show>
                 <Show when={currentView() === "content-fund-rounds"}><ContentFundRoundsPage /></Show>
+                <Show when={currentView() === "governance"}><GovernancePage /></Show>
+                <Show when={currentView() === "create-proposal"}><CreateProposalPage /></Show>
                 <Show when={currentView() === "admin"}><AdminPage /></Show>
               </main>
             </>

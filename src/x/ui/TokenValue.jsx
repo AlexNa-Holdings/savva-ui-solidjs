@@ -37,9 +37,27 @@ export default function TokenValue(props) {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
       const num = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
-      const maximumFractionDigits = num >= 1 ? 2 : 6;
+
+      // Determine appropriate decimal places based on value size
+      let minimumFractionDigits = 2;
+      let maximumFractionDigits = 2;
+
+      if (num >= 1) {
+        // For values >= 1, show 2 decimals
+        minimumFractionDigits = 2;
+        maximumFractionDigits = 2;
+      } else if (num >= 0.01) {
+        // For values >= 0.01 but < 1, show 2-4 decimals
+        minimumFractionDigits = 2;
+        maximumFractionDigits = 4;
+      } else if (num > 0) {
+        // For very small values > 0 but < 0.01, show up to 6 decimals
+        minimumFractionDigits = 0;
+        maximumFractionDigits = 6;
+      }
+
       return num.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
+        minimumFractionDigits,
         maximumFractionDigits,
       });
     } catch {

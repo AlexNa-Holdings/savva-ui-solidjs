@@ -142,24 +142,24 @@ export default function AddressInput(props) {
             </div>
           }
         >
-          <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-2">
+          <div class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] p-2 flex items-center gap-2">
             {/* IMPORTANT: UserCard expects `author`, not `user` */}
-            <UserCard
-              author={pickedUser()}
-              clickable
-              onClick={() => goProfile(pickedUser())}
-            />
-            <div class="mt-2 flex items-center justify-end">
-              <button
-                type="button"
-                class="px-2 py-1 text-xs rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
-                onClick={clearPicked}
-                aria-label={t("common.change")}
-                title={t("common.change")}
-              >
-                {t("common.change")}
-              </button>
+            <div class="flex-1 min-w-0">
+              <UserCard
+                author={pickedUser()}
+                clickable
+                onClick={() => goProfile(pickedUser())}
+              />
             </div>
+            <button
+              type="button"
+              class="px-3 py-1.5 text-sm rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] shrink-0"
+              onClick={clearPicked}
+              aria-label={t("common.change")}
+              title={t("common.change")}
+            >
+              {t("common.change")}
+            </button>
           </div>
         </Show>
       </label>

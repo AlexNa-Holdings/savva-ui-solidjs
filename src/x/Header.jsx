@@ -13,6 +13,7 @@ import TokenPrice from "./main/TokenPrice.jsx";
 import ActorBadge from "./actors/ActorBadge.jsx";
 import { dbg } from "../utils/debug.js";
 import HeaderSearchButton from "./ui/HeaderSearchButton.jsx";
+import HeaderGovernanceButton from "./ui/HeaderGovernanceButton.jsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import LibraryIcon from "./ui/icons/LibraryIcon.jsx";
 
@@ -119,7 +120,8 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
           <div class="flex items-center gap-3">
 
             <HeaderSearchButton />
-            
+            <HeaderGovernanceButton />
+
             <Show when={app.authorizedUser() && walletAccount()}>
               <NewPostButton />
             </Show>

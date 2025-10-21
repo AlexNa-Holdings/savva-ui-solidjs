@@ -135,6 +135,29 @@ export default function RightPane({ isOpen, onClose }) {
                 </div>
               </li>
 
+              {/* Governance link */}
+              <li>
+                <div
+                  class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                  role="button" tabIndex={0}
+                  onClick={() => {
+                    app.setSavedScrollY(window.scrollY);
+                    navigate("/governance");
+                    onClose();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      app.setSavedScrollY(window.scrollY);
+                      navigate("/governance");
+                      onClose();
+                    }
+                  }}
+                >
+                  {t("rightPane.governance")}
+                </div>
+              </li>
+
               {/* NPO list link */}
               <li>
                 <div
