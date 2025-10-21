@@ -8,13 +8,7 @@ export default function HeaderGovernanceButton() {
   const app = useApp();
   const { t } = app;
 
-  const count = () => {
-    const val = app.activeProposalsCount?.() || 0;
-    console.log("[HeaderGovernanceButton] count:", val);
-    return val;
-  };
-
-  console.log("[HeaderGovernanceButton] Rendering, count:", count());
+  const count = () => app.activeProposalsCount?.() || 0;
 
   return (
     <Show when={count() > 0}>

@@ -91,11 +91,9 @@ export function AppProvider(props) {
   // Check active proposals when domain changes
   Solid.createEffect(() => {
     const domain = selectedDomainName();
-    console.log("[AppContext] Domain changed to:", domain);
     if (domain) {
       // Delay to allow wsCall to be set by WsConnector
       setTimeout(() => {
-        console.log("[AppContext] Delayed check for active proposals");
         checkActiveProposals();
       }, 1000);
     }
@@ -104,7 +102,6 @@ export function AppProvider(props) {
   Solid.onMount(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log("[AppContext] Tab visible, checking active proposals");
         checkActiveProposals();
       }
     };
@@ -221,13 +218,10 @@ export function AppProvider(props) {
    */
   async function checkActiveProposals() {
     try {
-      console.log("[checkActiveProposals] Starting check...");
       const domain = selectedDomainName() || orchestrator.config()?.domain;
-      console.log("[checkActiveProposals] Domain:", domain);
-      if (!domain) {
-        console.log("[checkActiveProposals] No domain, returning");
-        return;
-      }
+      if (!domain) return;
+
+      if (!contextValue?.wsCall) return;
 
       const params = {
         domain,
@@ -235,27 +229,14 @@ export function AppProvider(props) {
         limit: 1,
         offset: 0,
       };
-      console.log("[checkActiveProposals] Calling get-proposals with params:", params);
-      console.log("[checkActiveProposals] wsCall available?", !!contextValue?.wsCall);
-
-      if (!contextValue?.wsCall) {
-        console.log("[checkActiveProposals] wsCall not available yet, skipping");
-        return;
-      }
 
       const result = await contextValue.wsCall("get-proposals", params);
-      console.log("[checkActiveProposals] Result:", result);
 
       if (Array.isArray(result)) {
-        const count = result.length;
-        console.log("[checkActiveProposals] Setting count to:", count);
-        setActiveProposalsCount(count);
+        setActiveProposalsCount(result.length);
       } else if (result?.proposals) {
         const count = result.proposals.length > 0 ? result.total || result.proposals.length : 0;
-        console.log("[checkActiveProposals] Setting count to:", count);
         setActiveProposalsCount(count);
-      } else {
-        console.log("[checkActiveProposals] No proposals in result");
       }
     } catch (error) {
       console.error("Failed to check active proposals:", error);
