@@ -1,5 +1,5 @@
 // src/x/pages/GovernancePage.jsx
-import { Show, For, createSignal, onMount, createMemo } from "solid-js";
+import { Show, For, createSignal, onMount, createMemo, createEffect } from "solid-js";
 import { createPublicClient } from "viem";
 import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/smartRouter.js";
@@ -91,9 +91,9 @@ export default function GovernancePage() {
         user_addr: address
       };
 
-      const me = app.authorizedUser?.();
-      if (me?.address) {
-        wsParams.caller = me.address;
+      const actorAddr = app.actorAddress?.();
+      if (actorAddr) {
+        wsParams.caller = actorAddr;
       }
 
       const userData = await app.wsCall?.("get-user", wsParams);
@@ -108,23 +108,23 @@ export default function GovernancePage() {
    * Load governance data (staking balance, voting power, delegation)
    */
   async function loadGovernanceData() {
-    const user = app.authorizedUser?.();
-    if (!user?.address) return;
+    const actorAddr = app.actorAddress?.();
+    if (!actorAddr) return;
 
     try {
       // Get Staking contract
       const staking = await getSavvaContract(app, "Staking", { read: true });
 
       // Fetch staking balance
-      const balance = await staking.read.balanceOf([user.address]);
+      const balance = await staking.read.balanceOf([actorAddr]);
       setStakingBalance(balance);
 
       // Fetch voting power (current votes)
-      const votes = await staking.read.getVotes([user.address]);
+      const votes = await staking.read.getVotes([actorAddr]);
       setVotingPower(votes);
 
       // Fetch delegation status
-      const delegate = await staking.read.delegates([user.address]);
+      const delegate = await staking.read.delegates([actorAddr]);
       setDelegatedTo(delegate);
 
       // Fetch user info for delegate (including self)
@@ -134,7 +134,7 @@ export default function GovernancePage() {
       }
 
       console.log("Governance data loaded:", {
-        account: user.address,
+        account: actorAddr,
         balance: balance.toString(),
         votes: votes.toString(),
         delegate,
@@ -151,7 +151,7 @@ export default function GovernancePage() {
   async function loadProposals() {
     setLoadingProposals(true);
     try {
-      const user = app.authorizedUser?.();
+      const actorAddr = app.actorAddress?.();
 
       // Get current block number from blockchain
       let currentBlock = 0n;
@@ -177,7 +177,7 @@ export default function GovernancePage() {
 
       const params = {
         active: showOnlyActive(),
-        caller: user?.address || "",
+        caller: actorAddr || "",
         current_block: Number(currentBlock),
         limit: 50,
         offset: 0,
@@ -211,12 +211,12 @@ export default function GovernancePage() {
   });
 
   /**
-   * Check if user delegated to themselves
+   * Check if actor delegated to themselves
    */
   const isDelegatedToSelf = createMemo(() => {
-    const user = app.authorizedUser?.();
+    const actorAddr = app.actorAddress?.();
     const delegate = delegatedTo();
-    return user?.address && delegate && user.address.toLowerCase() === delegate.toLowerCase();
+    return actorAddr && delegate && actorAddr.toLowerCase() === delegate.toLowerCase();
   });
 
   /**
@@ -282,6 +282,15 @@ export default function GovernancePage() {
       }
     } finally {
       setBusy(false);
+    }
+  });
+
+  // Reload data when actor changes
+  createEffect(() => {
+    const actorAddr = app.actorAddress?.();
+    if (actorAddr && !busy()) {
+      loadGovernanceData();
+      loadProposals();
     }
   });
 

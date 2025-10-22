@@ -1,7 +1,6 @@
 // src/x/modals/DelegateModal.jsx
 import { Show, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { walletAccount } from "../../blockchain/wallet.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { isAddress } from "viem";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
@@ -20,8 +19,8 @@ export default function DelegateModal(props) {
    * Delegate to self
    */
   const handleDelegateToSelf = async () => {
-    const account = walletAccount();
-    if (!account) return;
+    const actorAddr = app.actorAddress?.();
+    if (!actorAddr) return;
 
     setIsSubmitting(true);
     setError("");
@@ -36,8 +35,8 @@ export default function DelegateModal(props) {
       });
 
       try {
-        // Call delegate function with own address
-        const hash = await staking.write.delegate([account]);
+        // Call delegate function with actor address
+        const hash = await staking.write.delegate([actorAddr]);
 
         // Wait for transaction
         const publicClient = app.publicClient?.();

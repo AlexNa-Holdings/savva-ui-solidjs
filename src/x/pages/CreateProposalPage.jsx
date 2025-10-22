@@ -2,7 +2,6 @@
 import { Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/smartRouter.js";
-import { walletAccount } from "../../blockchain/wallet.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
@@ -21,6 +20,14 @@ export default function CreateProposalPage() {
   const [isDepositing, setIsDepositing] = createSignal(false);
   const [isWithdrawing, setIsWithdrawing] = createSignal(false);
   const [actions, setActions] = createSignal([]);
+  const [votingPower, setVotingPower] = createSignal(0n);
+  const [proposalThreshold, setProposalThreshold] = createSignal(0n);
+  const [dataLoaded, setDataLoaded] = createSignal(false);
+
+  // Get Staking token address (SAVVA_VOTES)
+  const stakingTokenAddress = createMemo(() => {
+    return app.info()?.savva_contracts?.Staking?.address || "";
+  });
 
   /**
    * Check if user has sufficient balance
@@ -30,17 +37,25 @@ export default function CreateProposalPage() {
   });
 
   /**
-   * Fetch governance balance and proposal price
+   * Check if user has sufficient voting power
+   */
+  const hasSufficientVotingPower = createMemo(() => {
+    return votingPower() >= proposalThreshold();
+  });
+
+  /**
+   * Fetch governance balance, proposal price, voting power, and threshold
    */
   const fetchBalanceAndPrice = async () => {
-    const account = walletAccount();
+    const account = app.actorAddress?.();
     if (!account) return;
 
+    setDataLoaded(false);
     try {
       const { getSavvaContract } = await import("../../blockchain/contracts.js");
       const governance = await getSavvaContract(app, "Governance", { read: true });
 
-      // Fetch user's balance in governance contract
+      // Fetch actor's balance in governance contract
       const balance = await governance.read.balances([account]);
       setGovernanceBalance(balance);
 
@@ -49,8 +64,20 @@ export default function CreateProposalPage() {
       const keyBytes32 = (await import("viem")).toHex("gov_proposal_price", { size: 32 });
       const price = await config.read.getUInt([keyBytes32]);
       setProposalPrice(price);
+
+      // Fetch proposal threshold from Governance contract
+      const threshold = await governance.read.proposalThreshold();
+      setProposalThreshold(threshold);
+
+      // Fetch actor's voting power (delegated token balance)
+      const staking = await getSavvaContract(app, "Staking", { read: true });
+      const votes = await staking.read.getVotes([account]);
+      setVotingPower(votes);
+
+      setDataLoaded(true);
     } catch (error) {
-      console.error("Failed to fetch governance balance:", error);
+      console.error("Failed to fetch governance data:", error);
+      setDataLoaded(true);
     }
   };
 
@@ -151,17 +178,20 @@ export default function CreateProposalPage() {
   };
 
   /**
-   * Fetch data on mount
+   * Fetch data on mount and when actor changes
    */
   createEffect(() => {
-    fetchBalanceAndPrice();
+    const actorAddr = app.actorAddress?.();
+    if (actorAddr) {
+      fetchBalanceAndPrice();
+    }
   });
 
   /**
    * Handle submit
    */
   const handleSubmit = async () => {
-    if (!description().trim() || !hasSufficientBalance()) return;
+    if (!description().trim() || !hasSufficientBalance() || !hasSufficientVotingPower()) return;
 
     setIsSubmitting(true);
     try {
@@ -271,7 +301,7 @@ export default function CreateProposalPage() {
             </div>
           </div>
 
-          <Show when={!hasSufficientBalance()}>
+          <Show when={dataLoaded() && !hasSufficientBalance()}>
             <div class="mb-4 p-3 rounded-md bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700">
               <p class="text-sm text-yellow-800 dark:text-yellow-400 font-medium">
                 {t("governance.insufficientBalance")}
@@ -317,6 +347,38 @@ export default function CreateProposalPage() {
           </div>
         </div>
 
+        {/* Voting Power Section */}
+        <div class="p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+          <h2 class="text-xl font-semibold mb-4">{t("governance.yourVotingPower")}</h2>
+
+          <p class="text-sm text-muted-foreground mb-4">
+            {t("governance.votingPowerDescription")}
+          </p>
+
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div class="text-xs text-muted-foreground mb-1">{t("governance.yourVotingPower")}</div>
+              <div class="text-lg font-semibold">
+                <TokenValue amount={votingPower()} tokenAddress={stakingTokenAddress()} />
+              </div>
+            </div>
+            <div>
+              <div class="text-xs text-muted-foreground mb-1">{t("governance.proposalThreshold")}</div>
+              <div class="text-lg font-semibold">
+                <TokenValue amount={proposalThreshold()} tokenAddress={stakingTokenAddress()} />
+              </div>
+            </div>
+          </div>
+
+          <Show when={dataLoaded() && !hasSufficientVotingPower()}>
+            <div class="p-3 rounded-md bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
+              <p class="text-sm text-red-800 dark:text-red-400 font-medium">
+                {t("governance.insufficientVotingPower")}
+              </p>
+            </div>
+          </Show>
+        </div>
+
         {/* Proposal Actions */}
         <div class="p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
           <ProposalActionsBuilder
@@ -337,7 +399,7 @@ export default function CreateProposalPage() {
             placeholder={t("governance.proposalDescriptionPlaceholder")}
             value={description()}
             onInput={(e) => setDescription(e.target.value)}
-            disabled={!hasSufficientBalance()}
+            disabled={!hasSufficientBalance() || !hasSufficientVotingPower()}
           />
         </div>
 
@@ -353,7 +415,7 @@ export default function CreateProposalPage() {
           <button
             class="px-6 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary))]/90 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSubmit}
-            disabled={isSubmitting() || !description().trim() || !hasSufficientBalance()}
+            disabled={isSubmitting() || !description().trim() || !hasSufficientBalance() || !hasSufficientVotingPower()}
           >
             {isSubmitting() ? t("governance.creating") : t("governance.createProposal")}
           </button>
