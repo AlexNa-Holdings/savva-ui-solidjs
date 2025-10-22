@@ -175,7 +175,9 @@ export default function DelegateModal(props) {
         />
 
         <Show when={error()}>
-          <p class="text-sm text-red-500 mb-2">{error()}</p>
+          <div class="mb-2 p-3 rounded-md bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700">
+            <p class="text-sm text-yellow-800 dark:text-yellow-400 font-medium">{error()}</p>
+          </div>
         </Show>
 
         <button
