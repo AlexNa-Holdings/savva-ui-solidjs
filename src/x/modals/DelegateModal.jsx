@@ -1,9 +1,8 @@
 // src/x/modals/DelegateModal.jsx
 import { Show, createSignal } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { getSavvaContract } from "../../blockchain/contracts.js";
 import { isAddress } from "viem";
-import { pushToast, pushErrorToast } from "../../ui/toast.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import AddressInput from "../ui/AddressInput.jsx";
 import Modal from "./Modal.jsx";
 
@@ -26,36 +25,15 @@ export default function DelegateModal(props) {
     setError("");
 
     try {
-      const staking = await getSavvaContract(app, "Staking", { write: true });
-
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.delegation.pending"),
-        autohideMs: 0,
+      await sendAsActor(app, {
+        contractName: "Staking",
+        functionName: "delegate",
+        args: [actorAddr],
       });
 
-      try {
-        // Call delegate function with actor address
-        const hash = await staking.write.delegate([actorAddr]);
-
-        // Wait for transaction
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.delegation.success"),
-        });
-
-        props.onSuccess?.();
-      } finally {
-        app.dismissToast?.(toastId);
-      }
+      props.onSuccess?.();
     } catch (err) {
       console.error("Failed to delegate to self:", err);
-      pushErrorToast(err, { message: t("governance.delegation.error") });
     } finally {
       setIsSubmitting(false);
     }
@@ -82,36 +60,15 @@ export default function DelegateModal(props) {
     setError("");
 
     try {
-      const staking = await getSavvaContract(app, "Staking", { write: true });
-
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.delegation.pending"),
-        autohideMs: 0,
+      await sendAsActor(app, {
+        contractName: "Staking",
+        functionName: "delegate",
+        args: [address],
       });
 
-      try {
-        // Call delegate function with specified address
-        const hash = await staking.write.delegate([address]);
-
-        // Wait for transaction
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.delegation.success"),
-        });
-
-        props.onSuccess?.();
-      } finally {
-        app.dismissToast?.(toastId);
-      }
+      props.onSuccess?.();
     } catch (err) {
       console.error("Failed to delegate to address:", err);
-      pushErrorToast(err, { message: t("governance.delegation.error") });
     } finally {
       setIsSubmitting(false);
     }

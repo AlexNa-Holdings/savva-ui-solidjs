@@ -1,6 +1,7 @@
 // src/x/governance/ProposalCard.jsx
 import { Show, createSignal, onMount, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import UserCard from "../ui/UserCard.jsx";
 import ProposalActions from "./ProposalActions.jsx";
 import ProgressBar from "../ui/ProgressBar.jsx";
@@ -430,11 +431,6 @@ export default function ProposalCard(props) {
 
     setIsExecuting(true);
     try {
-      const { getSavvaContract } = await import("../../blockchain/contracts.js");
-      const { pushToast } = await import("../../ui/toast.js");
-
-      const governance = await getSavvaContract(app, "Governance", { write: true });
-
       // Get proposal details for execution
       const actions = proposalActions();
       if (!actions || actions.length === 0) {
@@ -446,41 +442,17 @@ export default function ProposalCard(props) {
       const calldatas = actions.map(a => a.calldata);
       const descriptionHash = (await import("viem")).keccak256((await import("viem")).toBytes(proposal().description || ""));
 
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.executing"),
-        autohideMs: 0,
+      // Execute the proposal using sendAsActor
+      await sendAsActor(app, {
+        contractName: "Governance",
+        functionName: "execute",
+        args: [targets, values, calldatas, descriptionHash],
       });
 
-      try {
-        // Execute the proposal
-        const hash = await governance.write.execute([
-          targets,
-          values,
-          calldatas,
-          descriptionHash
-        ]);
-
-        // Wait for transaction
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.executeSuccess"),
-        });
-
-        // Refresh proposal data
-        await fetchVoteData();
-      } finally {
-        pushToast({ type: "close", id: toastId });
-      }
+      // Refresh proposal data
+      await fetchVoteData();
     } catch (error) {
       console.error("Failed to execute proposal:", error);
-      const { pushErrorToast } = await import("../../ui/toast.js");
-      pushErrorToast(error, { message: t("governance.executeFailed") });
     } finally {
       setIsExecuting(false);
     }

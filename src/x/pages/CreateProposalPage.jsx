@@ -2,6 +2,7 @@
 import { Show, createSignal, createMemo, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/smartRouter.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
@@ -89,41 +90,20 @@ export default function CreateProposalPage() {
 
     setIsDepositing(true);
     try {
-      const { getSavvaContract } = await import("../../blockchain/contracts.js");
       const { parseEther } = await import("viem");
-      const { pushToast, pushErrorToast } = await import("../../ui/toast.js");
-
-      const governance = await getSavvaContract(app, "Governance", { write: true });
       const amountWei = parseEther(depositAmount());
 
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.depositing"),
-        autohideMs: 0,
+      await sendAsActor(app, {
+        contractName: "Governance",
+        functionName: "deposit",
+        args: [],
+        valueWei: amountWei,
       });
 
-      try {
-        const hash = await governance.write.deposit([], { value: amountWei });
-
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.depositSuccess"),
-        });
-
-        setDepositAmount("");
-        await fetchBalanceAndPrice();
-      } finally {
-        pushToast({ type: "close", id: toastId });
-      }
+      setDepositAmount("");
+      await fetchBalanceAndPrice();
     } catch (error) {
       console.error("Failed to deposit:", error);
-      const { pushErrorToast } = await import("../../ui/toast.js");
-      pushErrorToast(error, { message: t("governance.depositFailed") });
     } finally {
       setIsDepositing(false);
     }
@@ -137,41 +117,19 @@ export default function CreateProposalPage() {
 
     setIsWithdrawing(true);
     try {
-      const { getSavvaContract } = await import("../../blockchain/contracts.js");
       const { parseEther } = await import("viem");
-      const { pushToast, pushErrorToast } = await import("../../ui/toast.js");
-
-      const governance = await getSavvaContract(app, "Governance", { write: true });
       const amountWei = parseEther(withdrawAmount());
 
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.withdrawing"),
-        autohideMs: 0,
+      await sendAsActor(app, {
+        contractName: "Governance",
+        functionName: "withdraw",
+        args: [amountWei],
       });
 
-      try {
-        const hash = await governance.write.withdraw([amountWei]);
-
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.withdrawSuccess"),
-        });
-
-        setWithdrawAmount("");
-        await fetchBalanceAndPrice();
-      } finally {
-        pushToast({ type: "close", id: toastId });
-      }
+      setWithdrawAmount("");
+      await fetchBalanceAndPrice();
     } catch (error) {
       console.error("Failed to withdraw:", error);
-      const { pushErrorToast } = await import("../../ui/toast.js");
-      pushErrorToast(error, { message: t("governance.withdrawFailed") });
     } finally {
       setIsWithdrawing(false);
     }
@@ -195,11 +153,6 @@ export default function CreateProposalPage() {
 
     setIsSubmitting(true);
     try {
-      const { getSavvaContract } = await import("../../blockchain/contracts.js");
-      const { pushToast, pushErrorToast } = await import("../../ui/toast.js");
-
-      const governance = await getSavvaContract(app, "Governance", { write: true });
-
       // Build arrays from actions
       const builtActions = actions();
       const targets = builtActions.map(a => a.target);
@@ -216,39 +169,16 @@ export default function CreateProposalPage() {
       const timestamp = `${day}.${month}.${year} ${hours}:${minutes}`;
       const uniqueDescription = `${description()}\n\n(${timestamp})`;
 
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.creating"),
-        autohideMs: 0,
+      await sendAsActor(app, {
+        contractName: "Governance",
+        functionName: "propose",
+        args: [targets, values, calldatas, uniqueDescription],
       });
 
-      try {
-        const hash = await governance.write.propose([
-          targets,
-          values,
-          calldatas,
-          uniqueDescription
-        ]);
-
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.createSuccess"),
-        });
-
-        // Navigate back to governance page
-        navigate("/governance");
-      } finally {
-        pushToast({ type: "close", id: toastId });
-      }
+      // Navigate back to governance page
+      navigate("/governance");
     } catch (error) {
       console.error("Failed to create proposal:", error);
-      const { pushErrorToast } = await import("../../ui/toast.js");
-      pushErrorToast(error, { message: t("governance.createFailed") });
     } finally {
       setIsSubmitting(false);
     }

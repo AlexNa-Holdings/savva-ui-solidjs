@@ -11,6 +11,7 @@ import { walletAccount, isWalletAvailable, connectWallet } from "../../blockchai
 import { authorize } from "../../blockchain/auth.js";
 import { getSavvaContract, configuredHttp } from "../../blockchain/contracts.js";
 import { pushErrorToast } from "../../ui/toast.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import DelegateModal from "../modals/DelegateModal.jsx";
 import ProposalCard from "../governance/ProposalCard.jsx";
 
@@ -236,38 +237,18 @@ export default function GovernancePage() {
     if (!proposal?.proposal_id) return;
 
     try {
-      const { pushToast, pushErrorToast } = await import("../../ui/toast.js");
-
-      const governance = await getSavvaContract(app, "Governance", { write: true });
       const proposalId = BigInt(proposal.proposal_id);
 
-      const toastId = pushToast({
-        type: "info",
-        message: t("governance.voting"),
-        autohideMs: 0,
+      await sendAsActor(app, {
+        contractName: "Governance",
+        functionName: "castVote",
+        args: [proposalId, support],
       });
 
-      try {
-        const hash = await governance.write.castVote([proposalId, support]);
-
-        const publicClient = app.publicClient?.();
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-
-        pushToast({
-          type: "success",
-          message: t("governance.voteSuccess"),
-        });
-
-        // Reload proposals to reflect the vote
-        await loadProposals();
-      } finally {
-        pushToast({ type: "close", id: toastId });
-      }
+      // Reload proposals to reflect the vote
+      await loadProposals();
     } catch (error) {
       console.error("Failed to vote:", error);
-      pushErrorToast(error, { message: t("governance.voteFailed") });
     }
   };
 
