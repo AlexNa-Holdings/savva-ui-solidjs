@@ -56,7 +56,25 @@ function readHistoryPath() {
   return window.location.pathname + window.location.search;
 }
 
-const [route, setRoute] = createSignal(USE_HASH_ROUTING ? readHashPath() : readHistoryPath());
+// Initialize route, handling hash URLs in history mode for backward compatibility
+function initializeRoute() {
+  if (USE_HASH_ROUTING) {
+    return readHashPath();
+  } else {
+    // In history mode, check if there's a hash URL (for backward compatibility)
+    const hash = window.location.hash;
+    if (hash && hash.length > 1) {
+      // Redirect hash URL to history URL
+      const path = hash.slice(1); // Remove the # symbol
+      console.log(`[SmartRouter] Detected hash URL in history mode, redirecting to: ${path}`);
+      window.history.replaceState({}, "", path);
+      return path;
+    }
+    return readHistoryPath();
+  }
+}
+
+const [route, setRoute] = createSignal(initializeRoute());
 
 function setFromHash() {
   closeAllModals();
@@ -77,6 +95,17 @@ if (typeof window !== "undefined") {
     window.addEventListener("hashchange", setFromHash);
   } else {
     window.addEventListener("popstate", setFromHistory);
+
+    // In history mode, also listen for hashchange to handle old hash URLs
+    window.addEventListener("hashchange", () => {
+      const hash = window.location.hash;
+      if (hash && hash.length > 1) {
+        // Convert hash URL to history URL
+        const path = hash.slice(1);
+        console.log(`[SmartRouter] Hash URL detected in history mode, converting to: ${path}`);
+        navigate(path, { replace: true });
+      }
+    });
   }
 }
 
