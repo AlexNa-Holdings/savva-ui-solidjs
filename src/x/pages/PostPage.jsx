@@ -638,38 +638,39 @@ export default function PostPage() {
                               </button>
                             </Show>
                             <Show when={userAddress() && !isUserInRecipients()}>
-                              <div class="space-y-3">
+                              {/* Show subscription requirements if this is a subscribers-only post */}
+                              <Show when={recipientListType() === "subscribers"}>
+                                <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center">
+                                  <div class="text-sm font-medium mb-2">
+                                    {t("post.encrypted.subscribeForFuture") || "Subscribe to access future posts like this"}
+                                  </div>
+                                  <Show when={recipientListMinWeekly() > 0n}>
+                                    <div class="text-xs text-[hsl(var(--muted-foreground))] mb-3">
+                                      {t("post.encrypted.minimumWeekly") || "Minimum weekly subscription"}:
+                                      <div class="mt-1 flex justify-center">
+                                        <TokenValue
+                                          amount={recipientListMinWeekly()}
+                                          tokenAddress={app.info()?.savva_contracts?.Staking?.address || ""}
+                                          format="inline"
+                                        />
+                                      </div>
+                                    </div>
+                                  </Show>
+                                  <button
+                                    onClick={() => setShowSubscribeModal(true)}
+                                    class="px-4 py-2 rounded-md text-sm font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+                                  >
+                                    {t("post.encrypted.subscribeButton") || "Subscribe Now"}
+                                  </button>
+                                </div>
+                              </Show>
+
+                              {/* Fallback message for non-subscriber encrypted posts */}
+                              <Show when={recipientListType() !== "subscribers"}>
                                 <p class="text-sm text-[hsl(var(--muted-foreground))]">
                                   {t("post.encrypted.noAccess") || "You don't have access to this content"}
                                 </p>
-
-                                {/* Show subscription requirements if this is a subscribers-only post */}
-                                <Show when={recipientListType() === "subscribers"}>
-                                  <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center">
-                                    <div class="text-sm font-medium mb-2">
-                                      {t("post.encrypted.subscribeForFuture") || "Subscribe to access future posts like this"}
-                                    </div>
-                                    <Show when={recipientListMinWeekly() > 0n}>
-                                      <div class="text-xs text-[hsl(var(--muted-foreground))] mb-3">
-                                        {t("post.encrypted.minimumWeekly") || "Minimum weekly subscription"}:
-                                        <div class="mt-1 flex justify-center">
-                                          <TokenValue
-                                            amount={recipientListMinWeekly()}
-                                            tokenAddress={app.info()?.savva_contracts?.Staking?.address || ""}
-                                            format="inline"
-                                          />
-                                        </div>
-                                      </div>
-                                    </Show>
-                                    <button
-                                      onClick={() => setShowSubscribeModal(true)}
-                                      class="px-4 py-2 rounded-md text-sm font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
-                                    >
-                                      {t("post.encrypted.subscribeButton") || "Subscribe Now"}
-                                    </button>
-                                  </div>
-                                </Show>
-                              </div>
+                              </Show>
                             </Show>
                             <Show when={!userAddress()}>
                               <p class="text-sm text-[hsl(var(--muted-foreground))]">
