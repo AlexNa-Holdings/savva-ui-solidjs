@@ -60,7 +60,7 @@ export default function SubscribeModal(props) {
     }
   );
 
-  // Initialize weekly amount from current sub
+  // Initialize weekly amount from props or current sub
   let didInit = false;
   createEffect(() => {
     if (didInit) return;
@@ -68,7 +68,16 @@ export default function SubscribeModal(props) {
     const dec = stakingDecimals();
     if (!s || !stakingAddr() || !Number.isFinite(dec)) return;
 
-    if (s.amountPerWeek && s.amountPerWeek > 0n) {
+    // If initialWeeklyAmountWei is provided via props, use that
+    if (props.initialWeeklyAmountWei && props.initialWeeklyAmountWei > 0n) {
+      const txt = formatAmountWithDecimals(props.initialWeeklyAmountWei, dec, 6)
+        .replace(/(\.\d*?[1-9])0+$/, "$1")
+        .replace(/\.$/, "");
+      setAmountText(txt);
+      setAmountWei(props.initialWeeklyAmountWei);
+    }
+    // Otherwise, use existing subscription amount
+    else if (s.amountPerWeek && s.amountPerWeek > 0n) {
       const txt = formatAmountWithDecimals(s.amountPerWeek, dec, 6)
         .replace(/(\.\d*?[1-9])0+$/, "$1")
         .replace(/\.$/, "");

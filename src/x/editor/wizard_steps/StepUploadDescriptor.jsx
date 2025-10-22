@@ -98,6 +98,20 @@ export default function StepUploadDescriptor(props) {
       descriptor.thumbnail = tn;
     }
 
+    // Add recipient list information for posts
+    if (contentType === "post") {
+      // Set recipient_list_type based on audience
+      if (params.audience === "subscribers") {
+        descriptor.recipient_list_type = "subscribers";
+        // Add minimum weekly payment if specified (convert from wei to token amount as string)
+        if (params.minWeeklyPaymentWei && params.minWeeklyPaymentWei > 0n) {
+          descriptor.recipient_list_min_weekly = params.minWeeklyPaymentWei.toString();
+        }
+      } else {
+        descriptor.recipient_list_type = "public";
+      }
+    }
+
     const gateways = isPinningEnabled()
       ? (getPinningServices().map((s) => s.gatewayUrl).filter(Boolean) || [])
       : (app.info()?.ipfs_gateways || []);
@@ -283,6 +297,8 @@ export default function StepUploadDescriptor(props) {
       const domainConfig = info?.domains?.find(d => d.name === currentDomain);
       const bigBrothers = domainConfig?.big_brothers || [];
 
+      const bigBrothersMissingKeys = [];
+
       if (bigBrothers.length > 0) {
         L(`Adding ${bigBrothers.length} big_brothers from domain config to recipients`);
 
@@ -312,12 +328,25 @@ export default function StepUploadDescriptor(props) {
               existingAddresses.add(String(bbAddress).toLowerCase());
               L(`Added big_brother ${bbAddress} to recipients`);
             } else {
-              E(`Big brother ${bbAddress} does not have a reading key - skipping`);
+              E(`Big brother ${bbAddress} does not have a reading key - will not be able to decrypt`);
+              bigBrothersMissingKeys.push(bbAddress);
             }
           } catch (err) {
             E(`Failed to fetch reading key for big_brother ${bbAddress}`, err);
+            bigBrothersMissingKeys.push(bbAddress);
             // Continue with other big brothers even if one fails
           }
+        }
+
+        // Check if some big_brothers don't have reading keys - this is a critical error
+        if (bigBrothersMissingKeys.length > 0) {
+          const addressList = bigBrothersMissingKeys.map(addr => `• ${addr}`).join('\n');
+          const errorMessage = `Cannot publish encrypted post: ${bigBrothersMissingKeys.length} domain moderator(s) do not have reading keys published:\n\n${addressList}\n\nThey need to generate and publish their reading keys first. Contact domain administrators to resolve this issue.`;
+
+          E("Some big_brothers missing reading keys - blocking publish:", bigBrothersMissingKeys);
+
+          // Throw error to stop the publish process
+          throw new Error(errorMessage);
         }
       }
 

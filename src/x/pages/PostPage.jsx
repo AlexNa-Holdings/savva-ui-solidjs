@@ -18,6 +18,7 @@ import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
 import MarkdownView from "../docs/MarkdownView.jsx";
+import TokenValue from "../ui/TokenValue.jsx";
 
 import ChapterSelector from "../post/ChapterSelector.jsx";
 import ChapterPager from "../post/ChapterPager.jsx";
@@ -33,6 +34,7 @@ import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallb
 import BannedBanner from "../post/BannedBanner.jsx";
 import PostInfo from "../post/PostInfo.jsx";
 import StoreReadingKeyModal from "../modals/StoreReadingKeyModal.jsx";
+import SubscribeModal from "../modals/SubscribeModal.jsx";
 
 // ⬇️ Profile store (same as PostCard)
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
@@ -151,6 +153,7 @@ export default function PostPage() {
   const [contributeCampaignId, setContributeCampaignId] = createSignal(null);
   const [showStoreKeyModal, setShowStoreKeyModal] = createSignal(false);
   const [pendingKeyToStore, setPendingKeyToStore] = createSignal(null);
+  const [showSubscribeModal, setShowSubscribeModal] = createSignal(false);
 
   const [postResource, { refetch: refetchPost }] = createResource(
     () => ({ identifier: identifier(), domain: app.selectedDomainName(), app, lang: uiLang() }),
@@ -278,6 +281,13 @@ export default function PostPage() {
     const encData = encryptionData();
     if (!encData) return false;
     return isUserInRecipientsList(userAddress(), encData);
+  });
+
+  // Get recipient list information from descriptor
+  const recipientListType = createMemo(() => details()?.descriptor?.recipient_list_type || "public");
+  const recipientListMinWeekly = createMemo(() => {
+    const minWeekly = details()?.descriptor?.recipient_list_min_weekly;
+    return minWeekly ? BigInt(minWeekly) : 0n;
   });
 
   const [postSecretKey, setPostSecretKey] = createSignal(null);
@@ -628,9 +638,38 @@ export default function PostPage() {
                               </button>
                             </Show>
                             <Show when={userAddress() && !isUserInRecipients()}>
-                              <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                                {t("post.encrypted.noAccess") || "You don't have access to this content"}
-                              </p>
+                              <div class="space-y-3">
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                  {t("post.encrypted.noAccess") || "You don't have access to this content"}
+                                </p>
+
+                                {/* Show subscription requirements if this is a subscribers-only post */}
+                                <Show when={recipientListType() === "subscribers"}>
+                                  <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center">
+                                    <div class="text-sm font-medium mb-2">
+                                      {t("post.encrypted.subscribeForFuture") || "Subscribe to access future posts like this"}
+                                    </div>
+                                    <Show when={recipientListMinWeekly() > 0n}>
+                                      <div class="text-xs text-[hsl(var(--muted-foreground))] mb-3">
+                                        {t("post.encrypted.minimumWeekly") || "Minimum weekly subscription"}:
+                                        <div class="mt-1 flex justify-center">
+                                          <TokenValue
+                                            amount={recipientListMinWeekly()}
+                                            tokenAddress={app.info()?.savva_contracts?.Staking?.address || ""}
+                                            format="inline"
+                                          />
+                                        </div>
+                                      </div>
+                                    </Show>
+                                    <button
+                                      onClick={() => setShowSubscribeModal(true)}
+                                      class="px-4 py-2 rounded-md text-sm font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+                                    >
+                                      {t("post.encrypted.subscribeButton") || "Subscribe Now"}
+                                    </button>
+                                  </div>
+                                </Show>
+                              </div>
                             </Show>
                             <Show when={!userAddress()}>
                               <p class="text-sm text-[hsl(var(--muted-foreground))]">
@@ -721,6 +760,19 @@ export default function PostPage() {
         isOpen={showStoreKeyModal()}
         onClose={handleDeclineStoreKey}
         onConfirm={handleConfirmStoreKey}
+      />
+
+      <SubscribeModal
+        isOpen={showSubscribeModal()}
+        domain={app.selectedDomainName()}
+        author={post()?.author || post()?.user}
+        initialWeeklyAmountWei={recipientListMinWeekly()}
+        onClose={() => setShowSubscribeModal(false)}
+        onSubmit={() => {
+          setShowSubscribeModal(false);
+          // Optionally refetch post to update subscription status
+          refetchPost();
+        }}
       />
     </main>
   );
