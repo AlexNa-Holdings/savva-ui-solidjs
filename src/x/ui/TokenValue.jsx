@@ -18,7 +18,10 @@ export default function TokenValue(props) {
 
   // Address to use
   const tokenAddressRaw = createMemo(() => props.tokenAddress ?? savvaTokenAddress());
-  const isBaseToken = createMemo(() => tokenAddressRaw() === "0");
+  const isBaseToken = createMemo(() => {
+    const addr = tokenAddressRaw();
+    return !addr || addr === "0" || addr === "";
+  });
   // Normalize for meta: "" (empty) means native/base coin
   const tokenAddressForMeta = createMemo(() => {
     const a = tokenAddressRaw();
@@ -85,17 +88,35 @@ export default function TokenValue(props) {
   // USD approximate value and animation
   const sourceUsdValue = createMemo(() => {
     let priceData = null;
-    if (isSavvaLike())        priceData = app.savvaTokenPrice?.();
-    else if (isBaseToken())   priceData = app.baseTokenPrice?.();
+    const isSavva = isSavvaLike();
+    const isBase = isBaseToken();
 
-    if (!priceData?.price) return null;
+    console.log("[TokenValue] USD calculation:", {
+      isSavvaLike: isSavva,
+      isBaseToken: isBase,
+      tokenAddress: tokenAddressRaw(),
+      savvaPrice: app.savvaTokenPrice?.(),
+      basePrice: app.baseTokenPrice?.(),
+      amount: props.amount,
+    });
+
+    if (isSavva)        priceData = app.savvaTokenPrice?.();
+    else if (isBase)   priceData = app.baseTokenPrice?.();
+
+    if (!priceData?.price) {
+      console.log("[TokenValue] No price data available");
+      return null;
+    }
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
       const units = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
       const total = units * Number(priceData.price);
-      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
-    } catch {
+      const formatted = total.toLocaleString(undefined, { style: "currency", currency: "USD" });
+      console.log("[TokenValue] USD value calculated:", formatted);
+      return formatted;
+    } catch (err) {
+      console.error("[TokenValue] Error calculating USD:", err);
       return null;
     }
   });

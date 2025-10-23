@@ -8,11 +8,22 @@ import TokenValue from "../ui/TokenValue.jsx";
  */
 function FormattedValue(props) {
   const app = useApp();
-  const { t } = app;
 
   const value = () => props.value;
   const format = () => props.format || "text";
-  const tokenSymbol = () => props.tokenSymbol;
+
+  // Get token address based on symbol (from detail.tokenSymbol)
+  const tokenAddress = () => {
+    const symbol = props.tokenSymbol;
+    if (symbol === "SAVVA") {
+      return app.info()?.savva_contracts?.SavvaToken?.address || "";
+    } else if (symbol === "PLS") {
+      // PLS is the native token, use empty string
+      return "";
+    }
+    // Default to empty for unknown tokens
+    return "";
+  };
 
   return (
     <Show
@@ -32,7 +43,10 @@ function FormattedValue(props) {
       </Show>
 
       <Show when={format() === "token"}>
-        <TokenValue amount={value()} symbol={tokenSymbol()} />
+        <TokenValue
+          amount={value()}
+          tokenAddress={tokenAddress()}
+        />
       </Show>
 
       <Show when={format() === "percent"}>

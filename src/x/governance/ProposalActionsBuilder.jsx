@@ -272,18 +272,36 @@ export default function ProposalActionsBuilder(props) {
             <Show
               when={selectedParamConfig()?.type === "address"}
               fallback={
-                <input
-                  type="text"
-                  class="w-full px-3 py-2 border border-[hsl(var(--border))] rounded-md bg-[hsl(var(--background))] text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
-                  value={newValue()}
-                  onInput={(e) => setNewValue(e.target.value)}
-                  placeholder={
-                    selectedParamConfig()?.format === "token" ? "0.0" :
-                    selectedParamConfig()?.format === "percent100" ? "5.5" :
-                    selectedParamConfig()?.format === "duration" ? "86400" :
-                    "0"
+                <Show
+                  when={selectedParamConfig()?.format === "token"}
+                  fallback={
+                    <input
+                      type="text"
+                      class="w-full px-3 py-2 border border-[hsl(var(--border))] rounded-md bg-[hsl(var(--background))] text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+                      value={newValue()}
+                      onInput={(e) => setNewValue(e.target.value)}
+                      placeholder={
+                        selectedParamConfig()?.format === "percent100" ? "5.5" :
+                        selectedParamConfig()?.format === "duration" ? "86400" :
+                        "0"
+                      }
+                    />
                   }
-                />
+                >
+                  <AmountInput
+                    value={newValue()}
+                    onInput={(text, wei) => setNewValue(text)}
+                    tokenAddress={
+                      selectedParamConfig()?.tokenSymbol === "SAVVA"
+                        ? app.info()?.savva_contracts?.SavvaToken?.address
+                        : selectedParamConfig()?.tokenSymbol === "PLS"
+                        ? ""
+                        : ""
+                    }
+                    placeholder="0.0"
+                    label=""
+                  />
+                </Show>
               }
             >
               <AddressInput
