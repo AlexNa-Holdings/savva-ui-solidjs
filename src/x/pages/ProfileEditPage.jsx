@@ -159,10 +159,10 @@ export default function ProfileEditPage() {
   const [pendingKeyToStore, setPendingKeyToStore] = createSignal(null);
   const [storedKeysCount, setStoredKeysCount] = createSignal(0);
 
-  // true only if we're editing the auth user and we're acting as the auth user
-  const isSelfActorEditingSelf = createMemo(
-    () => subjectAddress() && authAddress() && actorAddress()
-      ? subjectAddress() === authAddress() && actorAddress() === authAddress()
+  // true if we're editing the current actor's profile (supports both self and NPO editing)
+  const isEditingActorProfile = createMemo(
+    () => subjectAddress() && actorAddress()
+      ? subjectAddress() === actorAddress()
       : false
   );
 
@@ -221,10 +221,10 @@ export default function ProfileEditPage() {
     }
   });
 
-  // Fetch reading key when profile loads
+  // Fetch reading key when profile loads (visible for all, editable only for actor)
   createEffect(async () => {
     const data = profileData();
-    if (data && !data.error && data.address && isSelfActorEditingSelf()) {
+    if (data && !data.error && data.address) {
       setIsLoadingReadingKey(true);
       try {
         const key = await fetchReadingKey(app, data.address);
@@ -241,7 +241,7 @@ export default function ProfileEditPage() {
   // Update stored keys count when profile loads or changes
   createEffect(() => {
     const data = profileData();
-    if (data && !data.error && data.address && isSelfActorEditingSelf()) {
+    if (data && !data.error && data.address && isEditingActorProfile()) {
       const count = countStoredReadingKeys(data.address);
       setStoredKeysCount(count);
     }
@@ -322,7 +322,7 @@ export default function ProfileEditPage() {
 
   // Actor-aware: setName through current actor (NPO => multicall)
   const executeSetName = async () => {
-    if (isRegisterDisabled()) return;
+    if (isRegisterDisabled() || !isEditingActorProfile()) return;
     setIsRegistering(true);
     setShowConfirmNameChange(false);
 
@@ -353,6 +353,10 @@ export default function ProfileEditPage() {
 
   // Actor-aware: Avatar save
   const handleAvatarSave = async (blob) => {
+    if (!isEditingActorProfile()) {
+      throw new Error("You can only edit your own profile or profiles you're acting as");
+    }
+
     try {
       const formData = new FormData();
       formData.append("file", blob, "avatar.png");
@@ -487,6 +491,13 @@ export default function ProfileEditPage() {
   };
 
   const handleSave = async () => {
+    if (!isEditingActorProfile()) {
+      pushErrorToast(new Error("You can only edit your own profile or profiles you're acting as"), {
+        context: t("profile.edit.saveError")
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const profileJson = {
@@ -566,13 +577,26 @@ export default function ProfileEditPage() {
             </Match>
             <Match when={profileData()}>
               <div class="space-y-6">
+                {/* Warning when viewing someone else's profile */}
+                <Show when={!isEditingActorProfile()}>
+                  <div class="p-4 rounded-lg border border-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10">
+                    <p class="text-sm text-[hsl(var(--destructive))] text-center font-medium">
+                      {t("profile.edit.cannotEdit") || "You are viewing another user's profile. To edit this profile, switch to 'Act as' mode for this account."}
+                    </p>
+                  </div>
+                </Show>
+
                 {/* Section 1: Cross Domain Settings */}
                 <div class="p-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] space-y-4">
                   <h3 class="text-lg font-semibold">{t("profile.edit.crossDomainSettings")}</h3>
                   <div class="flex items-start gap-6">
                     <div
-                      onClick={() => setShowAvatarEditor(true)}
-                      class="relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0 cursor-pointer"
+                      onClick={() => isEditingActorProfile() && setShowAvatarEditor(true)}
+                      classList={{
+                        "relative group w-48 h-48 rounded-2xl overflow-hidden bg-[hsl(var(--muted))] shrink-0": true,
+                        "cursor-pointer": isEditingActorProfile(),
+                        "cursor-not-allowed opacity-60": !isEditingActorProfile()
+                      }}
                     >
                       <IpfsImage
                         src={avatar()}
@@ -580,9 +604,11 @@ export default function ProfileEditPage() {
                         class="w-full h-full object-cover"
                         fallback={<UnknownUserIcon class="w-full h-full object-cover text-[hsl(var(--muted-foreground))]" />}
                       />
-                      <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <EditIcon class="w-10 h-10 text-white" />
-                      </div>
+                      <Show when={isEditingActorProfile()}>
+                        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <EditIcon class="w-10 h-10 text-white" />
+                        </div>
+                      </Show>
                     </div>
                     <div class="flex-1 space-y-4">
                       <div>
@@ -607,7 +633,7 @@ export default function ProfileEditPage() {
                         </Show>
                         <button
                           class="mt-3 px-3 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-                          disabled={isRegisterDisabled()}
+                          disabled={isRegisterDisabled() || !isEditingActorProfile()}
                           onClick={handleRegisterName}
                         >
                           <Show when={isCheckingName() || isRegistering()} fallback={t("profile.edit.registerName")}>
@@ -618,54 +644,61 @@ export default function ProfileEditPage() {
                     </div>
                   </div>
 
-                  {/* Subsection: Reading Key */}
-                  <Show when={isSelfActorEditingSelf()}>
-                    <div class="pt-6 border-t border-[hsl(var(--border))]">
-                      <h4 class="text-md font-semibold mb-2">{t("profile.edit.readingKey.title")}</h4>
-                      <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
-                        {t("profile.edit.readingKey.description")}
-                      </p>
+                  {/* Subsection: Reading Key - visible for all, editable only for actor */}
+                  <div class="pt-6 border-t border-[hsl(var(--border))]">
+                    <h4 class="text-md font-semibold mb-2">{t("profile.edit.readingKey.title")}</h4>
+                    <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+                      {t("profile.edit.readingKey.description")}
+                    </p>
 
-                      <Show when={isLoadingReadingKey()}>
-                        <div class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-                          <Spinner class="w-4 h-4" />
-                          <span>{t("profile.edit.readingKey.loading")}</span>
-                        </div>
-                      </Show>
+                    <Show when={isLoadingReadingKey()}>
+                      <div class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+                        <Spinner class="w-4 h-4" />
+                        <span>{t("profile.edit.readingKey.loading")}</span>
+                      </div>
+                    </Show>
 
-                      <Show when={!isLoadingReadingKey()}>
-                        <Show
-                          when={readingKey()}
-                          fallback={
-                            <button
-                              class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
-                              onClick={handleGenerateReadingKey}
-                              disabled={isGeneratingReadingKey()}
-                            >
-                              <Show when={isGeneratingReadingKey()} fallback={t("profile.edit.readingKey.generateButton")}>
-                                <div class="flex items-center gap-2">
-                                  <Spinner class="w-4 h-4" />
-                                  <span>{t("profile.edit.readingKey.generating")}</span>
-                                </div>
-                              </Show>
-                            </button>
-                          }
-                        >
-                          <div class="space-y-3">
-                            <div class="bg-[hsl(var(--muted))] p-3 rounded text-xs font-mono space-y-2">
-                              <div>
-                                <span class="text-[hsl(var(--muted-foreground))]">Public Key: </span>
-                                <span class="break-all">{readingKey()?.publicKey}</span>
-                              </div>
-                              <div>
-                                <span class="text-[hsl(var(--muted-foreground))]">Scheme: </span>
-                                <span>{readingKey()?.scheme}</span>
-                              </div>
-                              <div>
-                                <span class="text-[hsl(var(--muted-foreground))]">Nonce: </span>
-                                <span class="break-all">{readingKey()?.nonce}</span>
-                              </div>
+                    <Show when={!isLoadingReadingKey()}>
+                      <Show
+                        when={readingKey()}
+                        fallback={
+                          <div>
+                            <p class="text-sm text-[hsl(var(--muted-foreground))] mb-3">
+                              {t("profile.edit.readingKey.notGenerated") || "No reading key has been generated yet."}
+                            </p>
+                            <Show when={isEditingActorProfile()}>
+                              <button
+                                class="px-4 py-2 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                                onClick={handleGenerateReadingKey}
+                                disabled={isGeneratingReadingKey()}
+                              >
+                                <Show when={isGeneratingReadingKey()} fallback={t("profile.edit.readingKey.generateButton")}>
+                                  <div class="flex items-center gap-2">
+                                    <Spinner class="w-4 h-4" />
+                                    <span>{t("profile.edit.readingKey.generating")}</span>
+                                  </div>
+                                </Show>
+                              </button>
+                            </Show>
+                          </div>
+                        }
+                      >
+                        <div class="space-y-3">
+                          <div class="bg-[hsl(var(--muted))] p-3 rounded text-xs font-mono space-y-2">
+                            <div>
+                              <span class="text-[hsl(var(--muted-foreground))]">Public Key: </span>
+                              <span class="break-all">{readingKey()?.publicKey}</span>
                             </div>
+                            <div>
+                              <span class="text-[hsl(var(--muted-foreground))]">Scheme: </span>
+                              <span>{readingKey()?.scheme}</span>
+                            </div>
+                            <div>
+                              <span class="text-[hsl(var(--muted-foreground))]">Nonce: </span>
+                              <span class="break-all">{readingKey()?.nonce}</span>
+                            </div>
+                          </div>
+                          <Show when={isEditingActorProfile()}>
                             <button
                               class="px-4 py-2 text-sm rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90 disabled:opacity-60"
                               onClick={handleGenerateReadingKey}
@@ -678,10 +711,12 @@ export default function ProfileEditPage() {
                                 </div>
                               </Show>
                             </button>
-                          </div>
-                        </Show>
+                          </Show>
+                        </div>
+                      </Show>
 
-                        {/* Stored Keys Info */}
+                      {/* Stored Keys Info - only show for actor's own profile */}
+                      <Show when={isEditingActorProfile()}>
                         <div class="mt-4 pt-4 border-t border-[hsl(var(--border))]">
                           <div class="flex items-center justify-between">
                             <div class="text-sm">
@@ -706,8 +741,8 @@ export default function ProfileEditPage() {
                           </Show>
                         </div>
                       </Show>
-                    </div>
-                  </Show>
+                    </Show>
+                  </div>
                 </div>
 
                 {/* Section 2: Domain Specific Parameters */}
@@ -791,7 +826,7 @@ export default function ProfileEditPage() {
                   <button
                     class="px-6 py-3 text-lg rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-bold hover:opacity-90 disabled:opacity-60"
                     onClick={handleSave}
-                    disabled={isSaving()}
+                    disabled={isSaving() || !isEditingActorProfile()}
                   >
                     <Show when={isSaving()} fallback={t("profile.edit.saveButton")}>
                       <div class="flex items-center gap-2">
