@@ -12,6 +12,7 @@ import { createWalletClient, custom } from "viem";
 import { useTokenPrices } from "./useTokenPrices.js";
 import { dbg } from "../utils/debug.js";
 import { useActor } from "./useActor.js";
+import { parse } from "yaml";
 
 const AppContext = Solid.createContext();
 const dn = (d) => (typeof d === "string" ? d : d?.name || "");
@@ -141,6 +142,60 @@ export function AppProvider(props) {
         i18n.setLang(nextLang);
       }
     }
+  });
+
+  // Effect to load domain-specific translation dictionaries
+  Solid.createEffect(() => {
+    const cfg = orchestrator.domainAssetsConfig();
+    const prefix = orchestrator.domainAssetsPrefix();
+    const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];
+
+    if (!cfg || !prefix) {
+      i18n.setDomainDictionaries({});
+      return;
+    }
+
+    const locales = Array.isArray(cfg.locales) ? cfg.locales : [];
+
+    // Load all dictionary files in parallel
+    Promise.all(
+      locales.map(async (locale) => {
+        const langCode = norm(locale.code);
+        const dictPath = locale.dictionary;
+
+        if (!langCode || !dictPath) return null;
+
+        try {
+          const url = `${prefix}${dictPath}`;
+          dbg.log("DomainDicts", `Loading dictionary from ${url}`);
+          const response = await fetch(url, { cache: "no-store" });
+
+          if (!response.ok) {
+            dbg.warn("DomainDicts", `Failed to load ${url}: ${response.status}`);
+            return null;
+          }
+
+          const text = await response.text();
+          const dict = parse(text) || {};
+
+          dbg.log("DomainDicts", `Loaded ${Object.keys(dict).length} keys for ${langCode}`);
+          return { langCode, dict };
+        } catch (error) {
+          dbg.warn("DomainDicts", `Error loading dictionary for ${langCode}:`, error);
+          return null;
+        }
+      })
+    ).then((results) => {
+      const domainDicts = {};
+      results.forEach((result) => {
+        if (result) {
+          domainDicts[result.langCode] = result.dict;
+        }
+      });
+
+      dbg.log("DomainDicts", `Setting domain dictionaries:`, Object.keys(domainDicts));
+      i18n.setDomainDictionaries(domainDicts);
+    });
   });
 
   const actor = useActor({ auth, loading: orchestrator.loading, selectedDomainName, t: i18n.t });
