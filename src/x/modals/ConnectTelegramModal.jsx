@@ -43,7 +43,7 @@ export default function ConnectTelegramModal(props) {
     setLoading(true);
     setExpiresAtSec(0);
 
-    callWs("auth-token", {})
+    callWs("temp-auth-token", {})
       .then((res) => {
         const tok = res?.token ? String(res.token) : "";
         if (!tok) throw new Error("no token");
