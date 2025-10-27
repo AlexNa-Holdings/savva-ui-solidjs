@@ -448,7 +448,6 @@ export default {
   "governance.proposalThreshold": "Prag za predlog",
   "governance.proposals": "Predlozi",
   "governance.proposalsLoadError": "Neuspešno učitavanje predloga",
-  "governance.quorum": "Kvorum",
   "governance.quorumReached": "Dostignuto",
   "governance.readyToExecute": "Spreman za izvršenje",
   "governance.requiredDeposit": "Potrebni depozit",

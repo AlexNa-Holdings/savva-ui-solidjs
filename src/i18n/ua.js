@@ -448,7 +448,6 @@ export default {
   "governance.proposalThreshold": "Поріг пропозиції",
   "governance.proposals": "Пропозиції",
   "governance.proposalsLoadError": "Не вдалося завантажити пропозиції",
-  "governance.quorum": "Кворум",
   "governance.quorumReached": "Досягнуто",
   "governance.readyToExecute": "Готово до виконання",
   "governance.requiredDeposit": "Потрібний депозит",

@@ -22,6 +22,7 @@ export default function ProposalCard(props) {
   const [currentBlock, setCurrentBlock] = createSignal(0n);
   const [voteData, setVoteData] = createSignal(null);
   const [quorum, setQuorum] = createSignal(0n);
+  const [totalVotingSupply, setTotalVotingSupply] = createSignal(0n);
   const [proposalState_blockchain, setProposalState_blockchain] = createSignal(null);
   const [isExecuting, setIsExecuting] = createSignal(false);
 
@@ -105,15 +106,38 @@ export default function ProposalCard(props) {
     const abstainVotes = BigInt(votes.abstain || 0);
     const totalVotes = forVotes + againstVotes + abstainVotes;
     const quorumRequired = quorum();
+    const totalSupply = totalVotingSupply();
 
     // Calculate percentages
     const forPercent = totalVotes > 0n ? Number((forVotes * 10000n) / totalVotes) / 100 : 0;
     const againstPercent = totalVotes > 0n ? Number((againstVotes * 10000n) / totalVotes) / 100 : 0;
     const abstainPercent = totalVotes > 0n ? Number((abstainVotes * 10000n) / totalVotes) / 100 : 0;
 
-    // Calculate quorum progress
-    const quorumPercent = quorumRequired > 0n ? Number((totalVotes * 10000n) / quorumRequired) / 100 : 0;
+    // Calculate voted percentage (percentage of total supply that has voted)
+    // Since totalVotes can never exceed totalSupply, this will naturally be <= 100%
+    const votedPercent = totalSupply > 0n
+      ? Number((totalVotes * 10000n) / totalSupply) / 100
+      : 0;
+
+    // Calculate quorum target as percentage of total supply
+    const quorumTargetPercent = totalSupply > 0n
+      ? Number((quorumRequired * 10000n) / totalSupply) / 100
+      : 0;
+
     const quorumReached = totalVotes >= quorumRequired;
+
+    // Debug logging
+    console.log("ProposalCard voteStats:", {
+      totalVotes: totalVotes.toString(),
+      totalSupply: totalSupply.toString(),
+      quorumRequired: quorumRequired.toString(),
+      votedPercent,
+      quorumTargetPercent,
+      quorumReached,
+      forVotes: forVotes.toString(),
+      againstVotes: againstVotes.toString(),
+      abstainVotes: abstainVotes.toString(),
+    });
 
     // Determine result
     const isEnded = proposalState().state === "ended";
@@ -146,7 +170,8 @@ export default function ProposalCard(props) {
       againstPercent,
       abstainPercent,
       quorumRequired,
-      quorumPercent,
+      votedPercent,
+      quorumTargetPercent,
       quorumReached,
       result,
       resultLabel,
@@ -353,13 +378,42 @@ export default function ProposalCard(props) {
       // Fetch proposal votes (againstVotes, forVotes, abstainVotes)
       const votes = await governance.read.proposalVotes([BigInt(proposalId)]);
 
-      // Fetch quorum required
+      // Fetch quorum required and calculate total supply from it
       const snapshotBlock = await governance.read.proposalSnapshot([BigInt(proposalId)]);
       const quorumVotes = await governance.read.quorum([snapshotBlock]);
+
+      // Get quorum fraction to calculate total supply
+      // quorum = (totalSupply * numerator) / denominator
+      // therefore: totalSupply = (quorum * denominator) / numerator
+      try {
+        const quorumNumerator = await governance.read.quorumNumerator();
+        const quorumDenominator = await governance.read.quorumDenominator();
+
+        if (quorumNumerator > 0n) {
+          const totalSupply = (quorumVotes * quorumDenominator) / quorumNumerator;
+          console.log("ProposalCard: Calculated total voting supply from quorum:", {
+            totalSupply: totalSupply.toString(),
+            quorumVotes: quorumVotes.toString(),
+            quorumNumerator: quorumNumerator.toString(),
+            quorumDenominator: quorumDenominator.toString(),
+            snapshotBlock: snapshotBlock.toString()
+          });
+          setTotalVotingSupply(totalSupply);
+        }
+      } catch (error) {
+        console.warn("Failed to calculate total voting supply from quorum:", error);
+      }
 
       // Fetch proposal state from blockchain
       // States: 0=Pending, 1=Active, 2=Canceled, 3=Defeated, 4=Succeeded, 5=Queued, 6=Expired, 7=Executed
       const state = await governance.read.state([BigInt(proposalId)]);
+
+      console.log("ProposalCard: Fetched vote data:", {
+        votes: votes.map(v => v.toString()),
+        quorumVotes: quorumVotes.toString(),
+        snapshotBlock: snapshotBlock.toString(),
+        state: Number(state)
+      });
 
       setVoteData({
         against: votes[0],
@@ -587,15 +641,15 @@ export default function ProposalCard(props) {
             </Show>
           </div>
 
-          {/* Quorum Progress */}
+          {/* Votes Progress */}
           <div class="pt-3 border-t border-[hsl(var(--border))]">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-medium">{t("governance.quorum")}</span>
+              <span class="text-xs font-medium">{t("governance.votes")}</span>
               <Show when={voteStats().quorumReached}>
                 <span class="text-xs text-green-600 dark:text-green-400 font-semibold">✓ {t("governance.quorumReached")}</span>
               </Show>
             </div>
-            <ProgressBar value={voteStats().quorumPercent} />
+            <ProgressBar value={voteStats().votedPercent} target={voteStats().quorumTargetPercent} />
           </div>
         </div>
       </Show>

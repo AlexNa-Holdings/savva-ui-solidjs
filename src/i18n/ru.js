@@ -448,7 +448,6 @@ export default {
   "governance.proposalThreshold": "Порог предложения",
   "governance.proposals": "Предложения",
   "governance.proposalsLoadError": "Не удалось загрузить предложения",
-  "governance.quorum": "Кворум",
   "governance.quorumReached": "Достигнут",
   "governance.readyToExecute": "Готово к выполнению",
   "governance.requiredDeposit": "Требуемый депозит",

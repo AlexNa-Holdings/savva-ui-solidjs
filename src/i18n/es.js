@@ -448,7 +448,6 @@ export default {
   "governance.proposalThreshold": "Umbral de propuesta",
   "governance.proposals": "Propuestas",
   "governance.proposalsLoadError": "Error al cargar las propuestas",
-  "governance.quorum": "Quórum",
   "governance.quorumReached": "Alcanzado",
   "governance.readyToExecute": "Listo para ejecutar",
   "governance.requiredDeposit": "Depósito requerido",
