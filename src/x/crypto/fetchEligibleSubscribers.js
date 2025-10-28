@@ -5,6 +5,9 @@ import { createPublicClient, getContract } from "viem";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import { configuredHttp } from "../../blockchain/contracts.js";
 
+// Maximum number of admins to include from a single NPO subscription (to prevent abuse)
+const MAX_NPO_ADMINS_PER_SUBSCRIPTION = 3;
+
 /**
  * Fetch NPO admins with their reading keys
  *
@@ -153,11 +156,36 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
   console.log(`[fetchEligibleSubscribers] Eligible subscribers after filtering: ${eligible.length}`);
 
   // Fetch reading keys for all eligible subscribers
+  // If subscriber is an NPO, replace with NPO admins instead
   const subscribersWithKeys = await Promise.all(
     eligible.map(async (subscriber) => {
       try {
         const userAddress = subscriber.user?.address || subscriber.user_addr;
-        console.log(`[fetchEligibleSubscribers] Fetching reading key for ${userAddress}`);
+        const isNpo = subscriber.user?.is_npo || false;
+
+        // Check if this subscriber is an NPO
+        if (isNpo) {
+          console.log(`[fetchEligibleSubscribers] Subscriber ${userAddress} is an NPO, fetching admins instead`);
+          const npoAdmins = await fetchNpoAdmins(app, userAddress);
+          console.log(`[fetchEligibleSubscribers] Found ${npoAdmins.length} admins for NPO ${userAddress}`);
+
+          // Limit the number of admins to prevent abuse
+          const limitedAdmins = npoAdmins.slice(0, MAX_NPO_ADMINS_PER_SUBSCRIPTION);
+          if (npoAdmins.length > MAX_NPO_ADMINS_PER_SUBSCRIPTION) {
+            console.log(`[fetchEligibleSubscribers] Limiting NPO ${userAddress} admins from ${npoAdmins.length} to ${MAX_NPO_ADMINS_PER_SUBSCRIPTION}`);
+          }
+
+          // Return limited NPO admins instead of the NPO itself
+          // Return as array to be flattened later
+          return limitedAdmins.map(admin => ({
+            ...admin,
+            amount: subscriber.amount, // Preserve subscription amount
+            weeks: subscriber.weeks,   // Preserve subscription weeks
+          }));
+        }
+
+        // Regular subscriber (not NPO)
+        console.log(`[fetchEligibleSubscribers] Fetching reading key for subscriber ${userAddress}`);
         const readingKey = await fetchReadingKey(app, userAddress);
         console.log(`[fetchEligibleSubscribers] Reading key result for ${userAddress}:`, readingKey);
 
@@ -166,14 +194,14 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
           return null;
         }
 
-        return {
+        return [{
           address: userAddress,
           publicKey: readingKey.publicKey,
           scheme: readingKey.scheme,
           nonce: readingKey.nonce,
           amount: subscriber.amount,
           weeks: subscriber.weeks,
-        };
+        }];
       } catch (error) {
         console.error(`Failed to fetch reading key for ${subscriber.user_addr}:`, error);
         return null;
@@ -181,8 +209,10 @@ export async function fetchEligibleSubscribers(app, authorAddress, minWeeklyPaym
     })
   );
 
-  // Filter out subscribers without reading keys
-  let validSubscribers = subscribersWithKeys.filter(s => s !== null);
+  // Flatten the array (since NPOs return multiple admins) and filter out nulls
+  let validSubscribers = subscribersWithKeys
+    .flat()
+    .filter(s => s !== null);
 
   console.log(`Eligible subscribers: ${eligible.length}, with reading keys: ${validSubscribers.length}`);
 
