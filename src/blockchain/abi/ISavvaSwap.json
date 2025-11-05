@@ -2,19 +2,19 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "fromToken",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
         "name": "amountIn",
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
-        "name": "amountOutMin",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address[]",
-        "name": "path",
-        "type": "address[]"
+        "internalType": "address",
+        "name": "toToken",
+        "type": "address"
       },
       {
         "internalType": "address",
@@ -22,7 +22,7 @@
         "type": "address"
       }
     ],
-    "name": "swapExactTokensForTokens",
+    "name": "swapExact",
     "outputs": [
       {
         "internalType": "uint256",
@@ -30,25 +30,15 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "payable",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "amountOut",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amountInMax",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address[]",
-        "name": "path",
-        "type": "address[]"
+        "internalType": "address",
+        "name": "toToken",
+        "type": "address"
       },
       {
         "internalType": "address",
@@ -56,11 +46,11 @@
         "type": "address"
       }
     ],
-    "name": "swapTokensForExactTokens",
+    "name": "swapExactNative",
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "amountIn",
+        "name": "amountOut",
         "type": "uint256"
       }
     ],

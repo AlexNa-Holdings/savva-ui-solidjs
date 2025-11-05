@@ -1,7 +1,18 @@
 [
   {
-    "inputs": [],
-    "name": "claimGain",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "author",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "event_id",
+        "type": "bytes32"
+      }
+    ],
+    "name": "claimPayment",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -9,20 +20,14 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "claimable",
-    "outputs": [
-      {
         "internalType": "uint256",
-        "name": "",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "name": "distribute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ]

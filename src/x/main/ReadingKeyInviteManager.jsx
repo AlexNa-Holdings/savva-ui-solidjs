@@ -21,8 +21,19 @@ function isInviteDismissed() {
 }
 
 /**
+ * Dismisses the reading key invite permanently
+ */
+function dismissInvite() {
+  try {
+    localStorage.setItem(DISMISSED_KEY, "true");
+  } catch {
+    // Ignore
+  }
+}
+
+/**
  * Component that manages the reading key invitation flow.
- * Shows a modal prompting users to generate their reading key after wallet connection.
+ * Shows a modal prompting users to generate their reading key after they subscribe to an author.
  */
 export default function ReadingKeyInviteManager() {
   const app = useApp();
@@ -31,24 +42,15 @@ export default function ReadingKeyInviteManager() {
   const [showInviteModal, setShowInviteModal] = createSignal(false);
   const [showStoreKeyModal, setShowStoreKeyModal] = createSignal(false);
   const [pendingKeyToStore, setPendingKeyToStore] = createSignal(null);
-  const [hasChecked, setHasChecked] = createSignal(false);
 
-  // Check if we should show the invite when user connects
-  createEffect(async () => {
+  /**
+   * Check and show invite if needed (called after successful subscription)
+   */
+  const checkAndShowInvite = async () => {
     const user = app.authorizedUser();
+    if (!user) return;
 
-    // Reset check flag when user changes
-    if (!user) {
-      setHasChecked(false);
-      setShowInviteModal(false);
-      return;
-    }
-
-    // Only check once per user session
-    if (hasChecked()) return;
-    setHasChecked(true);
-
-    // Don't show if user dismissed it
+    // Don't show if user dismissed it permanently
     if (isInviteDismissed()) return;
 
     try {
@@ -59,9 +61,19 @@ export default function ReadingKeyInviteManager() {
       if (existingKey) return;
 
       // Show the invite modal
+      console.log("[ReadingKeyInviteManager] Showing invite after subscription");
       setShowInviteModal(true);
     } catch (error) {
       console.error("Error checking reading key:", error);
+    }
+  };
+
+  // Expose checkAndShowInvite method on app context for subscription flow to call
+  createEffect(() => {
+    if (typeof window !== "undefined") {
+      window.__readingKeyInviteManager = {
+        checkAndShowInvite
+      };
     }
   });
 
@@ -127,6 +139,11 @@ export default function ReadingKeyInviteManager() {
   };
 
   const handleClose = () => {
+    setShowInviteModal(false);
+  };
+
+  const handleDismiss = () => {
+    dismissInvite();
     setShowInviteModal(false);
   };
 

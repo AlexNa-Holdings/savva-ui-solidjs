@@ -261,7 +261,7 @@ export default function WalletTab(props) {
         method: "wallet_watchAsset",
         params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
       });
-    } catch {}
+    } catch { }
   }
 
   async function handleClaimNftEarnings() {
@@ -292,20 +292,20 @@ export default function WalletTab(props) {
   const savvaMenuItems = createMemo(() =>
     isActorProfile()
       ? [
-          { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
-          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-          { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
-        ]
+        { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
+        { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+        { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
+      ]
       : []
   );
   const baseMenuItems = createMemo(() => (isActorProfile() ? [{ label: t("wallet.menu.transfer"), onClick: () => setShowBaseTransfer(true) }] : []));
   const stakedMenuItems = createMemo(() =>
     isActorProfile()
       ? [
-          { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-          { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
-          { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
-        ]
+        { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
+        { label: t("wallet.menu.transfer"), onClick: () => setShowStakeTransfer(true) },
+        { label: t("wallet.menu.unstake"), onClick: () => setShowUnstake(true) },
+      ]
       : []
   );
 
@@ -321,9 +321,9 @@ export default function WalletTab(props) {
   const rewardMenuItems = createMemo(() =>
     isActorProfile() && hasStakingReward()
       ? [
-          { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
-          { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
-        ]
+        { label: t("wallet.menu.addToStaked"), onClick: handleCompoundReward },
+        { label: t("wallet.menu.withdraw"), onClick: handleWithdrawReward },
+      ]
       : []
   );
   const hasAvailableUnstaked = createMemo(() => {
@@ -430,11 +430,7 @@ export default function WalletTab(props) {
             </WalletRow>
           </WalletSection>
 
-          <WalletSection title={t("profile.wallet.nft.title")}>
-            <WalletRow title={t("profile.wallet.nftEarnings.title")} description={t("profile.wallet.nftEarnings.description")}>
-              <ValueWithMenu amount={walletData()?.nftEarnings} items={nftMenuItems()} />
-            </WalletRow>
-          </WalletSection>
+
 
           <WalletSection
             title={t("profile.wallet.staking.title")}
@@ -509,6 +505,12 @@ export default function WalletTab(props) {
                 </div>
               </div>
             </Show>
+          </WalletSection>
+
+          <WalletSection title={t("profile.wallet.nft.title")}>
+            <WalletRow title={t("profile.wallet.nftEarnings.title")} description={t("profile.wallet.nftEarnings.description")}>
+              <ValueWithMenu amount={walletData()?.nftEarnings} items={nftMenuItems()} />
+            </WalletRow>
           </WalletSection>
         </Show>
       </Show>

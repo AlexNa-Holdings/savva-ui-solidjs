@@ -15,7 +15,16 @@ const RANGES = [
 
 function subtractMonths(date, months) {
   const d = new Date(date);
+  const originalDay = d.getDate();
+
+  // Set to first day of month to avoid date rollover issues
+  d.setDate(1);
   d.setMonth(d.getMonth() - months);
+
+  // Restore original day, but cap at the last day of the target month
+  const lastDayOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(originalDay, lastDayOfMonth));
+
   return d;
 }
 

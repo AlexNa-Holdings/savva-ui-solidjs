@@ -1,0 +1,79 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "domain",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "cmd",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "p1",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "p2",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "p3",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "p4",
+        "type": "string"
+      }
+    ],
+    "name": "command",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "domain",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "author",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "guid",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "ipfs",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "content_type",
+        "type": "bytes32"
+      }
+    ],
+    "name": "reg",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

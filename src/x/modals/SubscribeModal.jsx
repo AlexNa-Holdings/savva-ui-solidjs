@@ -167,6 +167,9 @@ export default function SubscribeModal(props) {
       props.onSubmit?.();
       setIsBusy(false);
       props.onClose?.();
+
+      // Trigger reading key invite prompt after successful subscription
+      window.__readingKeyInviteManager?.checkAndShowInvite();
     } catch (e2) {
       console.error("Subscribe failed:", e2);
       setIsBusy(false);

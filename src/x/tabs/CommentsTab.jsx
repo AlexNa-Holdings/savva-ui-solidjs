@@ -21,7 +21,7 @@ export default function CommentsTab(props) {
     return pref === "s" || pref === "w";
   };
 
-  const commentListFetcher = app.wsMethod ? app.wsMethod("latest-comments-new") : null;
+  const commentListFetcher = app.wsMethod ? app.wsMethod("latest-comments") : null;
 
   async function loadMore() {
     if (loading() || !hasMore()) return;
