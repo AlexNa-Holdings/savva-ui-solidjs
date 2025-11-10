@@ -4,7 +4,6 @@ import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import NpoIcon from "../ui/icons/NpoIcon.jsx";
-import VerifiedBadge from "../ui/icons/VerifiedBadge.jsx";
 
 export default function ActorBadge() {
   const app = useApp();
@@ -20,7 +19,7 @@ export default function ActorBadge() {
   const lang = () => app.lang?.() || "en";
   const shortAddr = (addr) => (addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : "");
 
-  // Primary label rules: reg name + badge  >  display name  >  short address
+  // Primary label rules: reg name + star  >  display name  >  short address
   const PrimaryLabel = (props) => {
     const u = () => props.user || {};
     const name = () => u()?.name; // registered unique name
@@ -28,11 +27,11 @@ export default function ActorBadge() {
     const addr = () => u()?.address;
 
     return (
-      <div class="inline-flex items-center gap-1">
+      <div class="inline-flex items-center">
         <Show when={name()} fallback={<span class="truncate">{display() || shortAddr(addr())}</span>}>
           <>
+            <span>★</span>
             <span class="truncate">{name()}</span>
-            <VerifiedBadge class="w-3.5 h-3.5 opacity-90" />
           </>
         </Show>
       </div>
@@ -101,7 +100,7 @@ export default function ActorBadge() {
         {/* Menu (narrower width) */}
         <Show when={open()}>
           <div
-            class="absolute right-0 mt-2 w-64 p-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg z-50"
+            class="absolute right-0 mt-2 w-52 p-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] shadow-lg z-50"
             role="menu"
           >
             {/* Self */}
@@ -117,7 +116,7 @@ export default function ActorBadge() {
                   fallback={<UnknownUserIcon class="w-full h-full" />}
                 />
               </div>
-              <div class="flex-1 min-w-0">
+              <div class="flex-1 min-w-0 text-left">
                 <div class="text-sm leading-tight truncate">
                   <PrimaryLabel user={app.authorizedUser?.()} />
                 </div>
@@ -151,7 +150,7 @@ export default function ActorBadge() {
                           fallback={<UnknownUserIcon class="w-full h-full" />}
                         />
                       </div>
-                      <div class="flex-1 min-w-0">
+                      <div class="flex-1 min-w-0 text-left">
                         <div class="text-sm leading-tight truncate">
                           <PrimaryLabel user={it?.user || it} />
                         </div>
@@ -159,7 +158,6 @@ export default function ActorBadge() {
                           {shortAddr(it?.address)}
                         </div>
                       </div>
-                      <NpoIcon class="w-4 h-4 opacity-80" />
                       <Show when={selectedCheck(it?.address)}>
                         <span class="text-xs">✓</span>
                       </Show>

@@ -8,7 +8,6 @@ import Spinner from "../ui/Spinner.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
 import UnknownUserIcon from "../ui/icons/UnknownUserIcon.jsx";
 import StakerLevelIcon from "../ui/StakerLevelIcon.jsx";
-import VerifiedBadge from "../ui/icons/VerifiedBadge.jsx";
 import NpoIcon from "../ui/icons/NpoIcon.jsx";
 import Address from "../ui/Address.jsx";
 import { ipfs } from "../../ipfs/index.js";
@@ -299,9 +298,9 @@ export default function ProfilePage() {
                       <Show when={!isBanned()}>
                         <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
                         <Show when={user().name}>
-                          <div class="flex items-center gap-1 text-sm text-[hsl(var(--muted-foreground))]">
-                            <span>{String(user().name || "").toUpperCase()}</span>
-                            <VerifiedBadge class="w-4 h-4" />
+                          <div class="flex items-center text-sm text-[hsl(var(--muted-foreground))]">
+                            <span>★</span>
+                            <span>{user().name}</span>
                           </div>
                         </Show>
                       </Show>

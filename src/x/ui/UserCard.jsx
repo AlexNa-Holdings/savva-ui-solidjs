@@ -3,13 +3,9 @@ import { Show, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "./IpfsImage.jsx";
 import UnknownUserIcon from "./icons/UnknownUserIcon.jsx";
-import VerifiedBadge from "./icons/VerifiedBadge.jsx";
 import StakerLevelIcon from "./StakerLevelIcon.jsx";
 import { navigate } from "../../routing/smartRouter.js";
 
-function isVerified(a) {
-  return Boolean(a && a.name);
-}
 function shortAddr(addr) {
   if (!addr) return "";
   return addr.slice(0, 6) + "…" + addr.slice(-4);
@@ -91,10 +87,8 @@ export default function UserCard(props) {
                 <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? "text-[11px]" : "text-xs"} ${mutedTextColor()} ${centered() ? "justify-center" : ""}`}>
                   <Show when={author().name}>
                     <div class="min-w-0 flex items-center">
-                      <span class="truncate uppercase font-semibold">{author().name}</span>
-                      <Show when={isVerified(author())}>
-                        <VerifiedBadge class="ml-0.5 w-3.5 h-3.5 shrink-0" />
-                      </Show>
+                      <span class="shrink-0">★</span>
+                      <span class="truncate font-semibold">{author().name}</span>
                     </div>
                   </Show>
 
