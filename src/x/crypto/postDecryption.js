@@ -98,6 +98,11 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
   if (!forceRecover) {
     const storedKey = findStoredSecretKey(userAddress, nonce);
     if (storedKey) {
+      console.log('[READING_KEY] Retrieved from storage:');
+      console.log('  - address:', userAddress);
+      console.log('  - secretKey (full hex):', storedKey);
+      console.log('  - nonce:', nonce);
+
       dbg.log("PostDecrypt", "getReadingSecretKey:stored-key", { userAddress, nonce });
       return storedKey;
     }
@@ -107,6 +112,13 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
   // Recover the key by signing again
   try {
     const recovered = await recoverReadingKey(userAddress, nonce);
+
+    console.log('[READING_KEY] Recovered from wallet signature:');
+    console.log('  - address:', userAddress);
+    console.log('  - publicKey (full hex):', recovered.publicKey);
+    console.log('  - secretKey (full hex):', recovered.secretKey);
+    console.log('  - nonce:', nonce);
+
     dbg.log("PostDecrypt", "getReadingSecretKey:recovered", {
       userAddress,
       nonce,

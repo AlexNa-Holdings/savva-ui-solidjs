@@ -2,6 +2,8 @@
 
 import { dbg } from "../../utils/debug.js";
 import { fetchDescriptorWithFallback } from "../../ipfs/fetchDescriptorWithFallback.js";
+import { toChecksumAddress } from "../../blockchain/utils.js";
+import { whenWsOpen } from "../../net/wsRuntime.js";
 
 /**
  * Fetch encryption information from a parent post
@@ -13,19 +15,38 @@ export async function fetchParentPostEncryption(app, rootSavvaCid) {
   try {
     dbg.log("fetchParentPostEncryption", `Fetching parent post: ${rootSavvaCid}`);
 
-    // Fetch the post metadata from WS API
-    const getPost = app.wsMethod?.("get-post");
-    if (!getPost) {
-      throw new Error("WebSocket method 'get-post' not available");
+    await whenWsOpen();
+
+    // Fetch the post metadata using content-list (same as fetchPostByIdentifier)
+    const contentList = app.wsMethod?.("content-list");
+    if (!contentList) {
+      throw new Error("WebSocket method 'content-list' not available");
     }
 
-    const postData = await getPost({
+    const requestParams = {
       domain: app.selectedDomainName?.() || "",
-      savva_cid: rootSavvaCid,
-    });
+      lang: app.lang?.() || "en",
+      limit: 1
+    };
+
+    if (rootSavvaCid.startsWith("0x")) {
+      requestParams.savva_cid = rootSavvaCid;
+    } else {
+      requestParams.short_cid = rootSavvaCid;
+    }
+
+    const user = app.authorizedUser?.();
+    if (user?.address) {
+      requestParams.my_addr = toChecksumAddress(user.address);
+    }
+
+    const res = await contentList(requestParams);
+    const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+    const postData = arr[0];
 
     if (!postData || !postData.ipfs) {
-      throw new Error(`Post ${rootSavvaCid} not found or has no IPFS path`);
+      dbg.warn("fetchParentPostEncryption", `Post ${rootSavvaCid} not found or has no IPFS path`);
+      return null;
     }
 
     // Fetch the descriptor

@@ -187,12 +187,47 @@ export default function EditorPage() {
         });
         if (!parentObject) throw new Error("Parent content not found.");
         const isReplyToComment = !!parentObject.parent_savva_cid;
+        const rootCid = isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid;
+
         const newPostParams = {
           locales: {},
           guid: crypto.randomUUID(),
           parent_savva_cid: parentObject.savva_cid,
-          root_savva_cid: isReplyToComment ? (parentObject.root_savva_cid || parentObject.parent_savva_cid) : parentObject.savva_cid,
+          root_savva_cid: rootCid,
         };
+
+        // Check if parent post is encrypted and auto-set audience to "subscribers"
+        console.log('[EditorPage] NEW_COMMENT mode - checking parent encryption:', {
+          parentCid,
+          rootCid,
+          isReplyToComment
+        });
+        try {
+          const { fetchParentPostEncryption } = await import("../crypto/fetchParentPostEncryption.js");
+          const parentEncryption = await fetchParentPostEncryption(app, rootCid);
+
+          console.log('[EditorPage] Parent encryption check result:', {
+            hasEncryption: !!parentEncryption,
+            recipientCount: parentEncryption?.recipients?.length || 0
+          });
+
+          if (parentEncryption && parentEncryption.recipients?.length > 0) {
+            console.log(`[EditorPage] ✓ Parent post is encrypted with ${parentEncryption.recipients.length} recipients. Auto-setting audience to "subscribers".`);
+            newPostParams.audience = "subscribers";
+          } else {
+            console.log("[EditorPage] ✗ Parent post is not encrypted. Comment will be public.");
+          }
+        } catch (err) {
+          console.warn("[EditorPage] Failed to check parent post encryption:", err);
+          // Don't fail, just proceed without setting audience
+        }
+
+        console.log('[EditorPage] Final postParams for new comment:', {
+          audience: newPostParams.audience,
+          root_savva_cid: newPostParams.root_savva_cid,
+          parent_savva_cid: newPostParams.parent_savva_cid
+        });
+
         const newPostData = {};
         for (const langCode of domainLangCodes()) {
           newPostData[langCode] = { title: "", body: "", chapters: [] };
@@ -247,12 +282,29 @@ export default function EditorPage() {
             dbg.log("EditorPage:load", `Draft has no languages. This should not happen if draft.content exists.`);
           }
           const initialChapters = (draft.content?.[initialLang]?.chapters || []);
+
+          const params = draft.params || {};
+          if (editorMode() === "new_post" && !params.guid) {
+            params.guid = crypto.randomUUID();
+          }
+
+          // For edit_comment mode: check if parent post is encrypted and ensure audience is set
+          if (mode === "edit_comment" && params.root_savva_cid && !params.audience) {
+            try {
+              const { fetchParentPostEncryption } = await import("../crypto/fetchParentPostEncryption.js");
+              const parentEncryption = await fetchParentPostEncryption(app, params.root_savva_cid);
+
+              if (parentEncryption && parentEncryption.recipients?.length > 0) {
+                console.log(`[EditorPage] Editing comment on encrypted post. Auto-setting audience to "subscribers".`);
+                params.audience = "subscribers";
+              }
+            } catch (err) {
+              console.warn("[EditorPage] Failed to check parent post encryption for edit_comment:", err);
+            }
+          }
+
           batch(() => {
             setPostData(draft.content);
-            const params = draft.params || {};
-            if (editorMode() === "new_post" && !params.guid) {
-              params.guid = crypto.randomUUID();
-            }
             setPostParams(params);
             setActiveLang(initialLang);
             // Ensure chapters block is shown on initial load when chapters already exist

@@ -131,19 +131,64 @@ export function encryptPostKeyForRecipient(postSecretKeyHex, recipientPublicKeyH
  * @returns {string} - Decrypted post secret key (hex)
  */
 export function decryptPostKey(encryptedKeyHex, ephemeralPublicKeyHex, nonceHex, recipientSecretKeyHex) {
+  console.log('[POST_DECRYPT] ========== decryptPostKey START ==========');
+
+  // Log input parameters (hex strings before conversion)
+  console.log('[POST_DECRYPT] Input parameters:');
+  console.log('  - encryptedKeyHex length:', encryptedKeyHex.length, 'chars');
+  console.log('  - encryptedKeyHex (full):', encryptedKeyHex);
+  console.log('  - ephemeralPublicKeyHex length:', ephemeralPublicKeyHex.length, 'chars');
+  console.log('  - ephemeralPublicKeyHex (full):', ephemeralPublicKeyHex);
+  console.log('  - nonceHex length:', nonceHex.length, 'chars');
+  console.log('  - nonceHex (full):', nonceHex);
+  console.log('  - recipientSecretKeyHex length:', recipientSecretKeyHex.length, 'chars');
+  console.log('  - recipientSecretKeyHex (full):', recipientSecretKeyHex);
+
+  // Convert to bytes
   const encryptedKey = hexToBytes(encryptedKeyHex);
   const ephemeralPublicKey = hexToBytes(ephemeralPublicKeyHex);
   const nonce = hexToBytes(nonceHex);
   const recipientSecretKey = hexToBytes(recipientSecretKeyHex);
 
+  // Log byte array sizes
+  console.log('[POST_DECRYPT] After hexToBytes conversion:');
+  console.log('  - encryptedKey:', encryptedKey.length, 'bytes');
+  console.log('  - ephemeralPublicKey:', ephemeralPublicKey.length, 'bytes');
+  console.log('  - nonce:', nonce.length, 'bytes');
+  console.log('  - recipientSecretKey:', recipientSecretKey.length, 'bytes');
+
   // Compute shared secret
+  console.log('[POST_DECRYPT] Computing X25519 ECDH shared secret...');
   const sharedSecret = x25519.getSharedSecret(recipientSecretKey, ephemeralPublicKey);
+  console.log('  - sharedSecret length:', sharedSecret.length, 'bytes');
+  console.log('  - sharedSecret (full hex):', bytesToHex(sharedSecret));
 
   // Decrypt the post key
+  console.log('[POST_DECRYPT] Creating XSalsa20-Poly1305 cipher...');
   const cipher = xsalsa20poly1305(sharedSecret, nonce);
-  const postKeyBytes = cipher.decrypt(encryptedKey);
 
-  return bytesToHex(postKeyBytes);
+  // The @noble/ciphers library doesn't expose MAC details, but we can log what we can
+  console.log('[POST_DECRYPT] Attempting decryption...');
+  console.log('  - Ciphertext (with MAC) length:', encryptedKey.length, 'bytes');
+  console.log('  - Expected ciphertext length:', encryptedKey.length - 16, 'bytes (excluding 16-byte MAC)');
+  console.log('  - Ciphertext (full hex):', bytesToHex(encryptedKey));
+
+  try {
+    const postKeyBytes = cipher.decrypt(encryptedKey);
+    const postKeyHex = bytesToHex(postKeyBytes);
+
+    console.log('[POST_DECRYPT] ✓ Decryption SUCCESS');
+    console.log('  - postKeyBytes length:', postKeyBytes.length, 'bytes');
+    console.log('  - postKeyHex (full):', postKeyHex);
+    console.log('[POST_DECRYPT] ========== decryptPostKey END ==========');
+
+    return postKeyHex;
+  } catch (error) {
+    console.error('[POST_DECRYPT] ✗ Decryption FAILED');
+    console.error('  - Error:', error.message);
+    console.log('[POST_DECRYPT] ========== decryptPostKey END ==========');
+    throw error;
+  }
 }
 
 /**
