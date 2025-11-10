@@ -24,6 +24,7 @@ export default function WalletTab(props) {
   const viewedUser = () => props.user || app.authorizedUser();
   const [refreshKey, setRefreshKey] = createSignal(0);
   const [correctedStaked, setCorrectedStaked] = createSignal(null); // Override for staked value if blockchain differs
+  const [fixRequestSent, setFixRequestSent] = createSignal(false); // Track if we've already sent a fix request
 
   // 🔁 Refresh data automatically when ACTOR changes (wallet open)
   createEffect(() => {
@@ -114,17 +115,40 @@ export default function WalletTab(props) {
     if (!data || data.error || !user || !user.address) return;
 
     const blockchainStaked = data.stakedBalance;
-    const backendStaked = user.staked;
+    if (typeof blockchainStaked !== 'bigint') return;
 
-    // Both should be bigints for comparison
-    if (typeof blockchainStaked !== 'bigint' || typeof backendStaked !== 'bigint') return;
+    // Convert backend staked to bigint for comparison
+    let backendStaked;
+    try {
+      if (typeof user.staked === 'bigint') {
+        backendStaked = user.staked;
+      } else if (typeof user.staked === 'number' || typeof user.staked === 'string') {
+        backendStaked = BigInt(Math.floor(Number(user.staked)));
+      } else {
+        return; // Can't convert, skip comparison
+      }
+    } catch (e) {
+      console.warn('[WalletTab] Failed to convert backend staked value:', user.staked);
+      return;
+    }
 
     // If values differ, we need to correct the backend
     if (blockchainStaked !== backendStaked) {
+      // Only send fix request once per mismatch
+      if (fixRequestSent()) {
+        console.log('[WalletTab] Fix request already sent, waiting for backend to sync...', {
+          blockchain: blockchainStaked.toString(),
+          backend: backendStaked.toString(),
+          diff: (blockchainStaked - backendStaked).toString(),
+        });
+        return;
+      }
+
       console.warn('[WalletTab] Staked value mismatch detected:', {
         blockchain: blockchainStaked.toString(),
         backend: backendStaked.toString(),
         userAddress: user.address,
+        diff: (blockchainStaked - backendStaked).toString(),
       });
 
       // Store the corrected value for immediate display update
@@ -135,29 +159,24 @@ export default function WalletTab(props) {
         try {
           const wsMethod = app.wsMethod?.("fix");
           if (wsMethod) {
+            setFixRequestSent(true); // Mark that we've sent the request
             await wsMethod({ user: user.address });
             console.log('[WalletTab] Sent fix request for user:', user.address);
-
-            // Trigger a wallet data refresh in the app context if available
-            app.triggerWalletDataRefresh?.();
-
-            // Notify parent component (ProfilePage) to refetch user data
-            // so the corrected staked value shows in the profile header
-            if (typeof props.onStakedCorrected === 'function') {
-              props.onStakedCorrected();
-            }
+            console.log('[WalletTab] Backend will sync automatically. Values will match on next page load.');
           } else {
             console.warn('[WalletTab] wsMethod("fix") not available');
           }
         } catch (error) {
           console.error('[WalletTab] Failed to send fix request:', error);
+          setFixRequestSent(false); // Allow retry on error
         }
       };
 
       fixStakedValue();
     } else {
-      // Values match, clear any correction
+      // Values match, clear any correction and reset fix flag
       setCorrectedStaked(null);
+      setFixRequestSent(false);
     }
   });
 
