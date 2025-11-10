@@ -113,7 +113,9 @@ export default function EditorFilesDrawer(props) {
     if (fileType === 'image' || fileType === 'video' || fileType === 'audio') {
       items.push({ label: t("editor.files.menu.insert"), onClick: () => props.onInsert(file.name, fileType) });
     }
-    if (fileType === 'image') {
+    // Only show "Set Thumbnail" option for posts, not comments
+    const isPost = props.editorMode === 'new_post' || props.editorMode === 'edit_post';
+    if (fileType === 'image' && isPost) {
       items.push({ label: t("editor.files.menu.setThumbnail"), onClick: () => props.onSetThumbnail(file.name) });
     }
     items.push({ label: t("editor.files.menu.insertUrl"), onClick: () => props.onInsertUrl(file.name) });

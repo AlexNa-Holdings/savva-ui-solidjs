@@ -751,6 +751,7 @@ export default function EditorPage() {
         onSetThumbnail={handleSetThumbnail}
         onInsertUrl={handleInsertUrl}
         filesRevision={filesRevision()}
+        editorMode={editorMode()}
       />
       <ConfirmModal
         isOpen={showConfirmDelete()}
