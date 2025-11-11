@@ -295,12 +295,13 @@ export async function decryptPost(post, userAddress, readingSecretKey = null) {
   // Decrypt the locales
   const decryptedContent = decryptPostLocales(content, postSecretKey);
 
-  // Return post with decrypted content
+  // Return post with decrypted content and the post secret key for image decryption
   return {
     ...post,
     savva_content: decryptedContent,
     content: decryptedContent,
     _decrypted: true, // Mark as decrypted
+    _postSecretKey: postSecretKey, // Store key for decrypting images/files
   };
 }
 

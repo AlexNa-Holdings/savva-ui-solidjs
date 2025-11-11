@@ -44,6 +44,7 @@ import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptP
 import { storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 const getIdentifier = (route) => {
   const path = route().split("?")[0]; // Strip query parameters
@@ -504,10 +505,7 @@ export default function PostPage() {
   const postForTags = createMemo(() => post());
 
   // ---- NSFW (exactly like PostCard) ----
-  const nsfwMode = createMemo(() => {
-    const p = profile?.();
-    return selectField(p, "nsfw") ?? selectField(p, "prefs.nsfw") ?? "h";
-  });
+  const nsfwMode = createMemo(() => loadNsfwPreference());
   const postIsNsfw = createMemo(() => post()?.nsfw === true);
   const shouldHide = createMemo(() => postIsNsfw() && nsfwMode() === "h");
   const shouldWarn = createMemo(() => postIsNsfw() && nsfwMode() === "w");

@@ -7,6 +7,7 @@ import { toChecksumAddress } from "../../blockchain/utils.js";
 import TagList from "./TagList.jsx";
 import { useDomainCategories } from "../../hooks/useDomainCategories.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 async function fetchUserTags(params) {
   const { app, user_addr, lang } = params;
@@ -44,7 +45,7 @@ export default function PostsTab(props) {
 
   const showNsfw = () => {
     if (isViewingSelf()) return true; // actor viewing their own profile → always show
-    const pref = selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h";
+    const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
   };
 

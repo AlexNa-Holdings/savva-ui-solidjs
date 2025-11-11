@@ -197,36 +197,18 @@ export default function EditorPage() {
         };
 
         // Check if parent post is encrypted and auto-set audience to "subscribers"
-        console.log('[EditorPage] NEW_COMMENT mode - checking parent encryption:', {
-          parentCid,
-          rootCid,
-          isReplyToComment
-        });
         try {
           const { fetchParentPostEncryption } = await import("../crypto/fetchParentPostEncryption.js");
           const parentEncryption = await fetchParentPostEncryption(app, rootCid);
 
-          console.log('[EditorPage] Parent encryption check result:', {
-            hasEncryption: !!parentEncryption,
-            recipientCount: parentEncryption?.recipients?.length || 0
-          });
-
           if (parentEncryption && parentEncryption.recipients?.length > 0) {
-            console.log(`[EditorPage] ✓ Parent post is encrypted with ${parentEncryption.recipients.length} recipients. Auto-setting audience to "subscribers".`);
+            dbg.log("EditorPage", `Parent post is encrypted (${parentEncryption.recipients.length} recipients). Auto-setting audience to "subscribers".`);
             newPostParams.audience = "subscribers";
-          } else {
-            console.log("[EditorPage] ✗ Parent post is not encrypted. Comment will be public.");
           }
         } catch (err) {
-          console.warn("[EditorPage] Failed to check parent post encryption:", err);
+          dbg.warn("EditorPage", "Failed to check parent post encryption:", err);
           // Don't fail, just proceed without setting audience
         }
-
-        console.log('[EditorPage] Final postParams for new comment:', {
-          audience: newPostParams.audience,
-          root_savva_cid: newPostParams.root_savva_cid,
-          parent_savva_cid: newPostParams.parent_savva_cid
-        });
 
         const newPostData = {};
         for (const langCode of domainLangCodes()) {
@@ -295,11 +277,11 @@ export default function EditorPage() {
               const parentEncryption = await fetchParentPostEncryption(app, params.root_savva_cid);
 
               if (parentEncryption && parentEncryption.recipients?.length > 0) {
-                console.log(`[EditorPage] Editing comment on encrypted post. Auto-setting audience to "subscribers".`);
+                dbg.log("EditorPage", "Editing comment on encrypted post. Auto-setting audience to subscribers.");
                 params.audience = "subscribers";
               }
             } catch (err) {
-              console.warn("[EditorPage] Failed to check parent post encryption for edit_comment:", err);
+              dbg.warn("EditorPage", "Failed to check parent post encryption for edit_comment:", err);
             }
           }
 

@@ -6,6 +6,7 @@ import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { useHashRouter } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 export default function ForYouTab(props) {
   const app = useApp();
@@ -23,10 +24,8 @@ export default function ForYouTab(props) {
       setCategory(categoryName);
     }
   });
-  const { dataStable: profile } = useUserProfile();
-
   const showNsfw = () => {
-    const pref = selectField(profile(), "nsfw") ?? "h";
+    const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
   };
 

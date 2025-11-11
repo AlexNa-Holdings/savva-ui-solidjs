@@ -6,6 +6,7 @@ import Spinner from "../ui/Spinner.jsx";
 import CommentCard from "./CommentCard.jsx";
 import { navigate } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 
 
@@ -17,11 +18,10 @@ export default function PostComments(props) {
   const [comments, setComments] = createSignal([]);
   const [nextOffset, setNextOffset] = createSignal(0);
   const [isLoadingMore, setIsLoadingMore] = createSignal(false);
-  const { dataStable: profile } = useUserProfile();
   const canAddComment = createMemo(() => Boolean(app.authorizedUser()?.address));
 
   const showNsfw = () => {
-    const pref = selectField(profile(), "nsfw") ?? "h";
+    const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
   };
 

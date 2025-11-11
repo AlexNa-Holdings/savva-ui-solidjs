@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import PostListView from "./PostListView.jsx";
 import { dbg } from "../../utils/debug.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 export default function ContentFeed(props) {
   const { t, authorizedUser } = useApp();
@@ -34,15 +35,7 @@ export default function ContentFeed(props) {
   const ready = () => !authed() || profileResolved();
 
   // Safe NSFW preference (used by fetchPage impls)
-  const nsfwPref = createMemo(() => {
-    const p = profVal();
-    const u = authorizedUser?.();
-    // Try profile first, then user's own flag (if present), then default 'h'
-    return (selectField?.(p, "nsfw") ??
-      selectField?.(p, "prefs.nsfw") ??
-      u?.nsfw ??
-      "h");
-  });
+  const nsfwPref = createMemo(() => loadNsfwPreference());
 
   // ---------- DEBUG SNAPSHOTS ----------
   createEffect(() => {

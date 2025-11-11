@@ -125,19 +125,9 @@ export default function StepUploadDescriptor(props) {
     let isCommentOnEncryptedPost = false;
     let parentPostRecipients = [];
 
-    console.log('[ENCRYPTION_DEBUG] Initial check:', {
-      contentType,
-      isComment,
-      audience: params.audience,
-      needsEncryption,
-      root_savva_cid: params.root_savva_cid,
-      parent_savva_cid: params.parent_savva_cid
-    });
-
     // For comments, check if parent post is encrypted
     if (isComment && params.root_savva_cid) {
       L("Checking if parent post is encrypted", { root_savva_cid: params.root_savva_cid });
-      console.log('[ENCRYPTION_DEBUG] Checking parent post encryption for comment...');
       try {
         const { fetchParentPostEncryption } = await import("../../crypto/fetchParentPostEncryption.js");
         const parentEncryption = await fetchParentPostEncryption(app, params.root_savva_cid);
@@ -147,27 +137,15 @@ export default function StepUploadDescriptor(props) {
           needsEncryption = true;
           parentPostRecipients = parentEncryption.recipients;
           L(`Parent post is encrypted with ${parentPostRecipients.length} recipients`);
-          console.log('[ENCRYPTION_DEBUG] ✓ Parent post IS encrypted:', {
-            recipientCount: parentPostRecipients.length,
-            needsEncryption
-          });
         } else {
           L("Parent post is not encrypted");
-          console.log('[ENCRYPTION_DEBUG] ✗ Parent post is NOT encrypted');
         }
       } catch (err) {
         E("Failed to check parent post encryption", err);
-        console.error('[ENCRYPTION_DEBUG] Failed to check parent encryption:', err);
         // Don't fail the whole publish if we can't check parent encryption
         // User might be commenting on a post that doesn't exist yet or is inaccessible
       }
     }
-
-    console.log('[ENCRYPTION_DEBUG] Final decision:', {
-      needsEncryption,
-      isCommentOnEncryptedPost,
-      parentRecipientCount: parentPostRecipients.length
-    });
 
     let postEncryptionKey = null;
     let recipients = [];

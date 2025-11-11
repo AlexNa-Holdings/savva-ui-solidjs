@@ -7,14 +7,14 @@ import { whenWsOpen } from "../../net/wsRuntime.js";
 import { useHashRouter } from "../../routing/smartRouter.js";
 import ContentCard from "../post/ContentCard.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 async function fetchPost(params) {
   const { app, savva_cid } = params;
   if (!app.wsMethod || !savva_cid) return null;
-  const { dataStable: profile } = useUserProfile();
 
   const showNsfw = () => {
-    const pref = selectField(profile(), "nsfw") ?? "h";
+    const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
   };
 

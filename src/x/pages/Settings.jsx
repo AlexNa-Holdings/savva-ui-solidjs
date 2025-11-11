@@ -1,5 +1,7 @@
 // src/pages/Settings.jsx
 import { useApp } from "../../context/AppContext.jsx";
+import PreferencesSection from "../settings/PreferencesSection.jsx";
+import ReadingKeysSection from "../settings/ReadingKeysSection.jsx";
 import LocalIpfsSection from "../settings/LocalIpfsSection.jsx";
 import Assets from "../settings/Assets.jsx";
 import DeveloperSection from "../settings/DeveloperSection.jsx";
@@ -21,6 +23,8 @@ export default function Settings() {
         <h2 class="text-2xl font-semibold">{t("settings.title")}</h2>
       </div>
 
+      <PreferencesSection />
+      <ReadingKeysSection />
       <LocalIpfsSection />
       <PinningServicesSection />
       <AISettingsSection />

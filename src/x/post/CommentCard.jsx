@@ -21,6 +21,10 @@ import { useDeleteAction } from "../../hooks/useDeleteAction.js";
 import ReactionInput from "./ReactionInput.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 import { canDecryptPost, decryptPostMetadata } from "../crypto/postDecryption.js";
+import { setEncryptedPostContext, clearEncryptedPostContext, fetchBestWithDecryption } from "../../ipfs/encryptedFetch.js";
+import { swManager } from "../crypto/serviceWorkerManager.js";
+import { dbg } from "../../utils/debug.js";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 async function fetchFullContent(params) {
   const { app, comment, lang } = params;
@@ -40,7 +44,9 @@ async function fetchFullContent(params) {
 
     const fullIpfsPath = `${dataCidForContent}/${dataPath}`;
     const postGateways = descriptor?.gateways || [];
-    const { res: contentRes } = await ipfs.fetchBest(app, fullIpfsPath, { postGateways });
+
+    // Use fetchBestWithDecryption to automatically decrypt encrypted comment content
+    const { res: contentRes } = await fetchBestWithDecryption(app, fullIpfsPath, { postGateways });
     return await contentRes.text();
   } catch (e) {
     console.error("Failed to fetch full comment content:", e);
@@ -90,6 +96,27 @@ export default function CommentCard(props) {
 
       // Update the comment with decrypted data
       setComment(reconcile({ ...comment, ...decrypted, _decrypted: true }));
+
+      // Set encrypted post context for image decryption (both blob-based and Service Worker)
+      if (decrypted._postSecretKey) {
+        const dataCid = getPostContentBaseCid(comment);
+        if (dataCid) {
+          // Set context for blob-based decryption fallback
+          setEncryptedPostContext({
+            dataCid,
+            postSecretKey: decrypted._postSecretKey
+          });
+
+          // Also set context in Service Worker for streaming decryption of images
+          swManager.setEncryptionContext(dataCid, decrypted._postSecretKey).catch(err => {
+            console.warn('[CommentCard] Failed to set SW encryption context:', err);
+            // Fallback to blob-based decryption will still work
+          });
+
+          dbg.log("CommentCard", "Set encrypted comment context for image decryption", { dataCid });
+        }
+      }
+
       console.log("Comment decrypted successfully");
     } catch (error) {
       console.error("Failed to auto-decrypt comment:", error);
@@ -200,8 +227,7 @@ export default function CommentCard(props) {
   };
 
   // NSFW
-  const { dataStable: profile } = useUserProfile();
-  const nsfwPref = createMemo(() => selectField(profile(), "nsfw") ?? selectField(profile(), "prefs.nsfw") ?? "h");
+  const nsfwPref = createMemo(() => loadNsfwPreference());
   const commentIsNsfw = createMemo(() => !!(comment?.nsfw || comment?.savva_content?.nsfw));
   const shouldHide = createMemo(() => commentIsNsfw() && nsfwPref() === "h");
   const shouldWarn = createMemo(() => commentIsNsfw() && nsfwPref() === "w");

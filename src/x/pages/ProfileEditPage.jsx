@@ -25,6 +25,7 @@ import useUserProfile, { applyProfileEditResult } from "../profile/userProfileSt
 import { generateReadingKey, publishReadingKey, fetchReadingKey } from "../crypto/readingKey.js";
 import { storeReadingKey, deleteStoredReadingKeys, countStoredReadingKeys } from "../crypto/readingKeyStorage.js";
 import StoreReadingKeyModal from "../modals/StoreReadingKeyModal.jsx";
+import { migrateFromProfile } from "../preferences/storage.js";
 
 async function fetchProfileForEdit(params) {
   const { app, identifier } = params;
@@ -127,8 +128,6 @@ export default function ProfileEditPage() {
   const [showConfirmNameChange, setShowConfirmNameChange] = createSignal(false);
 
   const [displayNames, setDisplayNames] = createStore({});
-  const [nsfwPreference, setNsfwPreference] = createSignal("h");
-  const [sponsorValues, setSponsorValues] = createStore(["", "", "", "", ""]);
   const [isSaving, setIsSaving] = createSignal(false);
   const [about, setAbout] = createStore({});
 
@@ -175,7 +174,6 @@ export default function ProfileEditPage() {
       setNameInput(currentName);
 
       const profile = data.profile || {};
-      setNsfwPreference(profile.nsfw || "h");
 
       const initialLinks = Array.isArray(profile.links)
         ? profile.links.map((l) => ({ title: String(l?.title || "").trim(), url: String(l?.url || "").trim() }))
@@ -190,15 +188,6 @@ export default function ProfileEditPage() {
       }
       setDisplayNames(reconcile(initialDisplayNames));
 
-      const s_values = profile.sponsor_values;
-      if (Array.isArray(s_values) && s_values.length > 0) {
-        const filledValues = s_values.slice(0, 5).map((v) => v || "");
-        while (filledValues.length < 5) filledValues.push("");
-        setSponsorValues(reconcile(filledValues));
-      } else {
-        setSponsorValues(reconcile(["", "", "", "", ""]));
-      }
-
       let initialAboutState = {};
       if (profile.about_me && typeof profile.about_me === "object") {
         initialAboutState = profile.about_me;
@@ -207,6 +196,9 @@ export default function ProfileEditPage() {
       }
 
       setAbout(reconcile(initialAboutState));
+
+      // Migrate NSFW and sponsor_values to browser storage (one-time migration)
+      migrateFromProfile(profile);
     }
   });
 
@@ -312,9 +304,6 @@ export default function ProfileEditPage() {
     }
   };
 
-  const handleSponsorValueChange = (index, value) => {
-    setSponsorValues(index, value.replace(/[^0-9]/g, ""));
-  };
 
   const isRegisterDisabled = createMemo(() => {
     return isRegistering() || isCheckingName() || !!nameError() || !nameInput() || nameInput() === initialName();
@@ -502,9 +491,7 @@ export default function ProfileEditPage() {
     try {
       const profileJson = {
         display_names: filterEmptyValues({ ...displayNames }),
-        nsfw: nsfwPreference(),
         about_me: filterEmptyValues({ ...about }),
-        sponsor_values: [...sponsorValues].map((v) => Number(v) || 0).filter((v) => v > 0),
         links: sanitizeLinks(links),
       };
 
@@ -789,37 +776,6 @@ export default function ProfileEditPage() {
                     <LinksEditor value={links} onChange={(next) => setLinks(reconcile(next || []))} />
                   </div>
 
-                  <div class="pt-4 border-t border-[hsl(var(--border))] grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
-                    <label htmlFor="nsfw-preference" class="font-medium justify-self-end">
-                      {t("profile.edit.nsfw.label")}
-                    </label>
-                    <select
-                      id="nsfw-preference"
-                      value={nsfwPreference()}
-                      onChange={(e) => setNsfwPreference(e.currentTarget.value)}
-                      class="w-full max-w-sm px-3 py-2 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                    >
-                      <option value="s">{t("profile.edit.nsfw.show")}</option>
-                      <option value="w">{t("profile.edit.nsfw.warn")}</option>
-                      <option value="h">{t("profile.edit.nsfw.hide")}</option>
-                    </select>
-
-                    <label class="font-medium justify-self-end self-start pt-2">
-                      {t("profile.edit.sponsorValues.label")}
-                    </label>
-                    <div class="flex items-center gap-2">
-                      <For each={sponsorValues}>
-                        {(value, index) => (
-                          <input
-                            type="number"
-                            value={value}
-                            onInput={(e) => handleSponsorValueChange(index(), e.currentTarget.value)}
-                            class="w-full px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
-                          />
-                        )}
-                      </For>
-                    </div>
-                  </div>
                 </div>
 
                 <div class="flex justify-end">

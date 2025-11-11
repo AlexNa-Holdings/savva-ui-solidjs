@@ -7,6 +7,7 @@ import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { useHashRouter } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 const TIME_FRAMES = ["month", "week", "year", "all"];
 
@@ -16,10 +17,9 @@ export default function LeadersTab(props) {
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
   const [timeFrame, setTimeFrame] = createSignal("month");
-  const { dataStable: profile } = useUserProfile();
 
   const showNsfw = () => {
-    const pref = selectField(profile(), "nsfw") ?? "h";
+    const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
   };
 

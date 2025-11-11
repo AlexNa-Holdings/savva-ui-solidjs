@@ -11,6 +11,7 @@ import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import Modal from "./Modal.jsx";
 import { useProfileByCid, selectField } from "../profile/userProfileStore.js";
+import { loadPredefinedAmounts } from "../preferences/storage.js";
 
 export default function ContributeModal(props) {
   const app = useApp();
@@ -90,8 +91,7 @@ export default function ContributeModal(props) {
   });
 
   const predefinedAmounts = createMemo(() => {
-    const values = selectField(actorProfile(), "sponsor_values");
-    return Array.isArray(values) ? values.filter((v) => Number(v) > 0) : [];
+    return loadPredefinedAmounts().filter((v) => Number(v) > 0);
   });
 
   const handlePredefinedClick = (amount) => {

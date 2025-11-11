@@ -16,6 +16,7 @@ import { resolvePostCidPath, getPostContentBaseCid } from "../../ipfs/utils.js";
 import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey } from "../crypto/postDecryption.js";
 import { setEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 function PinIcon(props) {
   return (
@@ -197,10 +198,7 @@ export default function PostCard(props) {
 
   // Sensitive flag + user preference
   const isSensitive = createMemo(() => !!(base()?.nsfw || content()?.nsfw));
-  const nsfwPref = createMemo(() => {
-    const p = profile();
-    return selectField(p, "nsfw") ?? selectField(p, "prefs.nsfw") ?? "h";
-  });
+  const nsfwPref = createMemo(() => loadNsfwPreference());
   const shouldCover = createMemo(() => isSensitive() && nsfwPref() === "w" && !revealed());
 
   // Encrypted content cover (takes precedence over NSFW)

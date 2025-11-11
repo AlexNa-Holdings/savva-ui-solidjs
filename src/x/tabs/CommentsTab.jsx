@@ -5,6 +5,7 @@ import { dbg } from "../../utils/debug.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import CommentThread from "../comments/CommentThread.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
+import { loadNsfwPreference } from "../preferences/storage.js";
 
 export default function CommentsTab(props) {
   const { t } = useApp();
@@ -14,10 +15,9 @@ export default function CommentsTab(props) {
   const [hasMore, setHasMore] = createSignal(true);
   const [loading, setLoading] = createSignal(false);
   const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
-  const { dataStable: profile } = useUserProfile();
 
-    const showNsfw = () => {
-    const pref = selectField(profile(), "nsfw") ?? "h";
+  const showNsfw = () => {
+    const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
   };
 
