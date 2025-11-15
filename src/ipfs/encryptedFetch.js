@@ -73,6 +73,15 @@ export async function fetchBestWithDecryption(app, ipfsPath, options = {}) {
     return { ...result, decrypted: false };
   }
 
+  // Check if Service Worker is active - if so, it already decrypted the content
+  // So we should NOT try to decrypt again (would fail with "authentication failed")
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    // Service Worker is active and controlling the page
+    // It has already decrypted the content, so return as-is
+    return { ...result, decrypted: true };
+  }
+
+  // Service Worker not available - use blob-based fallback decryption
   // Get the encrypted data as ArrayBuffer
   const encryptedData = await result.res.arrayBuffer();
 
