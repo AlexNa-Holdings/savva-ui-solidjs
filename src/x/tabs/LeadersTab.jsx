@@ -1,5 +1,5 @@
 // src/x/tabs/LeadersTab.jsx
-import { createMemo, createSignal, For, createEffect } from "solid-js";
+import { createMemo, createSignal, For, createEffect, onCleanup } from "solid-js";
 import ContentFeed from "../feed/ContentFeed.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
@@ -7,7 +7,7 @@ import { toChecksumAddress } from "../../blockchain/utils.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import { useHashRouter } from "../../routing/smartRouter.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
-import { loadNsfwPreference } from "../preferences/storage.js";
+import { loadNsfwPreference, loadTimeFramePreference, saveTimeFramePreference, onTimeFrameChanged } from "../preferences/storage.js";
 
 const TIME_FRAMES = ["month", "week", "year", "all"];
 
@@ -16,11 +16,26 @@ export default function LeadersTab(props) {
   const { route } = useHashRouter();
   const lang = createMemo(() => (app.lang?.() || "en").toLowerCase());
   const [category, setCategory] = createSignal("ALL");
-  const [timeFrame, setTimeFrame] = createSignal("month");
+  const [timeFrame, setTimeFrame] = createSignal(loadTimeFramePreference());
 
   const showNsfw = () => {
     const pref = loadNsfwPreference();
     return pref === "s" || pref === "w";
+  };
+
+  // Listen for external changes (e.g., from other tabs)
+  const cleanupTimeFrame = onTimeFrameChanged((value) => {
+    setTimeFrame(value);
+  });
+
+  onCleanup(() => {
+    cleanupTimeFrame();
+  });
+
+  // Save time frame when it changes
+  const handleTimeFrameChange = (value) => {
+    setTimeFrame(value);
+    saveTimeFramePreference(value);
   };
 
   createEffect(() => {
@@ -113,7 +128,7 @@ export default function LeadersTab(props) {
             <select
               class="flex-1 px-3 h-9 rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
               value={timeFrame()}
-              onInput={(e) => setTimeFrame(e.currentTarget.value)}
+              onInput={(e) => handleTimeFrameChange(e.currentTarget.value)}
               aria-label="Time frame"
             >
               <For each={TIME_FRAMES}>

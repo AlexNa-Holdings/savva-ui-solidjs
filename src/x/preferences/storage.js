@@ -8,10 +8,12 @@
 // Storage keys
 const NSFW_KEY = "savva.preferences.nsfw";
 const AMOUNTS_KEY = "savva.preferences.predefined_amounts";
+const TIME_FRAME_KEY = "savva.preferences.time_frame";
 
 // Defaults
 const DEFAULT_NSFW = "h"; // Hide
 const DEFAULT_AMOUNTS = [10, 100, 500, 1000, 10000];
+const DEFAULT_TIME_FRAME = "year";
 
 /**
  * Load NSFW preference from localStorage
@@ -161,12 +163,58 @@ export function migrateFromProfile(profile) {
 }
 
 /**
+ * Load time frame preference from localStorage
+ * @returns {string} - "month", "week", "year", or "all"
+ */
+export function loadTimeFramePreference() {
+  try {
+    const stored = localStorage.getItem(TIME_FRAME_KEY);
+    if (stored === "month" || stored === "week" || stored === "year" || stored === "all") {
+      return stored;
+    }
+  } catch (error) {
+    console.warn("[Preferences] Failed to load time frame preference:", error);
+  }
+  return DEFAULT_TIME_FRAME;
+}
+
+/**
+ * Save time frame preference to localStorage
+ * @param {string} value - "month", "week", "year", or "all"
+ */
+export function saveTimeFramePreference(value) {
+  try {
+    if (value !== "month" && value !== "week" && value !== "year" && value !== "all") {
+      console.warn("[Preferences] Invalid time frame value:", value);
+      return;
+    }
+    localStorage.setItem(TIME_FRAME_KEY, value);
+    // Dispatch custom event so other components can react to changes
+    window.dispatchEvent(new CustomEvent("savva:timeframe-changed", { detail: { value } }));
+  } catch (error) {
+    console.error("[Preferences] Failed to save time frame preference:", error);
+  }
+}
+
+/**
+ * Listen for time frame preference changes
+ * @param {Function} callback - Called with new value when preference changes
+ * @returns {Function} - Cleanup function to remove listener
+ */
+export function onTimeFrameChanged(callback) {
+  const handler = (event) => callback(event.detail.value);
+  window.addEventListener("savva:timeframe-changed", handler);
+  return () => window.removeEventListener("savva:timeframe-changed", handler);
+}
+
+/**
  * Reset all preferences to defaults
  */
 export function resetPreferences() {
   try {
     saveNsfwPreference(DEFAULT_NSFW);
     savePredefinedAmounts(DEFAULT_AMOUNTS);
+    saveTimeFramePreference(DEFAULT_TIME_FRAME);
     console.log("[Preferences] Reset to defaults");
   } catch (error) {
     console.error("[Preferences] Failed to reset preferences:", error);
