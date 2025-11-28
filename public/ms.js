@@ -118,6 +118,16 @@ document.addEventListener("DOMContentLoaded", () => {
     connectWalletBtn.addEventListener("click", connectWallet);
     saveSettingsBtn.addEventListener("click", saveSettings);
 
+    // Auto-save Safe address on change
+    document.getElementById("safeAddress").addEventListener("input", (e) => {
+      localStorage.setItem("safeAddress", e.target.value);
+    });
+
+    // Auto-save chain ID on change
+    document.getElementById("chainId").addEventListener("change", (e) => {
+      localStorage.setItem("targetChainId", e.target.value);
+    });
+
     if (window.ethereum && window.ethereum.selectedAddress) {
       connectWallet();
     }
@@ -265,6 +275,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  // Network configurations for wallet_addEthereumChain
+  const NETWORK_CONFIGS = {
+    369: {
+      chainId: "0x171",
+      chainName: "PulseChain",
+      nativeCurrency: { name: "PLS", symbol: "PLS", decimals: 18 },
+      rpcUrls: ["https://rpc.pulsechain.com"],
+      blockExplorerUrls: ["https://scan.pulsechain.com"],
+    },
+    1: {
+      chainId: "0x1",
+      chainName: "Ethereum Mainnet",
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: ["https://eth.llamarpc.com"],
+      blockExplorerUrls: ["https://etherscan.io"],
+    },
+    8453: {
+      chainId: "0x2105",
+      chainName: "Base",
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: ["https://mainnet.base.org"],
+      blockExplorerUrls: ["https://basescan.org"],
+    },
+  };
+
+  const switchNetwork = async (targetChainId) => {
+    const hexChainId = "0x" + targetChainId.toString(16);
+    try {
+      // Try to switch to the network
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: hexChainId }],
+      });
+      return true;
+    } catch (switchError) {
+      // Error 4902 means the chain is not added to the wallet
+      if (switchError.code === 4902) {
+        const networkConfig = NETWORK_CONFIGS[targetChainId];
+        if (networkConfig) {
+          try {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [networkConfig],
+            });
+            return true;
+          } catch (addError) {
+            logStatus(`Failed to add network: ${addError.message}`, true);
+            return false;
+          }
+        }
+      }
+      logStatus(`Failed to switch network: ${switchError.message}`, true);
+      return false;
+    }
+  };
+
   // --- Wallet and Contract Interaction ---
   const connectWallet = async () => {
     try {
@@ -295,17 +361,39 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("chainId").selectedIndex
           ];
         const targetNetworkName = selectedOption.text;
-        const message = `Wrong Network! Required: ${targetNetworkName} (ID: ${targetChainId}), Connected: ${network.chainId} (${network.name}).`;
-        updateConnectionStatus(true, false, message);
-        logStatus(message, true);
-        walletInfoDiv.innerHTML = `<span class="text-red-500">${message}</span>`;
-        return;
+        logStatus(`Wrong network. Switching to ${targetNetworkName}...`);
+
+        const switched = await switchNetwork(targetChainId);
+        if (switched) {
+          // Re-initialize provider after network switch
+          const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+          provider = newProvider;
+          signer = newProvider.getSigner();
+          const newNetwork = await newProvider.getNetwork();
+
+          if (newNetwork.chainId === targetChainId) {
+            logStatus(`Successfully switched to ${targetNetworkName}`);
+          } else {
+            const message = `Failed to switch network. Still on ${newNetwork.name}.`;
+            updateConnectionStatus(true, false, message);
+            logStatus(message, true);
+            walletInfoDiv.innerHTML = `<span class="text-red-500">${message}</span>`;
+            return;
+          }
+        } else {
+          const message = `Could not switch to ${targetNetworkName}. Please switch manually in your wallet.`;
+          updateConnectionStatus(true, false, message);
+          logStatus(message, true);
+          walletInfoDiv.innerHTML = `<span class="text-red-500">${message}</span>`;
+          return;
+        }
       }
 
+      const currentNetwork = await provider.getNetwork();
       walletInfoDiv.textContent = `Connected: ${connectedAccount}`;
-      updateConnectionStatus(true, true, `Connected to ${network.name}`);
+      updateConnectionStatus(true, true, `Connected to ${currentNetwork.name}`);
       logStatus(
-        `Wallet connected: ${connectedAccount} on network ${network.name}.`
+        `Wallet connected: ${connectedAccount} on network ${currentNetwork.name}.`
       );
       connectWalletBtn.textContent = "Wallet Connected";
       connectWalletBtn.disabled = true;
@@ -524,7 +612,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const contractInterface = new ethers.utils.Interface(contractDef.abi);
       let calldata;
       const methodName =
-        param.method || (param.type === "address" ? "setAddr" : "setUint");
+        param.method || (param.type === "address" ? "setAddr" : "setUInt");
 
       if (param.type === "address") {
         if (!ethers.utils.isAddress(value)) {
