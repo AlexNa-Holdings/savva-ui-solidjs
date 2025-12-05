@@ -3,6 +3,7 @@ import { Show, createSignal, createResource, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { parseUnits } from "viem";
 import { getSavvaContract } from "../../blockchain/contracts.js";
+import { getConfigParam } from "../../blockchain/config.js";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -59,11 +60,7 @@ export default function UnstakeModal(props) {
     () => app.desiredChain(),
     async () => {
       try {
-        const cfg = await getSavvaContract(app, "Config");
-        let sec;
-        if (cfg?.read?.staking_withdraw_delay) sec = await cfg.read.staking_withdraw_delay([]);
-        else if (cfg?.read?.stakingWithdrawDelay) sec = await cfg.read.stakingWithdrawDelay([]);
-        else if (cfg?.read?.get) sec = await cfg.read.get(["staking_withdraw_delay"]);
+        const sec = await getConfigParam(app, "staking_withdraw_delay");
         const days = Math.ceil(Number(sec || 0) / 86400);
         log("Unstake: withdraw delay (days)", days);
         return days;
