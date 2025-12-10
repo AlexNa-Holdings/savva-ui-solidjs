@@ -27,7 +27,7 @@ export default function RightPane({ isOpen, onClose }) {
         data-testid="right-pane"
         style="border-left: 1px solid hsl(var(--border));"
       >
-        <div class="h-full flex flex-col p-4 space-y-3">
+        <div class="h-full flex flex-col p-4 space-y-3 overflow-y-auto sv-rightpane__scroll">
           <nav class="pt-2">
             <ul class="space-y-3">
               <li><ThemeToggle /></li>
