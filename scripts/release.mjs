@@ -23,6 +23,10 @@ function sh(cmd, opts = {}) {
   return execSync(cmd, { stdio: "inherit", ...opts });
 }
 
+function shOut(cmd) {
+  return execSync(cmd, { encoding: "utf8" }).trim();
+}
+
 function readVersion() {
   const text = fs.readFileSync(VERSION_FILE, "utf8");
   const m = text.match(/APP_VERSION\s*=\s*["'`](\d+)\.(\d+)["'`]/);
@@ -57,6 +61,34 @@ function copyVersionFile() {
   fs.copyFileSync(VERSION_FILE, dest);
 }
 
+function generateReleaseNotes() {
+  // Get the last tag, or use initial commit if no tags exist
+  let lastTag;
+  try {
+    lastTag = shOut("git describe --tags --abbrev=0");
+  } catch {
+    lastTag = shOut("git rev-list --max-parents=0 HEAD");
+  }
+
+  // Get commit messages since last tag, clean them up
+  try {
+    const commits = shOut(`git log ${lastTag}..HEAD --pretty=format:"%s" --no-merges`);
+    const lines = commits
+      .split("\n")
+      .filter((l) => l && !l.startsWith("release:") && !l.startsWith("Merge "))
+      .slice(0, 5)
+      .map((l) => `- ${l}`);
+
+    if (lines.length > 0) {
+      return lines.join("\n");
+    }
+  } catch (e) {
+    console.warn("Could not generate release notes from commits:", e.message);
+  }
+
+  return "- Bug fixes and improvements";
+}
+
 function gitCommitAndPush(version) {
   try { sh("git add -A"); } catch {}
   try { sh(`git commit -m "release: v${version}"`); }
@@ -66,6 +98,32 @@ function gitCommitAndPush(version) {
   try { sh("git push"); } catch {}
   // Also push HEAD to Prod branch (without switching)
   try { sh(`git push origin HEAD:${PROD_BRANCH}`); } catch {}
+}
+
+function createGitTag(version) {
+  const tag = `v${version}`;
+  console.log(`Creating git tag ${tag}...`);
+  try {
+    sh(`git tag -a "${tag}" -m "Release ${tag}"`);
+    sh(`git push origin "${tag}"`);
+  } catch (e) {
+    console.warn(`Could not create/push tag ${tag}:`, e.message);
+  }
+}
+
+function createGitHubRelease(version, releaseNotes) {
+  const tag = `v${version}`;
+  console.log(`Creating GitHub release ${tag}...`);
+  try {
+    // Write release notes to temp file to avoid shell escaping issues
+    const tmpFile = path.join(ROOT, ".release-notes.tmp");
+    fs.writeFileSync(tmpFile, releaseNotes, "utf8");
+    sh(`gh release create "${tag}" --title "${tag}" --notes-file "${tmpFile}"`);
+    fs.unlinkSync(tmpFile);
+    console.log(`GitHub release created: ${tag}`);
+  } catch (e) {
+    console.warn(`Could not create GitHub release:`, e.message);
+  }
 }
 
 // ensure we finish on MAIN_BRANCH (ff-only pull for freshness)
@@ -98,10 +156,16 @@ function deploy() {
   const nextVersion = writeVersion(major, minor + 1, text);
   console.log(`Bumped version to ${nextVersion}`);
 
+  // Generate release notes before making new commits
+  const releaseNotes = generateReleaseNotes();
+  console.log("Release notes:\n" + releaseNotes);
+
   runI18nScripts();
   build();
   copyVersionFile();
   gitCommitAndPush(nextVersion);
+  createGitTag(nextVersion);
+  createGitHubRelease(nextVersion, releaseNotes);
   deploy();
   ensureMainBranch();
 

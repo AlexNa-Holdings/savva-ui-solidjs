@@ -11,5 +11,6 @@
   "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319",
   "core-concepts/encrypted-posts.md": "0c73dc11003c057571a3037a9e8cee0965bd0ec846947cca7037ef2a225235f7",
   "core-concepts/index.md": "b0c25ccb40847affcecbd805a81d552bcf5bceb2081c24d3c3379bfd91ffb7c4",
-  "core-concepts/domain.md": "f8d1700f9c3b0e22286b0214b1c5124d314f8405e7d42f20fd4a1704704d3860"
+  "core-concepts/domain.md": "f8d1700f9c3b0e22286b0214b1c5124d314f8405e7d42f20fd4a1704704d3860",
+  "licenses/official-contracts.md": "92180be02c03a6232ca1f9a7b24be6834844e4d45d4c9683ca8de369e2775fa3"
 }
