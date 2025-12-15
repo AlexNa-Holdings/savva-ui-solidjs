@@ -1,16 +1,26 @@
-                    GNU GENERAL PUBLIC LICENSE
-                       Version 3, 29 June 2007
+# SAVVA UI License
+
+This software is licensed under **GPL-3.0 with SAVVA Additional Terms**.
+
+See the [LICENSE](https://github.com/your-org/savva-ui-solidjs/blob/main/LICENSE) file in the repository root for the complete license text.
+
+## SAVVA Additional Terms
+
+**Projects that utilize the Software must employ the official SAVVA blockchain contracts and the official SAVVA token.** The official SAVVA blockchain contracts and the official SAVVA token are defined as the contracts and token deployed by the SAVVA team and made accessible exclusively through the official SAVVA website (https://savva.app/). While projects are allowed to introduce additional contracts to the system, they are expressly prohibited from introducing any additional tokens or altering/replacing the official SAVVA contracts in any way.
+
+---
+
+## GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
 
  Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
-                            Preamble
+### Preamble
 
   The GNU General Public License is a free, copyleft license for
 software and other kinds of works.
-
-**Projects that utilize the Software must employ the official SAVVA blockchain contracts and the official SAVVA token. The official SAVVA blockchain contracts and the official SAVVA token are defined as the contracts and token deployed by the SAVVA team and made accessible exclusively through the official SAVVA website (https://savva.app/). While projects are allowed to introduce additional contracts to the system, they are expressly prohibited from introducing any additional tokens or altering/replacing the official SAVVA contracts in any way.**
 
 
   The licenses for most software and other practical works are designed

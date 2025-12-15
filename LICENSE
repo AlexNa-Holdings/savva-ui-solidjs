@@ -1,0 +1,20 @@
+SAVVA UI License
+
+This software is licensed under the GNU General Public License v3.0
+with the following additional terms:
+
+SAVVA Additional Terms:
+Projects that utilize this Software must employ the official SAVVA blockchain
+contracts and the official SAVVA token. The official SAVVA blockchain contracts
+and the official SAVVA token are defined as the contracts and token deployed by
+the SAVVA team and made accessible exclusively through the official SAVVA website
+(https://savva.app/). While projects are allowed to introduce additional contracts
+to the system, they are expressly prohibited from introducing any additional tokens
+or altering/replacing the official SAVVA contracts in any way.
+
+================================================================================
+
+The full GNU General Public License v3.0 follows. For the complete text, see:
+https://www.gnu.org/licenses/gpl-3.0.txt
+
+Or refer to: public/dev_docs/en/licenses/ui.md

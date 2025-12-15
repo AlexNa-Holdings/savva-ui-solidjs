@@ -42,11 +42,6 @@ sections:
         file: tokenomics/buy-and-burn.md
       - label: Governance
         file: tokenomics/governance.md
-  - title: Getting Started
-    items:
-      - label: Setup
-        file: getting-started.md
-
   - title: Core Concepts
     items:
       - label: Overview
@@ -69,13 +64,29 @@ sections:
         file: core-concepts/config-contract.md
       - label: Connection Orchestration
         file: core-concepts/connection-orchestration.md
+  - title: Installation Guide
+    items:
+      - label: Overview
+        file: installation/index.md
+      - label: Prerequisites
+        file: installation/prerequisites.md
+      - label: Backend Server Setup
+        file: installation/backend-setup.md
+      - label: UI Website Setup
+        file: installation/ui-setup.md
+      - label: Configuration
+        file: installation/configuration.md
+      - label: Deployment
+        file: installation/deployment.md
+      - label: Troubleshooting
+        file: installation/troubleshooting.md
   - title: Licenses
     items:
-      - label: UI License 
+      - label: UI License
         file: licenses/ui.md
-      - label: Backend License 
+      - label: Backend License
         file: licenses/backend.md
-      - label: Contracts License 
+      - label: Contracts License
         file: licenses/contracts.md
       - label: Official Contract Addresses
         file: licenses/official-contracts.md

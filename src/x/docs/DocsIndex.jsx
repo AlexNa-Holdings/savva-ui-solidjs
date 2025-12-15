@@ -4,7 +4,9 @@ import { useApp } from "../../context/AppContext.jsx";
 
 async function fetchSidebar(lang) {
   // Expected: public/dev_docs/<lang>/sidebar.yaml
-  const res = await fetch(`/dev_docs/${lang}/sidebar.yaml`, { cache: "no-store" });
+  // Add cache-busting timestamp
+  const timestamp = Date.now();
+  const res = await fetch(`/dev_docs/${lang}/sidebar.yaml?v=${timestamp}`, { cache: "no-store" });
   if (!res.ok) return { sections: [] };
   const text = await res.text();
   // very small YAML reader to avoid extra deps:
@@ -17,7 +19,9 @@ async function fetchSidebar(lang) {
     if (Array.isArray(y.sections)) return { sections: y.sections };
     if (Array.isArray(y.items)) return { sections: [{ title: "Docs", items: y.items }] };
     if (Array.isArray(y)) return { sections: [{ title: "Docs", items: y }] };
-  } catch {}
+  } catch (e) {
+    console.error("DocsIndex: YAML parse error", e, "Text:", text.substring(0, 200));
+  }
   return { sections: [] };
 }
 
@@ -32,7 +36,7 @@ export default function DocsIndex(props) {
     const active = () => props.active === file;
     return (
       <button
-        class={`w-full text-left px-3 py-2 text-sm rounded ${
+        class={`w-full text-left px-3 py-2 text-sm rounded text-[hsl(var(--foreground))] ${
           active() ? "bg-[hsl(var(--accent))]" : "hover:bg-[hsl(var(--accent))]"
         }`}
         onClick={() => props.onPick?.(file)}
@@ -51,9 +55,9 @@ export default function DocsIndex(props) {
       }>
         <For each={data()?.sections || []}>
           {(sec, index) => (
-            <div class="mb-2">
-              <h2 class="px-3 pb-1 pt-2 text-sm font-semibold tracking-wide text-[hsl(var(--card-foreground))]">
-                {`${index() + 1}. ${sec.title || app.t("docs.section")}`}
+            <div class="mb-4">
+              <h2 class="px-3 pb-2 pt-3 text-xs font-bold uppercase tracking-wider text-[hsl(var(--primary))] border-b border-[hsl(var(--primary))] mb-2">
+                {sec.title || app.t("docs.section")}
               </h2>
               <For each={sec.items || []}>{item}</For>
             </div>

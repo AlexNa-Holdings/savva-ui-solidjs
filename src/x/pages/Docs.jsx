@@ -31,7 +31,7 @@ export default function Docs() {
             <div class="flex items-center justify-between pb-2">
               <h2 class="text-sm font-semibold">{title()}</h2>
             </div>
-            <div class="md:max-h-[calc(100vh-10rem)] md:overflow-y-auto md:pr-1">
+            <div class="md:max-h-[calc(100vh-10rem)] md:overflow-y-auto md:pr-1 sv-docs-scroll">
               <DocsIndex active={file()} onPick={onPick} />
             </div>
           </aside>
