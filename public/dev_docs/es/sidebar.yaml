@@ -7,7 +7,7 @@ sections:
         file: general/what-we-do.md
   - title: Características
     items:
-      - label: Redes comunitarias
+      - label: Redes de base
         file: features/grassroot.md
       - label: Más allá de los 'Me gusta'
         file: features/beyond-likes.md
@@ -29,9 +29,9 @@ sections:
         file: tokenomics/sacrifice.md
       - label: Staking
         file: tokenomics/staking.md
-      - label: Staking para publicar
+      - label: Apostar para publicar
         file: tokenomics/stake-to-post.md
-      - label: Fondos para publicar
+      - label: Fondos para publicaciones
         file: tokenomics/post-funds.md
       - label: Suscripciones al estilo Patreon
         file: tokenomics/patreon.md
@@ -41,15 +41,11 @@ sections:
         file: tokenomics/buy-and-burn.md
       - label: Gobernanza
         file: tokenomics/governance.md
-  - title: Primeros pasos
+  - title: Conceptos clave
     items:
-      - label: Configuración
-        file: getting-started.md
-  - title: Conceptos básicos
-    items:
-      - label: Visión general
+      - label: Resumen
         file: core-concepts/index.md
-      - label: Inicialización de la aplicación y conexión al backend
+      - label: Inicialización de la app y conexión con el backend
         file: core-concepts/app-init.md
       - label: Trabajando con dominios
         file: core-concepts/domain.md
@@ -57,7 +53,7 @@ sections:
         file: core-concepts/auth.md
       - label: Mostrar publicaciones
         file: core-concepts/showing-posts.md
-      - label: Publicar publicaciones
+      - label: Publicar contenido
         file: core-concepts/publishing-posts.md
       - label: Publicaciones cifradas
         file: core-concepts/encrypted-posts.md
@@ -67,9 +63,25 @@ sections:
         file: core-concepts/config-contract.md
       - label: Orquestación de conexiones
         file: core-concepts/connection-orchestration.md
+  - title: Guía de instalación
+    items:
+      - label: Resumen
+        file: installation/index.md
+      - label: Requisitos previos
+        file: installation/prerequisites.md
+      - label: Configuración del servidor backend
+        file: installation/backend-setup.md
+      - label: Configuración del sitio web de la UI
+        file: installation/ui-setup.md
+      - label: Configuración
+        file: installation/configuration.md
+      - label: Despliegue
+        file: installation/deployment.md
+      - label: Resolución de problemas
+        file: installation/troubleshooting.md
   - title: Licencias
     items:
-      - label: Licencia de UI
+      - label: Licencia de la UI
         file: licenses/ui.md
       - label: Licencia del backend
         file: licenses/backend.md

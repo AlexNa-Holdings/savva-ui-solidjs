@@ -1,0 +1,133 @@
+# SAVVA Nginx Configuration Example
+# Replace 'yourdomain.com' with your actual domain
+# Save this file to: /etc/nginx/sites-available/yourdomain.com
+# Then create symlink: sudo ln -s /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/
+
+# HTTP Server - Redirect all HTTP traffic to HTTPS
+server {
+	server_name yourdomain.com;
+
+	listen 80;
+	listen [::]:80;
+
+	# Redirect to HTTPS
+	return 301 https://yourdomain.com$request_uri;
+}
+
+# HTTPS Server - Main configuration
+server {
+	server_name yourdomain.com;
+
+	listen 443 ssl;
+	listen [::]:443 ssl;
+
+	keepalive_timeout 70;
+
+	# Configuration variables
+	# These are used in default_connect.yaml endpoint
+	set $default_domain "yourdomain.com";
+	set $default_backend "https://yourdomain.com/api/";
+
+	# Your IPFS gateway URL (Pinata, Filebase, or custom)
+	set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+
+	# Path to your UI build files
+	root /var/www/savva-ui;
+	index index.html;
+
+	# SSL Certificate Configuration
+	# Option 1: Cloudflare Origin Certificate (recommended for Cloudflare users)
+	ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
+	ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
+
+	# Option 2: Let's Encrypt (uncomment if using certbot)
+	# ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+	# ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+	ssl_protocols       TLSv1.2 TLSv1.3;
+	ssl_ciphers         HIGH:!aNULL:!MD5;
+
+	ssl_stapling off;
+	ssl_stapling_verify on;
+
+	# Special endpoint for UI configuration
+	# The UI fetches this to know backend and IPFS gateway URLs
+	location = /default_connect.yaml {
+		add_header Content-Type text/plain;
+		return 200 'domain: $default_domain
+backendLink: $default_backend
+default_ipfs_link: $default_ipfs';
+	}
+
+	# Main location block - serves UI and handles prerendering for bots
+	location / {
+		set $prerender 0;
+
+		# Detect popular search engine and social media bots
+		# These bots need server-side rendered content for SEO and link previews
+		if ($http_user_agent ~*
+			"googlebot|facebookexternalhit|twitterbot|telegrambot|yahoo|bingbot|baiduspider|yandex|yeti|yodaobot|gigabot|ia_archiver|developers\.google\.com") {
+			set $prerender 1;
+		}
+
+		# Support for escaped fragment URLs (legacy AJAX crawling)
+		if ($args ~ "_escaped_fragment_") {
+			set $prerender 1;
+		}
+
+		# Don't prerender if request is from the prerender service itself
+		if ($http_user_agent ~ "Prerender") {
+			set $prerender 0;
+		}
+
+		# Don't prerender the config endpoint
+		if ($uri = "/default_connect.yaml") {
+			set $prerender 0;
+		}
+
+		# If bot detected, send to backend prerender service
+		if ($prerender = "1") {
+			rewrite (.*) /api/render/$scheme://$host$uri?prerender&domain=$default_domain break;
+			proxy_pass http://localhost:7000;
+		}
+
+		# Serve static files, fallback to index.html for SPA routing
+		try_files $uri /index.html;
+	}
+
+	# Explicit cache control for index.html
+	# Prevents browser from caching the main HTML file
+	# This ensures users always get the latest version after deployments
+	location = /index.html {
+		add_header Cache-Control "no-cache, no-store, must-revalidate";
+		add_header Pragma "no-cache";
+		expires -1;
+	}
+
+	# Backend API proxy configuration
+	# Proxies all /api requests to the backend server on port 7000
+	location /api {
+		# Forward to local backend server
+		proxy_pass http://localhost:7000;
+
+		# Preserve original request headers
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+		# WebSocket support for real-time features
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection "Upgrade";
+
+		# Extended timeouts for long-running requests and WebSocket connections
+		proxy_read_timeout 86400s;    # 24 hours
+		proxy_connect_timeout 86400s; # 24 hours
+		proxy_send_timeout 86400s;    # 24 hours
+
+		# Disable buffering for real-time streaming
+		proxy_buffering off;
+
+		# Allow larger uploads (avatars, cover images, post attachments)
+		client_max_body_size 20M;
+	}
+}

@@ -1,0 +1,105 @@
+# SAVVA Backend Configuration Example
+# Copy this file to /etc/savva.yml and update with your actual values
+
+# Blockchain Configuration
+# Use WSS (WebSocket Secure) for reliable connection
+blockchain-rpc: wss://your-rpc-endpoint.com:8546/your-api-key
+# Block number to start indexing from (network launch block)
+initial-block: 20110428
+
+# Smart Contracts
+contracts:
+  # Main Config contract address (already deployed on PulseChain)
+  Config: 0x4ED8321722ACB984aB6B249C4AE74a58CAD7E4e8
+
+# Database Configuration
+db:
+  type: postgres
+  # For self-hosted PostgreSQL or DigitalOcean Managed Database
+  # Format: postgresql://username:password@host:port/database?sslmode=require
+  connection-string: postgresql://savva_user:your_secure_password@your-db-host:25060/savva?sslmode=require
+
+# Server Configuration
+server:
+  port: 7000
+  # API will be available at /api path (proxied by Nginx)
+  url-prefix: "/api"
+  # Rate limit: requests per minute per IP
+  rpm-limit: 600
+  # CORS allowed origins (your domain)
+  cors-allowed-origins:
+    - yourdomain.com
+    - www.yourdomain.com
+
+# IPFS Configuration
+ipfs:
+  # Local IPFS node API endpoint
+  url: http://localhost:5001
+
+  # External pinning services for redundancy
+  pin-services:
+    - name: pinata
+      url: https://api.pinata.cloud/pinning
+      # Get your JWT token from Pinata dashboard
+      api-key: YOUR_PINATA_JWT_TOKEN
+
+    # You can add more pinning services for redundancy
+    # - name: filebase
+    #   url: https://api.filebase.io/v1/ipfs
+    #   api-key: YOUR_FILEBASE_TOKEN
+
+  # Public IPFS gateways for content retrieval
+  gateways:
+    - https://gateway.pinata.cloud/ipfs/
+    # Add more gateways for redundancy
+    # - https://ipfs.io/ipfs/
+    # - https://cloudflare-ipfs.com/ipfs/
+
+# Content Limits
+max-post-len: 10000        # Maximum post length in characters
+max-avatar-size: 524288    # Maximum avatar size: 512 KB
+max-cover-size: 2097152    # Maximum cover image size: 2 MB
+
+# Storage Limits
+max-disk-usage: 10737418240  # Maximum disk usage: 10 GB
+
+# Cache Configuration (in seconds)
+user-cache-ttl: 600   # User data cache: 10 minutes
+post-cache-ttl: 300   # Post data cache: 5 minutes
+
+# Full-Text Search
+# Language for text search (affects stemming and stop words)
+fts-lang: english
+
+# Logging Configuration
+log:
+  # Log level: debug, info, warn, error
+  level: info
+  # Log file location
+  file: /var/log/savva/backend.log
+  # Maximum log file size before rotation (10 MB)
+  max-size: 10485760
+  # Number of old log files to keep
+  max-backups: 5
+  # Maximum age of log files in days
+  max-age: 30
+  # Compress rotated log files
+  compress: true
+
+# Domain Configuration
+# Your SAVVA instance domain name
+domain: yourdomain.com
+
+# Optional: Telegram Bot Configuration (for notifications)
+# telegram:
+#   bot-token: YOUR_TELEGRAM_BOT_TOKEN
+#   chat-id: YOUR_TELEGRAM_CHAT_ID
+
+# Optional: Email Configuration (for notifications)
+# email:
+#   smtp-host: smtp.yourprovider.com
+#   smtp-port: 587
+#   smtp-user: noreply@yourdomain.com
+#   smtp-password: YOUR_EMAIL_PASSWORD
+#   from-address: noreply@yourdomain.com
+#   from-name: SAVVA Network

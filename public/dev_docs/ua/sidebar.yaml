@@ -5,46 +5,42 @@ sections:
         file: index.md
       - label: Що ми робимо
         file: general/what-we-do.md
-  - title: Можливості
+  - title: Функції
     items:
-      - label: Народні мережі
+      - label: Громадські мережі
         file: features/grassroot.md
-      - label: Поза лайками
+      - label: Більше, ніж лайки
         file: features/beyond-likes.md
       - label: Авторизація
         file: features/authorization.md
-      - label: Керування контентом
+      - label: Контроль вмісту
         file: features/content-control.md
-      - label: Багатомовний
+      - label: Багатомовність
         file: features/multi-lingual.md
-      - label: Розширений формат контенту
+      - label: Розширений формат вмісту
         file: features/content-format.md
-      - label: Зашифрований контент
+      - label: Зашифрований вміст
         file: features/encrypted-content.md
   - title: Токеноміка
     items:
       - label: Токен SAVVA
         file: tokenomics/savva-token.md
-      - label: Безперервне жертвування
+      - label: Поточні пожертви
         file: tokenomics/sacrifice.md
       - label: Стейкінг
         file: tokenomics/staking.md
       - label: Стейк для публікації
         file: tokenomics/stake-to-post.md
-      - label: Кошти для постів
+      - label: Кошти посту
         file: tokenomics/post-funds.md
       - label: Підписки в стилі Patreon
         file: tokenomics/patreon.md
       - label: NFT
         file: tokenomics/nfts.md
-      - label: Купівля та спалення
+      - label: Купити й спалити
         file: tokenomics/buy-and-burn.md
       - label: Управління
         file: tokenomics/governance.md
-  - title: Початок роботи
-    items:
-      - label: Налаштування
-        file: getting-started.md
   - title: Основні поняття
     items:
       - label: Огляд
@@ -63,10 +59,26 @@ sections:
         file: core-concepts/encrypted-posts.md
       - label: Контракт профілю користувача
         file: core-concepts/user-profile.md
-      - label: Конфігураційний контракт
+      - label: Контракт конфігурації
         file: core-concepts/config-contract.md
       - label: Оркестрація підключень
         file: core-concepts/connection-orchestration.md
+  - title: Посібник з встановлення
+    items:
+      - label: Огляд
+        file: installation/index.md
+      - label: Вимоги
+        file: installation/prerequisites.md
+      - label: Налаштування бекенд-сервера
+        file: installation/backend-setup.md
+      - label: Налаштування UI-сайту
+        file: installation/ui-setup.md
+      - label: Конфігурація
+        file: installation/configuration.md
+      - label: Розгортання
+        file: installation/deployment.md
+      - label: Усунення неполадок
+        file: installation/troubleshooting.md
   - title: Ліцензії
     items:
       - label: Ліцензія UI

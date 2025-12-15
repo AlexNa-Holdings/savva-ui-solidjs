@@ -1,5 +1,5 @@
 {
-  "sidebar.yaml": "f0fcc4910b055c62a5bc618a0632fcbd501b16e3fc153d5092ee5bfebae8aa57",
+  "sidebar.yaml": "3ae4bc10cd4bb3b771f75c4059e33ccbaffcb562652c2e8bd183f593faddc78e",
   "tokenomics/buy-and-burn.md": "34de7082651305d8bbc896e448aa2d90cd64dcdbdf001bbdc03bbb89224048a2",
   "tokenomics/governance.md": "fe7e14bb62142114561e7e777d911f99670d5f0eb0332a401bd62268f7f696b0",
   "tokenomics/nfts.md": "4c5c1f39e2922fcd430fb10129e6e308e8a98acee3bf346f397e67f2f02353e9",
@@ -12,5 +12,15 @@
   "core-concepts/encrypted-posts.md": "0c73dc11003c057571a3037a9e8cee0965bd0ec846947cca7037ef2a225235f7",
   "core-concepts/index.md": "b0c25ccb40847affcecbd805a81d552bcf5bceb2081c24d3c3379bfd91ffb7c4",
   "core-concepts/domain.md": "f8d1700f9c3b0e22286b0214b1c5124d314f8405e7d42f20fd4a1704704d3860",
-  "licenses/official-contracts.md": "92180be02c03a6232ca1f9a7b24be6834844e4d45d4c9683ca8de369e2775fa3"
+  "licenses/official-contracts.md": "92180be02c03a6232ca1f9a7b24be6834844e4d45d4c9683ca8de369e2775fa3",
+  "installation/backend-setup.md": "cf3c9965a4c3a0054e12b5d958116e558c60c2d367f5c8062b70253beb4b8fd9",
+  "installation/configuration.md": "7bd12b57c3fb19a02df6d1662685e6dea6c6bed606a27d68657dfd1eb9bc700a",
+  "installation/deployment.md": "4e9ac2aeded2ec19e447fafeb33c757c62271f4848f709efdb73008a49a8b9d5",
+  "installation/index.md": "c5f5be0a269bbda69588298ba5f1dc128b811e804a1db758dc80040b5acf5fff",
+  "installation/nginx.conf.example": "75031e164ea5be7ca79f69121e36be1ea59fdd739c2c468fc32b290fc40d001d",
+  "installation/prerequisites.md": "bacd3e4c7b75a41bc0e848f6bf9b6c79c79bcc094b658f2bedcd174c8c356a2a",
+  "installation/savva.yml.example": "476b4ccdd3076c77d65bb1293de604f04db578f678b50995f66e199abb186251",
+  "installation/troubleshooting.md": "8a8cfda38b0c280c3b13b444643d22385fc87e094652d0fdc405509d7bc7f764",
+  "installation/ui-setup.md": "79765146a2aae736f74946033c406870b90fb8ad5c4e8efef592dec88d71c1cd",
+  "licenses/ui.md": "a65edc205663681f97730a04d4b87b0c169d3520c97bb65bc90fc12b9c167222"
 }
