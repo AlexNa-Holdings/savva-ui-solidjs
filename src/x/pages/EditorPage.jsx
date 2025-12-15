@@ -81,6 +81,7 @@ export default function EditorPage() {
   const [aiLastRunOk, setAiLastRunOk] = createSignal(false);
   const [showAiDialog, setShowAiDialog] = createSignal(false);
   const [aiIndividualRunning, setAiIndividualRunning] = createSignal(false);
+  const [aiIndividualPending, setAiIndividualPending] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -153,10 +154,21 @@ export default function EditorPage() {
 
   // Auto-confirm AI changes when user makes any edit
   createEffect(on([postData, postParams], () => {
-    // Skip if AI is not pending or if AI is currently running
-    if (!ai.pending() || ai.running()) return;
+    // Skip if no AI changes are pending or if AI is currently running
+    const fullAiPending = ai.pending() && !ai.running();
+    const individualPending = aiIndividualPending();
+    const individualRunning = aiIndividualRunning();
+
+    // Skip if AI is currently running (changes are from the AI, not user)
+    if (individualRunning) return;
+    if (!fullAiPending && !individualPending) return;
+
     // User made a change while AI changes are pending - treat as implicit confirmation
-    ai.confirm();
+    if (fullAiPending) ai.confirm();
+    if (individualPending) {
+      dropLastAiSnapshot(draftKey());
+      setAiIndividualPending(false);
+    }
   }, { defer: true }));
 
   // ----- Individual AI action handlers -----
@@ -173,18 +185,43 @@ export default function EditorPage() {
 
   async function runIndividualAiAction(actionFn) {
     setAiIndividualRunning(true);
+    setAiIndividualPending(false);
     const before = readEditorState();
     snapshotBeforeAi(draftKey(), before, { reason: "ai-individual" });
 
+    let changed = false;
     try {
-      await actionFn();
-      ai.pending() || pushToast({ type: "info", message: t("editor.ai.applied") });
+      changed = await actionFn();
+      if (changed === false) {
+        // AI ran successfully but nothing changed - clean up snapshot and notify user
+        dropLastAiSnapshot(draftKey());
+        pushToast({ type: "info", message: t("editor.ai.noChanges") });
+      }
     } catch (err) {
       dropLastAiSnapshot(draftKey());
       pushToast({ type: "error", message: err?.message || t("editor.ai.errors.api") });
     } finally {
+      // Important: set pending BEFORE clearing running, so the auto-confirm effect doesn't fire prematurely
+      if (changed === true) {
+        setAiIndividualPending(true);
+      }
       setAiIndividualRunning(false);
     }
+  }
+
+  function handleAiIndividualUndo() {
+    const before = undoLastAi(draftKey());
+    if (before) {
+      setPostData(before.postData);
+      setPostParams(before.postParams);
+      pushToast({ type: "info", message: t("editor.ai.undone") });
+    }
+    setAiIndividualPending(false);
+  }
+
+  function handleAiIndividualConfirm() {
+    dropLastAiSnapshot(draftKey());
+    setAiIndividualPending(false);
   }
 
   async function handleAiFixGrammar() {
@@ -192,7 +229,7 @@ export default function EditorPage() {
       const client = createAiClient();
       const lang = activeLang();
       const body = currentBody();
-      if (!body.trim()) return;
+      if (!body.trim()) return false;
 
       const fixed = await client.fixGrammar(body, lang);
       if (fixed && fixed !== body) {
@@ -204,7 +241,9 @@ export default function EditorPage() {
           chapters[idx] = { ...chapters[idx], body: fixed };
           updateField("chapters", chapters);
         }
+        return true;
       }
+      return false;
     });
   }
 
@@ -213,7 +252,7 @@ export default function EditorPage() {
       const client = createAiClient();
       const lang = activeLang();
       const body = currentBody();
-      if (!body.trim()) return;
+      if (!body.trim()) return false;
 
       const improved = await client.improveStyle(body, lang);
       if (improved && improved !== body) {
@@ -225,7 +264,9 @@ export default function EditorPage() {
           chapters[idx] = { ...chapters[idx], body: improved };
           updateField("chapters", chapters);
         }
+        return true;
       }
+      return false;
     });
   }
 
@@ -234,7 +275,7 @@ export default function EditorPage() {
       const client = createAiClient();
       const lang = activeLang();
       const body = currentBody();
-      if (!body.trim()) return;
+      if (!body.trim()) return false;
 
       const shorter = await client.makeShorter(body, lang);
       if (shorter && shorter !== body) {
@@ -246,7 +287,9 @@ export default function EditorPage() {
           chapters[idx] = { ...chapters[idx], body: shorter };
           updateField("chapters", chapters);
         }
+        return true;
       }
+      return false;
     });
   }
 
@@ -261,7 +304,9 @@ export default function EditorPage() {
       const title = await client.proposeTitle(lang, { body, chapters });
       if (title) {
         updateField("title", title);
+        return true;
       }
+      return false;
     });
   }
 
@@ -778,8 +823,8 @@ export default function EditorPage() {
             </header>
           </Show>
 
-          {/* AI content banner - shown when AI made changes, auto-dismisses on user edit */}
-          <Show when={ai.pending() && !ai.running()}>
+          {/* AI content banner - shown when AI made changes (full handler or individual actions) */}
+          <Show when={(ai.pending() && !ai.running()) || aiIndividualPending()}>
             <div class="flex items-center justify-between gap-3 px-4 py-2 mb-4 rounded-lg bg-blue-500/20 border border-blue-500/50">
               <div class="flex items-center gap-2 text-sm text-blue-200">
                 <AiIcon size={18} />
@@ -787,7 +832,7 @@ export default function EditorPage() {
               </div>
               <button
                 type="button"
-                onClick={ai.undo}
+                onClick={aiIndividualPending() ? handleAiIndividualUndo : ai.undo}
                 class="px-3 py-1 text-sm font-medium rounded bg-red-500/20 border border-red-500 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
               >
                 {t("editor.ai.undo")}
