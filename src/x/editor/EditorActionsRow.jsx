@@ -19,16 +19,12 @@ export default function EditorActionsRow(props) {
   );
   const aiAuto = createMemo(() => aiConfigured() && !!aiCfg()?.auto);
 
-  const isPending = () => !!props.aiPending;
   const isRunning = () => !!props.aiRunning;
   const p = () => props.aiProgress || { i: 0, total: 0, label: "" };
 
-  // Armed when user clicks Preview in auto mode; we’ll navigate once AI finishes successfully.
+  // Armed when user clicks Preview in auto mode; we'll navigate once AI finishes successfully.
   const [autoPreviewArmed, setAutoPreviewArmed] = createSignal(false);
 
-  const AiGlyphInside = (
-    <AiIcon size={22} class="mr-2 opacity-90 inline-block align-[-1px]" />
-  );
   const AiGlyphButton = (
     <AiIcon size={28} class="opacity-90 inline-block" />
   );
@@ -113,27 +109,6 @@ export default function EditorActionsRow(props) {
                   {p().i + 1}/{p().total} — {p().label}
                 </span>
               </div>
-            </div>
-          ) : isPending() ? (
-            // Undo/Confirm block with AI icon (shown even in auto mode)
-            <div class="flex items-stretch rounded-lg border border-[hsl(var(--border))] overflow-hidden">
-              <div class="px-4 py-3 flex items-center">
-                <AiIcon size={28} class="opacity-90 inline-block" />
-              </div>
-              <button
-                type="button"
-                onClick={props.onAiUndo}
-                class="px-5 py-3 text-lg border-l border-[hsl(var(--border))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--muted))]"
-              >
-                {t("editor.ai.undo")}
-              </button>
-              <button
-                type="button"
-                onClick={props.onAiConfirm}
-                class="px-5 py-3 text-lg border-l border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:opacity-90"
-              >
-                {t("editor.ai.confirm")}
-              </button>
             </div>
           ) : (
             // Manual AI button is hidden in auto mode

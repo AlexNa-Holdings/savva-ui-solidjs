@@ -140,7 +140,7 @@ async function fetchMainContent(details, app, lang, chapterIndex, postSecretKey 
 
 export default function PostPage() {
   const app = useApp();
-  const { t } = app;
+  const { t, tLang } = app;
   const { route } = useHashRouter();
 
   // profile from spec store
@@ -692,9 +692,9 @@ export default function PostPage() {
                               <div class="flex justify-end mb-4">
                                 <ChapterSelector
                                   chapters={[
-                                    { title: t("post.chapters.prologue") },
+                                    { title: tLang(postLang(), "post.chapters.prologue") },
                                     ...(chapters().map((ch, i) => ({
-                                      title: ch.title || `${t("post.chapters.chapter")} ${i + 1}`
+                                      title: ch.title || `${tLang(postLang(), "post.chapters.chapter")} ${i + 1}`
                                     })))
                                   ]}
                                   selectedIndex={selectedChapterIndex()}
@@ -708,9 +708,9 @@ export default function PostPage() {
                             <Show when={chapters().length > 0}>
                               <ChapterPager
                                 chapters={[
-                                  { title: t("post.chapters.prologue") },
+                                  { title: tLang(postLang(), "post.chapters.prologue") },
                                   ...(chapters().map((ch, i) => ({
-                                    title: ch.title || `${t("post.chapters.chapter")} ${i + 1}`
+                                    title: ch.title || `${tLang(postLang(), "post.chapters.chapter")} ${i + 1}`
                                   })))
                                 ]}
                                 currentIndex={selectedChapterIndex()}

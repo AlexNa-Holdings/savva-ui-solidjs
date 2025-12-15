@@ -28,16 +28,26 @@ function MinusIcon(props) {
 }
 
 export default function EditorChapterSelector(props) {
-  const { t } = useApp();
+  const app = useApp();
+  const { t } = app;
   const [isOpen, setIsOpen] = createSignal(false);
   let containerRef;
 
   const chapters = () => props.chapters || [];
   const activeIndex = () => props.activeIndex;
 
+  // Use locale-specific translation for "Prologue" based on current editor locale
+  const prologueLabel = createMemo(() => {
+    const locale = props.locale?.() || props.locale;
+    if (locale && app.tLang) {
+      return app.tLang(locale, "post.chapters.prologue");
+    }
+    return t("post.chapters.prologue");
+  });
+
   const activeItem = createMemo(() => {
     const index = activeIndex();
-    if (index === -1) return { title: t("post.chapters.prologue") };
+    if (index === -1) return { title: prologueLabel() };
     return chapters()[index] || null;
   });
 
@@ -76,7 +86,7 @@ export default function EditorChapterSelector(props) {
                     <ul class="py-1" role="menu">
                         <li>
                             <a href="#" class="block w-full text-left px-4 py-2 text-sm hover:bg-[hsl(var(--accent))]" onClick={(e) => { e.preventDefault(); props.onSelectIndex(-1); setIsOpen(false); }}>
-                                {t("post.chapters.prologue")}
+                                {prologueLabel()}
                             </a>
                         </li>
                         <For each={chapters()}>

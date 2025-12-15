@@ -308,6 +308,101 @@ export function createAiClient(explicitCfg) {
     return j.translations;
   }
 
+  /**
+   * Fix grammar and spelling mistakes in text
+   * @param {string} text - The text to fix
+   * @param {string} language - The language code (e.g., "en", "ru")
+   * @returns {Promise<string>} - The corrected text
+   */
+  async function fixGrammar(text, language = "en") {
+    const sys = [
+      "You are a precise grammar and spelling editor.",
+      `Language: ${language}.`,
+      "Fix ONLY grammar, spelling, and punctuation errors.",
+      "Do NOT change the meaning, tone, or style of the text.",
+      "Do NOT shorten or expand the text.",
+      "Preserve ALL Markdown formatting, code blocks, links, and URLs exactly.",
+      'Respond ONLY with strict JSON: {"text":"..."}',
+    ].join(" ");
+    const content = await chat([
+      { role: "system", content: sys },
+      { role: "user", content: String(text || "") },
+    ]);
+    const j = parseJsonStrict(content);
+    return String(j?.text || text);
+  }
+
+  /**
+   * Improve the writing style of text
+   * @param {string} text - The text to improve
+   * @param {string} language - The language code
+   * @returns {Promise<string>} - The improved text
+   */
+  async function improveStyle(text, language = "en") {
+    const sys = [
+      "You are a professional editor improving text style.",
+      `Language: ${language}.`,
+      "Make the text more engaging, clear, and professional.",
+      "Improve readability and flow while preserving the original meaning.",
+      "Keep approximately the same length.",
+      "Preserve ALL Markdown formatting, code blocks, links, and URLs exactly.",
+      'Respond ONLY with strict JSON: {"text":"..."}',
+    ].join(" ");
+    const content = await chat([
+      { role: "system", content: sys },
+      { role: "user", content: String(text || "") },
+    ]);
+    const j = parseJsonStrict(content);
+    return String(j?.text || text);
+  }
+
+  /**
+   * Make text shorter while preserving key information
+   * @param {string} text - The text to shorten
+   * @param {string} language - The language code
+   * @returns {Promise<string>} - The shortened text
+   */
+  async function makeShorter(text, language = "en") {
+    const sys = [
+      "You are a concise editor.",
+      `Language: ${language}.`,
+      "Make the text significantly shorter while keeping all important information.",
+      "Remove redundancy and unnecessary words.",
+      "Preserve the original meaning and tone.",
+      "Preserve ALL Markdown formatting, code blocks, links, and URLs exactly.",
+      'Respond ONLY with strict JSON: {"text":"..."}',
+    ].join(" ");
+    const content = await chat([
+      { role: "system", content: sys },
+      { role: "user", content: String(text || "") },
+    ]);
+    const j = parseJsonStrict(content);
+    return String(j?.text || text);
+  }
+
+  /**
+   * Translate a single text string
+   * @param {string} sourceLang - Source language code
+   * @param {string} targetLang - Target language code
+   * @param {string} text - Text to translate
+   * @returns {Promise<string>} - Translated text
+   */
+  async function translateText(sourceLang, targetLang, text) {
+    const sys = [
+      "You are a professional translator.",
+      `Translate from ${sourceLang} to ${targetLang}.`,
+      "Preserve the meaning, tone, and style.",
+      "Preserve ALL Markdown formatting, code blocks, links, and URLs exactly.",
+      'Respond ONLY with strict JSON: {"text":"..."}',
+    ].join(" ");
+    const content = await chat([
+      { role: "system", content: sys },
+      { role: "user", content: String(text || "") },
+    ]);
+    const j = parseJsonStrict(content);
+    return String(j?.text || "");
+  }
+
   return {
     chat,
     cleanTextBatch,
@@ -316,5 +411,9 @@ export function createAiClient(explicitCfg) {
     proposeTitle,
     proposeChapterTitle,
     translateStructure,
+    fixGrammar,
+    improveStyle,
+    makeShorter,
+    translateText,
   };
 }

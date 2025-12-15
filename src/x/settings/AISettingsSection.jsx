@@ -1,7 +1,7 @@
 // src/x/settings/AISettingsSection.jsx
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { AI_PROVIDERS, findProvider, testConnection } from "../../ai/registry.js";
+import { AI_PROVIDERS, findProvider, testConnection, fetchModels } from "../../ai/registry.js";
 import { loadAiConfig, saveAiConfig } from "../../ai/storage.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { createAiClient } from "../../ai/client.js";
@@ -13,6 +13,8 @@ export default function AISettingsSection() {
   const [cfg, setCfg] = createSignal(loadAiConfig());
   const [busyTest, setBusyTest] = createSignal(false);
   const [showAdvanced, setShowAdvanced] = createSignal(false);
+  const [availableModels, setAvailableModels] = createSignal([]);
+  const [loadingModels, setLoadingModels] = createSignal(false);
   const provider = createMemo(() => findProvider(cfg().providerId));
 
   const persistConfig = (nextCfg) => {
@@ -80,6 +82,7 @@ export default function AISettingsSection() {
 
   function handleProviderChange(nextId) {
     const p = findProvider(nextId);
+    setAvailableModels([]); // Clear models when provider changes
     setCfg((prev) => {
       const next = { ...prev, providerId: nextId };
       next.baseUrl = p?.defaultBaseUrl !== undefined ? (p.defaultBaseUrl || "") : "";
@@ -98,6 +101,32 @@ export default function AISettingsSection() {
       persistConfig(next);
       return next;
     });
+  }
+
+  // Check if current provider supports model fetching
+  const supportsModelFetch = createMemo(() => {
+    const p = provider();
+    return p?.kind === "openai" || p?.kind === "gemini";
+  });
+
+  async function handleFetchModels() {
+    setLoadingModels(true);
+    try {
+      const result = await fetchModels(cfg());
+      if (result.ok && result.models.length > 0) {
+        setAvailableModels(result.models);
+      } else {
+        setAvailableModels([]);
+        if (result.error) {
+          pushErrorToast(new Error(result.error), { context: "ai-models" });
+        }
+      }
+    } catch (err) {
+      setAvailableModels([]);
+      pushErrorToast(err, { context: "ai-models" });
+    } finally {
+      setLoadingModels(false);
+    }
   }
 
   // Persist AUTO immediately when toggled so the editor can pick it up
@@ -253,16 +282,45 @@ export default function AISettingsSection() {
             </select>
           </label>
 
-          <label class="grid gap-1">
+          <div class="grid gap-1">
             <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.model")}</span>
-            <input
-              type="text"
-              class="rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
-              placeholder={modelPlaceholder()}
-              value={cfg().model || ""}
-              onInput={(e) => update("model", e.currentTarget.value)} 
-            />
-          </label>
+            <div class="flex gap-2">
+              <Show
+                when={availableModels().length > 0}
+                fallback={
+                  <input
+                    type="text"
+                    class="flex-1 rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
+                    placeholder={modelPlaceholder()}
+                    value={cfg().model || ""}
+                    onInput={(e) => update("model", e.currentTarget.value)}
+                  />
+                }
+              >
+                <select
+                  class="flex-1 rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1.5"
+                  value={cfg().model || ""}
+                  onChange={(e) => update("model", e.currentTarget.value)}
+                >
+                  <option value="">{t("settings.ai.selectModel")}</option>
+                  <For each={availableModels()}>
+                    {(model) => <option value={model}>{model}</option>}
+                  </For>
+                </select>
+              </Show>
+              <Show when={supportsModelFetch() && cfg().apiKey}>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-sm rounded border border-[hsl(var(--input))] bg-[hsl(var(--background))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+                  disabled={loadingModels()}
+                  onClick={handleFetchModels}
+                  title={t("settings.ai.fetchModels")}
+                >
+                  {loadingModels() ? "..." : "↻"}
+                </button>
+              </Show>
+            </div>
+          </div>
 
           <label class="grid gap-1 sm:col-span-2">
             <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiKey")}</span>

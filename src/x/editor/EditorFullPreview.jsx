@@ -11,7 +11,7 @@ import LangSelector from "../ui/LangSelector.jsx";
 
 export default function EditorFullPreview(props) {
   const app = useApp();
-  const { t } = app;
+  const { t, tLang } = app;
 
   const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
   const [previewLang, setPreviewLang] = createSignal(props.activeLang);
@@ -23,8 +23,16 @@ export default function EditorFullPreview(props) {
   const title = createMemo(() => props.postData?.[lang()]?.title || "");
 
   const chapterList = createMemo(() => {
-    const prologue = { title: t("post.chapters.prologue") };
-    return [prologue, ...(props.chapters || [])];
+    const currentLang = lang();
+    const prologueTitle = tLang ? tLang(currentLang, "post.chapters.prologue") : t("post.chapters.prologue");
+    const chapterFallback = () => tLang ? tLang(currentLang, "post.chapters.chapter") : t("post.chapters.chapter");
+    const prologue = { title: prologueTitle };
+    // Get chapters from the current preview language, not from props.chapters (which is only the active editor lang)
+    const langChapters = (props.postData?.[currentLang]?.chapters || []).map((ch, i) => ({
+      ...ch,
+      title: ch.title || `${chapterFallback(i)} ${i + 1}`
+    }));
+    return [prologue, ...langChapters];
   });
 
   const currentContent = createMemo(() => {

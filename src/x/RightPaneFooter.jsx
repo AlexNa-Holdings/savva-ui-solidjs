@@ -42,6 +42,7 @@ export default function RightPaneFooter() {
   return (
     <div class="mt-auto pt-3 border-t border-[hsl(var(--border))] text-sm text-[hsl(var(--muted-foreground))]">
       {/* Google Play Button */}
+      <div class="mb-2 font-medium">{t("app.installApplication")}</div>
       <a
         href={GOOGLE_PLAY_URL}
         target="_blank"

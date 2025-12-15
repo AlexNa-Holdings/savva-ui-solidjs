@@ -83,6 +83,18 @@ export function useI18n() {
       return showKeys() ? `${base} [${key}]` : base;
     };
 
+    /** Get translation for a specific language (not the current UI language) */
+    const tLang = (targetLang, key, params) => {
+      const normalizedLang = normalizeLang(targetLang);
+      let base = resolveKey(normalizedLang, key);
+      if (params) {
+        for (const [paramKey, paramValue] of Object.entries(params)) {
+          base = base.replace(`{${paramKey}}`, String(paramValue));
+        }
+      }
+      return showKeys() ? `${base} [${key}]` : base;
+    };
+
     // The problematic event listener has been removed.
 
     const available = () => {
@@ -92,7 +104,7 @@ export function useI18n() {
     };
 
     i18nSingleton = {
-      t, lang, setLang, showKeys, setShowKeys, available,
+      t, tLang, lang, setLang, showKeys, setShowKeys, available,
       setDomainDictionaries: (d) => setDomainDicts(d || {}),
       setDomainLangCodes: (codes) => setDomainLangCodes(codes || []),
     };

@@ -79,7 +79,7 @@ export default function PreferencesSection() {
                 min="0"
                 step="1"
                 value={amount}
-                onInput={(e) => handleAmountChange(index(), e.currentTarget.value)}
+                onChange={(e) => handleAmountChange(index(), e.currentTarget.value)}
                 class="w-24 px-2 py-1 text-center rounded border bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-[hsl(var(--input))]"
                 placeholder={t("settings.preferences.amounts.placeholder")}
               />

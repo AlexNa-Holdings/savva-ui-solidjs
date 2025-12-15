@@ -421,8 +421,11 @@ async function ensureTranslated(ai, t, base, target, sourceText, candidate) {
 
 // ---------- AI tasks ----------
 
+/**
+ * Analyze task - uses the current active locale as the base.
+ * Detects the actual language if content script differs from the locale key.
+ */
 function makeAnalyzeAiTask(t, opts) {
-  const CONF_MIN = 0.7; // robust fallback if below this
   return {
     id: "analyze",
     label: t("editor.ai.progress.analyze"),
@@ -444,123 +447,61 @@ function makeAnalyzeAiTask(t, opts) {
 
       if (!textsExist) throw new Error(t("editor.ai.errors.empty"));
 
-      const originalLocales = collectAllLocaleKeys(state);
+      // Use the currently selected locale as the base key
+      const activeKey = normCode(state?.activeLang) || locKeys[0] || "en";
+      const baseKey = activeKey;
 
-      const stats = locKeys
-        .map((k) => _collectLocaleStats(state, k))
-        .filter((s) => s.fieldsCount > 0 || s.totalChars > 0);
-      const statsByKey = new Map(stats.map((s) => [normCode(s.key), s]));
-      const best = _pickBestLocale(stats, state?.activeLang);
+      // Get the content from the active locale for language detection
+      const textsForDetection = _aggregateTextsForLocale(state, activeKey);
 
-      const topForDetection = stats
-        .slice()
-        .sort((a, b) => b.totalChars - a.totalChars)
-        .slice(0, 3)
-        .flatMap((s) => _aggregateTextsForLocale(state, s.key))
-        .slice(0, 40);
+      // Start with the locale key as the assumed language
+      let baseAliased = langAlias(activeKey);
 
-      const ai = createAiClient();
-      let res;
-      try {
-        res = await ai.detectBaseLanguage(topForDetection, {
-          activeLang: state?.activeLang,
-          instruction:
-            "Identify the single dominant language of the given content regardless of the locale key. " +
-            "Return ISO 639-1 code in `base` plus numeric `confidence` 0..1.",
-        });
-      } catch {
-        res = null;
+      // Detect the actual language if content exists
+      // The content language might differ from the locale key (e.g., user is in "en" but wrote in Russian)
+      if (textsForDetection.length > 0) {
+        const scriptGuess = guessLangByScript(textsForDetection);
+        // If script suggests a different language, verify with AI
+        if (scriptGuess && scriptGuess !== baseAliased) {
+          const ai = createAiClient();
+          try {
+            const res = await ai.detectBaseLanguage(textsForDetection.slice(0, 20), {
+              activeLang: activeKey,
+              instruction:
+                "Identify the dominant language of the text. Return ISO 639-1 code in `base` plus `confidence` 0..1.",
+            });
+            const detectedRaw = langAlias(res?.base);
+            const conf = typeof res?.confidence === "number" ? res.confidence : 0;
+            if (detectedRaw && conf >= 0.7) {
+              baseAliased = detectedRaw;
+            } else if (scriptGuess) {
+              baseAliased = scriptGuess;
+            }
+          } catch {
+            // If detection fails, use script guess
+            if (scriptGuess) baseAliased = scriptGuess;
+          }
+        }
       }
 
-      const detectedRaw = langAlias(res?.base);
-      const conf = typeof res?.confidence === "number" ? res.confidence : 0;
-      const scriptGuess = guessLangByScript(topForDetection);
-      // prefer API when confident, otherwise use script; also fix obvious contradictions
-      let baseAliased =
-        detectedRaw && conf >= CONF_MIN
-          ? detectedRaw
-          : scriptGuess || detectedRaw || "";
-      if (
-        detectedRaw === "en" &&
-        (scriptGuess === "ru" || scriptGuess === "uk")
-      )
-        baseAliased = scriptGuess;
-      if (!baseAliased) baseAliased = normCode(best?.key); // last resort
-
-      if (!baseAliased) throw new Error(t("editor.ai.errors.ambiguous"));
-
-      // choose a storage key for the base language (ua vs uk)
-      const baseKey = pickPreferredLocaleKeyFor(baseAliased, state);
-
-      // pick where to copy the source data from
-      const sourceKey =
-        (statsByKey.get(baseKey)?.totalChars || 0) > 0
-          ? baseKey
-          : (statsByKey.get(baseAliased)?.totalChars || 0) > 0
-          ? statsByKey.get(baseAliased).key
-          : stats.slice().sort((a, b) => b.totalChars - a.totalChars)[0]?.key ||
-            best.key;
-
-      const next = deepClone(state);
-
-      const chosenData = deepClone(
-        state?.postData?.[sourceKey] || { title: "", body: "", chapters: [] }
-      );
-      const chosenParams = deepClone(
-        state?.postParams?.locales?.[sourceKey] || { chapters: [] }
-      );
-
-      const prevSnapshot = JSON.stringify({
-        pd: state?.postData || {},
-        pp: state?.postParams?.locales || {},
-        act: state?.activeLang || "",
-      });
-
-      // rebase into the proper baseKey
-      next.postData = { [baseKey]: chosenData };
-      const postParamsRest = { ...(state?.postParams || {}) };
-      next.postParams = {
-        ...postParamsRest,
-        locales: { [baseKey]: chosenParams },
-      };
-      next.activeLang = baseKey;
-
-      const supportedAfter = resolveSupportedLangs(opts, next);
-      const supportedBefore = resolveSupportedLangs(opts, state);
-      const initialLocales = supportedBefore.length
-        ? supportedBefore
-        : originalLocales;
-
-      const normalizedFrom = normCode(sourceKey);
-      const targetsAtStart = Array.from(
-        new Set(
-          [...initialLocales, normalizedFrom]
-            .map(normCode)
-            .filter((x) => x && x !== baseKey)
-        )
-      );
+      const supportedLangs = resolveSupportedLangs(opts, state);
+      const targetsAtStart = supportedLangs
+        .map(normCode)
+        .filter((x) => x && x !== baseKey);
 
       opts._setMeta?.({
         ...(opts._getMeta?.() || {}),
         analysis: {
-          baseLang: baseAliased, // ru/uk/en
-          baseKey, // ru/en/fr/ua (preferred storage key)
-          confidence: conf ?? 0,
-          normalizedFrom,
-          supported: supportedAfter,
-          initialLocales,
+          baseLang: baseAliased, // The actual detected language (ru/uk/en)
+          baseKey, // The locale key being used (from activeLang)
+          confidence: 1,
+          supported: supportedLangs,
           targetsAtStart,
         },
       });
 
-      const nextSnapshot = JSON.stringify({
-        pd: next?.postData || {},
-        pp: next?.postParams?.locales || {},
-        act: next?.activeLang || "",
-      });
-
-      const changed = prevSnapshot !== nextSnapshot;
-      return { state: changed ? next : state, modified: changed };
+      // No state changes in analyze step - we just gather info about the current locale
+      return { state, modified: false };
     },
   };
 }

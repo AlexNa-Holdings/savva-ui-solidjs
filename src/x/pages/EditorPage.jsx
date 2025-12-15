@@ -32,6 +32,10 @@ import { TrashIcon } from "../ui/icons/ActionIcons.jsx";
 import { createAIPostHandler } from "../../ai/AIPostHandler.js";
 import ClaimableRewardHint from "../editor/ClaimableRewardHint.jsx";
 import { preparePostForEditing } from "../../editor/postImporter.js";
+import AiIcon from "../ui/icons/AiIcon.jsx";
+import AIAssistantDialog from "../editor/AIAssistantDialog.jsx";
+import { createAiClient } from "../../ai/client.js";
+import { snapshotBeforeAi, undoLastAi, dropLastAiSnapshot } from "../../ai/aiHistory.js";
 
 async function fetchPostByIdentifier(params) {
   const { identifier, domain, app, lang } = params;
@@ -75,6 +79,8 @@ export default function EditorPage() {
 
   const [parentPreviewCid, setParentPreviewCid] = createSignal(null);
   const [aiLastRunOk, setAiLastRunOk] = createSignal(false);
+  const [showAiDialog, setShowAiDialog] = createSignal(false);
+  const [aiIndividualRunning, setAiIndividualRunning] = createSignal(false);
 
   let autoSaveTimeoutId;
   onCleanup(() => clearTimeout(autoSaveTimeoutId));
@@ -144,6 +150,125 @@ export default function EditorPage() {
     supportedLangs: () => domainLangCodes(),
     editorMode: () => editorMode(),
   });
+
+  // Auto-confirm AI changes when user makes any edit
+  createEffect(on([postData, postParams], () => {
+    // Skip if AI is not pending or if AI is currently running
+    if (!ai.pending() || ai.running()) return;
+    // User made a change while AI changes are pending - treat as implicit confirmation
+    ai.confirm();
+  }, { defer: true }));
+
+  // ----- Individual AI action handlers -----
+  const currentBody = createMemo(() => {
+    const langData = postData()?.[activeLang()] || {};
+    const idx = editingChapterIndex();
+    return idx === -1 ? (langData.body || "") : (langData.chapters?.[idx]?.body || "");
+  });
+
+  const currentChapters = createMemo(() => {
+    const langData = postData()?.[activeLang()] || {};
+    return langData.chapters || [];
+  });
+
+  async function runIndividualAiAction(actionFn) {
+    setAiIndividualRunning(true);
+    const before = readEditorState();
+    snapshotBeforeAi(draftKey(), before, { reason: "ai-individual" });
+
+    try {
+      await actionFn();
+      ai.pending() || pushToast({ type: "info", message: t("editor.ai.applied") });
+    } catch (err) {
+      dropLastAiSnapshot(draftKey());
+      pushToast({ type: "error", message: err?.message || t("editor.ai.errors.api") });
+    } finally {
+      setAiIndividualRunning(false);
+    }
+  }
+
+  async function handleAiFixGrammar() {
+    await runIndividualAiAction(async () => {
+      const client = createAiClient();
+      const lang = activeLang();
+      const body = currentBody();
+      if (!body.trim()) return;
+
+      const fixed = await client.fixGrammar(body, lang);
+      if (fixed && fixed !== body) {
+        const idx = editingChapterIndex();
+        if (idx === -1) {
+          updateField("body", fixed);
+        } else {
+          const chapters = [...(postData()[lang]?.chapters || [])];
+          chapters[idx] = { ...chapters[idx], body: fixed };
+          updateField("chapters", chapters);
+        }
+      }
+    });
+  }
+
+  async function handleAiImproveStyle() {
+    await runIndividualAiAction(async () => {
+      const client = createAiClient();
+      const lang = activeLang();
+      const body = currentBody();
+      if (!body.trim()) return;
+
+      const improved = await client.improveStyle(body, lang);
+      if (improved && improved !== body) {
+        const idx = editingChapterIndex();
+        if (idx === -1) {
+          updateField("body", improved);
+        } else {
+          const chapters = [...(postData()[lang]?.chapters || [])];
+          chapters[idx] = { ...chapters[idx], body: improved };
+          updateField("chapters", chapters);
+        }
+      }
+    });
+  }
+
+  async function handleAiMakeShorter() {
+    await runIndividualAiAction(async () => {
+      const client = createAiClient();
+      const lang = activeLang();
+      const body = currentBody();
+      if (!body.trim()) return;
+
+      const shorter = await client.makeShorter(body, lang);
+      if (shorter && shorter !== body) {
+        const idx = editingChapterIndex();
+        if (idx === -1) {
+          updateField("body", shorter);
+        } else {
+          const chapters = [...(postData()[lang]?.chapters || [])];
+          chapters[idx] = { ...chapters[idx], body: shorter };
+          updateField("chapters", chapters);
+        }
+      }
+    });
+  }
+
+  async function handleAiSuggestTitle() {
+    await runIndividualAiAction(async () => {
+      const client = createAiClient();
+      const lang = activeLang();
+      const langData = postData()?.[lang] || {};
+      const body = langData.body || "";
+      const chapters = langData.chapters || [];
+
+      const title = await client.proposeTitle(lang, { body, chapters });
+      if (title) {
+        updateField("title", title);
+      }
+    });
+  }
+
+  async function handleAiTranslateToAll() {
+    // Use the full AI handler for translation (it handles chapters properly)
+    ai.run();
+  }
 
   createEffect(on(routeParams, (rp) => {
     if (!rp) return;
@@ -653,6 +778,23 @@ export default function EditorPage() {
             </header>
           </Show>
 
+          {/* AI content banner - shown when AI made changes, auto-dismisses on user edit */}
+          <Show when={ai.pending() && !ai.running()}>
+            <div class="flex items-center justify-between gap-3 px-4 py-2 mb-4 rounded-lg bg-blue-500/20 border border-blue-500/50">
+              <div class="flex items-center gap-2 text-sm text-blue-200">
+                <AiIcon size={18} />
+                <span>{t("editor.ai.contentGenerated")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={ai.undo}
+                class="px-3 py-1 text-sm font-medium rounded bg-red-500/20 border border-red-500 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
+              >
+                {t("editor.ai.undo")}
+              </button>
+            </div>
+          </Show>
+
           <Show when={postData() !== null} fallback={<div>{t("common.loading")}</div>}>
             <div classList={{ "h-full flex flex-col": isFullScreen() }}>
               <Show when={!isFullScreen()}>
@@ -696,6 +838,7 @@ export default function EditorPage() {
                         onAdd={handleAddChapter}
                         onRemove={handleRemoveChapter}
                         onTitleChange={(newTitle) => updateChapterTitle(editingChapterIndex(), newTitle)}
+                        locale={activeLang}
                       />
                     </div>
                   </Show>
@@ -765,7 +908,7 @@ export default function EditorPage() {
                       aiPending={ai.pending()}
                       aiRunning={ai.running()}
                       aiProgress={ai.progress()}
-                      onAiRun={ai.run}
+                      onAiRun={() => setShowAiDialog(true)}
                       onAiUndo={ai.undo}
                       onAiConfirm={ai.confirm}
                     />
@@ -808,6 +951,24 @@ export default function EditorPage() {
         postData={postData}
         postParams={postParams}
         editorMode={editorMode()}
+      />
+      <AIAssistantDialog
+        isOpen={showAiDialog()}
+        onClose={() => setShowAiDialog(false)}
+        editorMode={editorMode}
+        currentBody={currentBody}
+        chapters={currentChapters}
+        availableLanguages={domainLangCodes}
+        onPrepareForPublishing={() => {
+          setShowAiDialog(false);
+          ai.run();
+        }}
+        onFixGrammar={handleAiFixGrammar}
+        onImproveStyle={handleAiImproveStyle}
+        onMakeShorter={handleAiMakeShorter}
+        onSuggestTitle={handleAiSuggestTitle}
+        onTranslateToAll={handleAiTranslateToAll}
+        onOpenSettings={() => navigate("/settings")}
       />
     </main>
   );

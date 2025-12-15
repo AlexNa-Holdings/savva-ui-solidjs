@@ -301,7 +301,7 @@ export function AppProvider(props) {
   contextValue = {
     ...orchestrator, ...auth, ...ipfs, ...prices,
     assetUrl,
-    i18n, t: i18n.t, lang: i18n.lang, setLang: i18n.setLang,
+    i18n, t: i18n.t, tLang: i18n.tLang, lang: i18n.lang, setLang: i18n.setLang,
     showKeys: i18n.showKeys, setShowKeys: i18n.setShowKeys,
     i18nAvailable: i18n.available,
     lastTabRoute, setLastTabRoute,

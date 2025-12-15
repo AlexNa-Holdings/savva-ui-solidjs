@@ -25,7 +25,7 @@ export function findProvider(id) {
 
 function trimSlash(s = "") { return String(s || "").replace(/\/+$/, ""); }
 
-/** Cheap, provider-specific connectivity probe used by the Settings “Test” button. */
+/** Cheap, provider-specific connectivity probe used by the Settings "Test" button. */
 export async function testConnection(cfg) {
   const p = findProvider(cfg.providerId);
   const baseUrl = trimSlash(cfg.baseUrl || p.defaultBaseUrl || "");
@@ -60,5 +60,55 @@ export async function testConnection(cfg) {
     return { ok: res.ok, status, body };
   } catch (err) {
     return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+/** Fetch available models from the provider API */
+export async function fetchModels(cfg) {
+  const p = findProvider(cfg.providerId);
+  const baseUrl = trimSlash(cfg.baseUrl || p.defaultBaseUrl || "");
+  const apiKey = cfg.apiKey || "";
+
+  if (!apiKey) return { ok: false, models: [], error: "No API key" };
+
+  try {
+    let url = "";
+    let init = { method: "GET", headers: {} };
+
+    if (p.kind === "openai") {
+      url = `${baseUrl}/models`;
+      init.headers = { Authorization: `Bearer ${apiKey}` };
+    } else if (p.kind === "gemini") {
+      url = `${baseUrl}/models?key=${encodeURIComponent(apiKey)}`;
+    } else {
+      // Other providers don't have a simple models endpoint or require different handling
+      return { ok: false, models: [], error: "Model listing not supported for this provider" };
+    }
+
+    const res = await fetchWithTimeout(url, init);
+    if (!res.ok) {
+      return { ok: false, models: [], error: `HTTP ${res.status}` };
+    }
+
+    const body = await res.json();
+    let models = [];
+
+    if (p.kind === "openai") {
+      // OpenAI returns { data: [{ id: "model-name", ... }, ...] }
+      models = (body.data || [])
+        .map((m) => m.id)
+        .filter((id) => id && !id.includes("embedding") && !id.includes("whisper") && !id.includes("tts") && !id.includes("dall-e"))
+        .sort();
+    } else if (p.kind === "gemini") {
+      // Gemini returns { models: [{ name: "models/gemini-1.5-pro", ... }, ...] }
+      models = (body.models || [])
+        .map((m) => m.name?.replace(/^models\//, "") || "")
+        .filter((name) => name && name.includes("gemini"))
+        .sort();
+    }
+
+    return { ok: true, models };
+  } catch (err) {
+    return { ok: false, models: [], error: err?.message || String(err) };
   }
 }
