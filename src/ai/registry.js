@@ -87,7 +87,13 @@ export async function fetchModels(cfg) {
 
     const res = await fetchWithTimeout(url, init);
     if (!res.ok) {
-      return { ok: false, models: [], error: `HTTP ${res.status}` };
+      let errorMsg = `HTTP ${res.status}`;
+      try {
+        const errBody = await res.json();
+        if (errBody?.error?.message) errorMsg = errBody.error.message;
+        else if (errBody?.error?.type) errorMsg = `${res.status}: ${errBody.error.type}`;
+      } catch { /* ignore parse errors */ }
+      return { ok: false, models: [], error: errorMsg };
     }
 
     const body = await res.json();
