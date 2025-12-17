@@ -1,12 +1,12 @@
-# Solución de problemas
+# Resolución de problemas
 
 Problemas comunes y sus soluciones.
 
 ## Problemas del backend
 
-### El backend no se inicia
+### El backend no inicia
 
-**Síntoma**: El servicio no inicia
+**Síntoma**: El servicio no se inicia
 
 **Soluciones**:
 ```bash
@@ -27,7 +27,7 @@ sudo lsof -i :8080
 
 ### Errores de conexión a la base de datos
 
-**Síntoma**: `connection refused` o `authentication failed`
+**Síntoma**: `connection refused` or `authentication failed`
 
 **Soluciones**:
 ```bash
@@ -45,9 +45,9 @@ sudo nano /etc/postgresql/14/main/pg_hba.conf
 sudo systemctl restart postgresql
 ```
 
-### Problemas de conexión a IPFS
+### Problemas de conexión con IPFS
 
-**Síntoma**: No se puede subir/recuperar desde IPFS
+**Síntoma**: No se puede subir/obtener desde IPFS
 
 **Soluciones**:
 ```bash
@@ -62,19 +62,19 @@ ipfs daemon &
 curl http://localhost:5001/api/v0/version
 ```
 
-### Uso alto de memoria
+### Alto uso de memoria
 
 **Síntoma**: El backend consume demasiada memoria
 
 **Soluciones**:
 - Revisar la configuración del pool de conexiones
-- Buscar fugas de memoria en los registros
+- Buscar fugas de memoria en los logs
 - Reiniciar el servicio periódicamente
-- Considerar aumentar la RAM del servidor
+- Considerar aumentar la memoria RAM del servidor
 
-## Problemas de la UI
+## Problemas de la interfaz (UI)
 
-### Página en blanco / pantalla blanca
+### Página en blanco / Pantalla blanca
 
 **Síntoma**: La página carga pero no muestra nada
 
@@ -106,7 +106,7 @@ sudo cp -r dist/* /var/www/savva-ui/
 cat dist/assets/index-*.js | grep -o 'https://api[^"]*'
 
 # 2. Test backend health
-curl https://api.yourdomain.com/health
+curl https://api.yourdomain.com/api/info
 
 # 3. Check CORS settings in backend
 # Ensure UI domain is in allowed_origins
@@ -115,15 +115,15 @@ curl https://api.yourdomain.com/health
 curl -I https://api.yourdomain.com
 ```
 
-### Billetera Web3 no se conecta
+### La cartera Web3 no se conecta
 
-**Síntoma**: No se puede conectar MetaMask u otras billeteras
+**Síntoma**: No se puede conectar MetaMask u otras carteras
 
 **Soluciones**:
 - **Asegurar HTTPS**: Web3 requiere conexión segura
-- **Verificar extensión de la billetera**: ¿Está instalada y desbloqueada?
-- **Desajuste de red**: ¿La billetera está en la cadena equivocada?
-- **Verificar encabezados CSP**: Pueden bloquear la inyección de la billetera
+- **Comprobar la extensión de la cartera**: ¿Está instalada y desbloqueada?
+- **Coincidencia de red**: ¿La cartera está en la cadena equivocada?
+- **Verificar encabezados CSP**: Pueden bloquear la inyección de la cartera
 
 ```bash
 # Check Content-Security-Policy header
@@ -174,7 +174,7 @@ openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 
 ### Problemas de resolución DNS
 
-**Síntoma**: El dominio no se resuelve
+**Síntoma**: El dominio no resuelve
 
 **Soluciones**:
 ```bash
@@ -191,7 +191,7 @@ dig A yourdomain.com +short
 
 ### Firewall bloqueando conexiones
 
-**Síntoma**: No se puede acceder a los servicios de forma remota
+**Síntoma**: No se pueden acceder a los servicios remotamente
 
 **Soluciones**:
 ```bash
@@ -213,16 +213,16 @@ sudo netstat -tlnp | grep :443
 
 ### Carga lenta de la página
 
-**Síntoma**: La UI tarda en cargar
+**Síntoma**: La UI tarda mucho en cargar
 
 **Soluciones**:
 - Habilitar compresión Gzip en Nginx
-- Configurar CDN (Cloudflare, etc.)
-- Revisar tiempos de respuesta del backend
+- Configurar un CDN (Cloudflare, etc.)
+- Revisar los tiempos de respuesta del backend
 - Optimizar consultas a la base de datos
 - Habilitar caché en el navegador
 
-### Uso alto de CPU
+### Alto uso de CPU
 
 **Síntoma**: CPU del servidor al 100%
 
@@ -270,15 +270,15 @@ REINDEX DATABASE savva;
 ### "authentication failed"
 - Contraseña incorrecta en la configuración
 - El usuario no tiene permisos
-- Revisar permisos/grants en la base de datos
+- Revisar los grants de la base de datos
 
-### "CORS policy" errors
+### Errores de "CORS policy"
 - CORS del backend no está configurado
 - Origen incorrecto en allowed_origins
-- La solicitud preflight está fallando
+- Fallo en la petición preflight
 
-### "network error" in UI
-- Backend no accesible
+### "network error" en la UI
+- Backend inaccesible
 - URL de la API incorrecta en la configuración de la UI
 - Problemas con el certificado SSL
 
@@ -286,7 +286,7 @@ REINDEX DATABASE savva;
 
 Si los problemas persisten:
 
-1. **Comprobar registros**:
+1. **Revisar logs**:
    ```bash
    # Backend logs
    sudo journalctl -u savva-backend -n 100 -f
@@ -298,14 +298,14 @@ Si los problemas persisten:
    # Press F12 → Console
    ```
 
-2. **Reunir información**:
+2. **Recopilar información**:
    - Mensajes de error
    - Especificaciones del servidor
    - Números de versión
    - Configuración (sanitizada)
 
-3. **Soporte de la comunidad**:
-   - GitHub Issues
+3. **Soporte comunitario**:
+   - Issues en GitHub
    - Foros de la comunidad SAVVA
    - Documentación para desarrolladores
 
@@ -324,4 +324,4 @@ Si los problemas persisten:
 
 ---
 
-*Esta guía de solución de problemas se ampliará a medida que se documenten más incidencias.*
+*Esta guía de resolución de problemas se ampliará a medida que se documenten más incidencias.*

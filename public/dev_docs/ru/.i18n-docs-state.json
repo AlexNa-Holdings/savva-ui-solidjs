@@ -1,5 +1,5 @@
 {
-  "core-concepts/app-init.md": "e0a8526b3460031a2a9794a549b31b18581154e1aa833da535dbca06d58d1f20",
+  "core-concepts/app-init.md": "a6ee3143827ee326098382be179acba094902b7024437cfab9c8b04e18cc0d00",
   "core-concepts/domain.md": "f8d1700f9c3b0e22286b0214b1c5124d314f8405e7d42f20fd4a1704704d3860",
   "core-concepts/index.md": "b0c25ccb40847affcecbd805a81d552bcf5bceb2081c24d3c3379bfd91ffb7c4",
   "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
@@ -8,7 +8,7 @@
   "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
   "core-concepts/showing-posts.md": "bc16a41e33c7d807a7e69397b597ebf3674eb142410a527472ff1440504656fb",
   "core-concepts/config-contract.md": "d0390a3d46e6bd6cc6a50b6caa979b608876d04fb9cb174bd67cc2652275e960",
-  "core-concepts/publishing-posts.md": "61774803e87614ea4bc5f6f132ca0fbf74f1b4b84ed41a1a29675f7940ce2e65",
+  "core-concepts/publishing-posts.md": "f66dd186e5a1d4326b53b702ac873066a9522b985d1ec4b6635d8a6f037edcb8",
   "core-concepts/connection-orchestration.md": "b5b28dfabb2198e87d8131a6d06d43ed5d479f23e3ea171f349a55171debabf1",
   ".DS_Store": "cf1025c43373dbac398f5daabd247d3cebec991811b1c1b5c8b90aee90010cc5",
   "core-concepts/user-profile.md": "3c8f3c50c078143e4fd2269f4cfc84320701a9897be19ef6f1042fabcda6ba15",
@@ -35,13 +35,13 @@
   "tokenomics/stake-to-post.md": "1adc5bfedc077a3b0de706d741e09aaf9df94d62fcf986a5aa90da857b289966",
   "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319",
   "core-concepts/encrypted-posts.md": "0c73dc11003c057571a3037a9e8cee0965bd0ec846947cca7037ef2a225235f7",
-  "installation/backend-setup.md": "cf3c9965a4c3a0054e12b5d958116e558c60c2d367f5c8062b70253beb4b8fd9",
+  "installation/backend-setup.md": "28a10a8a8d6af1d814a7661f69c02379901157ee8cc4ce723d4fb5b54f3a2631",
   "installation/configuration.md": "7bd12b57c3fb19a02df6d1662685e6dea6c6bed606a27d68657dfd1eb9bc700a",
   "installation/deployment.md": "4e9ac2aeded2ec19e447fafeb33c757c62271f4848f709efdb73008a49a8b9d5",
   "installation/index.md": "c5f5be0a269bbda69588298ba5f1dc128b811e804a1db758dc80040b5acf5fff",
   "installation/nginx.conf.example": "75031e164ea5be7ca79f69121e36be1ea59fdd739c2c468fc32b290fc40d001d",
   "installation/prerequisites.md": "bacd3e4c7b75a41bc0e848f6bf9b6c79c79bcc094b658f2bedcd174c8c356a2a",
   "installation/savva.yml.example": "476b4ccdd3076c77d65bb1293de604f04db578f678b50995f66e199abb186251",
-  "installation/troubleshooting.md": "8a8cfda38b0c280c3b13b444643d22385fc87e094652d0fdc405509d7bc7f764",
-  "installation/ui-setup.md": "79765146a2aae736f74946033c406870b90fb8ad5c4e8efef592dec88d71c1cd"
+  "installation/troubleshooting.md": "cb3b1f696c3ee72b3b60ec7f802cf973d2175b2297ef5f16145a03fdf029a901",
+  "installation/ui-setup.md": "8f1fe81f1d09cb2a47041080b56afedcb58d2723fa0f6d6b2a69dd8f6fa54d89"
 }

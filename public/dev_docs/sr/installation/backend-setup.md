@@ -4,21 +4,21 @@ Ovaj vodič obuhvata instalaciju i konfiguraciju SAVVA backend servera.
 
 ## Pregled
 
-SAVVA backend je API server napisan u Go-u koji upravlja:
+SAVVA backend je API server baziran na Go-u koji rukuje:
 - Autentifikacijom korisnika i sesijama
 - Čuvanjem i preuzimanjem objava (PostgreSQL)
-- Integracijom sa IPFS za čuvanje sadržaja
-- WebSocket vezama za ažuriranja u realnom vremenu
-- Interakcijom i nadzorom blokčejna
+- Integracijom sa IPFS za skladištenje sadržaja
+- WebSocket konekcijama za ažuriranja u realnom vremenu
+- Interakcijom sa blockchainom i nadgledanjem
 
-## 1. Preuzimanje backend softvera
+## 1. Preuzmite backend softver
 
-Najnoviji SAVVA backend softver dostupan je na:
+Najnoviji SAVVA backend softver je dostupan na:
 
 **https://savva.app/public_files/**
 
 **Važne napomene**:
-- Backend je trenutno u aktivnom razvoju — redovno proveravajte nova izdanja
+- Backend je trenutno u aktivnom razvoju - redovno proveravajte nove verzije
 - Backend još nije otvorenog koda. Planiramo da ga otvorimo u budućnosti
 - Preuzmite najnoviju verziju odgovarajuću za vašu platformu (obično `savva-backend-linux-amd64`)
 
@@ -34,18 +34,18 @@ sudo mv savva-backend-linux-amd64 savva-backend
 
 ## 2. Podešavanje baze podataka
 
-### Opcija A: Vraćanje iz najnovije snimke (Preporučeno)
+### Opcija A: Vraćanje iz najnovijeg snimka (preporučeno)
 
-Da biste smanjili vreme sinhronizacije, možete vratiti iz najnovije snimke baze podataka. Snimka uključuje:
-- Svu neophodnu strukturu baze podataka
-- Sve informacije o sadržaju iz SAVVA mreže
-- **Nema ličnih informacija korisnika** (bezbedno za privatnost)
+Da biste smanjili vreme sinhronizacije, možete vratiti bazu iz najnovijeg snimka. Snimak uključuje:
+- Sve potrebne strukture baze podataka
+- Sve informacije o sadržaju sa SAVVA mreže
+- **Nema ličnih podataka korisnika** (zaštita privatnosti)
 
-Baza se automatski bekapuje svakog dana i dostupna je na:
+Baza podataka se automatski bekapuje svakog dana i dostupna je na:
 
 **https://savva.app/public_files/**
 
-Potražite fajlove kao što su `savva-db-backup-YYYY-MM-DD.sql.gz`
+Potražite fajlove poput `savva-db-backup-YYYY-MM-DD.sql.gz`
 
 ```bash
 # Download latest database backup
@@ -70,7 +70,7 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO savva_user;
 EOF
 ```
 
-### Opcija B: Nova baza (Za razvoj)
+### Opcija B: Nova baza podataka (za razvoj)
 
 Ako želite da počnete iz početka:
 
@@ -92,7 +92,7 @@ Kreirajte konfiguracioni fajl SAVVA backenda na `/etc/savva.yml`.
 
 ### Preuzmite šablon konfiguracije
 
-Kompletan primer konfiguracije dostupan je:
+Ceo primer konfiguracije je dostupan:
 
 ```bash
 # Download the example configuration
@@ -106,21 +106,21 @@ sudo cp savva.yml.example /etc/savva.yml
 sudo chmod 600 /etc/savva.yml  # Protect configuration file
 ```
 
-**Pogledajte kompletan primer**: [savva.yml.example](savva.yml.example)
+**Pogledajte ceo primer**: [savva.yml.example](savva.yml.example)
 
 ### Parametri konfiguracije
 
-#### Podešavanja blokčejna
+#### Podešavanja blockchaina
 
 ```yaml
 blockchain-rpc: wss://your-rpc-endpoint.com:8546/your-api-key
 initial-block: 20110428  # Starting block number for sync
 ```
 
-- **blockchain-rpc**: WebSocket RPC endpoint (WSS se preporučuje za događaje u realnom vremenu)
-  - Nabavite od AllNodes, Infura ili vašeg sopstvenog čvora
+- **blockchain-rpc**: WebSocket RPC endpoint (preporučuje se WSS za događaje u realnom vremenu)
+  - Nabavite od AllNodes, Infura ili vašeg sopstvenog noda
   - Format: `wss://hostname:port/api-key`
-- **initial-block**: Broj bloka od kojeg počinje sinhronizacija (preskače staru istoriju)
+- **initial-block**: Broj bloka od kojeg treba započeti sinhronizaciju (preskočiti staru istoriju)
 
 #### Kontrakti
 
@@ -129,7 +129,7 @@ contracts:
   Config: 0x4ED8321722ACB984aB6B249C4AE74a58CAD7E4e8
 ```
 
-Koristite zvaničnu adresu SAVVA Config kontrakta iz [Zvaničnih adresa ugovora](../licenses/official-contracts.md).
+Koristite zvaničnu adresu SAVVA Config ugovora iz [Official Contract Addresses](../licenses/official-contracts.md).
 
 #### Konfiguracija baze podataka
 
@@ -139,8 +139,8 @@ db:
   connection-string: postgresql://username:password@host:port/database?sslmode=require
 ```
 
-- **Za DigitalOcean upravljanu bazu**: Kopirajte connection string iz kontrolne table DigitalOceana
-- **Za samostalno hostovano**: `postgresql://savva_user:your_password@localhost:5432/savva?sslmode=disable`
+- **Za DigitalOcean Managed Database**: Kopirajte konekcioni string sa DigitalOcean kontrolne table
+- **Za samostalno hostovanje**: `postgresql://savva_user:your_password@localhost:5432/savva?sslmode=disable`
 
 #### Podešavanja servera
 
@@ -154,9 +154,9 @@ server:
     - www.yourdomain.com
 ```
 
-- **port**: Port na kojem API backend sluša (podrazumevano: 7000)
-- **url-prefix**: Prefiks puta za API (obično "/api")
-- **rpm-limit**: Ograničenje zahteva (po zahtevu u minuti po IP adresi)
+- **port**: Port backend API-ja (podrazumevano: 7000)
+- **url-prefix**: Prefiks API putanje (obično "/api")
+- **rpm-limit**: Ograničenje broja zahteva (zahteva u minuti po IP)
 - **cors-allowed-origins**: Lista dozvoljenih domena za CORS
 
 #### IPFS konfiguracija
@@ -179,8 +179,8 @@ ipfs:
 ```
 
 - **url**: Lokalni IPFS API endpoint
-- **pin-services**: Konfigurišite uslugu za pinovanje sa API ključevima
-- **gateways**: Javni IPFS gateway-ovi za preuzimanje sadržaja
+- **pin-services**: Konfigurišite servis(e) za pinovanje sa API ključevima
+- **gateways**: Javne IPFS gateway-e za preuzimanje sadržaja
 
 #### Sadržaj i skladištenje
 
@@ -193,7 +193,7 @@ max-user-disk-space: 50 MB
 max-post-size: 50 MB
 ```
 
-- **data-folder**: Trajno skladište za domen resurse
+- **data-folder**: Trajno skladište za domenske resurse
 - **temp-folder**: Privremeno skladište fajlova
 - **max-post-size**: Maksimalna veličina jedne objave
 
@@ -204,7 +204,7 @@ user-cache-ttl: 6h
 post-cache-ttl: 6h
 ```
 
-Vreme života keša za keširane podatke.
+Vreme trajanja (TTL) za keširane podatke.
 
 #### Pretraga punog teksta
 
@@ -214,7 +214,7 @@ full-text-search:
   languages: [english, russian, french]
 ```
 
-Omogućite PostgreSQL pretragu punog teksta sa željenim jezicima.
+Omogućite PostgreSQL full-text pretragu sa željenim jezicima.
 
 #### Logovanje
 
@@ -237,8 +237,8 @@ domains:
       enabled: false
 ```
 
-- **process-all-domains**: Podesite na `true` da obrađujete sve SAVVA mrežne domene
-- **domains**: Konfigurišite podešavanja specifična za domene (opciono)
+- **process-all-domains**: Podesite na `true` da obrađujete sve domene SAVVA mreže
+- **domains**: Konfigurišite podešavanja specifična za domen (opciono)
 
 ### Kompletan primer konfiguracije
 
@@ -314,7 +314,7 @@ sudo chown -R your-user:your-user /var/lib/savva /tmp/savva
 
 ## 4. Pokretanje backenda
 
-### Testiranje konfiguracije
+### Test konfiguracije
 
 ```bash
 # Test run to verify configuration
@@ -322,7 +322,7 @@ cd /opt
 ./savva-backend --config /etc/savva.yml
 ```
 
-Pritisnite Ctrl+C za zaustavljanje ako se uspešno pokrene.
+Pritisnite Ctrl+C da zaustavite ako se uspešno pokrene.
 
 ### Podešavanje systemd servisa
 
@@ -365,16 +365,16 @@ sudo systemctl status savva-backend
 sudo journalctl -u savva-backend -f
 ```
 
-## 5. Provera instalacije
+## 5. Proverite instalaciju
 
 ```bash
 # Test backend health (local)
-curl http://localhost:7000/api/health
+curl http://localhost:7000/api/info
 
 # Should return: {"status":"ok"}
 ```
 
-Treba da vidite JSON odgovor koji pokazuje da backend radi. Logove backenda možete pogledati pomoću:
+Trebalo bi da vidite JSON odgovor koji pokazuje da backend radi. Backend logovi se mogu pregledati pomoću:
 
 ```bash
 # View real-time logs

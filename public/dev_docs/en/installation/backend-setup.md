@@ -369,7 +369,7 @@ sudo journalctl -u savva-backend -f
 
 ```bash
 # Test backend health (local)
-curl http://localhost:7000/api/health
+curl http://localhost:7000/api/info
 
 # Should return: {"status":"ok"}
 ```

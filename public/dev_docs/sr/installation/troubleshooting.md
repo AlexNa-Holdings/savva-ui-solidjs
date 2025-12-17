@@ -2,11 +2,11 @@
 
 Uobičajeni problemi i njihova rešenja.
 
-## Problemi sa backend-om
+## Problemi na backendu
 
-### Backend se ne pokreće
+### Backend se neće pokrenuti
 
-**Simptom**: Servis ne može da se pokrene
+**Simptom**: Servis ne uspeva da se pokrene
 
 **Rešenja**:
 ```bash
@@ -25,9 +25,9 @@ sudo lsof -i :8080
 ./savva-backend --validate-config
 ```
 
-### Greške pri povezivanju sa bazom
+### Greške pri konekciji sa bazom podataka
 
-**Simptom**: `connection refused` ili `authentication failed`
+**Simptom**: `connection refused` or `authentication failed`
 
 **Rešenja**:
 ```bash
@@ -45,9 +45,9 @@ sudo nano /etc/postgresql/14/main/pg_hba.conf
 sudo systemctl restart postgresql
 ```
 
-### Problemi sa povezivanjem na IPFS
+### Problemi sa konekcijom na IPFS
 
-**Simptom**: Ne može da se upload-uje/učita sa IPFS-a
+**Simptom**: Ne može da otpremi/učita sa IPFS-a
 
 **Rešenja**:
 ```bash
@@ -67,16 +67,16 @@ curl http://localhost:5001/api/v0/version
 **Simptom**: Backend troši previše memorije
 
 **Rešenja**:
-- Proverite podešavanja connection pool-a
-- Tražite curenja memorije u logovima
-- Periodično restartujte servis
+- Pregledajte podešavanja konekcionog pool-a
+- Proverite zapise za curenje memorije
+- Poništavajte servis periodično
 - Razmotrite povećanje RAM-a na serveru
 
 ## Problemi sa UI
 
 ### Prazna stranica / beli ekran
 
-**Simptom**: Stranica se učitava ali ne prikazuje ništa
+**Simptom**: Stranica se učita ali ne prikazuje ništa
 
 **Rešenja**:
 ```bash
@@ -96,9 +96,9 @@ npm run build
 sudo cp -r dist/* /var/www/savva-ui/
 ```
 
-### Konekcija sa API-jem nije uspela
+### Veza sa API-jem nije uspela
 
-**Simptom**: UI se ne može povezati sa backend-om
+**Simptom**: UI se ne može povezati na backend
 
 **Rešenja**:
 ```bash
@@ -106,7 +106,7 @@ sudo cp -r dist/* /var/www/savva-ui/
 cat dist/assets/index-*.js | grep -o 'https://api[^"]*'
 
 # 2. Test backend health
-curl https://api.yourdomain.com/health
+curl https://api.yourdomain.com/api/info
 
 # 3. Check CORS settings in backend
 # Ensure UI domain is in allowed_origins
@@ -120,17 +120,17 @@ curl -I https://api.yourdomain.com
 **Simptom**: Ne može da se poveže MetaMask ili drugi novčanici
 
 **Rešenja**:
-- **Obezbedite HTTPS**: Web3 zahteva sigurnu konekciju
-- **Proverite ekstenziju novčanika**: Da li je instalirana i otključana?
-- **Neusklađenost mreže**: Novčanik na pogrešnom lancu?
-- **Proverite CSP zaglavlja**: Mogu blokirati injektovanje novčanika
+- **Ensure HTTPS**: Web3 zahteva sigurnu vezu
+- **Check wallet extension**: Da li je ekstenzija instalirana i otključana?
+- **Network mismatch**: Novčanik je na pogrešnom lancu?
+- **Check CSP headers**: Mogu blokirati injektovanje novčanika
 
 ```bash
 # Check Content-Security-Policy header
 curl -I https://yourdomain.com | grep -i content-security
 ```
 
-### Greške pri build-u
+### Greške pri buildovanju
 
 **Simptom**: `npm run build` ne uspeva
 
@@ -189,9 +189,9 @@ dig A yourdomain.com +short
 # Use: https://dnschecker.org
 ```
 
-### Vatrozid blokira konekcije
+### Firewall blokira konekcije
 
-**Simptom**: Ne može da se pristupi servisima iz daljine
+**Simptom**: Ne može da se pristupi servisima na daljinu
 
 **Rešenja**:
 ```bash
@@ -213,16 +213,16 @@ sudo netstat -tlnp | grep :443
 
 ### Sporo učitavanje stranice
 
-**Simptom**: UI se dugo učitava
+**Simptom**: UI se sporo učitava
 
 **Rešenja**:
 - Omogućite Gzip kompresiju u Nginx-u
-- Postavite CDN (Cloudflare, itd.)
+- Podesite CDN (Cloudflare, itd.)
 - Proverite vreme odgovora backenda
 - Optimizujte upite ka bazi podataka
 - Omogućite keširanje u pregledaču
 
-### Visoko opterećenje CPU-a
+### Visoka upotreba CPU-a
 
 **Simptom**: CPU servera na 100%
 
@@ -263,19 +263,19 @@ REINDEX DATABASE savva;
 ## Uobičajene poruke o grešci
 
 ### "connection refused"
-- Servis nije pokrenut
-- Vatrozid blokira port
+- Servis ne radi
+- Firewall blokira port
 - Pogrešan host/port u konfiguraciji
 
 ### "authentication failed"
 - Pogrešna lozinka u konfiguraciji
 - Korisnik nema dozvole
-- Proverite grants u bazi
+- Proverite grant-ove u bazi
 
 ### "CORS policy" greške
-- Backend nije konfigurisan za CORS
+- Backend nema podešen CORS
 - Pogrešan origin u allowed_origins
-- Preflight zahtev ne prolazi
+- Preflight zahtev ne uspeva
 
 ### "network error" u UI
 - Backend nije dostupan
@@ -284,9 +284,9 @@ REINDEX DATABASE savva;
 
 ## Dobijanje pomoći
 
-Ako problemi potraju:
+Ako problemi i dalje postoje:
 
-1. **Proverite logove**:
+1. **Proverite zapise**:
    ```bash
    # Backend logs
    sudo journalctl -u savva-backend -n 100 -f
@@ -324,4 +324,4 @@ Ako problemi potraju:
 
 ---
 
-*Ovaj vodič za otklanjanje problema biće proširen kako se budu dokumentovali novi problemi.*
+*Ovaj vodič za otklanjanje problema biće proširen kako budu dokumentovani novi problemi.*

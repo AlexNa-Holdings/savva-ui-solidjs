@@ -1,7 +1,7 @@
-# Qué hacemos
+# Lo que hacemos
 
-- **Stack abierto** para que las comunidades gestionen sus propias redes.
-- **UX moderna** con tematización a nivel de dominio y activos.
-- **Herramientas para creadores**: suscripciones, fondos por publicaciones (recompensas estilo juego), NFTs, promociones.
-- **Gobernanza**: configuración on-chain y votación por quienes realizan staking.
-- **Interoperable**: las redes comparten la misma tokenómica pero mantienen su cultura.
+- **Stack abierto** para que las comunidades operen sus propias redes.
+- **UX moderno** con personalización de temas y activos a nivel de dominio.
+- **Herramientas para creadores**: suscripciones, fondos para publicaciones (recompensas tipo juego), NFTs, promociones.
+- **Gobernanza**: configuración en cadena y votación por quienes hacen staking.
+- **Interoperables**: las redes comparten la misma tokenómica pero mantienen su propia cultura.

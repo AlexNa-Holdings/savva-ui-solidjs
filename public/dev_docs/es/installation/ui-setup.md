@@ -1,15 +1,15 @@
-# Configuración del sitio web UI
+# Configuración del sitio web de la UI
 
 Esta guía cubre la instalación y el despliegue del frontend SAVVA UI.
 
 ## Resumen
 
-La UI de SAVVA es una aplicación de una sola página basada en SolidJS que proporciona:
+La UI de SAVVA es una aplicación de una sola página (SPA) basada en SolidJS que ofrece:
 - Interfaz para creación y navegación de contenido
-- Integración con billeteras Web3
-- Subida de archivos a IPFS
+- Integración con wallets Web3
+- Subidas de archivos a IPFS
 - Interacciones con contratos inteligentes
-- Soporte multilenguaje
+- Soporte multilingüe
 
 ## 1. Clonar el repositorio
 
@@ -85,13 +85,13 @@ DEPLOY_PORT=22
 
 ### Configuración adicional
 
-La UI obtiene automáticamente las direcciones de los contratos de blockchain desde el endpoint `/info` del backend, que lee desde el contrato Config.
+La UI obtiene automáticamente las direcciones de los contratos de blockchain desde el endpoint `/info` del backend, el cual lee desde el contrato Config.
 
-No se necesitan direcciones de contrato hardcodeadas en la configuración de la UI.
+No se necesitan direcciones de contrato codificadas en la configuración de la UI.
 
 ## 4. Construir la UI
 
-### Compilación para desarrollo
+### Compilación de desarrollo
 
 ```bash
 # Run development server
@@ -110,7 +110,7 @@ npm run build
 # Contains optimized static files ready for deployment
 ```
 
-### Compilar con despliegue
+### Compilación con despliegue
 
 ```bash
 # Automated build + deploy (if DEPLOY_* vars configured)
@@ -125,18 +125,18 @@ npm run release
 # 6. Deploy via SCP (if configured)
 ```
 
-## 5. Desplegar en producción
+## 5. Desplegar a producción
 
 ### Opción A: Hospedaje de archivos estáticos
 
-La carpeta compilada `dist/` contiene archivos estáticos que pueden ser servidos por cualquier servidor web.
+La carpeta `dist/` generada contiene archivos estáticos que pueden ser servidos por cualquier servidor web.
 
-#### Usando Nginx (recomendado)
+#### Usando Nginx (Recomendado)
 
-SAVVA requiere una configuración de Nginx completa que gestione:
+SAVVA requiere una configuración completa de Nginx que gestione:
 - Servir archivos estáticos de la UI
-- Proxy de la API backend en `/api`
-- Prerenderizado para bots de SEO
+- Proxy de la API del backend en `/api`
+- Prerendering para bots de SEO
 - Endpoint de configuración dinámica
 - Soporte WebSocket
 
@@ -155,14 +155,14 @@ nano nginx.conf.example
 
 **Ver el ejemplo completo**: [nginx.conf.example](nginx.conf.example)
 
-**Características principales incluidas:**
-1. Redirección de HTTP a HTTPS
+**Características clave incluidas:**
+1. Redirección HTTP a HTTPS
 2. Configuración SSL/TLS (Cloudflare Origin Certificates o Let's Encrypt)
-3. Endpoint `/default_connect.yaml` - provee URLs del backend y del gateway IPFS a la UI
-4. Prerenderizado para bots - renderizado del lado servidor amigable para SEO y redes sociales
-5. Proxy `/api` - reenvía las solicitudes de la API al backend en el puerto 7000
+3. Endpoint `/default_connect.yaml` - proporciona las URLs del backend y del gateway IPFS a la UI
+4. Prerendering para bots - renderizado en servidor amigable para SEO y redes sociales
+5. Proxy `/api` - reenvía peticiones API al backend en el puerto 7000
 6. Soporte WebSocket - para funcionalidades en tiempo real
-7. Servicio de archivos estáticos con enrutamiento SPA
+7. Servido de archivos estáticos con enrutado SPA
 8. Caché inteligente - `index.html` nunca cacheado, assets cacheados por 1 año
 
 **Personalizar la configuración:**
@@ -354,10 +354,10 @@ curl https://yourdomain.com
 
 Abrir en el navegador:
 - Navega a `https://yourdomain.com`
-- La UI debería cargar y conectarse al backend
+- La UI debería cargarse y conectarse al backend
 - Revisa la consola del navegador por si hay errores
 
-## 7. Configuración post-despliegue
+## 7. Configuración posterior al despliegue
 
 ### Actualizar CORS del backend
 
@@ -371,17 +371,17 @@ cors:
     - "https://www.yourdomain.com"
 ```
 
-### Configurar CDN (opcional)
+### Configurar CDN (Opcional)
 
-Para mejor rendimiento, considera usar un CDN:
+Para un mejor rendimiento, considera usar un CDN:
 
 - **Cloudflare**: Añade el sitio a Cloudflare, actualiza DNS
-- **AWS CloudFront**: Crea una distribución apuntando al origin
+- **AWS CloudFront**: Crea una distribución apuntando al origen
 - **Otros CDNs**: Sigue la documentación del proveedor
 
 ### Configurar monitorización
 
-Añade monitorización para uptime y errores:
+Añade monitorización para disponibilidad y errores:
 
 ```bash
 # Using UptimeRobot, Pingdom, or similar services
@@ -445,20 +445,20 @@ node --version  # Should be v18+
 ### Problemas de conexión con el backend
 
 - Verifica `VITE_BACKEND_URL` en `.env`
-- Verifica la configuración CORS del backend
+- Comprueba la configuración CORS del backend
 - Revisa la consola del navegador por errores
-- Prueba la salud del backend: `curl https://api.yourdomain.com/health`
+- Prueba la salud del backend: `curl https://api.yourdomain.com/api/info`
 
 ### Página en blanco / pantalla blanca
 
 - Revisa la consola del navegador por errores de JavaScript
 - Verifica que todos los assets se carguen correctamente
-- Comprueba la configuración de Nginx/Apache para el enrutamiento SPA
-- Asegúrate de que `try_files` o `FallbackResource` esté configurado
+- Revisa la configuración de Nginx/Apache para el enrutado SPA
+- Asegura que `try_files` o `FallbackResource` estén configurados
 
-### La billetera Web3 no se conecta
+### La wallet Web3 no se conecta
 
 - Comprueba que HTTPS esté habilitado (requerido para Web3)
-- Verifica que la URL RPC de la blockchain sea accesible
-- Revisa que la extensión de la billetera del navegador esté instalada
+- Verifica que la URL del RPC de la blockchain sea accesible
+- Asegúrate de que la extensión de la wallet esté instalada en el navegador
 - Revisa las cabeceras de Content Security Policy

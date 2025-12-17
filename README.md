@@ -63,12 +63,15 @@ npm run release
 
 ## Configuration
 
-The app requires several environment variables. Copy `.env.example` to `.env` and configure:
+The app does **not require** any environment variables to run. All configuration is fetched from the blockchain Config contract at runtime.
 
-- `VITE_BACKEND_URL` - Backend API endpoint
-- `VITE_IPFS_GATEWAY` - IPFS gateway URL
-- `VITE_WEBSITE_URL` - Main website URL
-- See `.env.example` for complete list
+Optional `.env` settings (copy `.env.example` to `.env`):
+
+- **Deployment** - `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH` for automated SSH deployment via `npm run release`
+- **Git branches** - `GIT_MAIN_BRANCH`, `PROD_BRANCH` if your branches differ from defaults
+- **OpenAI** - For Claude Code development tools only (not used by the app itself)
+
+User-facing AI features (grammar fix, translation, etc.) are configured in the app's Settings page and stored in browser localStorage.
 
 ## Project Structure
 
@@ -97,8 +100,10 @@ This UI connects to SAVVA smart contracts deployed on PulseChain:
 
 ## Documentation
 
-Comprehensive documentation available at:
-- [Developer Docs](public/dev_docs/en/) - In-app documentation
+Developer documentation is available at: **https://savva.app/docs**
+
+Local docs (in this repository):
+- [Developer Docs](public/dev_docs/en/)
 - [Connection Architecture](public/dev_docs/en/core-concepts/connection-orchestration.md)
 - [Smart Contract Integration](public/dev_docs/en/core-concepts/config-contract.md)
 
@@ -115,8 +120,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ## Links
 
 - Website: https://savva.app
+- Documentation: https://savva.app/docs
 - Android App: https://play.google.com/store/apps/details?id=app.savva.mobile
-- Documentation: Available in-app under Developer Docs
 
 ## Support
 

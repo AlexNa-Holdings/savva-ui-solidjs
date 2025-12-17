@@ -1,17 +1,17 @@
-# Podešavanje UI veb-sajta
+# Podešavanje UI veb sajta
 
-Ovaj vodič obuhvata instalaciju i postavljanje (deploy) frontend dela SAVVA UI.
+Ovaj vodič obuhvata instalaciju i postavljanje SAVVA UI frontenda.
 
 ## Pregled
 
-SAVVA UI je single-page aplikacija bazirana na SolidJS koja pruža:
+SAVVA UI je single-page aplikacija zasnovana na SolidJS-u koja obezbeđuje:
 - Interfejs za kreiranje i pregled sadržaja
 - Integraciju Web3 novčanika
-- Otpremanje fajlova na IPFS
-- Interakcije sa smart kontraktima
+- IPFS otpremanje fajlova
+- Interakcije sa smart ugovorima
 - Podršku za više jezika
 
-## 1. Kloniranje repozitorijuma
+## 1. Klonirajte repozitorijum
 
 ```bash
 # Clone the UI repository
@@ -22,7 +22,7 @@ cd savva-ui-solidjs
 git checkout $(git describe --tags --abbrev=0)
 ```
 
-## 2. Instalacija zavisnosti
+## 2. Instalirajte zavisnosti
 
 ```bash
 # Install Node.js dependencies
@@ -34,7 +34,7 @@ yarn install
 
 ## 3. Konfiguracija
 
-### Kreiranje fajla za okruženje
+### Kreirajte fajl okruženja
 
 ```bash
 # Copy example environment file
@@ -85,13 +85,13 @@ DEPLOY_PORT=22
 
 ### Dodatna konfiguracija
 
-UI automatski preuzima adrese blockchain ugovora iz backend `/info` endpoint-a, koji čita iz Config ugovora.
+UI automatski preuzima adrese blockchain ugovora sa backend /info endpointa, koji čita iz Config ugovora.
 
-Nema potrebe za hardkodovanim adresama ugovora u UI konfiguraciji.
+Nema potrebe za hardkodiranim adresama ugovora u konfiguraciji UI.
 
 ## 4. Izgradnja UI
 
-### Razvojna izgradnja
+### Razvojni build
 
 ```bash
 # Run development server
@@ -100,7 +100,9 @@ npm run dev
 # Access at http://localhost:5173
 ```
 
-### Produkcijska izgradnja
+Pristupite na http://localhost:5173
+
+### Build za produkciju
 
 ```bash
 # Build for production
@@ -110,7 +112,7 @@ npm run build
 # Contains optimized static files ready for deployment
 ```
 
-### Izgradnja sa automatskim postavljanjem
+### Build sa deploy-om
 
 ```bash
 # Automated build + deploy (if DEPLOY_* vars configured)
@@ -127,20 +129,20 @@ npm run release
 
 ## 5. Postavljanje u produkciju
 
-### Opcija A: Hostovanje statičkih fajlova
+### Opcija A: Hosting statičkih fajlova
 
-Kompajlirana fascikla `dist/` sadrži statičke fajlove koje može da poslužuje bilo koji veb server.
+Izgrađeni `dist/` direktorijum sadrži statičke fajlove koji se mogu poslužiti bilo kojim veb serverom.
 
 #### Korišćenje Nginx-a (preporučeno)
 
-SAVVA zahteva sveobuhvatnu Nginx konfiguraciju koja obuhvata:
-- Serviranje statičkih fajlova UI-a
+SAVVA zahteva sveobuhvatnu Nginx konfiguraciju koja pokriva:
+- Posluživanje statičkih fajlova UI
 - Proxy za backend API na `/api`
-- Prerenderovanje za SEO botove
+- Prerendering za SEO botove
 - Dinamički endpoint za konfiguraciju
 - Podršku za WebSocket
 
-Preuzmite kompletan Nginx konfiguracioni šablon:
+**Preuzmite kompletan Nginx predložak konfiguracije:**
 
 ```bash
 # Download the example configuration
@@ -153,21 +155,21 @@ wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/publi
 nano nginx.conf.example
 ```
 
-Pogledajte kompletan primer: [nginx.conf.example](nginx.conf.example)
+**Pogledajte kompletan primer**: [nginx.conf.example](nginx.conf.example)
 
-Ključne funkcije koje su uključene:
-1. Preusmeravanje sa HTTP na HTTPS
+**Ključne karakteristike uključene:**
+1. Preusmeravanje HTTP -> HTTPS
 2. Podešavanje SSL/TLS (Cloudflare Origin Certificates ili Let's Encrypt)
-3. `/default_connect.yaml` endpoint - obezbeđuje URL-ove backend-a i IPFS gateway-a za UI
-4. Prerenderovanje za botove - SEO-prijazno server-side renderovanje za pretraživače i društvene mreže
-5. `/api` proxy - prosleđuje API zahteve backend-u na port 7000
+3. `/default_connect.yaml` endpoint - pruža backend i IPFS gateway URL-ove UI-ju
+4. Bot prerendering - SEO-prijazno server-side renderovanje za pretraživače i društvene mreže
+5. Proxy za `/api` - prosleđuje API zahteve ka backendu na portu 7000
 6. Podrška za WebSocket - za real-time funkcionalnosti
-7. Serviranje statičkih fajlova sa SPA routing-om
-8. Pametno keširanje - index.html se nikada ne kešira, asset-i se keširaju 1 godinu
+7. Posluživanje statičkih fajlova sa SPA rutiranjem
+8. Pametno keširanje - `index.html` se nikada ne kešira, asseti se keširaju 1 godinu
 
-Prilagodite konfiguraciju:
+**Prilagodite konfiguraciju:**
 
-Izmenite sledeće ključne promenljive u preuzetom fajlu:
+Izmenite ove ključne varijable u preuzetom fajlu:
 
 ```nginx
 # Your domain
@@ -184,7 +186,7 @@ ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
 
-Postavite fajlove i omogućite sajt:
+**Postavite fajlove i omogućite sajt:**
 
 ```bash
 # Create web directory
@@ -269,9 +271,9 @@ sudo a2ensite savva-ui
 sudo systemctl reload apache2
 ```
 
-### Opcija B: Automatizovani skript za deployment
+### Opcija B: Automatizovani skript za deploy
 
-Kreirajte deployment skript:
+Kreirajte skript za deploy:
 
 ```bash
 nano deploy.sh
@@ -303,13 +305,13 @@ echo "Deployment complete!"
 echo "Visit https://yourdomain.com"
 ```
 
-Pokrenite deployment:
+Pokrenite deploy:
 
 ```bash
 ./deploy.sh
 ```
 
-### Opcija C: Deployment putem Docker-a
+### Opcija C: Deploy koristeći Docker
 
 Kreirajte Dockerfile:
 
@@ -353,15 +355,15 @@ curl https://yourdomain.com
 ```
 
 Otvorite u pregledaču:
-- Idite na `https://yourdomain.com`
-- UI bi trebalo da se učita i poveže sa backend-om
-- Proverite konzolu pregledača zbog grešaka
+- Otvorite `https://yourdomain.com`
+- UI bi trebalo da se učita i poveže na backend
+- Proverite konzolu pregledača za eventualne greške
 
-## 7. Podešavanja nakon postavljanja
+## 7. Konfiguracija nakon postavljanja
 
 ### Ažurirajte CORS na backendu
 
-Osigurajte da backend dozvoljava vašu UI domenu:
+Osigurajte da backend dozvoljava vaš UI domen:
 
 ```yaml
 # In backend config.yaml
@@ -371,17 +373,17 @@ cors:
     - "https://www.yourdomain.com"
 ```
 
-### Konfigurišite CDN (opciono)
+### Konfigurisanje CDN-a (opciono)
 
-Za bolje performanse, razmotrite korišćenje CDN-a:
+Za bolјe performanse, razmotrite upotrebu CDN-a:
 
 - **Cloudflare**: Dodajte sajt na Cloudflare, ažurirajte DNS
 - **AWS CloudFront**: Kreirajte distribuciju koja pokazuje na origin
-- **Other CDNs**: Pratite dokumentaciju provajdera
+- **Ostali CDN-ovi**: Pratite dokumentaciju provajdera
 
-### Postavite monitoring
+### Podesite nadzor
 
-Dodajte nadzor za dostupnost i greške:
+Dodajte monitoring za dostupnost i greške:
 
 ```bash
 # Using UptimeRobot, Pingdom, or similar services
@@ -431,7 +433,7 @@ jobs:
 
 ## Otklanjanje problema
 
-### Greška pri izgradnji
+### Greška pri build-u
 
 ```bash
 # Clear cache and reinstall
@@ -442,23 +444,23 @@ npm install
 node --version  # Should be v18+
 ```
 
-### Problemi sa povezivanjem na backend
+### Problemi sa konekcijom ka backendu
 
 - Proverite `VITE_BACKEND_URL` u `.env`
-- Proverite CORS podešavanja backend-a
+- Verifikujte CORS podešavanja na backendu
 - Proverite konzolu pregledača za greške
-- Testirajte zdravlje backend-a: `curl https://api.yourdomain.com/health`
+- Testirajte health backend-a: `curl https://api.yourdomain.com/api/info`
 
 ### Prazna stranica / beli ekran
 
-- Proverite konzolu pregledača zbog JavaScript grešaka
-- Proverite da li su svi asset-i ispravno učitani
-- Proverite Nginx/Apache konfiguraciju za SPA routing
-- Uverite se da su `try_files` ili `FallbackResource` konfigurirani
+- Proverite konzolu pregledača za JavaScript greške
+- Proverite da li su svi asseti učitani ispravno
+- Proverite Nginx/Apache konfiguraciju za SPA rutiranje
+- Osigurajte da je `try_files` ili `FallbackResource` konfigurisan
 
 ### Web3 novčanik se ne povezuje
 
-- Proverite da li je HTTPS omogućen (zahtevano za Web3)
-- Proverite da li je blockchain RPC URL dostupan
-- Proverite da li je ekstenzija novčanika u pregledaču instalirana
-- Proverite Content Security Policy (CSP) zaglavlja
+- Proverite da li je omogućeno HTTPS (zahtevano za Web3)
+- Verifikujte da je blockchain RPC URL dostupan
+- Proverite da li je instalirano proširenje novčanika u pregledaču
+- Pregledajte Content Security Policy zaglavlja

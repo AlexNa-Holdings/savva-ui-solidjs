@@ -2,13 +2,13 @@
 
 Problèmes courants et leurs solutions.
 
-## Problèmes du backend
+## Problèmes de backend
 
 ### Le backend ne démarre pas
 
-**Symptôme** : le service ne démarre pas
+**Symptôme**: Le service ne démarre pas
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Check logs
 sudo journalctl -u savva-backend -n 100
@@ -27,9 +27,9 @@ sudo lsof -i :8080
 
 ### Erreurs de connexion à la base de données
 
-**Symptôme** : `connection refused` or `authentication failed`
+**Symptôme**: `connection refused` or `authentication failed`
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Check PostgreSQL is running
 sudo systemctl status postgresql
@@ -47,9 +47,9 @@ sudo systemctl restart postgresql
 
 ### Problèmes de connexion à IPFS
 
-**Symptôme** : Impossible d'envoyer/récupérer depuis IPFS
+**Symptôme**: Impossible de téléverser/récupérer depuis IPFS
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Check IPFS daemon
 ipfs swarm peers
@@ -62,23 +62,23 @@ ipfs daemon &
 curl http://localhost:5001/api/v0/version
 ```
 
-### Utilisation mémoire élevée
+### Utilisation élevée de la mémoire
 
-**Symptôme** : Le backend consomme trop de mémoire
+**Symptôme**: Le backend consomme trop de mémoire
 
-**Solutions** :
+**Solutions**:
 - Vérifier les paramètres du pool de connexions
 - Rechercher des fuites de mémoire dans les logs
 - Redémarrer le service périodiquement
 - Envisager d'augmenter la RAM du serveur
 
-## Problèmes de l'interface utilisateur (UI)
+## Problèmes d'interface utilisateur
 
 ### Page blanche / écran blanc
 
-**Symptôme** : la page se charge mais n'affiche rien
+**Symptôme**: La page se charge mais n'affiche rien
 
-**Solutions** :
+**Solutions**:
 ```bash
 # 1. Check browser console for errors
 # Press F12 → Console tab
@@ -96,17 +96,17 @@ npm run build
 sudo cp -r dist/* /var/www/savva-ui/
 ```
 
-### Échec de la connexion à l'API
+### Connexion à l'API échouée
 
-**Symptôme** : l'interface ne peut pas se connecter au backend
+**Symptôme**: L'interface ne peut pas se connecter au backend
 
-**Solutions** :
+**Solutions**:
 ```bash
 # 1. Check VITE_BACKEND_URL in build
 cat dist/assets/index-*.js | grep -o 'https://api[^"]*'
 
 # 2. Test backend health
-curl https://api.yourdomain.com/health
+curl https://api.yourdomain.com/api/info
 
 # 3. Check CORS settings in backend
 # Ensure UI domain is in allowed_origins
@@ -115,15 +115,15 @@ curl https://api.yourdomain.com/health
 curl -I https://api.yourdomain.com
 ```
 
-### Le portefeuille Web3 ne se connecte pas
+### Portefeuille Web3 non connecté
 
-**Symptôme** : Impossible de connecter MetaMask ou d'autres portefeuilles
+**Symptôme**: Impossible de connecter MetaMask ou d'autres portefeuilles
 
-**Solutions** :
-- **S'assurer d'utiliser HTTPS** : Web3 nécessite une connexion sécurisée
-- **Vérifier l'extension du portefeuille** : est-elle installée et déverrouillée ?
-- **Réseau incorrect** : le portefeuille est-il sur la mauvaise chaîne ?
-- **Vérifier les en-têtes CSP** : ils peuvent bloquer l'injection du portefeuille
+**Solutions**:
+- **Assurer HTTPS** : Web3 nécessite une connexion sécurisée
+- **Vérifier l'extension de portefeuille** : Est-elle installée et déverrouillée ?
+- **Incompatibilité de réseau** : Le portefeuille est-il sur la mauvaise chaîne ?
+- **Vérifier les en-têtes CSP** : Ils peuvent bloquer l'injection du portefeuille
 
 ```bash
 # Check Content-Security-Policy header
@@ -132,9 +132,9 @@ curl -I https://yourdomain.com | grep -i content-security
 
 ### Erreurs de build
 
-**Symptôme** : `npm run build` échoue
+**Symptôme**: `npm run build` échoue
 
-**Solutions** :
+**Solutions**:
 ```bash
 # 1. Clear cache
 rm -rf node_modules package-lock.json dist
@@ -155,9 +155,9 @@ NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 ### Erreurs de certificat SSL
 
-**Symptôme** : HTTPS ne fonctionne pas ou avertissements de certificat
+**Symptôme**: HTTPS ne fonctionne pas ou avertissements de certificat
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Renew Let's Encrypt certificate
 sudo certbot renew
@@ -174,9 +174,9 @@ openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 
 ### Problèmes de résolution DNS
 
-**Symptôme** : le domaine ne se résout pas
+**Symptôme**: Le domaine ne se résout pas
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Check DNS propagation
 dig yourdomain.com
@@ -191,9 +191,9 @@ dig A yourdomain.com +short
 
 ### Pare-feu bloquant les connexions
 
-**Symptôme** : Impossible d'accéder aux services à distance
+**Symptôme**: Impossible d'accéder aux services à distance
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Check UFW status
 sudo ufw status
@@ -211,22 +211,22 @@ sudo netstat -tlnp | grep :443
 
 ## Problèmes de performance
 
-### Chargement lent de la page
+### Chargement lent des pages
 
-**Symptôme** : l'interface met du temps à se charger
+**Symptôme**: L'interface met du temps à se charger
 
-**Solutions** :
+**Solutions**:
 - Activer la compression Gzip dans Nginx
-- Configurer un CDN (Cloudflare, etc.)
+- Mettre en place un CDN (Cloudflare, etc.)
 - Vérifier les temps de réponse du backend
-- Optimiser les requêtes de la base de données
-- Activer la mise en cache côté navigateur
+- Optimiser les requêtes vers la base de données
+- Activer le cache navigateur
 
-### Utilisation CPU élevée
+### Utilisation élevée du CPU
 
-**Symptôme** : CPU du serveur à 100 %
+**Symptôme**: Le CPU du serveur à 100%
 
-**Solutions** :
+**Solutions**:
 ```bash
 # Identify process
 top
@@ -243,9 +243,9 @@ sudo journalctl -u savva-backend -n 100
 
 ### Performance de la base de données
 
-**Symptôme** : requêtes lentes
+**Symptôme**: Requêtes lentes
 
-**Solutions** :
+**Solutions**:
 ```sql
 -- Check slow queries
 SELECT pid, query, state, query_start
@@ -263,30 +263,30 @@ REINDEX DATABASE savva;
 ## Messages d'erreur courants
 
 ### "connection refused"
-- Service non démarré
-- Pare-feu bloquant le port
-- Hôte/port incorrect dans la configuration
+- Le service n'est pas en cours d'exécution
+- Le pare-feu bloque le port
+- Mauvais hôte/port dans la configuration
 
 ### "authentication failed"
 - Mauvais mot de passe dans la configuration
 - L'utilisateur n'a pas les permissions
-- Vérifier les grants de la base de données
+- Vérifier les droits dans la base de données
 
 ### "CORS policy" errors
-- CORS du backend non configuré
+- Le CORS du backend n'est pas configuré
 - Origine incorrecte dans allowed_origins
 - Requête preflight échouée
 
 ### "network error" in UI
-- Backend inaccessible
-- URL de l'API incorrecte dans la configuration de l'UI
+- Le backend n'est pas accessible
+- Mauvaise URL d'API dans la configuration UI
 - Problèmes de certificat SSL
 
 ## Obtenir de l'aide
 
 Si les problèmes persistent :
 
-1. **Vérifier les logs** :
+1. **Vérifier les logs**:
    ```bash
    # Backend logs
    sudo journalctl -u savva-backend -n 100 -f
@@ -298,18 +298,18 @@ Si les problèmes persistent :
    # Press F12 → Console
    ```
 
-2. **Rassembler les informations** :
+2. **Rassembler les informations**:
    - Messages d'erreur
    - Spécifications du serveur
    - Numéros de version
    - Configuration (sanitisée)
 
-3. **Support communautaire** :
-   - GitHub Issues
+3. **Support communautaire**:
+   - Issues GitHub
    - Forums de la communauté SAVVA
    - Documentation développeur
 
-4. **Vérifier les mises à jour** :
+4. **Vérifier les mises à jour**:
    ```bash
    # Backend
    cd savva-backend
@@ -324,4 +324,4 @@ Si les problèmes persistent :
 
 ---
 
-*Ce guide de dépannage sera étoffé au fur et à mesure que d'autres problèmes seront documentés.*
+*Ce guide de dépannage sera étendu à mesure que d'autres problèmes seront documentés.*

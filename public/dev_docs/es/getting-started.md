@@ -1,15 +1,15 @@
 # Primeros pasos
 
-Bienvenido a la guía **Primeros pasos** de la plataforma SAVVA.
+Bienvenido a la guía **Primeros pasos** de la Plataforma SAVVA.
 
-Esta página te guía por los pasos básicos para configurar el proyecto localmente y empezar a contribuir.
+Esta página te guía a través de los pasos básicos para configurar el proyecto localmente y comenzar a contribuir.
 
 ## Requisitos previos
 
 Antes de comenzar, asegúrate de tener instaladas las siguientes herramientas:
 
 - **Node.js** (se recomienda v18 o posterior)  
-- Gestor de paquetes **npm** o **yarn**  
+- **npm** o **yarn** como gestor de paquetes  
 - **Git** para clonar el repositorio  
 - Un **navegador** moderno (Chrome, Firefox, Edge) para desarrollo y pruebas  
 
@@ -21,7 +21,6 @@ El código fuente está alojado en GitHub. Para obtener la versión más recient
 git clone https://github.com/AlexNa-Holdings/savva-ui-solidjs
 cd savva-ui-solidjs
 ````
-
 ## Instalar dependencias
 
 Dentro de la carpeta del proyecto, instala todas las dependencias requeridas:
@@ -44,7 +43,7 @@ yarn dev
 
 La aplicación estará disponible en [http://localhost:5173](http://localhost:5173).
 
-## Compilar para producción
+## Construir para producción
 
 Para crear una compilación optimizada:
 
@@ -54,13 +53,13 @@ npm run build
 
 La salida estará en la carpeta `dist/`.
 
-## Siguientes pasos
+## Próximos pasos
 
-* Explora la **Documentación para desarrolladores** para ver la arquitectura y los módulos.
-* Prueba cambiar dominios y recursos en el **panel derecho**.
+* Explora la **Documentación para desarrolladores** para la arquitectura y los módulos.
+* Prueba a cambiar dominios y recursos en el **panel derecho**.
 * Contribuye abriendo issues o pull requests en GitHub.
 
-¡Eso es todo! 🎉 Estás listo para empezar a trabajar con la **plataforma SAVVA**.
+¡Eso es todo! 🎉 Estás listo para empezar a trabajar con la **Plataforma SAVVA**.
 
 ```html
 <!doctype html>

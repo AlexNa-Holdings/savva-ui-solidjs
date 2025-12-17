@@ -1,26 +1,26 @@
-# Configuración del Servidor Backend
+# Configuración del servidor backend
 
 Esta guía cubre la instalación y configuración del servidor backend de SAVVA.
 
-## Descripción general
+## Resumen
 
-El backend de SAVVA es un servidor API escrito en Go que maneja:
+El backend de SAVVA es un servidor API basado en Go que maneja:
 - Autenticación de usuarios y sesiones
 - Almacenamiento y recuperación de publicaciones (PostgreSQL)
-- Integración con IPFS para el almacenamiento de contenido
+- Integración con IPFS para almacenamiento de contenido
 - Conexiones WebSocket para actualizaciones en tiempo real
-- Interacción y supervisión de la blockchain
+- Interacción y monitoreo de la cadena de bloques
 
-## 1. Descargar el Software del Backend
+## 1. Descargar el software del backend
 
-El software más reciente del backend de SAVVA está disponible en:
+El último software del backend de SAVVA está disponible en:
 
 **https://savva.app/public_files/**
 
 **Notas importantes**:
-- El backend está actualmente en desarrollo activo: revisa regularmente si hay nuevas versiones
-- El backend todavía no es open source. Planeamos hacerlo open source en el futuro
-- Descarga la versión más reciente apropiada para tu plataforma (típicamente `savva-backend-linux-amd64`)
+- El backend está actualmente en desarrollo activo — revise nuevas versiones con regularidad
+- El backend aún no es de código abierto. Planeamos hacerlo público en el futuro
+- Descargue la versión más reciente adecuada para su plataforma (típicamente `savva-backend-linux-amd64`)
 
 ```bash
 # Download latest backend
@@ -32,20 +32,20 @@ sudo chmod +x savva-backend-linux-amd64
 sudo mv savva-backend-linux-amd64 savva-backend
 ```
 
-## 2. Configuración de la Base de Datos
+## 2. Configuración de la base de datos
 
-### Opción A: Restaurar desde el Snapshot más reciente (Recomendado)
+### Opción A: Restaurar desde la última instantánea (Recomendado)
 
-Para reducir el tiempo de sincronización, puedes restaurar desde el snapshot más reciente de la base de datos. El snapshot incluye:
-- Toda la estructura de base de datos necesaria
+Para reducir el tiempo de sincronización, puede restaurar desde la última instantánea de la base de datos. La instantánea incluye:
+- Toda la estructura necesaria de la base de datos
 - Toda la información de contenido de la red SAVVA
-- **No contiene información personal de usuarios** (seguro para la privacidad)
+- **No contiene información personal de usuarios** (segura para la privacidad)
 
 La base de datos se respalda automáticamente cada día y está disponible en:
 
 **https://savva.app/public_files/**
 
-Busca archivos como `savva-db-backup-YYYY-MM-DD.sql.gz`
+Busque archivos como `savva-db-backup-YYYY-MM-DD.sql.gz`
 
 ```bash
 # Download latest database backup
@@ -70,9 +70,9 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO savva_user;
 EOF
 ```
 
-### Opción B: Base de Datos Nueva (Para Desarrollo)
+### Opción B: Base de datos nueva (Para desarrollo)
 
-Si prefieres empezar desde cero:
+Si prefiere empezar desde cero:
 
 ```bash
 # Create database and user
@@ -88,9 +88,9 @@ Nota: El backend creará las tablas necesarias automáticamente en la primera ej
 
 ## 3. Configuración
 
-Crea el archivo de configuración del backend SAVVA en `/etc/savva.yml`.
+Cree el archivo de configuración del backend SAVVA en `/etc/savva.yml`.
 
-### Descargar la plantilla de configuración
+### Descargar plantilla de configuración
 
 Un ejemplo completo de configuración está disponible:
 
@@ -110,7 +110,7 @@ sudo chmod 600 /etc/savva.yml  # Protect configuration file
 
 ### Parámetros de configuración
 
-#### Ajustes de la Blockchain
+#### Configuración de blockchain
 
 ```yaml
 blockchain-rpc: wss://your-rpc-endpoint.com:8546/your-api-key
@@ -118,9 +118,9 @@ initial-block: 20110428  # Starting block number for sync
 ```
 
 - **blockchain-rpc**: Endpoint RPC WebSocket (se recomienda WSS para eventos en tiempo real)
-  - Consíguelo en AllNodes, Infura o en tu propio nodo
+  - Obtenga uno en AllNodes, Infura o desde su propio nodo
   - Formato: `wss://hostname:port/api-key`
-- **initial-block**: Número de bloque desde el cual comenzar la sincronización (omitir historial antiguo)
+- **initial-block**: Número de bloque desde el cual comenzar a sincronizar (omite historial antiguo)
 
 #### Contratos
 
@@ -129,9 +129,9 @@ contracts:
   Config: 0x4ED8321722ACB984aB6B249C4AE74a58CAD7E4e8
 ```
 
-Usa la dirección oficial del contrato Config de SAVVA desde [Official Contract Addresses](../licenses/official-contracts.md).
+Use la dirección oficial del contrato Config de SAVVA desde [Official Contract Addresses](../licenses/official-contracts.md).
 
-#### Configuración de la Base de Datos
+#### Configuración de la base de datos
 
 ```yaml
 db:
@@ -139,10 +139,10 @@ db:
   connection-string: postgresql://username:password@host:port/database?sslmode=require
 ```
 
-- **Para DigitalOcean Managed Database**: Copia la cadena de conexión desde el panel de DigitalOcean
+- **Para DigitalOcean Managed Database**: Copie la cadena de conexión desde el panel de DigitalOcean
 - **Para autoalojado**: `postgresql://savva_user:your_password@localhost:5432/savva?sslmode=disable`
 
-#### Ajustes del Servidor
+#### Ajustes del servidor
 
 ```yaml
 server:
@@ -154,9 +154,9 @@ server:
     - www.yourdomain.com
 ```
 
-- **port**: Puerto del API del backend (por defecto: 7000)
-- **url-prefix**: Prefijo de ruta de la API (usualmente "/api")
-- **rpm-limit**: Límite de peticiones (requests per minute por IP)
+- **port**: Puerto de la API del backend (por defecto: 7000)
+- **url-prefix**: Prefijo de ruta de la API (normalmente "/api")
+- **rpm-limit**: Límite de solicitudes (por minuto por IP)
 - **cors-allowed-origins**: Lista de dominios permitidos para CORS
 
 #### Configuración de IPFS
@@ -178,11 +178,11 @@ ipfs:
     - https://ipfs.filebase.io/ipfs/
 ```
 
-- **url**: Endpoint API local de IPFS
-- **pin-services**: Configura tu(s) servicio(s) de pinning con las claves API
-- **gateways**: Gateways públicas de IPFS para recuperación de contenido
+- **url**: Endpoint local de la API de IPFS
+- **pin-services**: Configure su(s) servicio(s) de pinning con claves API
+- **gateways**: Gateways públicos de IPFS para la recuperación de contenido
 
-#### Contenido y Almacenamiento
+#### Contenido y almacenamiento
 
 ```yaml
 content-retry-delay: 5m
@@ -204,9 +204,9 @@ user-cache-ttl: 6h
 post-cache-ttl: 6h
 ```
 
-Tiempo de vida (TTL) para los datos en caché.
+Tiempo de vida para los datos en caché.
 
-#### Búsqueda de Texto Completo
+#### Búsqueda de texto completo
 
 ```yaml
 full-text-search:
@@ -214,16 +214,16 @@ full-text-search:
   languages: [english, russian, french]
 ```
 
-Habilita la búsqueda de texto completo de PostgreSQL con los idiomas deseados.
+Habilite la búsqueda de texto completo de PostgreSQL con los idiomas deseados.
 
-#### Registro (Logging)
+#### Registro
 
 ```yaml
 verbosity: info  # Options: trace, debug, info, warn, error
 log-prefix: SAVVA
 ```
 
-#### Configuración de Dominios
+#### Configuración de dominios
 
 ```yaml
 process-all-domains: true
@@ -237,8 +237,8 @@ domains:
       enabled: false
 ```
 
-- **process-all-domains**: Configura a `true` para procesar todos los dominios de la red SAVVA
-- **domains**: Configura ajustes específicos por dominio (opcional)
+- **process-all-domains**: Establezca en `true` para procesar todos los dominios de la red SAVVA
+- **domains**: Configure ajustes específicos por dominio (opcional)
 
 ### Ejemplo completo de configuración
 
@@ -312,9 +312,9 @@ sudo mkdir -p /tmp/savva
 sudo chown -R your-user:your-user /var/lib/savva /tmp/savva
 ```
 
-## 4. Ejecutar el Backend
+## 4. Ejecutar el backend
 
-### Probar la configuración
+### Prueba de configuración
 
 ```bash
 # Test run to verify configuration
@@ -322,11 +322,11 @@ cd /opt
 ./savva-backend --config /etc/savva.yml
 ```
 
-Presiona Ctrl+C para detener si arranca correctamente.
+Presione Ctrl+C para detenerlo si se inicia correctamente.
 
-### Configurar el servicio systemd
+### Configurar servicio systemd
 
-Crea el archivo de servicio systemd:
+Cree el archivo de servicio systemd:
 
 ```bash
 sudo nano /etc/systemd/system/savva-backend.service
@@ -353,7 +353,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-Habilita e inicia:
+Habilite e inicie:
 
 ```bash
 sudo systemctl daemon-reload
@@ -369,12 +369,12 @@ sudo journalctl -u savva-backend -f
 
 ```bash
 # Test backend health (local)
-curl http://localhost:7000/api/health
+curl http://localhost:7000/api/info
 
 # Should return: {"status":"ok"}
 ```
 
-Deberías ver una respuesta JSON que indique que el backend está en funcionamiento. Los registros del backend pueden consultarse con:
+Debería ver una respuesta JSON que indique que el backend está en funcionamiento. Los registros del backend pueden verse con:
 
 ```bash
 # View real-time logs

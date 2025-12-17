@@ -447,7 +447,7 @@ node --version  # Should be v18+
 - Check `VITE_BACKEND_URL` in `.env`
 - Verify backend CORS settings
 - Check browser console for errors
-- Test backend health: `curl https://api.yourdomain.com/health`
+- Test backend health: `curl https://api.yourdomain.com/api/info`
 
 ### Blank Page / White Screen
 

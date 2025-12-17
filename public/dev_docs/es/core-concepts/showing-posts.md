@@ -1,4 +1,4 @@
-# Mostrar publicaciones
+# Mostrar Publicaciones
 
 Mostrar una publicación de SAVVA es un proceso de dos pasos.
 
@@ -13,7 +13,7 @@ La forma principal de obtener una lista de publicaciones es mediante el método 
 
 ### Llamando a `content-list`
 
-Se llama al método con parámetros que especifican el contenido que necesitas. Ejemplo:
+Llamas al método con parámetros que especifican qué contenido necesitas. Ejemplo:
 
 ```js
 // Example call using the app's wsMethod helper
@@ -79,17 +79,17 @@ Example:
 ### Campos clave explicados
 
 * **author** — información del perfil del autor (incluyendo la cantidad apostada).
-* **savva_cid / short_cid** — IDs únicos. Úsalos para construir URLs (`/post/<short_cid>`).
-* **ipfs / savva_content.data_cid** — punteros al contenido en IPFS.
-* **savva_content** — metadatos en caché del backend (títulos, vistas previas, miniaturas). Útil para renderizar el feed sin necesidad de obtener desde IPFS.
+* **savva\_cid / short\_cid** — IDs únicos. Úsalos para construir URLs (`/post/<short_cid>`).
+* **ipfs / savva\_content.data\_cid** — apuntadores al contenido en IPFS.
+* **savva\_content** — metadatos almacenados en caché por el backend (títulos, vistas previas, miniaturas). Útiles para renderizar el feed sin requerir una petición a IPFS.
 * **fund** — información del fondo de financiación de la publicación.
-* **reactions** — arreglo de contadores para cada tipo de reacción.
+* **reactions** — arreglo con los contadores para cada tipo de reacción.
 
 ---
 
 ## Paso 2: Resolver el contenido completo desde IPFS
 
-Aunque `savva_content` es útil para vistas previas, el contenido completo debe obtenerse desde IPFS (cuerpo de la publicación, capítulos, recursos).
+Aunque `savva_content` es útil para las vistas previas, el contenido completo debe recuperarse desde IPFS (cuerpo de la publicación, capítulos, activos).
 
 ### Resolución de rutas de contenido
 
@@ -97,16 +97,16 @@ La ubicación de `info.yaml` depende del formato:
 
 * **Formato moderno**
 
-  * `savva_content.data_cid` = CID base para los recursos.
+  * `savva_content.data_cid` = CID base para los activos.
   * `ipfs` = ruta directa a `info.yaml`.
 * **Formato heredado**
 
-  * No `data_cid`.
+  * Sin `data_cid`.
   * `ipfs` = CID base. Se asume el descriptor en `<ipfs>/info.yaml`.
 
-### Funciones utilitarias
+### Utility Functions
 
-Usa las funciones auxiliares de `src/ipfs/utils.js`:
+Usa los helpers de `src/ipfs/utils.js`:
 
 ```js
 import {
@@ -129,23 +129,23 @@ const fullThumbnailPath = resolvePostCidPath(post, post.savva_content.thumbnail)
 
 ---
 
-## Prioridad de gateways de IPFS
+## Priorización de gateways de IPFS
 
 Orden de obtención:
 
-1. **Nodo local** (si está habilitado).
-2. **Gateways específicos de la publicación** (listados en el descriptor).
-3. **Gateways del sistema** (backend `/info`).
+1. **Local node** (si está habilitado).
+2. **Post-specific gateways** (listados en el descriptor).
+3. **System gateways** (backend `/info`).
 
-Esto asegura la mejor velocidad y disponibilidad.
+Esto garantiza la mejor velocidad y disponibilidad.
 
 ---
 
-## Descriptor de la publicación (`info.yaml`)
+## El descriptor de la publicación (`info.yaml`)
 
 Un archivo YAML que define la estructura completa: idiomas, capítulos, metadatos.
 
-### Ejemplo `info.yaml`
+### Example `info.yaml`
 
 ```yaml
 thumbnail: assets/post_thumbnail.png
@@ -181,11 +181,11 @@ locales:
 ### Campos clave del descriptor
 
 * **thumbnail** — ruta relativa a la imagen principal.
-* **gateways** — gateways IPFS recomendados (opcional).
+* **gateways** — gateways IPFS recomendadas (opcional).
 * **locales** — objeto indexado por códigos de idioma.
 
-  * **title / text_preview / tags / categories** — metadatos específicos por idioma.
-  * **data_path** — contenido principal en Markdown para ese idioma.
+  * **title / text\_preview / tags / categories** — metadatos específicos por idioma.
+  * **data\_path** — contenido principal en Markdown para ese idioma.
   * **chapters** — arreglo de capítulos, cada uno con `title` y `data_path`.
 
 Para obtener el contenido completo de un capítulo:

@@ -2,13 +2,13 @@
 
 Ce guide couvre l'installation et le déploiement du frontend SAVVA UI.
 
-## Présentation
+## Vue d'ensemble
 
 Le SAVVA UI est une application monopage (SPA) basée sur SolidJS qui fournit :
 - Interface de création et de navigation de contenu
-- Intégration de portefeuille Web3
-- Téléversements de fichiers sur IPFS
-- Interactions avec des contrats intelligents
+- Intégration de portefeuilles Web3
+- Téléversements de fichiers vers IPFS
+- Interactions avec les contrats intelligents
 - Prise en charge multilingue
 
 ## 1. Cloner le dépôt
@@ -85,13 +85,13 @@ DEPLOY_PORT=22
 
 ### Configuration supplémentaire
 
-L'UI récupère automatiquement les adresses des contrats blockchain depuis l'endpoint backend `/info`, qui lit depuis le contrat Config.
+L'UI récupère automatiquement les adresses des contrats blockchain depuis l'endpoint `/info` du backend, qui lit à partir du contrat Config.
 
-Aucune adresse de contrat codée en dur n'est requise dans la configuration de l'UI.
+Aucune adresse de contrat codée en dur n'est nécessaire dans la configuration de l'UI.
 
-## 4. Compiler l'UI
+## 4. Construire l'UI
 
-### Compilation en développement
+### Build de développement
 
 ```bash
 # Run development server
@@ -100,7 +100,7 @@ npm run dev
 # Access at http://localhost:5173
 ```
 
-### Compilation pour la production
+### Build de production
 
 ```bash
 # Build for production
@@ -110,7 +110,7 @@ npm run build
 # Contains optimized static files ready for deployment
 ```
 
-### Compilation avec déploiement
+### Build avec déploiement
 
 ```bash
 # Automated build + deploy (if DEPLOY_* vars configured)
@@ -129,18 +129,18 @@ npm run release
 
 ### Option A : Hébergement de fichiers statiques
 
-Le dossier `dist/` compilé contient des fichiers statiques pouvant être servis par n'importe quel serveur web.
+Le dossier buildé `dist/` contient des fichiers statiques qui peuvent être servis par n'importe quel serveur web.
 
 #### Utilisation de Nginx (recommandé)
 
 SAVVA nécessite une configuration Nginx complète qui gère :
-- Le service des fichiers statiques de l'UI
+- La distribution des fichiers statiques de l'UI
 - Le proxy de l'API backend sur `/api`
-- Le prerendering pour les bots SEO
-- L'endpoint de configuration dynamique
+- Le prérendu pour les bots (SEO)
+- Un endpoint de configuration dynamique
 - Le support WebSocket
 
-**Téléchargez le modèle complet de configuration Nginx :**
+**Télécharger le template complet de configuration Nginx :**
 
 ```bash
 # Download the example configuration
@@ -159,13 +159,13 @@ nano nginx.conf.example
 1. Redirection HTTP vers HTTPS
 2. Configuration SSL/TLS (certificats Cloudflare Origin ou Let's Encrypt)
 3. Endpoint `/default_connect.yaml` - fournit les URLs du backend et de la passerelle IPFS à l'UI
-4. Prerendering pour bots - rendu côté serveur optimisé pour le SEO et les réseaux sociaux
-5. Proxy `/api` - redirige les requêtes API vers le backend sur le port 7000
+4. Prérendu pour les bots - rendu côté serveur optimisé pour le SEO et les réseaux sociaux
+5. Proxy `/api` - relaie les requêtes API vers le backend sur le port 7000
 6. Support WebSocket - pour les fonctionnalités en temps réel
-7. Service des fichiers statiques avec routage SPA
-8. Mise en cache intelligente - `index.html` jamais mis en cache, les ressources mises en cache pendant 1 an
+7. Distribution des fichiers statiques avec routage SPA
+8. Mise en cache intelligente - `index.html` jamais mis en cache, les assets mis en cache pendant 1 an
 
-**Personnalisez la configuration :**
+**Personnaliser la configuration :**
 
 Modifiez ces variables clés dans le fichier téléchargé :
 
@@ -184,7 +184,7 @@ ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
 
-**Déployez les fichiers et activez le site :**
+**Déployer les fichiers et activer le site :**
 
 ```bash
 # Create web directory
@@ -211,7 +211,7 @@ sudo systemctl reload nginx
 
 #### Utilisation d'Apache
 
-Créez la configuration Apache :
+Créer la configuration Apache :
 
 ```bash
 sudo nano /etc/apache2/sites-available/savva-ui.conf
@@ -261,7 +261,7 @@ Configuration Apache :
 </VirtualHost>
 ```
 
-Activez le site :
+Activer le site :
 
 ```bash
 sudo a2enmod ssl rewrite headers deflate
@@ -271,7 +271,7 @@ sudo systemctl reload apache2
 
 ### Option B : Script de déploiement automatisé
 
-Créez le script de déploiement :
+Créer le script de déploiement :
 
 ```bash
 nano deploy.sh
@@ -303,7 +303,7 @@ echo "Deployment complete!"
 echo "Visit https://yourdomain.com"
 ```
 
-Exécutez le déploiement :
+Exécuter le déploiement :
 
 ```bash
 ./deploy.sh
@@ -311,7 +311,7 @@ Exécutez le déploiement :
 
 ### Option C : Déploiement avec Docker
 
-Créez le Dockerfile :
+Créer le Dockerfile :
 
 ```dockerfile
 # Dockerfile
@@ -331,7 +331,7 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-Construisez et lancez :
+Builder et exécuter :
 
 ```bash
 # Build image
@@ -343,7 +343,7 @@ docker run -d -p 80:80 --name savva-ui savva-ui
 
 ## 6. Vérifier l'installation
 
-Testez l'UI :
+Tester l'UI :
 
 ```bash
 # Test website is accessible
@@ -353,15 +353,15 @@ curl https://yourdomain.com
 ```
 
 Ouvrir dans le navigateur :
-- Rendez-vous sur `https://yourdomain.com`
-- L'interface devrait se charger et se connecter au backend
+- Accédez à `https://yourdomain.com`
+- L'UI doit se charger et se connecter au backend
 - Vérifiez la console du navigateur pour d'éventuelles erreurs
 
-## 7. Configuration post-déploiement
+## 7. Configuration après déploiement
 
 ### Mettre à jour le CORS du backend
 
-Assurez-vous que le backend autorise votre domaine UI :
+Assurez-vous que le backend autorise le domaine de votre UI :
 
 ```yaml
 # In backend config.yaml
@@ -392,7 +392,7 @@ Ajoutez une surveillance pour la disponibilité et les erreurs :
 
 ### GitHub Actions
 
-Créez `.github/workflows/deploy.yml` :
+Créer `.github/workflows/deploy.yml` :
 
 ```yaml
 name: Deploy UI
@@ -445,20 +445,20 @@ node --version  # Should be v18+
 ### Problèmes de connexion au backend
 
 - Vérifiez `VITE_BACKEND_URL` dans `.env`
-- Vérifiez les paramètres CORS du backend
-- Consultez la console du navigateur pour les erreurs
-- Testez la santé du backend : `curl https://api.yourdomain.com/health`
+- Vérifiez la configuration CORS du backend
+- Consultez la console du navigateur pour des erreurs
+- Testez la santé du backend : `curl https://api.yourdomain.com/api/info`
 
-### Page blanche / écran vide
+### Page blanche / écran blanc
 
-- Vérifiez la console du navigateur pour des erreurs JavaScript
-- Vérifiez que tous les assets sont chargés correctement
-- Vérifiez la configuration Nginx/Apache pour le routage SPA
+- Vérifiez la console du navigateur pour les erreurs JavaScript
+- Vérifiez que tous les assets sont correctement chargés
+- Contrôlez la configuration Nginx/Apache pour le routage SPA
 - Assurez-vous que `try_files` ou `FallbackResource` est configuré
 
 ### Le portefeuille Web3 ne se connecte pas
 
-- Vérifiez que HTTPS est activé (nécessaire pour Web3)
-- Vérifiez que l'URL RPC de la blockchain est accessible
+- Vérifiez si HTTPS est activé (requis pour Web3)
+- Vérifiez que l'URL RPC blockchain est accessible
 - Vérifiez que l'extension de portefeuille du navigateur est installée
 - Passez en revue les en-têtes de Content Security Policy

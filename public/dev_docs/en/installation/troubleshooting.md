@@ -106,7 +106,7 @@ sudo cp -r dist/* /var/www/savva-ui/
 cat dist/assets/index-*.js | grep -o 'https://api[^"]*'
 
 # 2. Test backend health
-curl https://api.yourdomain.com/health
+curl https://api.yourdomain.com/api/info
 
 # 3. Check CORS settings in backend
 # Ensure UI domain is in allowed_origins
