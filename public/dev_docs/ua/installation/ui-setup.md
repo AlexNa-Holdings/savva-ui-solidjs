@@ -1,11 +1,11 @@
-# Налаштування UI Вебсайту
+# Налаштування UI Website
 
-Цей посібник охоплює встановлення та розгортання фронтенда SAVVA UI.
+Цей посібник охоплює встановлення та розгортання фронтенду SAVVA UI.
 
 ## Огляд
 
-SAVVA UI — односторінковий додаток на SolidJS, який надає:
-- Інтерфейс для створення та перегляду контенту
+SAVVA UI — односторінковий додаток на базі SolidJS, який надає:
+- Інтерфейс створення та перегляду контенту
 - Інтеграцію Web3-гаманців
 - Завантаження файлів в IPFS
 - Взаємодію зі смарт-контрактами
@@ -85,11 +85,11 @@ DEPLOY_PORT=22
 
 ### Додаткова конфігурація
 
-UI автоматично отримує адреси смарт-контрактів з бекенду через endpoint `/info`, який читає з Config контракту.
+UI автоматично отримує адреси смарт-контрактів блокчейну з бекенду через ендпойнт `/info`, який читає їх з контракту Config.
 
-Немає потреби в жорстко вбудованих адресах контрактів у конфігурації UI.
+У конфігурації UI немає необхідності в жорстко прописаних адресах контрактів.
 
-## 4. Збірка UI
+## 4. Зібрати UI
 
 ### Розробницька збірка
 
@@ -100,7 +100,7 @@ npm run dev
 # Access at http://localhost:5173
 ```
 
-### Продакшн-збірка
+### Релізна збірка
 
 ```bash
 # Build for production
@@ -129,18 +129,18 @@ npm run release
 
 ### Варіант A: Хостинг статичних файлів
 
-Збудована папка `dist/` містить статичні файли, які можуть обслуговуватися будь-яким веб-сервером.
+Зібрана папка `dist/` містить статичні файли, які можна обслуговувати будь-яким веб-сервером.
 
-#### Використання Nginx (рекомендується)
+#### Використання Nginx (рекомендовано)
 
-SAVVA потребує комплексної конфігурації Nginx, яка обробляє:
+SAVVA вимагає комплексної конфігурації Nginx, яка обробляє:
 - Обслуговування статичних файлів UI
 - Проксі бекенду на `/api`
-- Попередній рендеринг для ботів (SEO)
+- Попередній рендеринг для SEO-ботів
 - Динамічний endpoint конфігурації
 - Підтримку WebSocket
 
-Завантажте повний шаблон конфігурації Nginx:
+**Завантажте повний шаблон конфігурації Nginx:**
 
 ```bash
 # Download the example configuration
@@ -153,19 +153,47 @@ wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/publi
 nano nginx.conf.example
 ```
 
-Переглянути повний приклад: [nginx.conf.example](nginx.conf.example)
+**Переглянути повний приклад**: [nginx.conf.example](nginx.conf.example)
 
-Ключові можливості, що включені:
+**Ключові можливості, що входять:**
 1. Перенаправлення HTTP на HTTPS
-2. Налаштування SSL/TLS (Cloudflare Origin Certificates або Let's Encrypt)
-3. Endpoint `/default_connect.yaml` — надає UI URL бекенду та IPFS-шлюзу
-4. Попередній рендеринг для ботів — SEO-дружнє серверне рендерування для пошукових систем та соцмереж
-5. Проксі `/api` — пересилає API-запити на бекенд на порті 7000
-6. Підтримка WebSocket — для реального часу
+2. Налаштування SSL/TLS (сертифікати Cloudflare Origin або Let's Encrypt)
+3. Ендпойнт `/default_connect.yaml` — **обов'язковий** динамічний конфіг для UI
+4. Пререндеринг для ботів — SEO-дружній серверний рендеринг для пошукових систем і соцмереж
+5. Проксі `/api` — перенаправляє API-запити на бекенд на порті 7000
+6. Підтримка WebSocket — для функцій в реальному часі
 7. Обслуговування статичних файлів з маршрутизацією SPA
-8. Розумне кешування — `index.html` не кешується, ресурси кешуються на 1 рік
+8. Розумне кешування — `index.html` ніколи не кешується, ассети кешуються на 1 рік
 
-Налаштуйте конфігурацію:
+### Розуміння default_connect.yaml
+
+UI потребує ендпойнт `/default_connect.yaml`, який повідомляє, де знайти бекенд і шлюз IPFS. Це налаштовується безпосередньо в Nginx за допомогою змінних:
+
+```nginx
+# Define your deployment settings
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+
+# Serve dynamic configuration to the UI
+location = /default_connect.yaml {
+    add_header Content-Type text/plain;
+    return 200 'domain: $default_domain
+backendLink: $default_backend
+default_ipfs_link: $default_ipfs';
+}
+```
+
+Цей ендпойнт повертає YAML-відповідь виду:
+```yaml
+domain: yourdomain.com
+backendLink: https://yourdomain.com/api/
+default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+```
+
+UI зчитує цю конфігурацію під час запуску, щоб знати, до чого підключатися.
+
+**Налаштуйте конфігурацію:**
 
 Відредагуйте ці ключові змінні у завантаженому файлі:
 
@@ -173,8 +201,10 @@ nano nginx.conf.example
 # Your domain
 server_name yourdomain.com;
 
-# IPFS gateway (Pinata, Filebase, or custom)
-set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+# Dynamic configuration variables
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # Or Filebase, etc.
 
 # Path to UI build files
 root /var/www/savva-ui;
@@ -184,7 +214,7 @@ ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
 
-Розгорніть файли та активуйте сайт:
+**Розгорніть файли та увімкніть сайт:**
 
 ```bash
 # Create web directory
@@ -209,67 +239,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-#### Використання Apache
-
-Створіть конфігурацію Apache:
-
-```bash
-sudo nano /etc/apache2/sites-available/savva-ui.conf
-```
-
-Конфіг Apache:
-
-```apache
-<VirtualHost *:80>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    # Redirect to HTTPS
-    Redirect permanent / https://yourdomain.com/
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    DocumentRoot /var/www/savva-ui
-
-    # SSL Configuration
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/yourdomain.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/yourdomain.com/privkey.pem
-
-    # SPA routing
-    <Directory /var/www/savva-ui>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-
-        # Fallback to index.html for SPA routing
-        FallbackResource /index.html
-    </Directory>
-
-    # Security headers
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-XSS-Protection "1; mode=block"
-
-    # Compression
-    <IfModule mod_deflate.c>
-        AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
-    </IfModule>
-</VirtualHost>
-```
-
-Активуйте сайт:
-
-```bash
-sudo a2enmod ssl rewrite headers deflate
-sudo a2ensite savva-ui
-sudo systemctl reload apache2
-```
-
-### Варіант B: Автоматичний скрипт розгортання
+### Варіант B: Скрипт автоматичного розгортання
 
 Створіть скрипт розгортання:
 
@@ -309,38 +279,6 @@ echo "Visit https://yourdomain.com"
 ./deploy.sh
 ```
 
-### Варіант C: Розгортання через Docker
-
-Створіть Dockerfile:
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-Збірка та запуск:
-
-```bash
-# Build image
-docker build -t savva-ui .
-
-# Run container
-docker run -d -p 80:80 --name savva-ui savva-ui
-```
-
 ## 6. Перевірка встановлення
 
 Перевірте UI:
@@ -352,16 +290,16 @@ curl https://yourdomain.com
 # Should return HTML with SAVVA UI content
 ```
 
-Відкрийте в браузері:
+Відкрийте у браузері:
 - Перейдіть на `https://yourdomain.com`
-- UI має завантажитися та підключитися до бекенду
+- UI повинен завантажитись і підключитися до бекенду
 - Перевірте консоль браузера на наявність помилок
 
 ## 7. Налаштування після розгортання
 
-### Оновити CORS бекенду
+### Оновити CORS на бекенді
 
-Переконайтеся, що бекенд дозволяє запити з домену вашого UI:
+Переконайтесь, що бекенд дозволяє домен вашого UI:
 
 ```yaml
 # In backend config.yaml
@@ -371,12 +309,12 @@ cors:
     - "https://www.yourdomain.com"
 ```
 
-### Налаштування CDN (необов'язково)
+### Налаштувати CDN (необов'язково)
 
 Для кращої продуктивності розгляньте використання CDN:
 
 - **Cloudflare**: Додайте сайт у Cloudflare, оновіть DNS
-- **AWS CloudFront**: Створіть дистрибуцію з вказівкою origin
+- **AWS CloudFront**: Створіть дистрибуцію з походженням
 - **Інші CDN**: Дотримуйтесь документації провайдера
 
 ### Налаштування моніторингу
@@ -388,48 +326,7 @@ cors:
 # Monitor: https://yourdomain.com
 ```
 
-## 8. Безперервне розгортання
-
-### GitHub Actions
-
-Створіть файл `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy UI
-
-on:
-  push:
-    branches: [ prod ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build
-      run: npm run build
-
-    - name: Deploy via SCP
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        source: "dist/*"
-        target: "/var/www/savva-ui"
-```
-
-## Усунення неполадок
+## Усунення несправностей
 
 ### Збірка не вдається
 
@@ -444,21 +341,21 @@ node --version  # Should be v18+
 
 ### Проблеми з підключенням до бекенду
 
-- Перевірте `VITE_BACKEND_URL` у файлі `.env`
-- Перевірте налаштування CORS бекенду
-- Перегляньте консоль браузера на наявність помилок
+- Перевірте `VITE_BACKEND_URL` в `.env`
+- Перевірте налаштування CORS на бекенді
+- Перегляньте консоль браузера на предмет помилок
 - Перевірте стан бекенду: `curl https://api.yourdomain.com/api/info`
 
-### Порожня сторінка / білий екран
+### Порожня сторінка / Білий екран
 
-- Перевірте консоль браузера на помилки JavaScript
-- Переконайтеся, що всі ресурси завантажуються правильно
-- Перевірте конфігурацію Nginx/Apache для маршрутизації SPA
-- Переконайтеся, що `try_files` або `FallbackResource` налаштовані
+- Перевірте консоль браузера на JavaScript-помилки
+- Переконайтесь, що всі ассети завантажуються коректно
+- Перевірте конфігурацію Nginx для маршрутизації SPA
+- Переконайтесь, що директива `try_files` налаштована правильно
 
-### Web3 гаманець не підключається
+### Web3-гаманець не підключається
 
-- Переконайтеся, що HTTPS увімкнено (потрібно для Web3)
-- Перевірте доступність RPC-URL блокчейну
-- Перевірте, чи встановлене розширення гаманця у браузері
-- Перегляньте заголовки політики безпеки контенту (Content Security Policy)
+- Перевірте, чи увімкнено HTTPS (потрібно для Web3)
+- Переконайтесь, що RPC-URL блокчейну доступний
+- Перевірте, чи встановлене розширення гаманця в браузері
+- Перегляньте заголовки політики безпеки контенту (CSP)

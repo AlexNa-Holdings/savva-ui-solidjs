@@ -2,14 +2,14 @@
 
 Ce guide couvre l'installation et le déploiement du frontend SAVVA UI.
 
-## Vue d'ensemble
+## Aperçu
 
-Le SAVVA UI est une application monopage (SPA) basée sur SolidJS qui fournit :
+L'UI SAVVA est une application mono-page (SPA) basée sur SolidJS qui fournit :
 - Interface de création et de navigation de contenu
 - Intégration de portefeuilles Web3
 - Téléversements de fichiers vers IPFS
-- Interactions avec les contrats intelligents
-- Prise en charge multilingue
+- Interactions avec des smart contracts
+- Support multilingue
 
 ## 1. Cloner le dépôt
 
@@ -85,7 +85,7 @@ DEPLOY_PORT=22
 
 ### Configuration supplémentaire
 
-L'UI récupère automatiquement les adresses des contrats blockchain depuis l'endpoint `/info` du backend, qui lit à partir du contrat Config.
+L'UI récupère automatiquement les adresses des contrats blockchain depuis le point de terminaison backend `/info`, qui lit depuis le contrat Config.
 
 Aucune adresse de contrat codée en dur n'est nécessaire dans la configuration de l'UI.
 
@@ -129,18 +129,18 @@ npm run release
 
 ### Option A : Hébergement de fichiers statiques
 
-Le dossier buildé `dist/` contient des fichiers statiques qui peuvent être servis par n'importe quel serveur web.
+Le dossier construit `dist/` contient des fichiers statiques pouvant être servis par n'importe quel serveur web.
 
-#### Utilisation de Nginx (recommandé)
+#### Utiliser Nginx (recommandé)
 
 SAVVA nécessite une configuration Nginx complète qui gère :
-- La distribution des fichiers statiques de l'UI
-- Le proxy de l'API backend sur `/api`
-- Le prérendu pour les bots (SEO)
-- Un endpoint de configuration dynamique
-- Le support WebSocket
+- Service des fichiers statiques de l'UI
+- Proxy de l'API backend sur `/api`
+- Prérendu pour les bots SEO
+- Point de terminaison de configuration dynamique
+- Support WebSocket
 
-**Télécharger le template complet de configuration Nginx :**
+**Téléchargez le modèle complet de configuration Nginx :**
 
 ```bash
 # Download the example configuration
@@ -155,15 +155,43 @@ nano nginx.conf.example
 
 **Voir l'exemple complet** : [nginx.conf.example](nginx.conf.example)
 
-**Principales fonctionnalités incluses :**
+**Fonctionnalités clés incluses :**
 1. Redirection HTTP vers HTTPS
 2. Configuration SSL/TLS (certificats Cloudflare Origin ou Let's Encrypt)
-3. Endpoint `/default_connect.yaml` - fournit les URLs du backend et de la passerelle IPFS à l'UI
-4. Prérendu pour les bots - rendu côté serveur optimisé pour le SEO et les réseaux sociaux
-5. Proxy `/api` - relaie les requêtes API vers le backend sur le port 7000
+3. **/default_connect.yaml** - point de terminaison **requis** pour la configuration dynamique de l'UI
+4. Prérendu pour bots - rendu côté serveur adapté au SEO et aux réseaux sociaux
+5. Proxy `/api` - redirige les requêtes API vers le backend sur le port 7000
 6. Support WebSocket - pour les fonctionnalités en temps réel
-7. Distribution des fichiers statiques avec routage SPA
-8. Mise en cache intelligente - `index.html` jamais mis en cache, les assets mis en cache pendant 1 an
+7. Service de fichiers statiques avec routage SPA
+8. Caching intelligent - `index.html` jamais mis en cache, actifs mis en cache pendant 1 an
+
+### Comprendre default_connect.yaml
+
+L'UI requiert un point de terminaison `/default_connect.yaml` qui lui indique où trouver le backend et la passerelle IPFS. Ceci est configuré directement dans Nginx à l'aide de variables :
+
+```nginx
+# Define your deployment settings
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+
+# Serve dynamic configuration to the UI
+location = /default_connect.yaml {
+    add_header Content-Type text/plain;
+    return 200 'domain: $default_domain
+backendLink: $default_backend
+default_ipfs_link: $default_ipfs';
+}
+```
+
+Ce point de terminaison renvoie une réponse YAML comme :
+```yaml
+domain: yourdomain.com
+backendLink: https://yourdomain.com/api/
+default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+```
+
+L'UI récupère cette configuration au démarrage pour savoir où se connecter.
 
 **Personnaliser la configuration :**
 
@@ -173,8 +201,10 @@ Modifiez ces variables clés dans le fichier téléchargé :
 # Your domain
 server_name yourdomain.com;
 
-# IPFS gateway (Pinata, Filebase, or custom)
-set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+# Dynamic configuration variables
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # Or Filebase, etc.
 
 # Path to UI build files
 root /var/www/savva-ui;
@@ -207,66 +237,6 @@ sudo nginx -t
 
 # Reload Nginx
 sudo systemctl reload nginx
-```
-
-#### Utilisation d'Apache
-
-Créer la configuration Apache :
-
-```bash
-sudo nano /etc/apache2/sites-available/savva-ui.conf
-```
-
-Configuration Apache :
-
-```apache
-<VirtualHost *:80>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    # Redirect to HTTPS
-    Redirect permanent / https://yourdomain.com/
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    DocumentRoot /var/www/savva-ui
-
-    # SSL Configuration
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/yourdomain.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/yourdomain.com/privkey.pem
-
-    # SPA routing
-    <Directory /var/www/savva-ui>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-
-        # Fallback to index.html for SPA routing
-        FallbackResource /index.html
-    </Directory>
-
-    # Security headers
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-XSS-Protection "1; mode=block"
-
-    # Compression
-    <IfModule mod_deflate.c>
-        AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
-    </IfModule>
-</VirtualHost>
-```
-
-Activer le site :
-
-```bash
-sudo a2enmod ssl rewrite headers deflate
-sudo a2ensite savva-ui
-sudo systemctl reload apache2
 ```
 
 ### Option B : Script de déploiement automatisé
@@ -303,42 +273,10 @@ echo "Deployment complete!"
 echo "Visit https://yourdomain.com"
 ```
 
-Exécuter le déploiement :
+Lancer le déploiement :
 
 ```bash
 ./deploy.sh
-```
-
-### Option C : Déploiement avec Docker
-
-Créer le Dockerfile :
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-Builder et exécuter :
-
-```bash
-# Build image
-docker build -t savva-ui .
-
-# Run container
-docker run -d -p 80:80 --name savva-ui savva-ui
 ```
 
 ## 6. Vérifier l'installation
@@ -353,15 +291,15 @@ curl https://yourdomain.com
 ```
 
 Ouvrir dans le navigateur :
-- Accédez à `https://yourdomain.com`
+- Rendez-vous sur `https://yourdomain.com`
 - L'UI doit se charger et se connecter au backend
 - Vérifiez la console du navigateur pour d'éventuelles erreurs
 
-## 7. Configuration après déploiement
+## 7. Configuration post-déploiement
 
 ### Mettre à jour le CORS du backend
 
-Assurez-vous que le backend autorise le domaine de votre UI :
+Assurez-vous que le backend autorise votre domaine UI :
 
 ```yaml
 # In backend config.yaml
@@ -388,47 +326,6 @@ Ajoutez une surveillance pour la disponibilité et les erreurs :
 # Monitor: https://yourdomain.com
 ```
 
-## 8. Déploiement continu
-
-### GitHub Actions
-
-Créer `.github/workflows/deploy.yml` :
-
-```yaml
-name: Deploy UI
-
-on:
-  push:
-    branches: [ prod ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build
-      run: npm run build
-
-    - name: Deploy via SCP
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        source: "dist/*"
-        target: "/var/www/savva-ui"
-```
-
 ## Dépannage
 
 ### Échec de la compilation
@@ -446,19 +343,19 @@ node --version  # Should be v18+
 
 - Vérifiez `VITE_BACKEND_URL` dans `.env`
 - Vérifiez la configuration CORS du backend
-- Consultez la console du navigateur pour des erreurs
+- Consultez la console du navigateur pour les erreurs
 - Testez la santé du backend : `curl https://api.yourdomain.com/api/info`
 
 ### Page blanche / écran blanc
 
 - Vérifiez la console du navigateur pour les erreurs JavaScript
-- Vérifiez que tous les assets sont correctement chargés
-- Contrôlez la configuration Nginx/Apache pour le routage SPA
-- Assurez-vous que `try_files` ou `FallbackResource` est configuré
+- Vérifiez que tous les assets sont chargés correctement
+- Vérifiez la configuration Nginx pour le routage SPA
+- Assurez-vous que la directive `try_files` est configurée correctement
 
 ### Le portefeuille Web3 ne se connecte pas
 
 - Vérifiez si HTTPS est activé (requis pour Web3)
 - Vérifiez que l'URL RPC blockchain est accessible
-- Vérifiez que l'extension de portefeuille du navigateur est installée
-- Passez en revue les en-têtes de Content Security Policy
+- Assurez-vous que l'extension de portefeuille du navigateur est installée
+- Vérifiez les en-têtes de Content Security Policy

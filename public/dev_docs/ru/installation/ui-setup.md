@@ -1,15 +1,15 @@
-# Настройка веб-сайта UI
+# Настройка веб-интерфейса UI
 
 Это руководство описывает установку и развёртывание фронтенда SAVVA UI.
 
 ## Обзор
 
-SAVVA UI — одностраничное приложение на основе SolidJS, которое обеспечивает:
-- Интерфейс создания и просмотра контента
-- Интеграцию с Web3-кошельками
-- Загрузку файлов в IPFS
+SAVVA UI — одностраничное приложение на SolidJS, которое предоставляет:
+- Интерфейс для создания и просмотра контента
+- Интеграция с Web3-кошельками
+- Загрузка файлов в IPFS
 - Взаимодействие со смарт-контрактами
-- Поддержку нескольких языков
+- Поддержка нескольких языков
 
 ## 1. Клонирование репозитория
 
@@ -85,13 +85,13 @@ DEPLOY_PORT=22
 
 ### Дополнительная конфигурация
 
-UI автоматически получает адреса блокчейн-контрактов с бэкенда через endpoint `/info`, который читает их из контракта Config.
+UI автоматически получает адреса блокчейн-контрактов с бэкенд-эндпоинта `/info`, который читает их из Config-контракта.
 
-В конфигурации UI не требуется жёстко задавать адреса контрактов.
+В UI не требуется хардкодить адреса контрактов в конфигурации.
 
 ## 4. Сборка UI
 
-### Сборка для разработки
+### Разработка (development)
 
 ```bash
 # Run development server
@@ -100,7 +100,7 @@ npm run dev
 # Access at http://localhost:5173
 ```
 
-### Сборка для production
+### Сборка для продакшена
 
 ```bash
 # Build for production
@@ -110,7 +110,7 @@ npm run build
 # Contains optimized static files ready for deployment
 ```
 
-### Сборка с деплоем
+### Сборка с автоматическим деплоем
 
 ```bash
 # Automated build + deploy (if DEPLOY_* vars configured)
@@ -125,22 +125,22 @@ npm run release
 # 6. Deploy via SCP (if configured)
 ```
 
-## 5. Развёртывание в продакшн
+## 5. Развёртывание в продакшен
 
 ### Вариант A: Хостинг статических файлов
 
-Собранная `dist/` папка содержит статические файлы, которые можно отдавать любым веб-сервером.
+Собранная папка `dist/` содержит статические файлы, которые можно отдавать любым веб-сервером.
 
 #### Использование Nginx (рекомендуется)
 
-SAVVA требует комплексной конфигурации Nginx, которая обеспечивает:
+SAVVA требует комплексной конфигурации Nginx, которая обрабатывает:
 - Раздачу статических файлов UI
-- Прокси бэкенда по пути `/api`
+- Проксирование запросов к бэкенду на `/api`
 - Пререндеринг для SEO-ботов
-- Динамическую конечную точку конфигурации
+- Эндпоинт динамической конфигурации
 - Поддержку WebSocket
 
-**Скачайте шаблон полной конфигурации Nginx:**
+**Скачать полный шаблон конфигурации Nginx:**
 
 ```bash
 # Download the example configuration
@@ -155,27 +155,27 @@ nano nginx.conf.example
 
 **Просмотреть полный пример**: [nginx.conf.example](nginx.conf.example)
 
-**Ключевые возможности:**
-1. Перенаправление HTTP на HTTPS
+**Ключевые возможности, включённые в конфиг:**
+1. Перенаправление с HTTP на HTTPS
 2. Настройка SSL/TLS (Cloudflare Origin Certificates или Let's Encrypt)
-3. Endpoint `/default_connect.yaml` — **обязательная** динамическая конфигурация для UI
-4. Пререндеринг для ботов — SEO-дружественный серверный рендеринг для поисковых систем и соцсетей
-5. Прокси `/api` — пересылает API-запросы на бэкенд на порт 7000
-6. Поддержка WebSocket — для функций реального времени
+3. Эндпоинт `/default_connect.yaml` — **обязательный** динамический конфиг для UI
+4. Пререндеринг для ботов — удобство для SEO и социальных сетей
+5. Проксирование `/api` — пересылает запросы к бэкенду на порт 7000
+6. Поддержка WebSocket — для функций в реальном времени
 7. Раздача статических файлов с маршрутизацией SPA
-8. Интеллектуальное кеширование — index.html никогда не кешируется, ассеты кешируются на 1 год
+8. Интеллектуальное кэширование — `index.html` никогда не кешируется, ассеты кешируются на 1 год
 
-### Понимание default_connect.yaml
+### Понимание /default_connect.yaml
 
-UI требует endpoint `/default_connect.yaml`, который сообщает ему, где найти бэкенд и IPFS-гейтвей. Это настраивается непосредственно в Nginx с помощью переменных:
+UI требует эндпоинт `/default_connect.yaml`, который сообщает, где находится бэкенд и IPFS-шлюз. Это настраивается прямо в Nginx с помощью переменных:
 
 ```nginx
-# Определите настройки вашего деплоя
+# Define your deployment settings
 set $default_domain "yourdomain.com";
 set $default_backend "https://yourdomain.com/api/";
 set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
 
-# Отдача динамической конфигурации для UI
+# Serve dynamic configuration to the UI
 location = /default_connect.yaml {
     add_header Content-Type text/plain;
     return 200 'domain: $default_domain
@@ -184,37 +184,37 @@ default_ipfs_link: $default_ipfs';
 }
 ```
 
-Этот endpoint возвращает YAML-ответ вида:
+Этот эндпоинт возвращает YAML-ответ, например:
 ```yaml
 domain: yourdomain.com
 backendLink: https://yourdomain.com/api/
 default_ipfs_link: https://gateway.pinata.cloud/ipfs/
 ```
 
-UI получает эту конфигурацию при запуске, чтобы знать, куда подключаться.
+UI запрашивает эту конфигурацию при старте, чтобы знать, куда подключаться.
 
 **Настройка конфигурации:**
 
-Отредактируйте эти ключевые переменные в загруженном файле:
+Отредактируйте эти ключевые переменные в скачанном файле:
 
 ```nginx
-# Ваш домен
+# Your domain
 server_name yourdomain.com;
 
-# Переменные динамической конфигурации
+# Dynamic configuration variables
 set $default_domain "yourdomain.com";
 set $default_backend "https://yourdomain.com/api/";
-set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # Или Filebase и т.д.
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # Or Filebase, etc.
 
-# Путь к файлам сборки UI
+# Path to UI build files
 root /var/www/savva-ui;
 
-# SSL-сертификаты (Cloudflare или Let's Encrypt)
+# SSL certificates (Cloudflare or Let's Encrypt)
 ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
 
-**Разверните файлы и включите сайт:**
+**Развернуть файлы и включить сайт:**
 
 ```bash
 # Create web directory
@@ -239,7 +239,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Вариант B: Автоматический скрипт деплоя
+### Вариант B: Автоматизированный скрипт деплоя
 
 Создайте скрипт деплоя:
 
@@ -273,42 +273,10 @@ echo "Deployment complete!"
 echo "Visit https://yourdomain.com"
 ```
 
-Запуск деплоя:
+Запустите деплой:
 
 ```bash
 ./deploy.sh
-```
-
-### Вариант C: Развёртывание в Docker
-
-Создайте Dockerfile:
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-Сборка и запуск:
-
-```bash
-# Build image
-docker build -t savva-ui .
-
-# Run container
-docker run -d -p 80:80 --name savva-ui savva-ui
 ```
 
 ## 6. Проверка установки
@@ -325,13 +293,13 @@ curl https://yourdomain.com
 Откройте в браузере:
 - Перейдите на `https://yourdomain.com`
 - UI должен загрузиться и подключиться к бэкенду
-- Проверьте консоль браузера на наличие ошибок
+- Проверьте консоль браузера на предмет ошибок
 
 ## 7. Постдеплойная конфигурация
 
-### Обновите CORS бэкенда
+### Обновление CORS на бэкенде
 
-Убедитесь, что бэкенд разрешает ваш домен UI:
+Убедитесь, что бэкенд разрешает домен вашего UI:
 
 ```yaml
 # In backend config.yaml
@@ -345,9 +313,9 @@ cors:
 
 Для лучшей производительности рассмотрите использование CDN:
 
-- **Cloudflare**: Добавьте сайт в Cloudflare, обновите DNS
-- **AWS CloudFront**: Создайте дистрибутив, указывающий на origin
-- **Другие CDN**: Следуйте документации провайдера
+- **Cloudflare**: добавьте сайт в Cloudflare, обновите DNS
+- **AWS CloudFront**: создайте distribution, указывающий на origin
+- **Другие CDN**: следуйте документации провайдера
 
 ### Настройка мониторинга
 
@@ -356,47 +324,6 @@ cors:
 ```bash
 # Using UptimeRobot, Pingdom, or similar services
 # Monitor: https://yourdomain.com
-```
-
-## 8. Непрерывный деплой
-
-### GitHub Actions
-
-Создайте `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy UI
-
-on:
-  push:
-    branches: [ prod ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build
-      run: npm run build
-
-    - name: Deploy via SCP
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        source: "dist/*"
-        target: "/var/www/savva-ui"
 ```
 
 ## Устранение неполадок
@@ -415,16 +342,16 @@ node --version  # Should be v18+
 ### Проблемы с подключением к бэкенду
 
 - Проверьте `VITE_BACKEND_URL` в `.env`
-- Убедитесь в корректности настроек CORS на бэкенде
-- Посмотрите ошибки в консоли браузера
-- Проверьте работоспособность бэкенда: `curl https://api.yourdomain.com/api/info`
+- Убедитесь в настройках CORS на бэкенде
+- Проверьте консоль браузера на предмет ошибок
+- Протестируйте здоровье бэкенда: `curl https://api.yourdomain.com/api/info`
 
 ### Пустая страница / белый экран
 
 - Проверьте консоль браузера на наличие ошибок JavaScript
 - Убедитесь, что все ассеты загрузились корректно
-- Проверьте конфигурацию Nginx/Apache для маршрутизации SPA
-- Убедитесь, что настроен `try_files` или `FallbackResource`
+- Проверьте конфигурацию Nginx для маршрутизации SPA
+- Убедитесь, что директива `try_files` настроена правильно
 
 ### Web3-кошелёк не подключается
 
