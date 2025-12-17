@@ -121,10 +121,11 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 - Website: https://savva.app
 - Documentation: https://savva.app/docs
+- Telegram: https://t.me/savvaapp
 - Android App: https://play.google.com/store/apps/details?id=app.savva.mobile
 
 ## Support
 
 For issues and questions:
-- GitHub Issues: [Report a bug](https://github.com/your-org/savva-ui-solidjs/issues)
+- GitHub Issues: [Report a bug](https://github.com/AlexNa-Holdings/savva-ui-solidjs/issues)
 - Community: Join our platform at https://savva.app
