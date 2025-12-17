@@ -158,12 +158,40 @@ nano nginx.conf.example
 **Key features included:**
 1. HTTP to HTTPS redirect
 2. SSL/TLS setup (Cloudflare Origin Certificates or Let's Encrypt)
-3. `/default_connect.yaml` endpoint - provides backend and IPFS gateway URLs to UI
+3. `/default_connect.yaml` endpoint - **required** dynamic configuration for the UI
 4. Bot prerendering - SEO-friendly server-side rendering for search engines and social media
 5. `/api` proxy - forwards API requests to backend on port 7000
 6. WebSocket support - for real-time features
 7. Static file serving with SPA routing
 8. Smart caching - index.html never cached, assets cached for 1 year
+
+### Understanding default_connect.yaml
+
+The UI requires a `/default_connect.yaml` endpoint that tells it where to find the backend and IPFS gateway. This is configured directly in Nginx using variables:
+
+```nginx
+# Define your deployment settings
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+
+# Serve dynamic configuration to the UI
+location = /default_connect.yaml {
+    add_header Content-Type text/plain;
+    return 200 'domain: $default_domain
+backendLink: $default_backend
+default_ipfs_link: $default_ipfs';
+}
+```
+
+This endpoint returns a YAML response like:
+```yaml
+domain: yourdomain.com
+backendLink: https://yourdomain.com/api/
+default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+```
+
+The UI fetches this configuration on startup to know where to connect.
 
 **Customize the configuration:**
 
@@ -173,8 +201,10 @@ Edit these key variables in the downloaded file:
 # Your domain
 server_name yourdomain.com;
 
-# IPFS gateway (Pinata, Filebase, or custom)
-set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+# Dynamic configuration variables
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # Or Filebase, etc.
 
 # Path to UI build files
 root /var/www/savva-ui;
@@ -207,66 +237,6 @@ sudo nginx -t
 
 # Reload Nginx
 sudo systemctl reload nginx
-```
-
-#### Using Apache
-
-Create Apache configuration:
-
-```bash
-sudo nano /etc/apache2/sites-available/savva-ui.conf
-```
-
-Apache config:
-
-```apache
-<VirtualHost *:80>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    # Redirect to HTTPS
-    Redirect permanent / https://yourdomain.com/
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    DocumentRoot /var/www/savva-ui
-
-    # SSL Configuration
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/yourdomain.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/yourdomain.com/privkey.pem
-
-    # SPA routing
-    <Directory /var/www/savva-ui>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-
-        # Fallback to index.html for SPA routing
-        FallbackResource /index.html
-    </Directory>
-
-    # Security headers
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-XSS-Protection "1; mode=block"
-
-    # Compression
-    <IfModule mod_deflate.c>
-        AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
-    </IfModule>
-</VirtualHost>
-```
-
-Enable site:
-
-```bash
-sudo a2enmod ssl rewrite headers deflate
-sudo a2ensite savva-ui
-sudo systemctl reload apache2
 ```
 
 ### Option B: Automated Deployment Script
@@ -307,38 +277,6 @@ Run deployment:
 
 ```bash
 ./deploy.sh
-```
-
-### Option C: Docker Deployment
-
-Create Dockerfile:
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-Build and run:
-
-```bash
-# Build image
-docker build -t savva-ui .
-
-# Run container
-docker run -d -p 80:80 --name savva-ui savva-ui
 ```
 
 ## 6. Verify Installation
@@ -388,47 +326,6 @@ Add monitoring for uptime and errors:
 # Monitor: https://yourdomain.com
 ```
 
-## 8. Continuous Deployment
-
-### GitHub Actions
-
-Create `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy UI
-
-on:
-  push:
-    branches: [ prod ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Build
-      run: npm run build
-
-    - name: Deploy via SCP
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.DEPLOY_HOST }}
-        username: ${{ secrets.DEPLOY_USER }}
-        key: ${{ secrets.DEPLOY_SSH_KEY }}
-        source: "dist/*"
-        target: "/var/www/savva-ui"
-```
-
 ## Troubleshooting
 
 ### Build Fails
@@ -453,8 +350,8 @@ node --version  # Should be v18+
 
 - Check browser console for JavaScript errors
 - Verify all assets loaded correctly
-- Check Nginx/Apache configuration for SPA routing
-- Ensure `try_files` or `FallbackResource` is configured
+- Check Nginx configuration for SPA routing
+- Ensure `try_files` directive is configured correctly
 
 ### Web3 Wallet Not Connecting
 

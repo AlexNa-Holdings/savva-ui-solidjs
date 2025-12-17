@@ -158,28 +158,58 @@ nano nginx.conf.example
 **Ключевые возможности:**
 1. Перенаправление HTTP на HTTPS
 2. Настройка SSL/TLS (Cloudflare Origin Certificates или Let's Encrypt)
-3. Endpoint `/default_connect.yaml` — предоставляет UI URL-ы бэкенда и IPFS-гейтвея
+3. Endpoint `/default_connect.yaml` — **обязательная** динамическая конфигурация для UI
 4. Пререндеринг для ботов — SEO-дружественный серверный рендеринг для поисковых систем и соцсетей
 5. Прокси `/api` — пересылает API-запросы на бэкенд на порт 7000
 6. Поддержка WebSocket — для функций реального времени
 7. Раздача статических файлов с маршрутизацией SPA
 8. Интеллектуальное кеширование — index.html никогда не кешируется, ассеты кешируются на 1 год
 
+### Понимание default_connect.yaml
+
+UI требует endpoint `/default_connect.yaml`, который сообщает ему, где найти бэкенд и IPFS-гейтвей. Это настраивается непосредственно в Nginx с помощью переменных:
+
+```nginx
+# Определите настройки вашего деплоя
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+
+# Отдача динамической конфигурации для UI
+location = /default_connect.yaml {
+    add_header Content-Type text/plain;
+    return 200 'domain: $default_domain
+backendLink: $default_backend
+default_ipfs_link: $default_ipfs';
+}
+```
+
+Этот endpoint возвращает YAML-ответ вида:
+```yaml
+domain: yourdomain.com
+backendLink: https://yourdomain.com/api/
+default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+```
+
+UI получает эту конфигурацию при запуске, чтобы знать, куда подключаться.
+
 **Настройка конфигурации:**
 
 Отредактируйте эти ключевые переменные в загруженном файле:
 
 ```nginx
-# Your domain
+# Ваш домен
 server_name yourdomain.com;
 
-# IPFS gateway (Pinata, Filebase, or custom)
-set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+# Переменные динамической конфигурации
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # Или Filebase и т.д.
 
-# Path to UI build files
+# Путь к файлам сборки UI
 root /var/www/savva-ui;
 
-# SSL certificates (Cloudflare or Let's Encrypt)
+# SSL-сертификаты (Cloudflare или Let's Encrypt)
 ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
@@ -207,66 +237,6 @@ sudo nginx -t
 
 # Reload Nginx
 sudo systemctl reload nginx
-```
-
-#### Использование Apache
-
-Создайте конфигурацию Apache:
-
-```bash
-sudo nano /etc/apache2/sites-available/savva-ui.conf
-```
-
-Конфигурация Apache:
-
-```apache
-<VirtualHost *:80>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    # Redirect to HTTPS
-    Redirect permanent / https://yourdomain.com/
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName yourdomain.com
-    ServerAlias www.yourdomain.com
-
-    DocumentRoot /var/www/savva-ui
-
-    # SSL Configuration
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/yourdomain.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/yourdomain.com/privkey.pem
-
-    # SPA routing
-    <Directory /var/www/savva-ui>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-
-        # Fallback to index.html for SPA routing
-        FallbackResource /index.html
-    </Directory>
-
-    # Security headers
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-XSS-Protection "1; mode=block"
-
-    # Compression
-    <IfModule mod_deflate.c>
-        AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
-    </IfModule>
-</VirtualHost>
-```
-
-Включите сайт:
-
-```bash
-sudo a2enmod ssl rewrite headers deflate
-sudo a2ensite savva-ui
-sudo systemctl reload apache2
 ```
 
 ### Вариант B: Автоматический скрипт деплоя

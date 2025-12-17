@@ -158,28 +158,58 @@ nano nginx.conf.example
 **Características clave incluidas:**
 1. Redirección HTTP a HTTPS
 2. Configuración SSL/TLS (Cloudflare Origin Certificates o Let's Encrypt)
-3. Endpoint `/default_connect.yaml` - proporciona las URLs del backend y del gateway IPFS a la UI
+3. Endpoint `/default_connect.yaml` - **requerido** configuración dinámica para la UI
 4. Prerendering para bots - renderizado en servidor amigable para SEO y redes sociales
 5. Proxy `/api` - reenvía peticiones API al backend en el puerto 7000
 6. Soporte WebSocket - para funcionalidades en tiempo real
 7. Servido de archivos estáticos con enrutado SPA
 8. Caché inteligente - `index.html` nunca cacheado, assets cacheados por 1 año
 
+### Entendiendo default_connect.yaml
+
+La UI requiere un endpoint `/default_connect.yaml` que le indica dónde encontrar el backend y el gateway IPFS. Esto se configura directamente en Nginx usando variables:
+
+```nginx
+# Define la configuración de tu despliegue
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+
+# Sirve la configuración dinámica a la UI
+location = /default_connect.yaml {
+    add_header Content-Type text/plain;
+    return 200 'domain: $default_domain
+backendLink: $default_backend
+default_ipfs_link: $default_ipfs';
+}
+```
+
+Este endpoint devuelve una respuesta YAML como:
+```yaml
+domain: yourdomain.com
+backendLink: https://yourdomain.com/api/
+default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+```
+
+La UI obtiene esta configuración al iniciar para saber dónde conectarse.
+
 **Personalizar la configuración:**
 
 Edita estas variables clave en el archivo descargado:
 
 ```nginx
-# Your domain
+# Tu dominio
 server_name yourdomain.com;
 
-# IPFS gateway (Pinata, Filebase, or custom)
-set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
+# Variables de configuración dinámica
+set $default_domain "yourdomain.com";
+set $default_backend "https://yourdomain.com/api/";
+set $default_ipfs "https://gateway.pinata.cloud/ipfs/";  # O Filebase, etc.
 
-# Path to UI build files
+# Ruta a los archivos de build de la UI
 root /var/www/savva-ui;
 
-# SSL certificates (Cloudflare or Let's Encrypt)
+# Certificados SSL (Cloudflare o Let's Encrypt)
 ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
