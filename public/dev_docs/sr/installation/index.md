@@ -1,32 +1,32 @@
-# Installation Guide - Overview
+# Vodič za instalaciju - Pregled
 
-Ovaj vodič će vas provesti kroz postavljanje sopstvene SAVVA mreže od nule. Prateći ove instrukcije, bićete u mogućnosti da pokrenete kompletnu SAVVA instancu sa backend serverom i frontend UI.
+Ovaj vodič će vas provesti kroz podešavanje sopstvene SAVVA mreže od nule. Prateći ove instrukcije, moći ćete da pokrenete potpunu SAVVA instancu sa backend serverom i frontend korisničkim interfejsom.
 
 ## Šta ćete postaviti
 
-Kompletna SAVVA mreža se sastoji od:
+Potpuna SAVVA mreža se sastoji od:
 
-1. **Backend server** - API server napisan u Go koji obavlja:
+1. **Backend Server** - API server zasnovan na Go-u koji obrađuje:
    - Autentifikaciju korisnika i sesije
-   - Skladištenje i preuzimanje postova
+   - Skladištenje i dohvat objava
    - Integraciju sa IPFS-om
    - Upravljanje bazom podataka
    - WebSocket veze
-   - Interakciju sa blokčejnom
+   - Interakciju sa blockchain-om
 
-2. **UI veb-sajt** - Frontend zasnovan na SolidJS koji obezbeđuje:
+2. **UI Website** - Frontend baziran na SolidJS koji obezbeđuje:
    - Korisnički interfejs za kreiranje i pregled sadržaja
    - Integraciju Web3 novčanika
-   - Upload fajlova na IPFS
-   - Interakcije sa pametnim ugovorima
-   - Podršku za više jezika
+   - Otpremanje fajlova na IPFS
+   - Interakcije sa smart kontraktima
+   - Višejezičnu podršku
 
-3. **Pametni ugovori** (opciono) - Ako pokrećete novu mrežu:
-   - SAVVA token ugovor
-   - Staking ugovor
-   - Ugovor za upravljanje (governance)
-   - Ugovor za Content NFT
-   - I drugi...
+3. Smart kontrakti:
+   - SAVVA Token kontrakt
+   - Staking kontrakt
+   - Governance kontrakt
+   - Content NFT kontrakt
+   - I ostali...
 
 ## Tok instalacije
 
@@ -39,34 +39,32 @@ Kompletna SAVVA mreža se sastoji od:
    ↓
 4. Configuration
    ↓
-5. Deployment
-   ↓
-6. Testing & Verification
+5. Testing & Verification
 ```
 
 ## Pregled zahteva
 
 - **Server**: Linux server (preporučeno Ubuntu 20.04+)
-- **Baza podataka**: PostgreSQL 14+ (ili upravljana usluga baze podataka)
-- **IPFS**: Lokalni IPFS čvor + eksterni pinning servis sa javnim gateway-jem
+- **Baza podataka**: PostgreSQL 14+ (ili upravljana baza podataka)
+- **IPFS**: Lokalni IPFS čvor + eksterni pinning servis sa javnim gateway-om
 - **Web server**: Nginx ili Apache
-- **Domen**: Ime domena sa SSL sertifikatom
-- **Blokčejn**: RPC pristup Ethereum-kompatibilnoj mreži (preporučen WSS)
+- **Domen**: Naziv domena sa SSL sertifikatom
+- **Blockchain**: RPC pristup Ethereum-kompatibilnoj mreži (preporučeno WSS)
 
-## Usklađenost sa licencom
+## Poštovanje licence
 
-**Važno**: Prilikom deploy-ovanja SAVVA, morate se pridržavati GPL-3.0 licence sa SAVVA dodatnim uslovima:
+**Važno**: Prilikom postavljanja SAVVA, morate se pridržavati GPL-3.0 licence sa SAVVA dodatnim uslovima:
 
-- Vi **morate** koristiti zvanične SAVVA blokčejn ugovore
-- Vi **ne smete** kreirati alternativne tokene
-- Vi **ne smete** menjati ili zamenjivati zvanične SAVVA ugovore
-- Vi **možete** uvesti dodatne ugovore u sistem
+- Morate koristiti oficijalne SAVVA blockchain kontrakte
+- **Ne smete** kreirati alternativne tokene
+- **Ne smete** menjati ili zamenjivati oficijalne SAVVA kontrakte
+- **Možete** uvesti dodatne kontrakte u sistem
 
-Pogledajte [UI licenca](../licenses/ui.md) i [Backend licenca](../licenses/backend.md) za detalje.
+Pogledajte [UI licencu](../licenses/ui.md) i [Backend licencu](../licenses/backend.md) za detalje.
 
 ## Podrška
 
 Ako naiđete na probleme:
-- Proverite [Troubleshooting](troubleshooting.md)
+- Proverite [Uputstva za rešavanje problema](troubleshooting.md)
 - Pregledajte backend i UI repozitorijume
 - Pridružite se SAVVA zajednici na https://savva.app

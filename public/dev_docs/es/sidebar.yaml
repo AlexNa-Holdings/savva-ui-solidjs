@@ -75,8 +75,6 @@ sections:
         file: installation/ui-setup.md
       - label: Configuración
         file: installation/configuration.md
-      - label: Despliegue
-        file: installation/deployment.md
       - label: Resolución de problemas
         file: installation/troubleshooting.md
   - title: Licencias

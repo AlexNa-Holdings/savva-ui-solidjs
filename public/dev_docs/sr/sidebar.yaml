@@ -75,8 +75,6 @@ sections:
         file: installation/ui-setup.md
       - label: Konfiguracija
         file: installation/configuration.md
-      - label: Postavljanje
-        file: installation/deployment.md
       - label: Otklanjanje problema
         file: installation/troubleshooting.md
   - title: Licence

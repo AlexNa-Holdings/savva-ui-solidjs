@@ -21,7 +21,7 @@ A complete SAVVA network consists of:
    - Smart contract interactions
    - Multi-language support
 
-3. **Smart Contracts** (Optional) - If launching a new network:
+3. **Smart Contracts** :
    - SAVVA Token contract
    - Staking contract
    - Governance contract
@@ -39,9 +39,7 @@ A complete SAVVA network consists of:
    ↓
 4. Configuration
    ↓
-5. Deployment
-   ↓
-6. Testing & Verification
+5. Testing & Verification
 ```
 
 ## Requirements Overview

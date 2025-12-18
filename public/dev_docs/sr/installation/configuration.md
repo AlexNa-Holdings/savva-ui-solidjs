@@ -17,16 +17,16 @@ SAVVA podržava integraciju Telegram bota za autentifikaciju korisnika i obaveš
 2. **Kreirajte novog bota**:
    - Pošaljite `/newbot` BotFather-u
    - Unesite prikazano ime za vašeg bota (npr. "SAVVA Network")
-   - Unesite korisničko ime za vašeg bota (mora završavati sa `bot`, npr. `savva_network_bot`)
+   - Unesite korisničko ime za vašeg bota (mora se završiti sa `bot`, npr. `savva_network_bot`)
 
-3. **Sačuvajte bot token**:
+3. **Sačuvajte token bota**:
    - BotFather će obezbediti API token kao: `7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-   - Čuvajte ovaj token sigurnim — svako ko ima ovaj token može kontrolisati vašeg bota
+   - Čuvajte ovaj token bezbednim — svako ko ima ovaj token može kontrolisati vašeg bota
 
-4. **Konfigurišite podešavanja bota** (opciono, ali preporučeno):
-   - Pošaljite `/setdescription` — dodajte opis vaše SAVVA instance
-   - Pošaljite `/setabouttext` — dodajte informacije prikazane u profilu bota
-   - Pošaljite `/setuserpic` — otpremite logo vaše mreže kao avatar bota
+4. **Konfigurišite podešavanja bota** (opciono ali preporučeno):
+   - Pošaljite `/setdescription` - dodajte opis vaše SAVVA instance
+   - Pošaljite `/setabouttext` - dodajte informacije prikazane u profilu bota
+   - Pošaljite `/setuserpic` - otpremite logo vaše mreže kao avatar bota
 
 ### Konfiguracija backend-a
 
@@ -40,7 +40,7 @@ telegram:
 
 ### Registracija webhook-a
 
-Nakon konfiguracije backend-a, potrebno je registrovati webhook URL kod Telegram-a. Time se Telegram-u govori gde da šalje ažuriranja kada korisnici komuniciraju sa vašim botom:
+Nakon konfiguracije backend-a, potrebno je registrovati webhook URL kod Telegrama. Ovo govori Telegramu gde da šalje ažuriranja kada korisnici komuniciraju sa vašim botom:
 
 ```bash
 curl -F "url=https://yourdomain/api/telegram-bot/yourdomain" \
@@ -48,8 +48,8 @@ curl -F "url=https://yourdomain/api/telegram-bot/yourdomain" \
 ```
 
 Zamenite:
-- `yourdomain` sa vašim stvarnim domenom (javlja se dva puta u URL-u)
-- `7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` sa tokenom vašeg bota
+- `yourdomain` vašim stvarnim domenom (pojavljuje se dva puta u URL-u)
+- `7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` vašim tokenom bota
 
 **Očekivani odgovor:**
 ```json
@@ -63,105 +63,17 @@ curl https://api.telegram.org/bot<your_bot_token>/getWebhookInfo
 
 ### Kako to radi
 
-Kada je konfigurisan, korisnici mogu:
+Kada je podešeno, korisnici mogu:
 - Povezati svoj Telegram nalog sa svojim SAVVA profilom
 - Primati obaveštenja o novim pratiocima, komentarima i pominjanjima
 - Koristiti Telegram kao dodatni metod autentifikacije
 
-### Bezbednosne napomene
+### Napomene o bezbednosti
 
-- Nikada ne delite javno token bota
+- Nikada ne delite javno token vašeg bota
 - Token bota u `savva.yml` treba imati ograničene dozvole fajla (`chmod 600`)
-- Razmotrite korišćenje promenljivih okruženja za token u produkciji:
+- Razmislite o korišćenju promenljivih okruženja za token u produkciji:
   ```yaml
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN}
   ```
-
-## Konfiguracija backend-a
-
-### Podešavanje baze podataka
-
-**Uskoro**: Optimizacija PostgreSQL-a za instance sa velikim saobraćajem
-
-### Konfiguracija IPFS-a
-
-**Uskoro**: Strategije pinovanja IPFS-a i optimizacija gateway-a
-
-### Keširanje
-
-**Uskoro**: Integracija Redis-a za keširanje sesija
-
-### Ograničavanje zahteva
-
-**Uskoro**: Konfiguracija ograničenja API zahteva
-
-## Konfiguracija UI-a
-
-### Brendiranje
-
-**Uskoro**: Kako prilagoditi boje, logo i brending
-
-### Feature flagovi
-
-**Uskoro**: Omogućavanje/onemogućavanje specifičnih funkcija
-
-### Analitika
-
-**Uskoro**: Integracija alata za analitiku
-
-## Konfiguracija blockchain-a
-
-### Prilagođene mreže
-
-**Uskoro**: Povezivanje sa prilagođenim EVM mrežama
-
-### Konfiguracija ugovora
-
-**Uskoro**: Napredna podešavanja za interakciju sa ugovorima
-
-## Optimizacija performansi
-
-### Podešavanje CDN-a
-
-**Uskoro**: Optimizacija isporuke resursa
-
-### Indeksi baze podataka
-
-**Uskoro**: Upiti za optimizaciju baze podataka
-
-### Strategije keširanja
-
-**Uskoro**: Keširanje na backend-u i frontend-u
-
-## Konfiguracija bezbednosti
-
-### SSL/TLS
-
-**Uskoro**: Napredna HTTPS konfiguracija
-
-### Bezbednost API-ja
-
-**Uskoro**: Konfiguracija JWT-a i najbolje prakse bezbednosti
-
-### CORS podešavanja
-
-**Uskoro**: Fino podešavanje CORS politika
-
-## Monitoring i logovanje
-
-### Upravljanje logovima
-
-**Uskoro**: Podesavanje centralizovanog logovanja
-
-### Monitoring performansi
-
-**Uskoro**: Integracija APM-a
-
-### Praćenje grešaka
-
-**Uskoro**: Integracija Sentry-ja ili sličnog
-
----
-
-*Ovo poglavlje je u izradi. Vratite se kasnije za ažuriranja.*

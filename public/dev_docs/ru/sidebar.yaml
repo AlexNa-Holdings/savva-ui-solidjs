@@ -75,8 +75,6 @@ sections:
         file: installation/ui-setup.md
       - label: Конфигурация
         file: installation/configuration.md
-      - label: Развертывание
-        file: installation/deployment.md
       - label: Устранение неполадок
         file: installation/troubleshooting.md
   - title: Лицензии
