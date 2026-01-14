@@ -696,6 +696,7 @@ export default {
   "post.comments": "Comments",
   "post.delete": "Delete Post",
   "post.edit": "Edit Post",
+  "post.encrypted.decryptFailed": "Couldn’t decrypt this post. You may not have the right key or the message is corrupted. Import the correct key or ask the sender to resend.",
   "post.encrypted.decrypting": "Decrypting...",
   "post.encrypted.description": "This post is encrypted for subscribers only",
   "post.encrypted.loginRequired": "Please connect your wallet to unlock",

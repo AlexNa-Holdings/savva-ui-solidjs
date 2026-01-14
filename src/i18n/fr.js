@@ -696,6 +696,7 @@ export default {
   "post.comments": "Commentaires",
   "post.delete": "Supprimer le Post",
   "post.edit": "Modifier le Post",
+  "post.encrypted.decryptFailed": "Impossible de déchiffrer cette publication. Il se peut que vous n'ayez pas la bonne clé ou que le message soit corrompu. Importez la bonne clé ou demandez à l'expéditeur de renvoyer la publication.",
   "post.encrypted.decrypting": "Déchiffrement en cours...",
   "post.encrypted.description": "Cette publication est chiffrée et réservée aux abonnés",
   "post.encrypted.loginRequired": "Veuillez connecter votre portefeuille pour déverrouiller",

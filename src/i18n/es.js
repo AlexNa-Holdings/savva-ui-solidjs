@@ -696,6 +696,7 @@ export default {
   "post.comments": "Comentarios",
   "post.delete": "Eliminar publicación",
   "post.edit": "Editar publicación",
+  "post.encrypted.decryptFailed": "No se pudo descifrar esta publicación. Puede que no tengas la clave correcta o que el mensaje esté dañado. Importa la clave correcta o pide al remitente que lo reenvíe.",
   "post.encrypted.decrypting": "Descifrando...",
   "post.encrypted.description": "Esta publicación está cifrada solo para suscriptores",
   "post.encrypted.loginRequired": "Conecta tu billetera para desbloquear",

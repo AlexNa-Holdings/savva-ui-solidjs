@@ -696,6 +696,7 @@ export default {
   "post.comments": "Komentari",
   "post.delete": "Obriši Post",
   "post.edit": "Uredi Post",
+  "post.encrypted.decryptFailed": "Nije moguće dešifrovati ovu objavu. Možda nemate odgovarajući ključ ili je poruka oštećena. Uvezite ispravan ključ ili zamolite pošiljaoca da ponovo pošalje.",
   "post.encrypted.decrypting": "Dešifrovanje...",
   "post.encrypted.description": "Ova objava je šifrovana samo za pretplatnike",
   "post.encrypted.loginRequired": "Povežite svoj novčanik da biste otključali",
