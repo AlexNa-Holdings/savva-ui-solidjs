@@ -59,11 +59,19 @@ function isFromEncryptedPost(cidPath) {
  * @returns {Promise<{res: Response, url: string, gateway: string, decrypted: boolean}>}
  */
 export async function fetchBestWithDecryption(app, ipfsPath, options = {}) {
+  console.log("[encryptedFetch] fetchBestWithDecryption called", {
+    ipfsPath,
+    hasContext: !!currentEncryptedPostContext,
+    contextDataCid: currentEncryptedPostContext?.dataCid,
+    hasKey: !!currentEncryptedPostContext?.postSecretKey,
+  });
+
   // First, fetch the content normally
   const result = await ipfs.fetchBest(app, ipfsPath, options);
 
   // Check if this is from an encrypted post
   if (!isFromEncryptedPost(ipfsPath)) {
+    console.log("[encryptedFetch] Not from encrypted post, returning as-is");
     return { ...result, decrypted: false };
   }
 
@@ -73,21 +81,25 @@ export async function fetchBestWithDecryption(app, ipfsPath, options = {}) {
     return { ...result, decrypted: false };
   }
 
-  // Check if Service Worker is active - if so, it already decrypted the content
-  // So we should NOT try to decrypt again (would fail with "authentication failed")
-  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-    // Service Worker is active and controlling the page
-    // It has already decrypted the content, so return as-is
-    return { ...result, decrypted: true };
-  }
+  console.log("[encryptedFetch] Will attempt decryption for", ipfsPath);
+
+  // NOTE: We used to check for Service Worker and assume it decrypted the content.
+  // However, this caused race conditions where content was fetched before the SW
+  // received the encryption context. Now we ALWAYS do client-side decryption
+  // when we have the postSecretKey context set. The SW may have also decrypted,
+  // but the second decryption will fail gracefully and we'll return the original.
 
   // Service Worker not available - use blob-based fallback decryption
   // Get the encrypted data as ArrayBuffer
   const encryptedData = await result.res.arrayBuffer();
 
   try {
+    console.log("[encryptedFetch] Encrypted data size:", encryptedData.byteLength, "bytes");
+
     // Decrypt the data
     const decryptedData = decryptFileData(encryptedData, postSecretKey);
+
+    console.log("[encryptedFetch] Decryption successful, decrypted size:", decryptedData.byteLength, "bytes");
 
     // Create a new Response with decrypted data
     const decryptedBlob = new Blob([decryptedData]);
@@ -104,6 +116,11 @@ export async function fetchBestWithDecryption(app, ipfsPath, options = {}) {
     };
   } catch (error) {
     console.error("[encryptedFetch] Failed to decrypt content:", error);
+    console.error("[encryptedFetch] Encrypted data first 100 bytes (hex):",
+      Array.from(new Uint8Array(encryptedData.slice(0, 100)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join(' ')
+    );
     // Recreate response from the encrypted data since we already consumed it
     const encryptedBlob = new Blob([encryptedData]);
     const fallbackResponse = new Response(encryptedBlob, {

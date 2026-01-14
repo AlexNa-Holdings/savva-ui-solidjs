@@ -15,6 +15,7 @@ import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 import { resolvePostCidPath, getPostContentBaseCid } from "../../ipfs/utils.js";
 import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey } from "../crypto/postDecryption.js";
 import { setEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
+import { READING_KEY_UPDATED_EVENT } from "../crypto/readingKeyStorage.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
 import { loadNsfwPreference } from "../preferences/storage.js";
 
@@ -60,6 +61,55 @@ export default function PostCard(props) {
   const disableContextMenu = () => !!(props.noContextMenu ?? props["no-context-menu"]);
 
   const [revealed, setRevealed] = createSignal(false);
+
+  // Signal to trigger re-check of decryption capability
+  const [keyUpdateTrigger, setKeyUpdateTrigger] = createSignal(0);
+
+  // Listen for reading key updates to auto-decrypt when a new key is stored
+  onMount(() => {
+    const handleKeyUpdate = (event) => {
+      const { address, publicKey } = event.detail || {};
+      const addr = app.authorizedUser()?.address; // Use app directly since userAddress memo may not be defined yet
+
+      console.log("[PostCard] Received key update event:", {
+        eventAddress: address,
+        eventPublicKey: publicKey,
+        myAddress: addr,
+        postId: base()?.savva_cid || base()?.short_cid,
+      });
+
+      if (!addr) {
+        console.log("[PostCard] No user address, ignoring event");
+        return;
+      }
+
+      // Check if this update is relevant to us (same user)
+      if (address && address.toLowerCase() === addr.toLowerCase()) {
+        const contentData = content();
+        const encData = contentData?.encryption;
+        const ourPublicKey = encData?.reading_public_key?.toLowerCase();
+
+        console.log("[PostCard] Checking public key match:", {
+          ourPublicKey,
+          eventPublicKey: publicKey,
+          isEncrypted: !!contentData?.encrypted,
+          hasEncData: !!encData,
+          contentData: contentData, // Full content for debugging
+        });
+
+        // If post is encrypted and public key matches (or no publicKey filter), trigger re-check
+        if (contentData?.encrypted && (ourPublicKey === publicKey || !publicKey || !ourPublicKey)) {
+          console.log("[PostCard] Encrypted post, triggering re-check for post:", base()?.savva_cid || base()?.short_cid);
+          setKeyUpdateTrigger(prev => prev + 1);
+        }
+      }
+    };
+
+    window.addEventListener(READING_KEY_UPDATED_EVENT, handleKeyUpdate);
+    onCleanup(() => {
+      window.removeEventListener(READING_KEY_UPDATED_EVENT, handleKeyUpdate);
+    });
+  });
 
   // Cleanup encryption context on unmount
   onCleanup(() => {
@@ -120,27 +170,69 @@ export default function PostCard(props) {
   const userAddress = createMemo(() => app.authorizedUser()?.address);
 
   const canDecrypt = createMemo(() => {
-    if (!isEncrypted()) return false;
+    // React to key update events
+    const trigger = keyUpdateTrigger();
+    const postId = base()?.savva_cid || base()?.short_cid;
+
+    const encrypted = isEncrypted();
     const addr = userAddress();
-    if (!addr) return false;
     const encData = content()?.encryption;
+
+    console.log("[PostCard] canDecrypt memo evaluating:", {
+      postId,
+      trigger,
+      isEncrypted: encrypted,
+      hasAddr: !!addr,
+      hasEncData: !!encData,
+      readingPublicKey: encData?.reading_public_key,
+      readingKeyNonce: encData?.reading_key_nonce,
+    });
+
+    if (!encrypted) return false;
+    if (!addr) return false;
     if (!encData) return false;
-    return canDecryptPost(addr, encData);
+
+    const result = canDecryptPost(addr, encData);
+    console.log("[PostCard] canDecrypt result for", postId, ":", result);
+    return result;
   });
 
   // Auto-decrypt if we have the key stored
   createEffect(async () => {
-    if (!isEncrypted() || base()?._decrypted) return;
-    if (!canDecrypt()) return;
+    const postId = base()?.savva_cid || base()?.short_cid;
+
+    console.log("[PostCard] Auto-decrypt effect triggered:", {
+      postId,
+      isEncrypted: isEncrypted(),
+      isDecrypted: base()?._decrypted,
+      canDecrypt: canDecrypt(),
+      keyUpdateTrigger: keyUpdateTrigger(),
+    });
+
+    if (!isEncrypted() || base()?._decrypted) {
+      console.log("[PostCard] Skipping: not encrypted or already decrypted", { postId });
+      return;
+    }
+    if (!canDecrypt()) {
+      console.log("[PostCard] Skipping: canDecrypt is false", { postId });
+      return;
+    }
+
+    console.log("[PostCard] Starting auto-decrypt for post:", postId);
 
     try {
       const addr = userAddress();
       const originalBase = base();
-      const content = originalBase?.savva_content || originalBase?.content;
-      const encryptionData = content?.encryption;
+      const postContent = originalBase?.savva_content || originalBase?.content;
+      const encryptionData = postContent?.encryption;
 
-      // Get the post secret key for decryption
-      const readingKey = await getReadingSecretKey(addr, encryptionData.reading_key_nonce);
+      // Get the post secret key for decryption (pass publicKey for cross-post key lookup)
+      const readingKey = await getReadingSecretKey(
+        addr,
+        encryptionData.reading_key_nonce,
+        false, // forceRecover
+        encryptionData.reading_public_key // publicKey for lookup
+      );
       if (!readingKey) {
         console.error("[PostCard] Failed to get reading secret key");
         return;
@@ -170,8 +262,8 @@ export default function PostCard(props) {
         console.log("[PostCard] Set encryption context for:", {
           cid: originalBase?.savva_cid || originalBase?.short_cid,
           dataCid,
-          hasThumbnail: !!content?.thumbnail,
-          thumbnailPath: content?.thumbnail,
+          hasThumbnail: !!postContent?.thumbnail,
+          thumbnailPath: postContent?.thumbnail,
         });
       }
 

@@ -1,7 +1,7 @@
 // src/x/crypto/postDecryption.js
 
 import { decryptPostKey, decryptText } from "./postEncryption.js";
-import { findStoredSecretKey } from "./readingKeyStorage.js";
+import { findStoredSecretKey, findStoredSecretKeyByPublicKey } from "./readingKeyStorage.js";
 import { recoverReadingKey } from "./readingKey.js";
 import { dbg } from "../../utils/debug.js";
 
@@ -56,6 +56,7 @@ export function isUserInRecipientsList(userAddress, encryptionData) {
 
 /**
  * Check if we can decrypt a post (have the reading key stored)
+ * Checks both by nonce (exact match) and by public key (same key, different nonce)
  * @param {string} userAddress - Current user's address
  * @param {object} encryptionData - Post encryption data from API
  * @returns {boolean} - True if we have the key stored
@@ -68,35 +69,58 @@ export function canDecryptPost(userAddress, encryptionData) {
     return false;
   }
 
+  // First try exact match by nonce
   const readingKeyNonce = encryptionData.reading_key_nonce;
-  console.log("[canDecryptPost] Reading key nonce:", readingKeyNonce);
-
-  if (!readingKeyNonce) {
-    console.log("[canDecryptPost] No reading_key_nonce in encryptionData");
-    return false;
+  if (readingKeyNonce) {
+    const secretKey = findStoredSecretKey(userAddress, readingKeyNonce);
+    if (secretKey) {
+      console.log("[canDecryptPost] Found stored key by nonce");
+      return true;
+    }
   }
 
-  const secretKey = findStoredSecretKey(userAddress, readingKeyNonce);
-  console.log("[canDecryptPost] Found stored key?", !!secretKey);
+  // Then try match by public key (same key used across different posts)
+  const readingPublicKey = encryptionData.reading_public_key;
+  if (readingPublicKey) {
+    const secretKey = findStoredSecretKeyByPublicKey(userAddress, readingPublicKey);
+    if (secretKey) {
+      console.log("[canDecryptPost] Found stored key by public key");
+      return true;
+    }
+  }
 
-  return !!secretKey;
+  console.log("[canDecryptPost] No stored key found");
+  return false;
 }
 
 /**
- * Get the reading secret key (from storage or by recovering it)
+ * Get the reading key (from storage or by recovering it)
  * @param {string} userAddress - Current user's address
  * @param {string} nonce - Reading key nonce
  * @param {boolean} forceRecover - Force key recovery even if stored
- * @returns {Promise<string|null>} - Secret key (hex) or null if failed
+ * @param {string} publicKey - Optional public key for lookup (allows using same key across posts)
+ * @param {boolean} returnFullKey - If true, returns { secretKey, publicKey, nonce } object instead of just secretKey
+ * @returns {Promise<string|object|null>} - Secret key (hex), full key object, or null if failed
  */
-export async function getReadingSecretKey(userAddress, nonce, forceRecover = false) {
+export async function getReadingSecretKey(userAddress, nonce, forceRecover = false, publicKey = null, returnFullKey = false) {
   if (!userAddress || !nonce) return null;
 
-  dbg.log("PostDecrypt", "getReadingSecretKey:start", { userAddress, nonce, forceRecover });
+  dbg.log("PostDecrypt", "getReadingSecretKey:start", { userAddress, nonce, forceRecover, publicKey, returnFullKey });
 
   // Try to find stored key first
   if (!forceRecover) {
-    const storedKey = findStoredSecretKey(userAddress, nonce);
+    // First try exact match by nonce
+    let storedKey = findStoredSecretKey(userAddress, nonce);
+    let storedPublicKey = publicKey; // Use provided publicKey if available
+
+    // If not found and we have a public key, try matching by public key
+    if (!storedKey && publicKey) {
+      storedKey = findStoredSecretKeyByPublicKey(userAddress, publicKey);
+      if (storedKey) {
+        console.log('[READING_KEY] Retrieved from storage by public key match');
+      }
+    }
+
     if (storedKey) {
       console.log('[READING_KEY] Retrieved from storage:');
       console.log('  - address:', userAddress);
@@ -104,6 +128,10 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
       console.log('  - nonce:', nonce);
 
       dbg.log("PostDecrypt", "getReadingSecretKey:stored-key", { userAddress, nonce });
+
+      if (returnFullKey) {
+        return { secretKey: storedKey, publicKey: storedPublicKey, nonce };
+      }
       return storedKey;
     }
   }
@@ -123,7 +151,12 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
       userAddress,
       nonce,
       hasSecret: !!recovered?.secretKey,
+      hasPublic: !!recovered?.publicKey,
     });
+
+    if (returnFullKey) {
+      return { secretKey: recovered.secretKey, publicKey: recovered.publicKey, nonce };
+    }
     return recovered.secretKey;
   } catch (error) {
     console.error("Failed to recover reading key:", error);
@@ -283,7 +316,12 @@ export async function decryptPost(post, userAddress, readingSecretKey = null) {
   // Get reading secret key if not provided
   let readingKey = readingSecretKey;
   if (!readingKey) {
-    readingKey = await getReadingSecretKey(userAddress, encryptionData.reading_key_nonce);
+    readingKey = await getReadingSecretKey(
+      userAddress,
+      encryptionData.reading_key_nonce,
+      false, // forceRecover
+      encryptionData.reading_public_key // publicKey for lookup
+    );
     if (!readingKey) {
       throw new Error("Failed to get reading secret key");
     }

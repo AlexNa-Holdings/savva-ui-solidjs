@@ -19,6 +19,26 @@
 const STORAGE_KEY = "savva_reading_keys";
 
 /**
+ * Event name for reading key updates
+ * Components can listen to this event to know when keys change
+ */
+export const READING_KEY_UPDATED_EVENT = "savva-reading-key-updated";
+
+/**
+ * Dispatch event when reading keys are updated
+ * @param {string} address - The address whose keys were updated
+ * @param {string} publicKey - The public key that was stored
+ */
+function dispatchKeyUpdateEvent(address, publicKey = null) {
+  if (typeof window !== 'undefined') {
+    const event = new CustomEvent(READING_KEY_UPDATED_EVENT, {
+      detail: { address: address?.toLowerCase(), publicKey: publicKey?.toLowerCase() }
+    });
+    window.dispatchEvent(event);
+  }
+}
+
+/**
  * Get all stored reading keys for a specific address
  * @param {string} address - Ethereum address (will be normalized to lowercase)
  * @returns {Array} - Array of stored keys [{ nonce, secretKey, publicKey, timestamp }, ...]
@@ -43,8 +63,22 @@ export function getStoredReadingKeys(address) {
  * @returns {boolean} - True if stored successfully
  */
 export function storeReadingKey(address, keyData) {
+  console.log("[storeReadingKey] Called with:", {
+    address,
+    hasKeyData: !!keyData,
+    nonce: keyData?.nonce,
+    hasSecretKey: !!keyData?.secretKey,
+    publicKey: keyData?.publicKey,
+  });
+
   if (!address || !keyData || !keyData.nonce || !keyData.secretKey || !keyData.publicKey) {
-    console.error("Invalid key data for storage");
+    console.error("[storeReadingKey] Invalid key data for storage:", {
+      hasAddress: !!address,
+      hasKeyData: !!keyData,
+      hasNonce: !!keyData?.nonce,
+      hasSecretKey: !!keyData?.secretKey,
+      hasPublicKey: !!keyData?.publicKey,
+    });
     return false;
   }
 
@@ -75,6 +109,15 @@ export function storeReadingKey(address, keyData) {
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(allKeys));
+
+    // Notify other components that a key was stored (pass publicKey for matching)
+    console.log("[readingKeyStorage] Key stored, dispatching event:", {
+      address: normalized,
+      publicKey: keyData.publicKey,
+      nonce: keyData.nonce,
+    });
+    dispatchKeyUpdateEvent(address, keyData.publicKey);
+
     return true;
   } catch (error) {
     console.error("Error storing reading key:", error);
@@ -93,6 +136,31 @@ export function findStoredSecretKey(address, nonce) {
 
   const keys = getStoredReadingKeys(address);
   const found = keys.find(k => k.nonce === nonce);
+  return found ? found.secretKey : null;
+}
+
+/**
+ * Find a stored secret key by public key
+ * This allows decrypting posts that use the same public reading key
+ * even if the nonce is different
+ * @param {string} address - Ethereum address
+ * @param {string} publicKey - The public key to search for
+ * @returns {string|null} - Secret key (hex) or null if not found
+ */
+export function findStoredSecretKeyByPublicKey(address, publicKey) {
+  if (!address || !publicKey) return null;
+
+  const keys = getStoredReadingKeys(address);
+  const normalizedPubKey = publicKey.toLowerCase();
+  const found = keys.find(k => k.publicKey?.toLowerCase() === normalizedPubKey);
+
+  console.log("[findStoredSecretKeyByPublicKey]", {
+    address,
+    searchPublicKey: normalizedPubKey,
+    storedKeys: keys.map(k => ({ publicKey: k.publicKey, nonce: k.nonce })),
+    found: !!found,
+  });
+
   return found ? found.secretKey : null;
 }
 

@@ -267,6 +267,10 @@ export default function PostPage() {
   const userAddress = createMemo(() => app.authorizedUser?.()?.address || "");
 
   const content = createMemo(() => post()?.savva_content || post()?.content);
+  // Note: isEncryptedPost checks if the post WAS encrypted (regardless of decryption state)
+  // This is used for content fetching logic
+  const isEncryptedPost = createMemo(() => !!content()?.encrypted);
+  // isEncrypted checks if we still need to show the "locked" overlay
   const isEncrypted = createMemo(() => !!(content()?.encrypted && !post()?._decrypted));
   const encryptionData = createMemo(() => content()?.encryption);
 
@@ -295,22 +299,32 @@ export default function PostPage() {
   const [isDecrypting, setIsDecrypting] = createSignal(false);
   const [decryptError, setDecryptError] = createSignal(null);
 
-  // Set/clear encrypted post context for automatic IPFS decryption
+  // Track if encryption context has been set (for timing synchronization)
+  const [encryptionContextReady, setEncryptionContextReady] = createSignal(false);
+
+  // Handle encryption context updates and Service Worker sync
+  // Note: Initial context is set synchronously in decrypt handlers to avoid race conditions
   createEffect(() => {
     const key = postSecretKey();
     const dataCid = details()?.dataCidForContent;
 
     if (key && dataCid) {
-      // Set context for both blob-based decryption (fallback) and Service Worker
-      setEncryptedPostContext({ dataCid, postSecretKey: key });
+      // Ensure context is set (may already be set by decrypt handlers)
+      if (!encryptionContextReady()) {
+        setEncryptedPostContext({ dataCid, postSecretKey: key });
+        setEncryptionContextReady(true);
+        dbg.log("PostPage", "Encryption context set via effect", { dataCid, hasKey: !!key });
+      }
 
-      // Also set context in Service Worker for streaming decryption
+      // Also set context in Service Worker for streaming decryption (async, can fail)
       swManager.setEncryptionContext(dataCid, key).catch(err => {
         console.warn('[PostPage] Failed to set SW encryption context:', err);
         // Fallback to blob-based decryption will still work
       });
     } else {
+      // Clear context when key or dataCid is removed
       clearEncryptedPostContext();
+      setEncryptionContextReady(false);
       swManager.clearAllContexts().catch(console.error);
     }
   });
@@ -333,19 +347,56 @@ export default function PostPage() {
       setIsDecrypting(true);
       const userAddr = userAddress();
 
-      // Decrypt the post (metadata)
-      const decrypted = await decryptPost(post(), userAddr);
-      setPost(decrypted);
+      // Get the reading key from storage (pass publicKey for cross-post key lookup)
+      dbg.log("PostPage", "Auto-decrypt: getting reading key from storage...");
+      const readingKey = await getReadingSecretKey(
+        userAddr,
+        encData.reading_key_nonce,
+        false, // forceRecover
+        encData.reading_public_key // publicKey for lookup
+      );
+      if (!readingKey) {
+        dbg.log("PostPage", "Auto-decrypt: no stored reading key, skipping auto-decrypt");
+        return; // No stored key, user will need to manually decrypt
+      }
+      dbg.log("PostPage", "Auto-decrypt: got reading key from storage");
 
       // Get the post secret key for content decryption
-      const readingKey = await getReadingSecretKey(userAddr, encData.reading_key_nonce);
+      dbg.log("PostPage", "Auto-decrypt: decrypting post encryption key...");
       const postKey = decryptPostEncryptionKey(encData, readingKey);
-      setPostSecretKey(postKey);
+      if (!postKey) {
+        throw new Error("Failed to decrypt post encryption key");
+      }
+      dbg.log("PostPage", "Auto-decrypt: got postKey", { hasPostKey: !!postKey });
 
-      dbg.log("PostPage", "Auto-decrypted post", { hasPostKey: !!postKey });
+      // Decrypt the post (metadata) to verify it works
+      dbg.log("PostPage", "Auto-decrypt: decrypting post metadata...");
+      const decrypted = await decryptPost(post(), userAddr);
+      if (!decrypted?._decrypted) {
+        throw new Error("Failed to decrypt post metadata");
+      }
+      dbg.log("PostPage", "Auto-decrypt: decrypted post metadata", { _decrypted: decrypted?._decrypted });
+
+      // Set encryption context BEFORE updating signals to avoid race conditions
+      const dataCid = details()?.dataCidForContent;
+      if (dataCid && postKey) {
+        setEncryptedPostContext({ dataCid, postSecretKey: postKey });
+        setEncryptionContextReady(true);
+        dbg.log("PostPage", "Auto-decrypt: set encryption context", { dataCid, hasKey: true });
+      }
+
+      // Now set state after context is ready
+      setPostSecretKey(postKey);
+      setPost(decrypted);
+
+      dbg.log("PostPage", "Auto-decrypted post", { hasPostKey: !!postKey, _decrypted: !!decrypted?._decrypted });
     } catch (error) {
       dbg.error("PostPage", "Auto-decrypt failed", { error });
       setDecryptError(error.message);
+      // Show error as toast for auto-decrypt failures too
+      app.pushToast?.({ type: "error", message: t("post.encrypted.decryptFailed") || `Auto-decryption failed: ${error.message}` });
+      // Clear any partially set state
+      setPostSecretKey(null);
     } finally {
       setIsDecrypting(false);
     }
@@ -364,33 +415,80 @@ export default function PostPage() {
       setDecryptError(null);
       const userAddr = userAddress();
 
-      // Get reading secret key (will prompt for signature)
-      const readingKey = await getReadingSecretKey(userAddr, encData.reading_key_nonce);
-      if (!readingKey) {
+      // Get reading key with full key data (will prompt for signature)
+      // Use returnFullKey=true to get the publicKey from the recovery process
+      // since encData.reading_public_key may not be provided by the API
+      dbg.log("PostPage", "Manual decrypt: getting reading key...");
+      const readingKeyData = await getReadingSecretKey(
+        userAddr,
+        encData.reading_key_nonce,
+        false, // forceRecover
+        encData.reading_public_key, // publicKey hint (may be null)
+        true // returnFullKey - get { secretKey, publicKey, nonce }
+      );
+      if (!readingKeyData || !readingKeyData.secretKey) {
         throw new Error("Failed to get reading key");
       }
-
-      // Decrypt the post
-      const decrypted = await decryptPost(post(), userAddr, readingKey);
-      setPost(decrypted);
+      dbg.log("PostPage", "Manual decrypt: got reading key", {
+        hasSecretKey: !!readingKeyData.secretKey,
+        hasPublicKey: !!readingKeyData.publicKey,
+      });
 
       // Get post secret key for content decryption
-      const postKey = decryptPostEncryptionKey(encData, readingKey);
-      setPostSecretKey(postKey);
+      dbg.log("PostPage", "Manual decrypt: decrypting post encryption key...");
+      const postKey = decryptPostEncryptionKey(encData, readingKeyData.secretKey);
+      if (!postKey) {
+        throw new Error("Failed to decrypt post encryption key");
+      }
+      dbg.log("PostPage", "Manual decrypt: got postKey", { hasPostKey: !!postKey });
 
-      dbg.log("PostPage", "Manual decrypt successful");
+      // Decrypt the post metadata FIRST to verify it works
+      dbg.log("PostPage", "Manual decrypt: decrypting post metadata...");
+      const decrypted = await decryptPost(post(), userAddr, readingKeyData.secretKey);
+      if (!decrypted?._decrypted) {
+        throw new Error("Failed to decrypt post metadata");
+      }
+      dbg.log("PostPage", "Manual decrypt: decrypted post metadata", { _decrypted: decrypted?._decrypted });
+
+      // Set encryption context BEFORE updating signals to avoid race conditions
+      const dataCid = details()?.dataCidForContent;
+      if (dataCid && postKey) {
+        setEncryptedPostContext({ dataCid, postSecretKey: postKey });
+        setEncryptionContextReady(true);
+        dbg.log("PostPage", "Manual decrypt: set encryption context", { dataCid, hasKey: true });
+      }
+
+      // Now set state after context is ready
+      setPostSecretKey(postKey);
+      setPost(decrypted);
+
+      dbg.log("PostPage", "Manual decrypt successful", { postSecretKey: !!postKey, _decrypted: !!decrypted?._decrypted });
+
+      // Log key data for debugging
+      console.log("[PostPage] Key data for storage:", {
+        nonce: readingKeyData.nonce,
+        publicKey: readingKeyData.publicKey,
+        hasSecretKey: !!readingKeyData.secretKey,
+        encDataPublicKey: encData.reading_public_key,
+      });
 
       // Prompt user to store the secret key
+      // Use publicKey from readingKeyData (derived from recovery) rather than encData
+      // since encData.reading_public_key may not be provided by the API
       setPendingKeyToStore({
-        nonce: encData.reading_key_nonce,
-        publicKey: encData.reading_public_key,
-        secretKey: readingKey,
+        nonce: readingKeyData.nonce,
+        publicKey: readingKeyData.publicKey,
+        secretKey: readingKeyData.secretKey,
         address: userAddr,
       });
       setShowStoreKeyModal(true);
     } catch (error) {
       dbg.error("PostPage", "Manual decrypt failed", { error });
       setDecryptError(error.message);
+      // Show error as toast
+      app.pushToast?.({ type: "error", message: t("post.encrypted.decryptFailed") || `Decryption failed: ${error.message}` });
+      // Clear any partially set state
+      setPostSecretKey(null);
     } finally {
       setIsDecrypting(false);
     }
@@ -399,11 +497,26 @@ export default function PostPage() {
   const handleConfirmStoreKey = () => {
     const pending = pendingKeyToStore();
     if (pending) {
-      storeReadingKey(pending.address, {
+      console.log("[PostPage] Storing reading key:", {
+        address: pending.address,
+        nonce: pending.nonce,
+        publicKey: pending.publicKey,
+        hasSecretKey: !!pending.secretKey,
+      });
+
+      const success = storeReadingKey(pending.address, {
         nonce: pending.nonce,
         publicKey: pending.publicKey,
         secretKey: pending.secretKey,
       });
+
+      console.log("[PostPage] storeReadingKey result:", success);
+
+      if (success) {
+        app.pushToast?.({ type: "success", message: "Reading key stored in browser" });
+      } else {
+        app.pushToast?.({ type: "error", message: "Failed to store reading key" });
+      }
     }
 
     setShowStoreKeyModal(false);
@@ -419,9 +532,31 @@ export default function PostPage() {
     return isEncrypted() && !post()?._decrypted && !isDecrypting();
   });
 
+  // For encrypted posts, wait until we have the decryption key AND context is set before fetching content
+  const readyToFetchContent = createMemo(() => {
+    const d = details();
+    if (!d) return false;
+    // If post was encrypted, we need the key AND the encryption context to be ready
+    if (isEncryptedPost()) {
+      if (!postSecretKey()) {
+        dbg.log("PostPage", "readyToFetchContent: waiting for postSecretKey", { isEncryptedPost: isEncryptedPost(), hasKey: false });
+        return false;
+      }
+      if (!encryptionContextReady()) {
+        dbg.log("PostPage", "readyToFetchContent: waiting for encryption context", { isEncryptedPost: isEncryptedPost(), hasKey: true, contextReady: false });
+        return false;
+      }
+    }
+    dbg.log("PostPage", "readyToFetchContent: ready", { isEncryptedPost: isEncryptedPost(), hasKey: !!postSecretKey(), contextReady: encryptionContextReady() });
+    return true;
+  });
+
   const [mainContent] = createResource(
-    () => ({ details: details(), lang: postLang(), chapterIndex: selectedChapterIndex(), postSecretKey: postSecretKey() }),
-    ({ details, lang, chapterIndex, postSecretKey }) => fetchMainContent(details, app, lang, chapterIndex, postSecretKey)
+    () => {
+      if (!readyToFetchContent()) return null;
+      return { details: details(), lang: postLang(), chapterIndex: selectedChapterIndex(), postSecretKey: postSecretKey() };
+    },
+    (params) => params ? fetchMainContent(params.details, app, params.lang, params.chapterIndex, params.postSecretKey) : ""
   );
 
   // normalize to short CID

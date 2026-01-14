@@ -41,7 +41,7 @@ export default function useSearch(querySignal) {
     setLoadingUsers(true);
     try {
       const method = app.wsMethod?.("search-user");
-      const res = method ? await method({ query: q, limit: U_LIMIT, offset: uOffset, domains: [app.selectedDomainName?.()] }) : [];
+      const res = method ? await method({ query: q, limit: U_LIMIT, offset: uOffset, domain: app.selectedDomainName?.() }) : [];
       if (rid !== reqId) return;
       const list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
       setUsers((prev) => (append ? [...prev, ...list] : list));
