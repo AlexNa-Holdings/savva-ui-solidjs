@@ -394,12 +394,25 @@ export default function StepUploadDescriptor(props) {
     // Add encryption section if needed
     if (needsEncryption && postEncryptionKey && recipients.length > 0) {
       L("Building encryption section");
+
+      // Build encryption options
+      const encryptionOptions = {};
+
+      // For subscriber-only posts, add access_type and min_weekly_pay
+      if (params.audience === "subscribers") {
+        encryptionOptions.accessType = "for_subscribers_only";
+        if (params.minWeeklyPaymentWei && params.minWeeklyPaymentWei > 0n) {
+          encryptionOptions.minWeeklyPay = params.minWeeklyPaymentWei.toString();
+        }
+      }
+
       descriptor.encryption = buildEncryptionSection(
         postEncryptionKey.publicKey,
         recipients,
-        postEncryptionKey.secretKey
+        postEncryptionKey.secretKey,
+        encryptionOptions
       );
-      L(`Encryption section added with ${recipients.length} recipients`);
+      L(`Encryption section added with ${recipients.length} recipients`, { encryptionOptions });
     }
 
     L("descriptor composed", { languages: langs, gateways, encrypted: needsEncryption, recipients: recipients.length });

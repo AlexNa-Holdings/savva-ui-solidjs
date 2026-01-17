@@ -1,20 +1,20 @@
 // src/x/ui/StakerLevelIcon.jsx
 import { createMemo, Show, splitProps } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
-import { stakerLevelIconFor } from "./icons/FishIcons.jsx";
 import { formatUnits } from "viem";
 
+// Staking levels matching iOS app - sorted ascending by minTokens
 const STAKER_LEVELS = [
-    { min: 0, key: "guest" }, 
-    { min: 5000, key: "clam" }, 
-    { min: 10000, key: "shrimp" }, 
-    { min: 20000, key: "seahorse" }, 
-    { min: 50000, key: "fish" }, 
-    { min: 100000, key: "dolphin" }, 
-    { min: 200000, key: "shark" }, 
-    { min: 500000, key: "stingray" }, 
-    { min: 1000000, key: "orca" }, 
-    { min: 10000000, key: "whale" }, 
+    { min: 0, key: "guest", emoji: "" },
+    { min: 5_000, key: "plankton", emoji: "🦠" },
+    { min: 10_000, key: "shrimp", emoji: "🦐" },
+    { min: 20_000, key: "crab", emoji: "🦀" },
+    { min: 50_000, key: "octopus", emoji: "🐙" },
+    { min: 100_000, key: "fish", emoji: "🐟" },
+    { min: 200_000, key: "dolphin", emoji: "🐬" },
+    { min: 500_000, key: "shark", emoji: "🦈" },
+    { min: 1_000_000, key: "whale", emoji: "🐋" },
+    { min: 10_000_000, key: "humpback", emoji: "🐳" },
 ];
 
 function getStakerLevel(levels, stakedAmount) {
@@ -54,24 +54,19 @@ export default function StakerLevelIcon(props) {
         return name;
     });
 
-    const IconComponent = createMemo(() => {
-        const key = level()?.key;
-        return key ? stakerLevelIconFor(key) : null;
-    });
+    const emoji = createMemo(() => level()?.emoji || "");
 
     return (
-        <Show when={IconComponent()}>
-            {(getIcon) => {
-                const Icon = getIcon();
-                return (
-                    <span title={tooltipText()}>
-                        <Icon
-                            {...rest}
-                            class={local.class || "w-4 h-4 text-[hsl(var(--muted-foreground))]"}
-                        />
-                    </span>
-                );
-            }}
+        <Show when={emoji()}>
+            <span
+                title={tooltipText()}
+                class={local.class || "text-base"}
+                role="img"
+                aria-label={tooltipText()}
+                {...rest}
+            >
+                {emoji()}
+            </span>
         </Show>
     );
 }

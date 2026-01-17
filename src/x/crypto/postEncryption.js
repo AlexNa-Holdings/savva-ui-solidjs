@@ -231,15 +231,28 @@ export function encryptDescriptorLocale(locale, postSecretKeyHex) {
  * @param {string} postPublicKeyHex - Post's X25519 public key (hex)
  * @param {Array<object>} recipients - Array of { address, publicKey, scheme, nonce }
  * @param {string} postSecretKeyHex - Post's secret key for encrypting
+ * @param {object} options - Additional options
+ * @param {string} options.accessType - Access type (e.g., "for_subscribers_only")
+ * @param {string} options.minWeeklyPay - Minimum weekly payment in wei as string
  * @returns {object} - Encryption section for descriptor
  */
-export function buildEncryptionSection(postPublicKeyHex, recipients, postSecretKeyHex) {
+export function buildEncryptionSection(postPublicKeyHex, recipients, postSecretKeyHex, options = {}) {
   const encryption = {
     type: POST_ENCRYPTION_TYPE,
     key_exchange_alg: "x25519",
     key_exchange_pub_key: postPublicKeyHex,
     recipients: {},
   };
+
+  // Add access_type if provided
+  if (options.accessType) {
+    encryption.access_type = options.accessType;
+  }
+
+  // Add min_weekly_pay if provided
+  if (options.minWeeklyPay) {
+    encryption.min_weekly_pay = options.minWeeklyPay;
+  }
 
   // Encrypt post key for each recipient
   recipients.forEach(recipient => {
