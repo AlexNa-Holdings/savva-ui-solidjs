@@ -1,5 +1,6 @@
 /* src/index.css */
 @import "tailwindcss";
+@import "@infolektuell/noto-color-emoji";
 @import "./styles/tabs.css";
 @import "./styles/themed-controls.css";
 @import "./styles/md-font.css";

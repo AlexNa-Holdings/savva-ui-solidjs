@@ -819,6 +819,7 @@ export default {
   "profile.history.error": "Не удалось загрузить историю.",
   "profile.history.loading": "Загрузка истории…",
   "profile.history.noData": "За выбранный период нет транзакций.",
+  "profile.history.post": "Посмотреть пост",
   "profile.history.range.label": "Период",
   "profile.history.range.month": "Последний месяц",
   "profile.history.range.threeMonths": "Последние 3 месяца",

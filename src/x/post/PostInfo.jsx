@@ -32,7 +32,7 @@ function PostComments(props) {
   return (
     <Show when={displayCount() > 0 || isAnimating()}>
       <div class="flex items-center gap-1 text-xs" classList={{ "default-animation": isAnimating() }}>
-        <span>💬</span>
+        <span style={{ "font-family": "'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif" }}>💬</span>
         <span>{displayCount()}</span>
       </div>
     </Show>

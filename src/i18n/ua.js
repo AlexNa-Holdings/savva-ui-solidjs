@@ -819,6 +819,7 @@ export default {
   "profile.history.error": "Не вдалося завантажити історію.",
   "profile.history.loading": "Завантаження історії…",
   "profile.history.noData": "За обраний період немає транзакцій.",
+  "profile.history.post": "Переглянути допис",
   "profile.history.range.label": "Період",
   "profile.history.range.month": "Минулого місяця",
   "profile.history.range.threeMonths": "Останні 3 місяці",

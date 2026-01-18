@@ -819,6 +819,7 @@ export default {
   "profile.history.error": "Neuspešno učitavanje istorije.",
   "profile.history.loading": "Učitavanje istorije…",
   "profile.history.noData": "Nema transakcija za izabrani period.",
+  "profile.history.post": "Pogledaj objavu",
   "profile.history.range.label": "Period",
   "profile.history.range.month": "Prošli mesec",
   "profile.history.range.threeMonths": "Prošla 3 meseca",

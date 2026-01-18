@@ -87,7 +87,7 @@ export default function UserCard(props) {
                 <div class={`flex items-center gap-0.5 min-w-0 ${props.compact ? "text-[11px]" : "text-xs"} ${mutedTextColor()} ${centered() ? "justify-center" : ""}`}>
                   <Show when={author().name}>
                     <div class="min-w-0 flex items-center">
-                      <span class="shrink-0">★</span>
+                      <span class="shrink-0" style={{ color: "#FF7100" }}>★</span>
                       <span class="truncate font-semibold">{author().name}</span>
                     </div>
                   </Show>
@@ -98,7 +98,7 @@ export default function UserCard(props) {
 
                   <StakerLevelIcon
                     staked={author().staked}
-                    class={`${props.compact ? "w-5 h-4" : "w-7 h-6"} shrink-0`}
+                    class={props.compact ? "text-sm" : "text-lg"}
                   />
                 </div>
               </>

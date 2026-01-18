@@ -6,6 +6,7 @@ import TokenValue from "../ui/TokenValue.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon, HistoryIcon } from "../ui/icons/ProfileIcons.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
+import { navigate } from "../../routing/smartRouter.js";
 
 const RANGES = [
   { id: "1m", months: 1, labelKey: "profile.history.range.month" },
@@ -95,6 +96,20 @@ function safeChecksum(addr) {
   } catch {
     return addr;
   }
+}
+
+function getPostTitle(record, lang) {
+  if (!record?.locales) return "";
+  const locales = record.locales;
+  // Try current lang, then en, then first available
+  const title = locales[lang]?.title || locales.en?.title || Object.values(locales)[0]?.title || "";
+  // Truncate to ~40 chars
+  if (title.length > 40) return title.slice(0, 40) + "…";
+  return title;
+}
+
+function getPostCid(record) {
+  return record?.short_cid || record?.savva_cid || "";
 }
 
 export default function HistoryTab(props) {
@@ -211,6 +226,20 @@ export default function HistoryTab(props) {
                           <div class="flex flex-col leading-tight">
                             <span class="text-[hsl(var(--foreground))] font-medium">{contractLabel}</span>
                             <span class="text-[hsl(var(--muted-foreground))]">{typeLabel}</span>
+                            <Show when={record.locales && getPostCid(record)}>
+                              <button
+                                type="button"
+                                class="flex items-center gap-1 text-xs hover:underline mt-0.5 text-left"
+                                style={{ color: "#FF7100" }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/post/${getPostCid(record)}`);
+                                }}
+                              >
+                                <PostsIcon class="w-3 h-3" />
+                                <span class="truncate max-w-[150px]">{getPostTitle(record, app.lang()) || t("profile.history.post")}</span>
+                              </button>
+                            </Show>
                           </div>
                         </div>
                       </td>

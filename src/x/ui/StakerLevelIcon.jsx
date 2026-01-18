@@ -60,7 +60,11 @@ export default function StakerLevelIcon(props) {
         <Show when={emoji()}>
             <span
                 title={tooltipText()}
-                class={local.class || "text-base"}
+                class={`inline-block leading-none align-middle ${local.class || "text-lg"}`}
+                style={{
+                    "transform": "translateY(-0.05em)",
+                    "font-family": "'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif",
+                }}
                 role="img"
                 aria-label={tooltipText()}
                 {...rest}

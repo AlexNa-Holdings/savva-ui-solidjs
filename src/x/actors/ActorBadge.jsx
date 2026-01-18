@@ -30,7 +30,7 @@ export default function ActorBadge() {
       <div class="inline-flex items-center">
         <Show when={name()} fallback={<span class="truncate">{display() || shortAddr(addr())}</span>}>
           <>
-            <span>★</span>
+            <span style={{ color: "#FF7100" }}>★</span>
             <span class="truncate">{name()}</span>
           </>
         </Show>

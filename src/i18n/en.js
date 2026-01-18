@@ -819,6 +819,7 @@ export default {
   "profile.history.error": "Failed to load history.",
   "profile.history.loading": "Loading history…",
   "profile.history.noData": "No transactions in this period.",
+  "profile.history.post": "View post",
   "profile.history.range.label": "Period",
   "profile.history.range.month": "Last Month",
   "profile.history.range.threeMonths": "Last 3 Months",

@@ -299,7 +299,7 @@ export default function ProfilePage() {
                         <h2 class="text-2xl font-bold">{displayName() || user().name || user().address}</h2>
                         <Show when={user().name}>
                           <div class="flex items-center text-sm text-[hsl(var(--muted-foreground))]">
-                            <span>★</span>
+                            <span style={{ color: "#FF7100" }}>★</span>
                             <span>{user().name}</span>
                           </div>
                         </Show>
@@ -315,7 +315,7 @@ export default function ProfilePage() {
                         <div class="flex items-center gap-2 mt-2 text-sm">
                           <span class="text-[hsl(var(--muted-foreground))]">{t("profile.stats.staking")}:</span>
                           <TokenValue amount={user().staked} />
-                          <StakerLevelIcon staked={user().staked} class="w-5 h-5" />
+                          <StakerLevelIcon staked={user().staked} class="text-lg" />
                         </div>
                         <div class="flex items-center gap-2 mt-1 text-sm">
                           <span class="text-[hsl(var(--muted-foreground))]">

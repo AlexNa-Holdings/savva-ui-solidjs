@@ -22,6 +22,7 @@ export default function ReactionIcon(props) {
     <Show when={emoji()}>
       <span
         class={props.class || "text-sm"}
+        style={{ "font-family": "'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif" }}
         aria-label={props.type}
       >
         {emoji()}

@@ -819,6 +819,7 @@ export default {
   "profile.history.error": "Échec du chargement de l'historique.",
   "profile.history.loading": "Chargement de l'historique…",
   "profile.history.noData": "Aucune transaction sur cette période.",
+  "profile.history.post": "Voir la publication",
   "profile.history.range.label": "Période",
   "profile.history.range.month": "Le mois dernier",
   "profile.history.range.threeMonths": "Les 3 derniers mois",
