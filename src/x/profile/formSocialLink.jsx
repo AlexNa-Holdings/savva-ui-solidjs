@@ -1,6 +1,6 @@
 // src/x/ui/social/formSocialLink.jsx
 import { useApp } from "../../context/AppContext.jsx";
-import { TelegramIcon, XIcon, FacebookIcon, YouTubeIcon } from "../ui/icons/SocialIcons.jsx";
+import { TelegramIcon, XIcon, FacebookIcon, YouTubeIcon, InstagramIcon, DiscordIcon, WhatsAppIcon, LinkedInIcon, TikTokIcon, TwitchIcon, RedditIcon } from "../ui/icons/SocialIcons.jsx";
 
 /**
  * Detect known social network by URL host.
@@ -19,10 +19,17 @@ export function detectSocialNetwork(rawUrl) {
   }
 
   const rules = [
-    { key: "telegram", hosts: ["t.me", "telegram.me", "telegram.org", "telegram.dog"], Icon: TelegramIcon },
-    { key: "x",        hosts: ["x.com", "twitter.com", "mobile.twitter.com"],           Icon: XIcon },
-    { key: "facebook", hosts: ["facebook.com", "m.facebook.com", "fb.com"],             Icon: FacebookIcon },
-    { key: "youtube",  hosts: ["youtube.com", "m.youtube.com", "youtu.be"],             Icon: YouTubeIcon },
+    { key: "telegram",  hosts: ["t.me", "telegram.me", "telegram.org", "telegram.dog"],  Icon: TelegramIcon },
+    { key: "x",         hosts: ["x.com", "twitter.com", "mobile.twitter.com"],           Icon: XIcon },
+    { key: "facebook",  hosts: ["facebook.com", "m.facebook.com", "fb.com"],             Icon: FacebookIcon },
+    { key: "youtube",   hosts: ["youtube.com", "m.youtube.com", "youtu.be"],             Icon: YouTubeIcon },
+    { key: "instagram", hosts: ["instagram.com", "www.instagram.com", "instagr.am"],     Icon: InstagramIcon },
+    { key: "discord",   hosts: ["discord.com", "discord.gg", "discordapp.com"],          Icon: DiscordIcon },
+    { key: "whatsapp",  hosts: ["wa.me", "whatsapp.com", "api.whatsapp.com"],            Icon: WhatsAppIcon },
+    { key: "linkedin",  hosts: ["linkedin.com", "www.linkedin.com"],                     Icon: LinkedInIcon },
+    { key: "tiktok",    hosts: ["tiktok.com", "www.tiktok.com", "vm.tiktok.com"],        Icon: TikTokIcon },
+    { key: "twitch",    hosts: ["twitch.tv", "www.twitch.tv"],                           Icon: TwitchIcon },
+    { key: "reddit",    hosts: ["reddit.com", "www.reddit.com", "old.reddit.com"],       Icon: RedditIcon },
   ];
 
   for (const r of rules) {
