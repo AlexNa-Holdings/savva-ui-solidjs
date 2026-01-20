@@ -1,10 +1,11 @@
 // src/x/Header.jsx
-import { Show, createSignal, onMount, createMemo } from "solid-js";
+import { Show, createSignal, onMount, onCleanup, createMemo, For } from "solid-js";
 import { useApp } from "../context/AppContext.jsx";
 import { connectWallet, walletAccount, walletChainId, isWalletAvailable, eagerConnect } from "../blockchain/wallet.js";
 import { authorize } from "../blockchain/auth.js";
 import { pushErrorToast } from "../ui/toast.js";
 import { getChainLogo } from "../blockchain/chainLogos.js";
+import { getChainMeta } from "../blockchain/chains.js";
 import BrandLogo from "./ui/BrandLogo.jsx";
 import Container from "./layout/Container.jsx";
 import AuthorizedUser from "./auth/AuthorizedUser.jsx";
@@ -26,9 +27,12 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
   const app = useApp();
   const { t } = app;
   const [isLoggingIn, setIsLoggingIn] = createSignal(false);
+  const [chainDropdownOpen, setChainDropdownOpen] = createSignal(false);
   const isDesktop = useMediaQuery("(min-width: 1280px)");
 
   const desiredId = () => app.desiredChainId();
+  const configChains = createMemo(() => app.config?.()?.chains || []);
+  const hasMultipleChains = createMemo(() => configChains().length > 1);
   const mismatchedChain = () =>
     walletChainId() != null &&
     desiredId() != null &&
@@ -44,6 +48,15 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
   onMount(() => {
     if (isWalletAvailable()) eagerConnect();
   });
+
+  // Close chain dropdown on click outside
+  function handleClickOutside(e) {
+    if (chainDropdownOpen() && !e.target.closest("[data-chain-dropdown]")) {
+      setChainDropdownOpen(false);
+    }
+  }
+  onMount(() => document.addEventListener("click", handleClickOutside));
+  onCleanup(() => document.removeEventListener("click", handleClickOutside));
 
   const handleLoginClick = async () => {
     setIsLoggingIn(true);
@@ -92,6 +105,27 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
       await app.ensureWalletOnDesiredChain();
     } catch (e) {
       pushErrorToast(e, { context: "Failed to switch chain" });
+    }
+  }
+
+  async function handleChainSelect(chain) {
+    setChainDropdownOpen(false);
+    // Don't switch if already on this chain
+    if (chain.chainId === desiredId()) {
+      dbg.log("Header:handleChainSelect", "Already on chain:", chain.chainId);
+      return;
+    }
+    dbg.log("Header:handleChainSelect", "Switching to chain:", chain);
+    try {
+      // Get domain from current config (shared across all chains)
+      const currentDomain = app.config?.()?.domain || "";
+      await app.initializeOrSwitch({
+        backendLink: chain.rpc,
+        domain: currentDomain,
+      });
+    } catch (e) {
+      dbg.error("Header:handleChainSelect", "Failed to switch chain:", e);
+      pushErrorToast(e, { context: "Failed to switch blockchain" });
     }
   }
 
@@ -177,8 +211,62 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
                 }>
                   <Show when={ChainLogo()}>
                     {(Logo) => (
-                      <div class="flex items-center justify-center w-6 h-6 flex-shrink-0" title={t("wallet.onRequiredNetwork")}>
-                        <Logo class="w-full h-full" />
+                      <div class="relative" data-chain-dropdown>
+                        <button
+                          type="button"
+                          class="flex items-center gap-1 p-1 rounded hover:bg-[hsl(var(--muted))] transition-colors"
+                          title={hasMultipleChains() ? t("wallet.selectChain") : t("wallet.onRequiredNetwork")}
+                          onClick={() => hasMultipleChains() && setChainDropdownOpen(!chainDropdownOpen())}
+                          disabled={!hasMultipleChains()}
+                        >
+                          <div class="flex items-center justify-center w-6 h-6 flex-shrink-0">
+                            <Logo class="w-full h-full" />
+                          </div>
+                          <Show when={hasMultipleChains()}>
+                            <svg
+                              class="w-3 h-3 text-[hsl(var(--muted-foreground))] transition-transform"
+                              classList={{ "rotate-180": chainDropdownOpen() }}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </Show>
+                        </button>
+
+                        {/* Chain dropdown */}
+                        <Show when={chainDropdownOpen()}>
+                          <div class="absolute right-0 top-full mt-1 min-w-[180px] bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] border border-[hsl(var(--border))] rounded-md shadow-lg z-50">
+                            <div class="py-1">
+                              <For each={configChains()}>
+                                {(chain) => {
+                                  const ChainIcon = getChainLogo(chain.chainId);
+                                  const chainMeta = getChainMeta(chain.chainId);
+                                  const isActive = () => desiredId() === chain.chainId;
+                                  return (
+                                    <button
+                                      type="button"
+                                      class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[hsl(var(--accent))] transition-colors text-left"
+                                      classList={{ "bg-[hsl(var(--accent))]": isActive() }}
+                                      onClick={() => handleChainSelect(chain)}
+                                    >
+                                      <Show when={ChainIcon} fallback={<div class="w-5 h-5" />}>
+                                        <ChainIcon class="w-5 h-5 flex-shrink-0" />
+                                      </Show>
+                                      <span class="truncate">{chainMeta?.name || `Chain ${chain.chainId}`}</span>
+                                      <Show when={isActive()}>
+                                        <svg class="w-4 h-4 ml-auto text-[hsl(var(--primary))]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </Show>
+                                    </button>
+                                  );
+                                }}
+                              </For>
+                            </div>
+                          </div>
+                        </Show>
                       </div>
                     )}
                   </Show>

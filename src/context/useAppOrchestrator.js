@@ -147,14 +147,28 @@ export function useAppOrchestrator({ auth, i18n }) {
         if (!res.ok) throw new Error("YAML load failed: " + res.status);
         const siteYaml = parse(await res.text()) || {};
         const override = overrideBefore || {};
-        requestedBackend = ensureSlash(override.backendLink || siteYaml.backendLink);
+
+        // Support both legacy format (backendLink) and new multi-chain format (chains array)
+        let yamlBackendLink = siteYaml.backendLink;
+        let expectedChainId = null;
+        if (!yamlBackendLink && Array.isArray(siteYaml.chains) && siteYaml.chains.length > 0) {
+          // New format: use the first chain's rpc as backendLink
+          yamlBackendLink = siteYaml.chains[0].rpc;
+          expectedChainId = siteYaml.chains[0].chainId;
+          dlog("boot:usingFirstChainRpc", { chainId: expectedChainId, rpc: yamlBackendLink });
+        }
+
+        requestedBackend = ensureSlash(override.backendLink || yamlBackendLink);
         requestedDomain = norm(override.domain || siteYaml.domain);
         // preserve gear (site-only)
         prevCfg.gear = !!siteYaml.gear;
+        // store chains for future use
+        prevCfg.chains = siteYaml.chains || null;
         dlog("boot:siteYaml", {
-          backendLink: siteYaml.backendLink,
+          backendLink: yamlBackendLink,
           domain: siteYaml.domain,
           gear: !!siteYaml.gear,
+          chains: siteYaml.chains,
         });
         dlog("boot:overrideLoaded", overrideBefore);
       }
@@ -206,6 +220,7 @@ export function useAppOrchestrator({ auth, i18n }) {
         backendLink: requestedBackend,
         domain: finalDomain,
         gear: prevCfg.gear, // never altered after boot
+        chains: prevCfg.chains, // preserve chains for UI (chain selector)
       };
 
       // persist UI override (domain + backendLink only)

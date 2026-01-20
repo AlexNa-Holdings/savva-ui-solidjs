@@ -90,13 +90,14 @@ export async function getTokenInfo(app, tokenAddress) {
 
   // SAVVA overrides
   const { savva, staking } = await _getSavvaAddresses(app);
+  const savvaSymbol = app.desiredChain?.()?.savvaTokenSymbol || "SAVVA";
   if (savva && addr === savva) {
-    const res = { symbol: "SAVVA", decimals: 18, Icon: SavvaTokenIcon };
+    const res = { symbol: savvaSymbol, decimals: 18, Icon: SavvaTokenIcon };
     _cache.set(k, res);
     return res;
   }
   if (staking && addr === staking) {
-    const res = { symbol: "SAVVA_VOTES", decimals: 18, Icon: SavvaTokenIcon };
+    const res = { symbol: `${savvaSymbol}_VOTES`, decimals: 18, Icon: SavvaTokenIcon };
     _cache.set(k, res);
     return res;
   }

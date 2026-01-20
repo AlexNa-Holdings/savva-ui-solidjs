@@ -15,11 +15,18 @@ export function useConnect() {
       if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
       const text = await res.text();
       const data = parse(text);
-      if (!data.backendLink) throw new Error("Missing backendLink in config");
+
+      // Support both legacy format (backendLink) and new multi-chain format (chains array)
+      let backendLink = data.backendLink;
+      if (!backendLink && Array.isArray(data.chains) && data.chains.length > 0) {
+        // New format: use the first chain's rpc as backendLink
+        backendLink = data.chains[0].rpc;
+      }
+      if (!backendLink) throw new Error("Missing backendLink or chains in config");
 
       // Configure endpoints once
       configureEndpoints({
-        backendLink: data.backendLink,
+        backendLink: backendLink,
         domain: data.domain || "",
       });
 
@@ -32,7 +39,8 @@ export function useConnect() {
 
       const infoRes = await fetch(httpBase() + "info", { headers: { Accept: "application/json" } });
       if (!infoRes.ok) throw new Error(`/info failed: ${infoRes.status}`);
-      setInfo(await infoRes.json());
+      const infoData = await infoRes.json();
+      setInfo(infoData);
     } catch (err) {
       setError(err);
     } finally {

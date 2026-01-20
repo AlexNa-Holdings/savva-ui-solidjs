@@ -11,13 +11,13 @@ export default function ConnectionError(props) {
 
   return (
     <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))] p-4">
-      <div class="w-full max-w-md p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] text-center shadow-lg">
+      <div class="w-full max-w-xl p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--card-foreground))] text-center shadow-lg">
         <h2 class="text-xl font-semibold mb-3">{t("error.connection.title")}</h2>
         <p class="mb-4 text-[hsl(var(--muted-foreground))]">
           {t("error.connection.message")}
         </p>
         <Show when={props.error}>
-          <pre class="mb-4 p-2 text-xs text-left bg-[hsl(var(--muted))] rounded overflow-x-auto">
+          <pre class="mb-4 p-3 text-xs text-left bg-[hsl(var(--muted))] rounded whitespace-pre-wrap break-words">
             {props.error.message || props.error.toString()}
           </pre>
         </Show>

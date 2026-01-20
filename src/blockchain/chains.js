@@ -7,6 +7,7 @@ export const CHAINS = {
     rpcUrls: ["https://rpc.v4.testnet.pulsechain.com"],
     nativeCurrency: { name: "Test Pulse", symbol: "tPLS", decimals: 18 },
     blockExplorers: ["https://scan.v4.testnet.pulsechain.com"],
+    savvaTokenSymbol: "SAVVA",
   },
   369: {
     id: 369,
@@ -15,6 +16,25 @@ export const CHAINS = {
     rpcUrls: ["https://rpc.pulsechain.com"],
     nativeCurrency: { name: "Pulse", symbol: "PLS", decimals: 18 },
     blockExplorers: ["https://scan.pulsechain.com"],
+    savvaTokenSymbol: "SAVVA",
+  },
+  143: {
+    id: 143,
+    chainId: 143,
+    name: "Monad",
+    rpcUrls: ["https://rpc.monad.xyz"],
+    nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+    blockExplorers: ["https://monadscan.com"],
+    savvaTokenSymbol: "SAVVA.M",
+  },
+  10143: {
+    id: 10143,
+    chainId: 10143,
+    name: "Monad Testnet",
+    rpcUrls: ["https://testnet-rpc.monad.xyz"],
+    nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+    blockExplorers: ["https://testnet.monadscan.com"],
+    savvaTokenSymbol: "SAVVA.M",
   },
 };
 
@@ -43,5 +63,6 @@ export function getChainMeta(chainId) {
     nativeCurrency: raw.nativeCurrency,
     rpcUrls,
     blockExplorers: explorers,
+    savvaTokenSymbol: raw.savvaTokenSymbol || "SAVVA",
   };
 }

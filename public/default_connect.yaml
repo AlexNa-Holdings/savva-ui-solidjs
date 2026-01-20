@@ -1,3 +1,31 @@
-domain: test
-backendLink: https://savva.app/api/
+# Savva Connect Configuration
+#
+# Two formats are supported:
+#
+# === Format 1: Simple (legacy) ===
+# Single backend connection with optional gear mode.
+#
+# domain: test
+# backendLink: https://savva.app/api/
+# gear: true
+#
+# === Format 2: Multi-chain ===
+# Common settings + list of blockchain networks with their RPC endpoints.
+
+# Common settings (apply to all chains)
+domain: savva.app
 gear: true
+
+# List of supported chains (mainnets first, then testnets)
+chains:
+  - chainId: 369          # PulseChain Mainnet
+    rpc: https://savva.app/api/
+
+  - chainId: 143          # Monad Mainnet
+    rpc: https://monad.savva.app/api/
+
+  - chainId: 943          # PulseChain Testnet v4
+    rpc: https://test.savva.app/api/
+
+  - chainId: 10143        # Monad Testnet
+    rpc: https://monad-test.savva.app/api/

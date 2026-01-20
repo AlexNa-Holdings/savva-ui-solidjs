@@ -62,12 +62,21 @@ export function useAppConnection() {
       const yaml = parse(await res.text()) || {};
       dbg.log("AppConnection", "init: parsed YAML", yaml);
 
-      if (!yaml.backendLink) throw new Error("Missing backendLink in config");
+      // Support both legacy format (backendLink) and new multi-chain format (chains array)
+      let backendLink = yaml.backendLink;
+      if (!backendLink && Array.isArray(yaml.chains) && yaml.chains.length > 0) {
+        // New format: use the first chain's rpc as backendLink
+        backendLink = yaml.chains[0].rpc;
+        dbg.log("AppConnection", "init: using first chain rpc as backendLink", { rpc: backendLink });
+      }
+
+      if (!backendLink) throw new Error("Missing backendLink or chains in config");
 
       const baseCfg = {
         domain: yaml.domain || "",
-        backendLink: ensureSlash(yaml.backendLink),
+        backendLink: ensureSlash(backendLink),
         gear: !!yaml.gear,
+        chains: yaml.chains || null, // Store chains for future use
       };
       const override = loadOverride();
       if (override) dbg.log("AppConnection", "init: found override", override);

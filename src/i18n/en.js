@@ -1313,6 +1313,7 @@ export default {
   "wallet.nativeToken": "Native Token",
   "wallet.notAvailable": "No compatible wallet found. Install or enable a wallet extension.",
   "wallet.onRequiredNetwork": "On required network",
+  "wallet.selectChain": "Select blockchain",
   "wallet.stake.amount": "Amount to Stake:",
   "wallet.stake.errors.insufficientBalance": "Amount exceeds your available SAVVA balance.",
   "wallet.stake.myStake": "My Stake",

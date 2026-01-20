@@ -264,6 +264,7 @@ export default function WalletTab(props) {
   });
 
   const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
+  const savvaTokenSymbol = createMemo(() => app.desiredChain()?.savvaTokenSymbol || "SAVVA");
   const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
   const stakingTokenAddress = () => walletData()?.stakingTokenAddress || "";
 
@@ -278,7 +279,7 @@ export default function WalletTab(props) {
       const token = await getSavvaContract(app, "SavvaToken");
       await window.ethereum?.request?.({
         method: "wallet_watchAsset",
-        params: { type: "ERC20", options: { address: token.address, symbol: "SAVVA", decimals: 18 } },
+        params: { type: "ERC20", options: { address: token.address, symbol: savvaTokenSymbol(), decimals: 18 } },
       });
     } catch { }
   }
@@ -313,7 +314,7 @@ export default function WalletTab(props) {
       ? [
         { label: t("wallet.menu.transfer"), onClick: () => setShowTransfer(true) },
         { label: t("wallet.menu.increaseStaking"), onClick: () => setShowIncreaseStaking(true) },
-        { label: t("wallet.menu.addToWallet", { token: "SAVVA" }), onClick: addSavvaToWallet },
+        { label: t("wallet.menu.addToWallet", { token: savvaTokenSymbol() }), onClick: addSavvaToWallet },
       ]
       : []
   );
@@ -441,7 +442,7 @@ export default function WalletTab(props) {
       <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
         <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error?.message}</p>}>
           <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
-            <WalletRow title={t("profile.wallet.savva.title")} description={t("profile.wallet.savva.description")}>
+            <WalletRow title={savvaTokenSymbol()} description={t("profile.wallet.savva.description")}>
               <ValueWithMenu amount={walletData()?.savvaBalance} tokenAddress={walletData()?.savvaTokenAddress} items={savvaMenuItems()} />
             </WalletRow>
             <WalletRow title={baseTokenSymbol()} description={t("profile.wallet.pls.description")}>

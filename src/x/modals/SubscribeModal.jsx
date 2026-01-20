@@ -48,6 +48,8 @@ export default function SubscribeModal(props) {
       chain: app.desiredChain()?.id,
     }),
     async ({ domain, userAddr, author }) => {
+      // Guard: skip if addresses are missing
+      if (!userAddr || !author) return null;
       const clubs = await getSavvaContract(app, "AuthorsClubs");
       const [sub, club] = await Promise.all([
         clubs.read.getSub([domain, userAddr, author]), // (amountPerWeek, lastFrame)
