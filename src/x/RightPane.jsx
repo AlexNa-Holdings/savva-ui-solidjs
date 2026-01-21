@@ -204,6 +204,31 @@ export default function RightPane({ isOpen, onClose }) {
                 </div>
               </li>
 
+              {/* Export/Import link (authorized users only) */}
+              <Show when={app.authorizedUser()}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => {
+                      app.setSavedScrollY(window.scrollY);
+                      navigate("/export-import");
+                      onClose();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        app.setSavedScrollY(window.scrollY);
+                        navigate("/export-import");
+                        onClose();
+                      }
+                    }}
+                  >
+                    {t("rightPane.exportImport")}
+                  </div>
+                </li>
+              </Show>
+
               {/* Admin link */}
               <Show when={app.authorizedUser()?.isAdmin}>
                 <li>
