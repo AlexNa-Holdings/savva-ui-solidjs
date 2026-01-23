@@ -165,6 +165,13 @@ export default function ProfileEditPage() {
       : false
   );
 
+  // true if we're editing the auth user's own profile (not an NPO)
+  const isEditingAuthUserProfile = createMemo(
+    () => subjectAddress() && authAddress()
+      ? subjectAddress() === authAddress()
+      : false
+  );
+
   createEffect(() => {
     const data = profileData();
     if (data && !data.error) {
@@ -631,7 +638,8 @@ export default function ProfileEditPage() {
                     </div>
                   </div>
 
-                  {/* Subsection: Reading Key - visible for all, editable only for actor */}
+                  {/* Subsection: Reading Key - only for auth user's own profile, not NPOs */}
+                  <Show when={isEditingAuthUserProfile()}>
                   <div class="pt-6 border-t border-[hsl(var(--border))]">
                     <h4 class="text-md font-semibold mb-2">{t("profile.edit.readingKey.title")}</h4>
                     <p class="text-sm text-[hsl(var(--muted-foreground))] mb-4">
@@ -730,6 +738,7 @@ export default function ProfileEditPage() {
                       </Show>
                     </Show>
                   </div>
+                  </Show>
                 </div>
 
                 {/* Section 2: Domain Specific Parameters */}
