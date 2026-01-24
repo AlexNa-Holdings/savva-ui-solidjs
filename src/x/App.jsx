@@ -31,8 +31,6 @@ import { closeAllModals } from "../utils/modalBus.js";
 import NavigationPanel from "./navigation/NavigationPanel.jsx";
 import VersionChecker from "./main/VersionChecker.jsx";
 import AdminActionsBridge from "./admin/AdminActionsBridge.jsx";
-import PromoCodesPage from "./pages/PromoCodesPage.jsx";
-import PromoRedeemPage from "./pages/PromoRedeemPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import ContentFundRoundsPage from "./pages/ContentFundRoundsPage.jsx";
 import GovernancePage from "./pages/GovernancePage.jsx";
@@ -57,8 +55,6 @@ export default function App() {
     if (r.startsWith("/npo-list")) return "npo-list";
     if (r.startsWith("/fundraising")) return "fundraising";
     if (r.startsWith("/npo/")) return "npo";
-    if (r.startsWith("/promo-codes")) return "promo-codes";
-    if (r.startsWith("/promo-code/")) return "promo-code";
     if (r.startsWith("/sac")) return "sacrifice";
     if (r.startsWith("/buy-burn")) return "buyburn";
     if (r.startsWith("/content-fund-rounds")) return "content-fund-rounds";
@@ -177,8 +173,6 @@ export default function App() {
                 <Show when={currentView() === "profile-edit"}><ProfileEditPage /></Show>
                 <Show when={currentView() === "fundraising"}><FundraisingPage /></Show>
                 <Show when={currentView() === "contribute"}><ContributePage /></Show>
-                <Show when={currentView() === "promo-codes"}><PromoCodesPage /></Show>
-                <Show when={currentView() === "promo-code"}><PromoRedeemPage /></Show>
                 <Show when={currentView() === "sacrifice"}><SacrificePage /></Show>
                 <Show when={currentView() === "buyburn"}><BuyBurnPage /></Show>
                 <Show when={currentView() === "content-fund-rounds"}><ContentFundRoundsPage /></Show>
