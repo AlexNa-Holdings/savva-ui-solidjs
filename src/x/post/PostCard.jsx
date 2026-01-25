@@ -1,5 +1,6 @@
 // src/x/post/PostCard.jsx
-import { Show, Switch, Match, createMemo, createSignal, createEffect, onMount, onCleanup } from "solid-js";
+import { Show, Switch, Match, createMemo, createSignal, createEffect, createResource, onMount, onCleanup } from "solid-js";
+import { Portal } from "solid-js/web";
 import { createStore, reconcile } from "solid-js/store";
 import { useApp } from "../../context/AppContext.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
@@ -18,6 +19,10 @@ import { setEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { READING_KEY_UPDATED_EVENT } from "../crypto/readingKeyStorage.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
 import { loadNsfwPreference } from "../preferences/storage.js";
+import { formatUnits } from "viem";
+import TokenValue from "../ui/TokenValue.jsx";
+import { getSavvaContract } from "../../blockchain/contracts.js";
+import { dbg } from "../../utils/debug.js";
 
 function PinIcon(props) {
   return (
@@ -61,6 +66,7 @@ export default function PostCard(props) {
   const disableContextMenu = () => !!(props.noContextMenu ?? props["no-context-menu"]);
 
   const [revealed, setRevealed] = createSignal(false);
+  const [showPurchaseDialog, setShowPurchaseDialog] = createSignal(false);
 
   // Signal to trigger re-check of decryption capability
   const [keyUpdateTrigger, setKeyUpdateTrigger] = createSignal(0);
@@ -296,6 +302,69 @@ export default function PostCard(props) {
   // Encrypted content cover (takes precedence over NSFW)
   const shouldCoverEncrypted = createMemo(() => isEncrypted() && !canDecrypt());
 
+  // Purchase access info
+  const purchaseInfo = createMemo(() => {
+    const encData = content()?.encryption;
+    if (!encData?.allow_purchase) return null;
+    const priceWei = encData.purchase_price;
+    if (!priceWei) return null;
+    try {
+      const priceFormatted = formatUnits(BigInt(priceWei), 18);
+      return {
+        available: true,
+        priceWei,
+        priceFormatted,
+        processorAddress: encData.processor_address,
+        purchaseToken: encData.purchase_token,
+      };
+    } catch {
+      return null;
+    }
+  });
+
+  // Fetch purchase fee from SavvaPurchase contract
+  const [purchaseFee] = createResource(
+    () => purchaseInfo()?.available ? app.desiredChain()?.id : null,
+    async () => {
+      try {
+        const purchaseContract = await getSavvaContract(app, "SavvaPurchase");
+        const feeBps = await purchaseContract.read.feeBps();
+        return Number(feeBps); // basis points (e.g., 500 = 5%)
+      } catch (e) {
+        dbg.warn("PostCard", "Failed to fetch purchase fee", e);
+        return null;
+      }
+    }
+  );
+
+  // Calculate fee amount in wei
+  const purchaseFeeAmount = createMemo(() => {
+    const info = purchaseInfo();
+    const feeBps = purchaseFee();
+    if (!info || !feeBps) return null;
+    try {
+      const priceWei = BigInt(info.priceWei);
+      return (priceWei * BigInt(feeBps)) / 10000n;
+    } catch {
+      return null;
+    }
+  });
+
+  // Calculate USD value for purchase price
+  const purchaseUsdValue = createMemo(() => {
+    const info = purchaseInfo();
+    if (!info) return null;
+    const priceData = app.savvaTokenPrice?.();
+    if (!priceData?.price) return null;
+    try {
+      const units = parseFloat(info.priceFormatted);
+      const total = units * Number(priceData.price);
+      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
+    } catch {
+      return null;
+    }
+  });
+
   // Banned ribbons
   const isBannedPost = createMemo(() => !!base()?.banned);
   const isBannedAuthor = createMemo(() => !!(base()?.author_banned || base()?.author?.banned));
@@ -364,16 +433,41 @@ export default function PostCard(props) {
             onClick={handleCardClick}
           >
             <div class="absolute inset-0 rounded-[inherit] bg-[hsl(var(--card))]/90 backdrop-blur-md" />
-            <div class="relative z-10 flex flex-col items-center gap-3 text-center px-4">
-              <svg class="w-12 h-12 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="relative z-10 flex flex-col items-center gap-2 text-center px-4">
+              <svg class="w-10 h-10 text-[hsl(var(--muted-foreground))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               <div class="text-sm font-semibold text-[hsl(var(--foreground))]">
                 {t("post.encrypted.title") || "Encrypted Content"}
               </div>
               <div class="text-xs text-[hsl(var(--muted-foreground))]">
-                {t("post.encrypted.description") || "Click to view"}
+                {t("post.encrypted.subscribersOnly") || "This post is encrypted for subscribers only"}
               </div>
+
+              {/* Purchase access option */}
+              <Show when={purchaseInfo()}>
+                <button
+                  class="mt-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity flex items-center gap-2"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowPurchaseDialog(true);
+                  }}
+                >
+                  <svg class="w-6 h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="text-xs font-medium">
+                    {t("post.encrypted.buyAccess") || "Buy access"} — {purchaseInfo().priceFormatted} SAVVA
+                    <Show when={purchaseUsdValue()}>
+                      <span class="opacity-75"> ({purchaseUsdValue()})</span>
+                    </Show>
+                  </span>
+                </button>
+                <div class="text-[10px] text-[hsl(var(--muted-foreground))] italic">
+                  {t("post.encrypted.buyAccessHint") || "One-time payment for permanent access"}
+                </div>
+              </Show>
             </div>
           </div>
         </Show>
@@ -540,6 +634,103 @@ export default function PostCard(props) {
             <ContentBlock />
           </>
         )}
+      </Show>
+
+      {/* Purchase Access Dialog */}
+      <Show when={showPurchaseDialog()}>
+        <Portal>
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowPurchaseDialog(false)}
+          >
+            <div
+              class="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-2xl p-6 max-w-md w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-[hsl(var(--foreground))] flex items-center gap-2">
+                  <svg class="w-6 h-6 text-[hsl(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {t("post.purchase.title") || "Purchase Access"}
+                </h3>
+                <button
+                  class="p-1 rounded-md hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                  onClick={() => setShowPurchaseDialog(false)}
+                >
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Post title */}
+              <div class="mb-3 text-sm font-medium text-[hsl(var(--foreground))] line-clamp-2">
+                <span class="text-[hsl(var(--muted-foreground))]">{t("post.purchase.postLabel") || "Post:"}</span> {title() || t("post.untitled") || "Untitled Post"}
+              </div>
+
+              {/* Author info with UserCard */}
+              <div class="mb-4 p-3 rounded-lg bg-[hsl(var(--muted))]">
+                <UserCard author={author()} />
+              </div>
+
+              {/* Price display with USD */}
+              <div class="mb-4 p-5 rounded-xl border-2 border-[hsl(var(--primary)/0.3)] bg-gradient-to-b from-[hsl(var(--primary)/0.1)] to-[hsl(var(--primary)/0.05)]">
+                <div class="text-center">
+                  <TokenValue
+                    amount={purchaseInfo()?.priceWei || "0"}
+                    tokenAddress={purchaseInfo()?.purchaseToken}
+                    format="vertical"
+                    centered
+                    class="text-3xl font-bold text-[hsl(var(--foreground))]"
+                  />
+                  <div class="mt-3 text-xs text-[hsl(var(--primary))] font-medium">
+                    {t("post.purchase.supportAuthor") || "Support the author and see the content now!"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div class="flex gap-3">
+                <button
+                  class="flex-1 px-4 py-3 rounded-lg border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+                  onClick={() => setShowPurchaseDialog(false)}
+                >
+                  {t("common.cancel") || "Cancel"}
+                </button>
+                <button
+                  class="flex-1 px-4 py-3 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium"
+                  onClick={() => {
+                    // TODO: Implement actual purchase logic
+                    console.log("[PostCard] Purchase clicked", {
+                      postId: base()?.savva_cid || base()?.short_cid,
+                      price: purchaseInfo()?.priceWei,
+                      processor: purchaseInfo()?.processorAddress,
+                      token: purchaseInfo()?.purchaseToken,
+                    });
+                    alert(t("post.purchase.comingSoon") || "Purchase feature coming soon!");
+                    setShowPurchaseDialog(false);
+                  }}
+                >
+                  {t("post.purchase.confirm") || "Purchase Now"}
+                </button>
+              </div>
+
+              {/* Small print: warnings, fee info, disclaimer */}
+              <div class="mt-4 space-y-1 text-[10px] text-center text-[hsl(var(--muted-foreground))]">
+                <div>{t("post.purchase.warningFinal") || "All purchases are final and non-refundable"}</div>
+                <div>{t("post.purchase.warningUpdate") || "If the author updates or removes the content, you may lose access"}</div>
+                <Show when={purchaseFee() && purchaseFeeAmount()}>
+                  <div>
+                    {formatUnits(purchaseFeeAmount(), 18)} SAVVA ({(purchaseFee() / 100).toFixed(1)}%) {t("post.purchase.buyBurnFee") || "will be sent to the BuyBurn contract"}
+                  </div>
+                </Show>
+                <div>{t("post.purchase.disclaimer") || "By purchasing, you agree to the terms of service"}</div>
+              </div>
+            </div>
+          </div>
+        </Portal>
       </Show>
     </article>
   );
