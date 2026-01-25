@@ -11,6 +11,7 @@ import { discoverEntriesOrThrow } from "../x/pages/admin/domain_config/remoteSca
 import { decryptFileData } from "../x/crypto/fileEncryption.js";
 import { getReadingSecretKey, decryptPostEncryptionKey, decryptLocale } from "../x/crypto/postDecryption.js";
 import { swManager } from "../x/crypto/serviceWorkerManager.js";
+import { formatUnits } from "viem";
 
 const UPLOADS_PREFIX = "uploads/";
 
@@ -278,6 +279,47 @@ export async function preparePostForEditing(post, app) {
   if (descriptor.parent_savva_cid) finalParams.parent_savva_cid = descriptor.parent_savva_cid;
   if (descriptor.root_savva_cid) finalParams.root_savva_cid = descriptor.root_savva_cid;
 
+  // Parse audience-related params from descriptor and encryption data
+  // Check descriptor first, then encryption block for access control settings
+  const recipientListType = descriptor.recipient_list_type;
+  if (recipientListType) {
+    finalParams.audience = recipientListType;
+    dbg.log("Importer", "Parsed audience from descriptor", { audience: recipientListType });
+  }
+
+  // Parse min weekly payment (check descriptor and encryption block)
+  const minWeeklyFromDescriptor = descriptor.recipient_list_min_weekly;
+  const minWeeklyFromEncryption = encryptionData?.min_weekly_pay;
+  const minWeeklyValue = minWeeklyFromDescriptor || minWeeklyFromEncryption;
+  if (minWeeklyValue) {
+    try {
+      finalParams.minWeeklyPaymentWei = BigInt(minWeeklyValue);
+      // Also set the human-readable text value (assuming 18 decimals)
+      finalParams.minWeeklyPayment = formatUnits(finalParams.minWeeklyPaymentWei, 18);
+      dbg.log("Importer", "Parsed minWeeklyPayment", { wei: minWeeklyValue, text: finalParams.minWeeklyPayment });
+    } catch (e) {
+      dbg.warn("Importer", "Failed to parse minWeeklyPaymentWei", { value: minWeeklyValue, error: e });
+    }
+  }
+
+  // Parse purchase access settings from encryption block only
+  if (encryptionData?.allow_purchase) {
+    finalParams.allowPurchase = true;
+    dbg.log("Importer", "Parsed allowPurchase", { value: true });
+  }
+
+  const purchasePriceValue = encryptionData?.purchase_price;
+  if (purchasePriceValue) {
+    try {
+      finalParams.purchasePriceWei = BigInt(purchasePriceValue);
+      // Also set the human-readable text value (assuming 18 decimals)
+      finalParams.purchasePrice = formatUnits(finalParams.purchasePriceWei, 18);
+      dbg.log("Importer", "Parsed purchasePrice", { wei: purchasePriceValue, text: finalParams.purchasePrice });
+    } catch (e) {
+      dbg.warn("Importer", "Failed to parse purchasePriceWei", { value: purchasePriceValue, error: e });
+    }
+  }
+
   const finalDescriptor = {
     savva_spec_version: descriptor.savva_spec_version || "2.0",
     data_cid: getPostContentBaseCid(post),
@@ -366,8 +408,18 @@ export async function preparePostForEditing(post, app) {
   }
 
   dbg.log("Importer:finalParams", "Params being saved to draft:", finalParams);
+
+  // Convert BigInt values to strings before JSON serialization
+  const serializableParams = { ...finalParams };
+  if (serializableParams.minWeeklyPaymentWei) {
+    serializableParams.minWeeklyPaymentWei = serializableParams.minWeeklyPaymentWei.toString();
+  }
+  if (serializableParams.purchasePriceWei) {
+    serializableParams.purchasePriceWei = serializableParams.purchasePriceWei.toString();
+  }
+
   await writeFile(dirHandle, "info.yaml", stringify(finalDescriptor));
-  await writeFile(dirHandle, "params.json", JSON.stringify(finalParams, null, 2));
+  await writeFile(dirHandle, "params.json", JSON.stringify(serializableParams, null, 2));
 
   dbg.log("Importer", "Post successfully imported for editing.");
 }

@@ -5,6 +5,16 @@
         "internalType": "address",
         "name": "_conf",
         "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "_name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_symbol",
+        "type": "string"
       }
     ],
     "stateMutability": "nonpayable",
@@ -411,172 +421,6 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "event_contract",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "staked",
-        "type": "uint256"
-      }
-    ],
-    "name": "PatronPaid",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "event_contract",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "staked",
-        "type": "uint256"
-      }
-    ],
-    "name": "PatronPaymentClaimed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "event_contract",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      }
-    ],
-    "name": "PayRecordDeleted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "event_contract",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "user_staked",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "author_staked",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "paid",
-        "type": "uint256"
-      }
-    ],
-    "name": "PayRecordSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": false,
         "internalType": "uint256",
         "name": "amount",
@@ -835,24 +679,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      }
-    ],
-    "name": "claimPayment",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "claimUnstaked",
     "outputs": [],
@@ -997,29 +823,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "event_contract",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      }
-    ],
-    "name": "deletePayRecord",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
@@ -1095,35 +898,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "contract_address",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      }
-    ],
-    "name": "getExpectedPatronPayment",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint256",
         "name": "timepoint",
         "type": "uint256"
@@ -1159,76 +933,6 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "key",
-        "type": "bytes32"
-      }
-    ],
-    "name": "getPayRecord",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "address",
-            "name": "author",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "event_contract",
-            "type": "address"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "event_id",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "uint256",
-            "name": "amount",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "index",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct Staking.PayRecord",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
-      }
-    ],
-    "name": "getPayRecordsKeys",
-    "outputs": [
-      {
-        "internalType": "bytes32[]",
-        "name": "",
-        "type": "bytes32[]"
       }
     ],
     "stateMutability": "view",
@@ -1381,34 +1085,6 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "event_contract",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "event_id",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "author",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "setPayRecord",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
@@ -1480,16 +1156,6 @@
       {
         "internalType": "uint256",
         "name": "stake_frame",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "event_contract",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "last_paid_by_patrons",
         "type": "uint256"
       }
     ],

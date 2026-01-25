@@ -3,11 +3,6 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_oldContract",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
         "name": "_owner",
         "type": "address"
       }
@@ -311,25 +306,6 @@
   {
     "inputs": [
       {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "name": "nameTransferredFromOldContract",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "",
         "type": "address"
@@ -341,19 +317,6 @@
         "internalType": "string",
         "name": "",
         "type": "string"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "oldContract",
-    "outputs": [
-      {
-        "internalType": "contract IUserProfile",
-        "name": "",
-        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -492,6 +455,34 @@
       }
     ],
     "name": "set",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "avatar",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "domain",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "profile",
+        "type": "string"
+      }
+    ],
+    "name": "setAll",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

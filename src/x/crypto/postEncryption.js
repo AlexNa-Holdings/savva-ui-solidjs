@@ -234,6 +234,10 @@ export function encryptDescriptorLocale(locale, postSecretKeyHex) {
  * @param {object} options - Additional options
  * @param {string} options.accessType - Access type (e.g., "for_subscribers_only")
  * @param {string} options.minWeeklyPay - Minimum weekly payment in wei as string
+ * @param {boolean} options.allowPurchase - Whether one-time purchase access is allowed
+ * @param {string} options.purchasePrice - Purchase price in wei as string
+ * @param {string} options.processorAddress - Payment processor address
+ * @param {string} options.purchaseToken - Token contract address for purchase payment
  * @returns {object} - Encryption section for descriptor
  */
 export function buildEncryptionSection(postPublicKeyHex, recipients, postSecretKeyHex, options = {}) {
@@ -252,6 +256,20 @@ export function buildEncryptionSection(postPublicKeyHex, recipients, postSecretK
   // Add min_weekly_pay if provided
   if (options.minWeeklyPay) {
     encryption.min_weekly_pay = options.minWeeklyPay;
+  }
+
+  // Add purchase access fields if enabled
+  if (options.allowPurchase) {
+    encryption.allow_purchase = true;
+    if (options.purchasePrice) {
+      encryption.purchase_price = options.purchasePrice;
+    }
+    if (options.processorAddress) {
+      encryption.processor_address = options.processorAddress;
+    }
+    if (options.purchaseToken) {
+      encryption.purchase_token = options.purchaseToken;
+    }
   }
 
   // Encrypt post key for each recipient

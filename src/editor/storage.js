@@ -1,6 +1,7 @@
 // src/editor/storage.js
 import { dbg } from "../utils/debug";
 import { parse, stringify } from "yaml";
+import { formatUnits } from "viem";
 import { createTextPreview } from "./preview-utils.js";
 
 export const DRAFT_DIRS = {
@@ -195,9 +196,18 @@ export async function loadDraft(baseDir) {
   const postData = {};
   const params = paramsJson ? JSON.parse(paramsJson) : {};
 
-  // Convert minWeeklyPaymentWei back to BigInt if it exists
+  // Convert BigInt values back from strings and compute text values
   if (params.minWeeklyPaymentWei && typeof params.minWeeklyPaymentWei === 'string') {
     params.minWeeklyPaymentWei = BigInt(params.minWeeklyPaymentWei);
+  }
+  if (params.minWeeklyPaymentWei && !params.minWeeklyPayment) {
+    params.minWeeklyPayment = formatUnits(params.minWeeklyPaymentWei, 18);
+  }
+  if (params.purchasePriceWei && typeof params.purchasePriceWei === 'string') {
+    params.purchasePriceWei = BigInt(params.purchasePriceWei);
+  }
+  if (params.purchasePriceWei && !params.purchasePrice) {
+    params.purchasePrice = formatUnits(params.purchasePriceWei, 18);
   }
 
   if (descriptorYaml) {
@@ -257,6 +267,9 @@ export async function saveDraft(baseDir, draftData) {
   const serializableParams = { ...(params || {}) };
   if (serializableParams.minWeeklyPaymentWei) {
     serializableParams.minWeeklyPaymentWei = serializableParams.minWeeklyPaymentWei.toString();
+  }
+  if (serializableParams.purchasePriceWei) {
+    serializableParams.purchasePriceWei = serializableParams.purchasePriceWei.toString();
   }
 
   const finalParams = JSON.parse(JSON.stringify(serializableParams));

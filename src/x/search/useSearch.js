@@ -2,6 +2,15 @@
 import { createSignal, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 
+/**
+ * Check if a string is a valid Ethereum address.
+ * Must start with 0x, be 42 characters long, and contain only hex characters.
+ */
+function isValidEthAddress(str) {
+  if (!str || typeof str !== "string") return false;
+  return /^0x[a-fA-F0-9]{40}$/.test(str);
+}
+
 export default function useSearch(querySignal) {
   const app = useApp();
 
@@ -43,7 +52,20 @@ export default function useSearch(querySignal) {
       const method = app.wsMethod?.("search-user");
       const res = method ? await method({ query: q, limit: U_LIMIT, offset: uOffset, domain: app.selectedDomainName?.() }) : [];
       if (rid !== reqId) return;
-      const list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+      let list = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+
+      // If query is a valid Ethereum address and not in results, add it as a potential user
+      if (!append && isValidEthAddress(q)) {
+        const qLower = q.toLowerCase();
+        const alreadyInResults = list.some(
+          (u) => u?.address?.toLowerCase() === qLower
+        );
+        if (!alreadyInResults) {
+          // Add a synthetic user entry for the address
+          list = [{ address: q, _isAddressSearch: true }, ...list];
+        }
+      }
+
       setUsers((prev) => (append ? [...prev, ...list] : list));
       setHasMoreUsers(list.length >= U_LIMIT);
       if (list.length) uOffset += list.length;

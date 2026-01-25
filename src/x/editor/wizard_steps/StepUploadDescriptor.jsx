@@ -10,6 +10,7 @@ import { isPinningEnabled, getPinningServices } from "../../../ipfs/pinning/stor
 import { encryptDescriptorLocale, buildEncryptionSection } from "../../crypto/postEncryption.js";
 import { fetchEligibleSubscribers } from "../../crypto/fetchEligibleSubscribers.js";
 import { storePostKey } from "../../../editor/storage.js";
+import { getSavvaContract } from "../../../blockchain/contracts.js";
 
 export default function StepUploadDescriptor(props) {
   const app = useApp();
@@ -107,6 +108,8 @@ export default function StepUploadDescriptor(props) {
         if (params.minWeeklyPaymentWei && params.minWeeklyPaymentWei > 0n) {
           descriptor.recipient_list_min_weekly = params.minWeeklyPaymentWei.toString();
         }
+        // Note: purchase access fields (allow_purchase, purchase_price, processor_address, purchase_token)
+        // are added only to the encryption section, not at the descriptor root level
       } else {
         descriptor.recipient_list_type = "public";
       }
@@ -266,7 +269,9 @@ export default function StepUploadDescriptor(props) {
         }
 
         // Check if there are any eligible subscribers with reading keys
-        if (recipients.length === 0) {
+        // Skip this check if purchase access is enabled - processor alone is sufficient
+        const hasPurchaseAccess = params.allowPurchase && params.purchasePriceWei && params.purchasePriceWei > 0n;
+        if (recipients.length === 0 && !hasPurchaseAccess) {
           E("No eligible subscribers with published reading keys found");
           throw new Error(t("editor.publish.encryption.noRecipientsWithKeys"));
         }
@@ -350,7 +355,47 @@ export default function StepUploadDescriptor(props) {
         }
       }
 
-      L(`Total recipients (including author and big_brothers): ${recipients.length}`);
+      // Add processor_address to recipients if purchase access is enabled
+      if (params.allowPurchase && params.purchasePriceWei && params.purchasePriceWei > 0n) {
+        const processorAddress = app.info()?.processor_address;
+        if (processorAddress) {
+          // Create a set of existing recipient addresses for deduplication
+          const existingAddresses = new Set(
+            recipients.map(r => String(r.address).toLowerCase())
+          );
+
+          if (!existingAddresses.has(String(processorAddress).toLowerCase())) {
+            try {
+              const processorReadingKey = await fetchReadingKey(app, processorAddress);
+              if (processorReadingKey && processorReadingKey.publicKey) {
+                recipients.push({
+                  address: processorAddress,
+                  publicKey: processorReadingKey.publicKey,
+                  scheme: processorReadingKey.scheme,
+                  nonce: processorReadingKey.nonce,
+                  amount: 0n,
+                  weeks: 0,
+                });
+                L(`Added processor_address ${processorAddress} to recipients for purchase access`);
+              } else {
+                E(`Processor ${processorAddress} does not have a reading key - purchase access won't work`);
+                throw new Error(`Payment processor does not have a reading key published. Purchase access feature is not available. Contact site administrators.`);
+              }
+            } catch (err) {
+              if (err.message.includes("Payment processor")) throw err;
+              E(`Failed to fetch reading key for processor ${processorAddress}`, err);
+              throw new Error(`Failed to fetch payment processor reading key: ${err.message}`);
+            }
+          } else {
+            L(`Processor ${processorAddress} is already in recipient list`);
+          }
+        } else {
+          E("No processor_address in backend info - cannot enable purchase access");
+          throw new Error("Payment processor not configured. Purchase access feature is not available.");
+        }
+      }
+
+      L(`Total recipients (including author, big_brothers, and processor): ${recipients.length}`);
     }
 
     const langs = [];
@@ -403,6 +448,24 @@ export default function StepUploadDescriptor(props) {
         encryptionOptions.accessType = "for_subscribers_only";
         if (params.minWeeklyPaymentWei && params.minWeeklyPaymentWei > 0n) {
           encryptionOptions.minWeeklyPay = params.minWeeklyPaymentWei.toString();
+        }
+        // Add purchase access info if enabled
+        if (params.allowPurchase && params.purchasePriceWei && params.purchasePriceWei > 0n) {
+          encryptionOptions.allowPurchase = true;
+          encryptionOptions.purchasePrice = params.purchasePriceWei.toString();
+          const processorAddress = app.info()?.processor_address;
+          if (processorAddress) {
+            encryptionOptions.processorAddress = processorAddress;
+          }
+          // Add purchase token (SAVVA token address)
+          try {
+            const savvaToken = await getSavvaContract(app, "SavvaToken");
+            if (savvaToken?.address) {
+              encryptionOptions.purchaseToken = savvaToken.address.toLowerCase();
+            }
+          } catch (e) {
+            L("Failed to get SAVVA token address for purchaseToken", e);
+          }
         }
       }
 

@@ -8,8 +8,9 @@ import Spinner from "../ui/Spinner.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { dbg } from "../../utils/debug.js";
 
-// LocalStorage key for saved minimum payment preference
+// LocalStorage keys
 const MIN_PAYMENT_STORAGE_KEY = "savva_editor_min_weekly_payment";
+const WARNING_COLLAPSED_KEY = "savva_editor_warning_collapsed";
 
 function buildCategoryTree(categories = []) {
   const root = [];
@@ -75,7 +76,7 @@ export default function AdditionalParametersPost(props) {
 
   const labelCls = "font-medium justify-self-end text-right";
 
-  // Get staking token address for AmountInput
+  // Get staking token address for AmountInput (minimum weekly payment)
   const [stakingTokenAddress] = createResource(
     () => app.desiredChain()?.id,
     async () => {
@@ -87,6 +88,29 @@ export default function AdditionalParametersPost(props) {
       }
     }
   );
+
+  // Get liquid SAVVA token address for purchase price
+  const [savvaTokenAddress] = createResource(
+    () => app.desiredChain()?.id,
+    async () => {
+      try {
+        const savva = await getSavvaContract(app, "SavvaToken");
+        return savva.address.toLowerCase();
+      } catch {
+        return "";
+      }
+    }
+  );
+
+  // Collapsible warning state (persisted)
+  const [warningCollapsed, setWarningCollapsed] = createSignal(
+    localStorage.getItem(WARNING_COLLAPSED_KEY) === "1"
+  );
+  const toggleWarningCollapsed = () => {
+    const next = !warningCollapsed();
+    setWarningCollapsed(next);
+    try { localStorage.setItem(WARNING_COLLAPSED_KEY, next ? "1" : "0"); } catch {}
+  };
 
   // Fetch all subscribers to calculate eligible count
   async function fetchAllSponsors() {
@@ -517,7 +541,7 @@ export default function AdditionalParametersPost(props) {
             <option value="subscribers">{t("editor.params.audience.subscribers")}</option>
           </select>
 
-          {/* Warning for encrypted content */}
+          {/* Warning for encrypted content - collapsible */}
           <Show when={(() => {
             const audience = props.postParams?.()?.audience || "public";
             const result = audience !== "public";
@@ -525,14 +549,30 @@ export default function AdditionalParametersPost(props) {
             return result;
           })()}>
             <div class={labelCls}></div>
-            <div class="flex items-start gap-2 p-3 rounded-md bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
-              <svg class="w-5 h-5 text-[hsl(var(--destructive))] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div class="text-xs text-[hsl(var(--foreground))] leading-relaxed">
-                <strong class="font-semibold">{t("editor.params.audience.encryptionWarning.title")}</strong>
-                <p class="mt-1 opacity-90">{t("editor.params.audience.encryptionWarning.message")}</p>
-              </div>
+            <div class="rounded-md bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)] overflow-hidden">
+              <button
+                type="button"
+                class="w-full flex items-center gap-2 p-3 text-left hover:bg-[hsl(var(--destructive)/0.05)] transition-colors"
+                onClick={toggleWarningCollapsed}
+                aria-expanded={!warningCollapsed()}
+              >
+                <svg class="w-5 h-5 text-[hsl(var(--destructive))] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <strong class="flex-1 text-xs font-semibold text-[hsl(var(--foreground))]">
+                  {t("editor.params.audience.encryptionWarning.title")}
+                </strong>
+                <ChevronDownIcon
+                  class={`w-4 h-4 text-[hsl(var(--muted-foreground))] transition-transform ${warningCollapsed() ? "" : "rotate-180"}`}
+                />
+              </button>
+              <Show when={!warningCollapsed()}>
+                <div class="px-3 pb-3 pt-0">
+                  <p class="text-xs text-[hsl(var(--foreground))] opacity-90 leading-relaxed pl-7">
+                    {t("editor.params.audience.encryptionWarning.message")}
+                  </p>
+                </div>
+              </Show>
             </div>
           </Show>
 
@@ -576,6 +616,47 @@ export default function AdditionalParametersPost(props) {
                   </Show>
                 </div>
               </div>
+
+              {/* Allow purchase access */}
+              <label class={labelCls}>{t("editor.params.audience.allowPurchase.label")}</label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!(props.postParams?.()?.allowPurchase)}
+                  onInput={(e) => {
+                    const checked = e.currentTarget.checked;
+                    props.setPostParams?.((p) => ({
+                      ...(p || {}),
+                      allowPurchase: checked,
+                      // Clear price if unchecked
+                      ...(!checked ? { purchasePrice: undefined, purchasePriceWei: undefined } : {}),
+                    }));
+                  }}
+                  aria-label={t("editor.params.audience.allowPurchase.label")}
+                />
+                <div class="text-xs opacity-70">{t("editor.params.audience.allowPurchase.help")}</div>
+              </div>
+
+              {/* Purchase price - only show when allowPurchase is checked */}
+              <Show when={props.postParams?.()?.allowPurchase}>
+                <div class={labelCls}></div>
+                <div class="space-y-2">
+                  <AmountInput
+                    label={t("editor.params.audience.purchasePrice.label")}
+                    tokenAddress={savvaTokenAddress() || ""}
+                    value={props.postParams?.()?.purchasePrice || ""}
+                    showMax={false}
+                    onInput={(text, wei) => {
+                      props.setPostParams?.((p) => ({
+                        ...(p || {}),
+                        purchasePrice: text,
+                        purchasePriceWei: wei,
+                      }));
+                    }}
+                    helper={t("editor.params.audience.purchasePrice.help")}
+                  />
+                </div>
+              </Show>
             </>
           </Show>
         </Show>
