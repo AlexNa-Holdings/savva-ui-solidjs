@@ -226,7 +226,7 @@ export async function preparePostForEditing(post, app) {
       dbg.log("Importer", "Reading secret key retrieved", { hasKey: true });
 
       // Decrypt the post encryption key using the reading key
-      postSecretKey = decryptPostEncryptionKey(encryptionData, readingSecretKey);
+      postSecretKey = await decryptPostEncryptionKey(encryptionData, readingSecretKey);
       dbg.log("Importer", "Post is encrypted, successfully decrypted post key using reading key");
     } catch (error) {
       dbg.warn("Importer", `Failed to decrypt post key:`, error);

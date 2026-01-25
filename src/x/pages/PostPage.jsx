@@ -42,12 +42,16 @@ import SubscribeModal from "../modals/SubscribeModal.jsx";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 
 // ⬇️ Encryption imports
-import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost, isUserInRecipientsList } from "../crypto/postDecryption.js";
+import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost, isUserInRecipientsList, getUserEncryptionData } from "../crypto/postDecryption.js";
 import { storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
 import { loadNsfwPreference } from "../preferences/storage.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { pushToast } from "../../ui/toast.js";
+import { toHex, stringToBytes } from "viem";
+import { fetchReadingKey, generateReadingKey, publishReadingKey } from "../crypto/readingKey.js";
 
 const getIdentifier = (route) => {
   const path = route().split("?")[0]; // Strip query parameters
@@ -90,9 +94,42 @@ async function fetchPostByIdentifier(params) {
   const user = app.authorizedUser?.();
   if (user?.address) requestParams.my_addr = toChecksumAddress(user.address);
 
+  console.log("[PostPage] fetchPostByIdentifier request:", {
+    savva_cid: requestParams.savva_cid,
+    short_cid: requestParams.short_cid,
+    my_addr: requestParams.my_addr,
+    domain: requestParams.domain,
+    fullParams: requestParams,
+  });
+
   const res = await contentList(requestParams);
   const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
-  return arr[0] || null;
+  const post = arr[0] || null;
+
+  // Debug: log encryption data from server response
+  if (post) {
+    const encData = post.savva_content?.encryption;
+    const userAddr = user?.address?.toLowerCase();
+    console.log("[PostPage] fetchPostByIdentifier response - encryption data:", {
+      postId: post.savva_cid || post.short_cid,
+      isEncrypted: !!post.savva_content?.encrypted,
+      hasEncryptionData: !!encData,
+      // Root level
+      hasReadingKeyNonceAtRoot: !!encData?.reading_key_nonce,
+      hasReadingPublicKeyAtRoot: !!encData?.reading_public_key,
+      hasPassAtRoot: !!encData?.pass,
+      readingPublicKeyAtRoot: encData?.reading_public_key,
+      readingKeyNonceAtRoot: encData?.reading_key_nonce,
+      // Recipients
+      recipientCount: encData?.recipients ? Object.keys(encData.recipients).length : 0,
+      recipientKeys: encData?.recipients ? Object.keys(encData.recipients) : [],
+      userInRecipients: userAddr && encData?.recipients ? userAddr in encData.recipients : false,
+      // Full encryption object for inspection
+      encryptionData: encData,
+    });
+  }
+
+  return post;
 }
 
 async function fetchPostDetails(mainPost, app) {
@@ -159,6 +196,7 @@ export default function PostPage() {
   const [pendingKeyToStore, setPendingKeyToStore] = createSignal(null);
   const [showSubscribeModal, setShowSubscribeModal] = createSignal(false);
   const [showPurchaseDialog, setShowPurchaseDialog] = createSignal(false);
+  const [isPurchasing, setIsPurchasing] = createSignal(false);
 
   const [postResource, { refetch: refetchPost }] = createResource(
     () => ({ identifier: identifier(), domain: app.selectedDomainName(), app, lang: uiLang() }),
@@ -281,7 +319,10 @@ export default function PostPage() {
   const canDecrypt = createMemo(() => {
     if (!isEncrypted()) return false;
     const encData = encryptionData();
-    if (!encData || !encData.reading_key_nonce) return false;
+    if (!encData) return false;
+    // Check if we have user-specific encryption data (at root or in recipients)
+    const userEncData = getUserEncryptionData(userAddress(), encData);
+    if (!userEncData) return false;
     return canDecryptPost(userAddress(), encData);
   });
 
@@ -347,6 +388,34 @@ export default function PostPage() {
     }
   });
 
+  // Fetch user's SAVVA balance when purchase dialog is shown
+  const [userBalance, { refetch: refetchBalance }] = createResource(
+    () => showPurchaseDialog() ? (app.actorAddress?.() || app.authorizedUser?.()?.address) : null,
+    async (actorAddr) => {
+      if (!actorAddr) return null;
+      try {
+        const savvaToken = await getSavvaContract(app, "SavvaToken");
+        const balance = await savvaToken.read.balanceOf([actorAddr]);
+        return balance;
+      } catch (e) {
+        dbg.warn("PostPage", "Failed to fetch SAVVA balance", e);
+        return null;
+      }
+    }
+  );
+
+  // Check if user has enough balance for purchase
+  const hasEnoughBalance = createMemo(() => {
+    const balance = userBalance();
+    const info = purchaseInfo();
+    if (balance === null || balance === undefined || !info) return null;
+    try {
+      return BigInt(balance) >= BigInt(info.priceWei);
+    } catch {
+      return null;
+    }
+  });
+
   const [postSecretKey, setPostSecretKey] = createSignal(null);
   const [isDecrypting, setIsDecrypting] = createSignal(false);
   const [decryptError, setDecryptError] = createSignal(null);
@@ -399,13 +468,20 @@ export default function PostPage() {
       setIsDecrypting(true);
       const userAddr = userAddress();
 
+      // Get user-specific encryption data (might be at root or in recipients object)
+      const userEncData = getUserEncryptionData(userAddr, encData);
+      if (!userEncData) {
+        dbg.log("PostPage", "Auto-decrypt: no user-specific encryption data found");
+        return;
+      }
+
       // Get the reading key from storage (pass publicKey for cross-post key lookup)
       dbg.log("PostPage", "Auto-decrypt: getting reading key from storage...");
       const readingKey = await getReadingSecretKey(
         userAddr,
-        encData.reading_key_nonce,
+        userEncData.reading_key_nonce,
         false, // forceRecover
-        encData.reading_public_key // publicKey for lookup
+        userEncData.reading_public_key // publicKey for lookup
       );
       if (!readingKey) {
         dbg.log("PostPage", "Auto-decrypt: no stored reading key, skipping auto-decrypt");
@@ -415,7 +491,7 @@ export default function PostPage() {
 
       // Get the post secret key for content decryption
       dbg.log("PostPage", "Auto-decrypt: decrypting post encryption key...");
-      const postKey = decryptPostEncryptionKey(encData, readingKey);
+      const postKey = await decryptPostEncryptionKey(userEncData, readingKey);
       if (!postKey) {
         throw new Error("Failed to decrypt post encryption key");
       }
@@ -467,15 +543,21 @@ export default function PostPage() {
       setDecryptError(null);
       const userAddr = userAddress();
 
+      // Get user-specific encryption data (might be at root or in recipients object)
+      const userEncData = getUserEncryptionData(userAddr, encData);
+      if (!userEncData) {
+        throw new Error("User not in recipients list");
+      }
+
       // Get reading key with full key data (will prompt for signature)
       // Use returnFullKey=true to get the publicKey from the recovery process
-      // since encData.reading_public_key may not be provided by the API
+      // since userEncData.reading_public_key may not be provided by the API
       dbg.log("PostPage", "Manual decrypt: getting reading key...");
       const readingKeyData = await getReadingSecretKey(
         userAddr,
-        encData.reading_key_nonce,
+        userEncData.reading_key_nonce,
         false, // forceRecover
-        encData.reading_public_key, // publicKey hint (may be null)
+        userEncData.reading_public_key, // publicKey hint (may be null)
         true // returnFullKey - get { secretKey, publicKey, nonce }
       );
       if (!readingKeyData || !readingKeyData.secretKey) {
@@ -488,7 +570,7 @@ export default function PostPage() {
 
       // Get post secret key for content decryption
       dbg.log("PostPage", "Manual decrypt: decrypting post encryption key...");
-      const postKey = decryptPostEncryptionKey(encData, readingKeyData.secretKey);
+      const postKey = await decryptPostEncryptionKey(userEncData, readingKeyData.secretKey);
       if (!postKey) {
         throw new Error("Failed to decrypt post encryption key");
       }
@@ -703,6 +785,154 @@ export default function PostPage() {
     setShowContributeModal(true);
   }
 
+  // Listen for purchase access granted event
+  onMount(() => {
+    const handlePurchaseAccessGranted = (event) => {
+      const { savva_cid } = event.detail || {};
+      const currentPost = post();
+      if (!currentPost) return;
+
+      const currentCid = currentPost.savva_cid || currentPost.cid || currentPost.id;
+      if (savva_cid && currentCid && String(savva_cid) === String(currentCid)) {
+        dbg.log("PostPage", "Received purchase access granted for this post, refetching...");
+        refetchPost();
+      }
+    };
+
+    window.addEventListener("savva:purchase-access-granted", handlePurchaseAccessGranted);
+    onCleanup(() => {
+      window.removeEventListener("savva:purchase-access-granted", handlePurchaseAccessGranted);
+    });
+  });
+
+  // Purchase handler
+  const handlePurchase = async () => {
+    const info = purchaseInfo();
+    if (!info) return;
+
+    const authorAddress = post()?.author?.address;
+    const savvaCid = post()?.savva_cid || post()?.short_cid;
+    if (!authorAddress || !savvaCid) {
+      pushToast({ type: "error", message: t("post.purchase.errorMissingData") || "Missing post data" });
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      const actorAddr = app.actorAddress?.() || app.authorizedUser?.()?.address;
+
+      if (!actorAddr) {
+        throw new Error(t("post.purchase.errorNotConnected") || "Wallet not connected");
+      }
+
+      // Step 1: Check if user has a published reading key
+      pushToast({ type: "info", message: t("post.purchase.checkingReadingKey") || "Checking reading key...", autohideMs: 0, id: "purchase_check" });
+
+      const existingKey = await fetchReadingKey(app, actorAddr);
+      app.dismissToast?.("purchase_check");
+
+      if (!existingKey) {
+        // User needs to generate and publish a reading key first
+        pushToast({ type: "info", message: t("post.purchase.generatingReadingKey") || "Generating reading key...", autohideMs: 0, id: "purchase_keygen" });
+
+        try {
+          // Generate the reading key (will prompt for wallet signature)
+          const { nonce, publicKey, secretKey } = await generateReadingKey(actorAddr);
+
+          // Publish to contract
+          await publishReadingKey(app, publicKey, nonce);
+
+          // Store locally for future decryption
+          storeReadingKey(actorAddr, { nonce, publicKey, secretKey });
+
+          app.dismissToast?.("purchase_keygen");
+          pushToast({ type: "success", message: t("post.purchase.readingKeyPublished") || "Reading key published!", autohideMs: 3000 });
+        } catch (keyError) {
+          app.dismissToast?.("purchase_keygen");
+          throw new Error(t("post.purchase.errorReadingKey") || "Failed to publish reading key. Please try again.");
+        }
+      }
+
+      // Step 2: Check balance and allowance
+      const purchaseContract = await getSavvaContract(app, "SavvaPurchase");
+      const savvaToken = await getSavvaContract(app, "SavvaToken");
+      const priceWei = BigInt(info.priceWei);
+
+      // Check balance first
+      const balance = await savvaToken.read.balanceOf([actorAddr]);
+      console.log("[PostPage] Purchase - balance check:", {
+        balance: balance.toString(),
+        priceWei: priceWei.toString(),
+        hasEnough: balance >= priceWei,
+      });
+
+      if (balance < priceWei) {
+        throw new Error(t("post.purchase.insufficientBalance") || `Insufficient balance. You have ${formatUnits(balance, 18)} SAVVA but need ${formatUnits(priceWei, 18)} SAVVA.`);
+      }
+
+      const allowance = await savvaToken.read.allowance([actorAddr, purchaseContract.address]);
+      console.log("[PostPage] Purchase - allowance check:", {
+        allowance: allowance.toString(),
+        priceWei: priceWei.toString(),
+        needsApproval: allowance < priceWei,
+      });
+
+      if (allowance < priceWei) {
+        pushToast({ type: "info", message: t("post.purchase.approving") || "Approving SAVVA token...", autohideMs: 0, id: "purchase_approve" });
+
+        const MAX_UINT = (1n << 256n) - 1n;
+        await sendAsActor(app, {
+          contractName: "SavvaToken",
+          functionName: "approve",
+          args: [purchaseContract.address, MAX_UINT],
+        });
+
+        app.dismissToast?.("purchase_approve");
+      }
+
+      // Step 3: Build metadata and call buy
+      const metadata = {
+        sku: "access_to_post",
+        savva_cid: savvaCid,
+        processor_address: info.processorAddress,
+      };
+      const metadataBytes = toHex(stringToBytes(JSON.stringify(metadata)));
+
+      pushToast({ type: "info", message: t("post.purchase.processing") || "Processing purchase...", autohideMs: 0, id: "purchase_tx" });
+
+      // Call buy function
+      await sendAsActor(app, {
+        contractName: "SavvaPurchase",
+        functionName: "buy",
+        args: [info.purchaseToken, priceWei, authorAddress, metadataBytes],
+      });
+
+      app.dismissToast?.("purchase_tx");
+      setShowPurchaseDialog(false);
+
+      // Show pending message - the actual access will be granted via WebSocket alert
+      pushToast({
+        type: "info",
+        message: t("post.purchase.pending") || "Purchase submitted! Waiting for confirmation...",
+        autohideMs: 10000,
+      });
+
+    } catch (error) {
+      dbg.error("PostPage", "Purchase failed", error);
+      app.dismissToast?.("purchase_check");
+      app.dismissToast?.("purchase_keygen");
+      app.dismissToast?.("purchase_approve");
+      app.dismissToast?.("purchase_tx");
+      pushToast({
+        type: "error",
+        message: t("post.purchase.errorFailed") || `Purchase failed: ${error.message}`,
+        autohideMs: 8000,
+      });
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
   return (
     <main class="sv-container p-4">
       <ClosePageButton />
@@ -825,7 +1055,7 @@ export default function PostPage() {
                             <Show when={userAddress() && !isUserInRecipients()}>
                               {/* Purchase access option */}
                               <Show when={purchaseInfo()}>
-                                <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center">
+                                <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center w-full max-w-xs mx-auto">
                                   <div class="text-sm font-medium mb-2">
                                     {t("post.encrypted.buyAccessTitle") || "Buy access to this post"}
                                   </div>
@@ -833,10 +1063,12 @@ export default function PostPage() {
                                     onClick={() => setShowPurchaseDialog(true)}
                                     class="px-4 py-2 rounded-md text-sm font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
                                   >
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span>{t("post.encrypted.buyAccess") || "Buy access"} — {purchaseInfo().priceFormatted} SAVVA</span>
+                                    <span>{t("post.encrypted.buyAccess") || "Buy access"} —</span>
+                                    <TokenValue
+                                      amount={purchaseInfo().priceWei}
+                                      tokenAddress={purchaseInfo().purchaseToken}
+                                      format="inline"
+                                    />
                                   </button>
                                   <div class="text-xs text-[hsl(var(--muted-foreground))] mt-2 italic">
                                     {t("post.encrypted.buyAccessHint") || "One-time payment for permanent access"}
@@ -846,7 +1078,7 @@ export default function PostPage() {
 
                               {/* Show subscription requirements if this is a subscribers-only post */}
                               <Show when={recipientListType() === "subscribers"}>
-                                <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center">
+                                <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center w-full max-w-xs mx-auto">
                                   <div class="text-sm font-medium mb-2">
                                     {t("post.encrypted.subscribeForFuture") || "Subscribe to access future posts like this"}
                                   </div>
@@ -1037,6 +1269,26 @@ export default function PostPage() {
                 </div>
               </div>
 
+              {/* User balance display */}
+              <div class={`mb-4 p-3 rounded-lg ${hasEnoughBalance() === false ? 'bg-red-500/10 border border-red-500/30' : 'bg-[hsl(var(--muted))]'}`}>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-[hsl(var(--muted-foreground))]">{t("post.purchase.yourBalance") || "Your balance:"}</span>
+                  <Show when={userBalance() !== null && userBalance() !== undefined} fallback={<span class="text-[hsl(var(--muted-foreground))]">Loading...</span>}>
+                    <TokenValue
+                      amount={userBalance()?.toString() || "0"}
+                      tokenAddress={purchaseInfo()?.purchaseToken}
+                      format="inline"
+                      class={hasEnoughBalance() === false ? 'text-red-500 font-medium' : 'text-[hsl(var(--foreground))] font-medium'}
+                    />
+                  </Show>
+                </div>
+                <Show when={hasEnoughBalance() === false}>
+                  <div class="mt-2 text-xs text-red-500 text-center font-medium">
+                    {t("post.purchase.insufficientBalance") || "Insufficient balance. You need more SAVVA tokens."}
+                  </div>
+                </Show>
+              </div>
+
               {/* Action buttons */}
               <div class="flex gap-3">
                 <button
@@ -1046,20 +1298,11 @@ export default function PostPage() {
                   {t("common.cancel") || "Cancel"}
                 </button>
                 <button
-                  class="flex-1 px-4 py-3 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium"
-                  onClick={() => {
-                    // TODO: Implement actual purchase logic
-                    console.log("[PostPage] Purchase clicked", {
-                      postId: post()?.savva_cid || post()?.short_cid,
-                      price: purchaseInfo()?.priceWei,
-                      processor: purchaseInfo()?.processorAddress,
-                      token: purchaseInfo()?.purchaseToken,
-                    });
-                    alert(t("post.purchase.comingSoon") || "Purchase feature coming soon!");
-                    setShowPurchaseDialog(false);
-                  }}
+                  class="flex-1 px-4 py-3 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isPurchasing() || hasEnoughBalance() === false}
+                  onClick={handlePurchase}
                 >
-                  {t("post.purchase.confirm") || "Purchase Now"}
+                  {isPurchasing() ? (t("post.purchase.processing") || "Processing...") : (t("post.purchase.confirm") || "Purchase Now")}
                 </button>
               </div>
 

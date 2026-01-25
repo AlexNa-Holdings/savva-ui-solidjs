@@ -258,6 +258,50 @@ export function handleListUpdated(app, payload) {
   }
 }
 
+export function handlePurchaseAccessGranted(app, payload) {
+  const data = payload.data;
+  dbg.log("Alerts:purchase_access_granted", data);
+
+  if (!data?.savva_cid) return;
+
+  // Get current user address
+  const currentUserAddr = String(app.authorizedUser?.()?.address || "").toLowerCase();
+  const buyerAddr = String(data.buyer?.address || "").toLowerCase();
+
+  // Only trigger update if the current user is the buyer
+  if (!currentUserAddr || buyerAddr !== currentUserAddr) {
+    dbg.log("Alerts:purchase_access_granted", "Ignoring - not current user", {
+      currentUserAddr,
+      buyerAddr,
+    });
+    return;
+  }
+
+  // Dispatch a custom event that PostPage/PostCard can listen to for refetching
+  try {
+    window.dispatchEvent(
+      new CustomEvent("savva:purchase-access-granted", {
+        detail: {
+          savva_cid: data.savva_cid,
+          buyer: data.buyer,
+          seller: data.seller,
+        },
+      })
+    );
+  } catch {}
+
+  // Show success toast
+  pushToast({
+    type: "success",
+    message: app.t("post.purchase.accessGranted") || "Access granted! You can now view the content.",
+    autohideMs: 8000,
+  });
+
+  dbg.log("Alerts:purchase_access_granted", "Access granted event dispatched", {
+    savva_cid: data.savva_cid,
+  });
+}
+
 export function handleError(app, payload) {
   try {
     dbg.log("Alerts:error", payload);

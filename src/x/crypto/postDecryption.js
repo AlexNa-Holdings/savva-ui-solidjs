@@ -16,6 +16,40 @@ import { dbg } from "../../utils/debug.js";
  */
 
 /**
+ * Get user-specific encryption data from the API response
+ * The API may return user-specific data at root level (when my_addr is provided)
+ * or in the recipients object (for authors/admins)
+ * @param {string} userAddress - Current user's address
+ * @param {object} encryptionData - Post encryption data from API
+ * @returns {object|null} - User-specific encryption data or null
+ */
+export function getUserEncryptionData(userAddress, encryptionData) {
+  if (!userAddress || !encryptionData) return null;
+
+  // If user-specific data is at root level (API returned it directly)
+  if (encryptionData.reading_key_nonce && encryptionData.pass) {
+    return encryptionData;
+  }
+
+  // Otherwise, check recipients object
+  if (encryptionData.recipients) {
+    const normalizedAddr = userAddress.toLowerCase();
+    const recipientData = encryptionData.recipients[normalizedAddr];
+    if (recipientData) {
+      // Merge with root-level data that might be needed
+      return {
+        ...recipientData,
+        // Keep any root-level fields that aren't user-specific
+        algorithm: encryptionData.algorithm,
+        version: encryptionData.version,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Check if user is in the recipients list for an encrypted post
  * @param {string} userAddress - Current user's address
  * @param {object} encryptionData - Post encryption data from API
@@ -69,8 +103,21 @@ export function canDecryptPost(userAddress, encryptionData) {
     return false;
   }
 
+  // Get user-specific encryption data - might be at root or in recipients object
+  let userEncData = encryptionData;
+
+  // If no reading_key_nonce at root, check if user's data is in recipients object
+  if (!encryptionData.reading_key_nonce && encryptionData.recipients) {
+    const normalizedAddr = userAddress.toLowerCase();
+    const recipientData = encryptionData.recipients[normalizedAddr];
+    if (recipientData) {
+      console.log("[canDecryptPost] Found user data in recipients object:", recipientData);
+      userEncData = recipientData;
+    }
+  }
+
   // First try exact match by nonce
-  const readingKeyNonce = encryptionData.reading_key_nonce;
+  const readingKeyNonce = userEncData.reading_key_nonce;
   if (readingKeyNonce) {
     const secretKey = findStoredSecretKey(userAddress, readingKeyNonce);
     if (secretKey) {
@@ -80,7 +127,7 @@ export function canDecryptPost(userAddress, encryptionData) {
   }
 
   // Then try match by public key (same key used across different posts)
-  const readingPublicKey = encryptionData.reading_public_key;
+  const readingPublicKey = userEncData.reading_public_key;
   if (readingPublicKey) {
     const secretKey = findStoredSecretKeyByPublicKey(userAddress, readingPublicKey);
     if (secretKey) {
@@ -105,6 +152,13 @@ export function canDecryptPost(userAddress, encryptionData) {
 export async function getReadingSecretKey(userAddress, nonce, forceRecover = false, publicKey = null, returnFullKey = false) {
   if (!userAddress || !nonce) return null;
 
+  console.log('[READING_KEY] ========== getReadingSecretKey START ==========');
+  console.log('[READING_KEY] Parameters:');
+  console.log('  - userAddress:', userAddress);
+  console.log('  - nonce (from backend):', nonce);
+  console.log('  - expectedPublicKey (from backend):', publicKey);
+  console.log('  - forceRecover:', forceRecover);
+
   dbg.log("PostDecrypt", "getReadingSecretKey:start", { userAddress, nonce, forceRecover, publicKey, returnFullKey });
 
   // Try to find stored key first
@@ -113,11 +167,15 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
     let storedKey = findStoredSecretKey(userAddress, nonce);
     let storedPublicKey = publicKey; // Use provided publicKey if available
 
+    console.log('[READING_KEY] Lookup by nonce:', storedKey ? 'FOUND' : 'NOT FOUND');
+
     // If not found and we have a public key, try matching by public key
     if (!storedKey && publicKey) {
       storedKey = findStoredSecretKeyByPublicKey(userAddress, publicKey);
       if (storedKey) {
-        console.log('[READING_KEY] Retrieved from storage by public key match');
+        console.log('[READING_KEY] Lookup by publicKey: FOUND');
+      } else {
+        console.log('[READING_KEY] Lookup by publicKey: NOT FOUND');
       }
     }
 
@@ -126,6 +184,7 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
       console.log('  - address:', userAddress);
       console.log('  - secretKey (full hex):', storedKey);
       console.log('  - nonce:', nonce);
+      console.log('[READING_KEY] ========== getReadingSecretKey END ==========');
 
       dbg.log("PostDecrypt", "getReadingSecretKey:stored-key", { userAddress, nonce });
 
@@ -134,8 +193,20 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
       }
       return storedKey;
     }
+
+    // Log all stored keys for debugging
+    const { getStoredReadingKeys } = await import("./readingKeyStorage.js");
+    const allKeys = getStoredReadingKeys(userAddress);
+    console.log('[READING_KEY] All stored keys for this address:', allKeys.map(k => ({
+      nonce: k.nonce,
+      publicKey: k.publicKey,
+      timestamp: k.timestamp
+    })));
+    console.log('[READING_KEY] Expected nonce:', nonce);
+    console.log('[READING_KEY] Expected publicKey:', publicKey);
   }
   dbg.log("PostDecrypt", "getReadingSecretKey:recovering", { userAddress, nonce });
+  console.log('[READING_KEY] No stored key found, will recover from wallet signature...');
 
   // Recover the key by signing again
   try {
@@ -143,9 +214,27 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
 
     console.log('[READING_KEY] Recovered from wallet signature:');
     console.log('  - address:', userAddress);
-    console.log('  - publicKey (full hex):', recovered.publicKey);
-    console.log('  - secretKey (full hex):', recovered.secretKey);
+    console.log('  - recoveredPublicKey (full hex):', recovered.publicKey);
+    console.log('  - recoveredSecretKey (full hex):', recovered.secretKey);
     console.log('  - nonce:', nonce);
+
+    // DIAGNOSTIC: Check if recovered public key matches expected
+    if (publicKey) {
+      const keysMatch = recovered.publicKey.toLowerCase() === publicKey.toLowerCase();
+      console.log('[READING_KEY] KEY VERIFICATION:');
+      console.log('  - Recovered publicKey:', recovered.publicKey);
+      console.log('  - Expected publicKey (from backend):', publicKey);
+      console.log('  - Keys match:', keysMatch ? '✓ YES' : '✗ NO');
+      if (!keysMatch) {
+        console.error('[READING_KEY] CRITICAL: Recovered key does not match what backend expects!');
+        console.error('  - This means the nonce from backend does not produce the same key.');
+        console.error('  - Possible causes:');
+        console.error('    1. The backend has a stale nonce from a previous reading key generation');
+        console.error('    2. The user regenerated their reading key but backend has old data');
+        console.error('    3. The nonce was somehow corrupted');
+      }
+    }
+    console.log('[READING_KEY] ========== getReadingSecretKey END ==========');
 
     dbg.log("PostDecrypt", "getReadingSecretKey:recovered", {
       userAddress,
@@ -159,7 +248,8 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
     }
     return recovered.secretKey;
   } catch (error) {
-    console.error("Failed to recover reading key:", error);
+    console.error("[READING_KEY] Failed to recover reading key:", error);
+    console.log('[READING_KEY] ========== getReadingSecretKey END ==========');
     dbg.warn("PostDecrypt", "getReadingSecretKey:recover-failed", {
       userAddress,
       nonce,
@@ -176,8 +266,8 @@ export async function getReadingSecretKey(userAddress, nonce, forceRecover = fal
  * @returns {string} - Decrypted post secret key (hex)
  * @throws {Error} - If decryption fails
  */
-export function decryptPostEncryptionKey(encryptionData, readingSecretKey) {
-  const { pass, pass_nonce, pass_ephemeral_pub_key } = encryptionData;
+export async function decryptPostEncryptionKey(encryptionData, readingSecretKey) {
+  const { pass, pass_nonce, pass_ephemeral_pub_key, reading_public_key } = encryptionData;
 
   if (!pass || !pass_nonce || !pass_ephemeral_pub_key) {
     throw new Error("Missing encryption data");
@@ -187,9 +277,11 @@ export function decryptPostEncryptionKey(encryptionData, readingSecretKey) {
     hasPass: !!pass,
     hasNonce: !!pass_nonce,
     hasEphemeral: !!pass_ephemeral_pub_key,
+    hasReadingPublicKey: !!reading_public_key,
   });
 
-  return decryptPostKey(pass, pass_ephemeral_pub_key, pass_nonce, readingSecretKey);
+  // Pass reading_public_key for key verification diagnostic
+  return await decryptPostKey(pass, pass_ephemeral_pub_key, pass_nonce, readingSecretKey, reading_public_key);
 }
 
 /**
@@ -300,10 +392,16 @@ export function decryptPostLocales(content, postSecretKey) {
  * @throws {Error} - If user doesn't have access or decryption fails
  */
 export async function decryptPost(post, userAddress, readingSecretKey = null) {
+  console.log('[DECRYPT_POST] ========== decryptPost START ==========');
+  console.log('[DECRYPT_POST] Post CID:', post.savva_cid || post.id);
+  console.log('[DECRYPT_POST] User address:', userAddress);
+
   const content = post.savva_content || post.content;
 
   if (!content || !content.encrypted) {
     // Not encrypted, return as-is
+    console.log('[DECRYPT_POST] Post is not encrypted, returning as-is');
+    console.log('[DECRYPT_POST] ========== decryptPost END ==========');
     return post;
   }
 
@@ -313,22 +411,39 @@ export async function decryptPost(post, userAddress, readingSecretKey = null) {
     throw new Error("Missing encryption data");
   }
 
+  // Get user-specific encryption data (might be at root or in recipients object)
+  const userEncData = getUserEncryptionData(userAddress, encryptionData);
+  if (!userEncData) {
+    throw new Error("User not in recipients list");
+  }
+
+  // Log all user-specific encryption data from backend
+  console.log('[DECRYPT_POST] User-specific encryption data from backend:');
+  console.log('  - reading_key_nonce:', userEncData.reading_key_nonce);
+  console.log('  - reading_public_key:', userEncData.reading_public_key);
+  console.log('  - reading_key_scheme:', userEncData.reading_key_scheme);
+  console.log('  - pass (encrypted post key):', userEncData.pass);
+  console.log('  - pass_nonce:', userEncData.pass_nonce);
+  console.log('  - pass_ephemeral_pub_key:', userEncData.pass_ephemeral_pub_key);
+
   // Get reading secret key if not provided
   let readingKey = readingSecretKey;
   if (!readingKey) {
     readingKey = await getReadingSecretKey(
       userAddress,
-      encryptionData.reading_key_nonce,
+      userEncData.reading_key_nonce,
       false, // forceRecover
-      encryptionData.reading_public_key // publicKey for lookup
+      userEncData.reading_public_key // publicKey for lookup
     );
     if (!readingKey) {
       throw new Error("Failed to get reading secret key");
     }
   }
 
-  // Decrypt the post encryption key
-  const postSecretKey = decryptPostEncryptionKey(encryptionData, readingKey);
+  console.log('[DECRYPT_POST] Got reading secret key:', readingKey);
+
+  // Decrypt the post encryption key using user-specific data
+  const postSecretKey = await decryptPostEncryptionKey(userEncData, readingKey);
 
   // Decrypt the locales
   const decryptedContent = decryptPostLocales(content, postSecretKey);

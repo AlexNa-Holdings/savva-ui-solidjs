@@ -14,14 +14,18 @@ import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 import { resolvePostCidPath, getPostContentBaseCid } from "../../ipfs/utils.js";
-import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey } from "../crypto/postDecryption.js";
+import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey, getUserEncryptionData } from "../crypto/postDecryption.js";
 import { setEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
-import { READING_KEY_UPDATED_EVENT } from "../crypto/readingKeyStorage.js";
+import { READING_KEY_UPDATED_EVENT, storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
 import { loadNsfwPreference } from "../preferences/storage.js";
-import { formatUnits } from "viem";
+import { formatUnits, toHex, stringToBytes } from "viem";
 import TokenValue from "../ui/TokenValue.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
+import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { pushToast } from "../../ui/toast.js";
+import { fetchReadingKey, generateReadingKey, publishReadingKey } from "../crypto/readingKey.js";
+import { toChecksumAddress } from "../../blockchain/utils.js";
 import { dbg } from "../../utils/debug.js";
 
 function PinIcon(props) {
@@ -67,6 +71,7 @@ export default function PostCard(props) {
 
   const [revealed, setRevealed] = createSignal(false);
   const [showPurchaseDialog, setShowPurchaseDialog] = createSignal(false);
+  const [isPurchasing, setIsPurchasing] = createSignal(false);
 
   // Signal to trigger re-check of decryption capability
   const [keyUpdateTrigger, setKeyUpdateTrigger] = createSignal(0);
@@ -126,6 +131,220 @@ export default function PostCard(props) {
       });
     }
   });
+
+  // Listen for purchase access granted event
+  onMount(() => {
+    const handlePurchaseAccessGranted = async (event) => {
+      const { savva_cid } = event.detail || {};
+      const b = base();
+      const currentCid = b?.savva_cid || b?.short_cid || b?.id;
+      if (savva_cid && currentCid && String(savva_cid) === String(currentCid)) {
+        dbg.log("PostCard", "Received purchase access granted for this post, refetching...");
+
+        // Refetch the post data to get updated recipient list
+        try {
+          const contentList = app.wsMethod("content-list");
+          const domain = app.selectedDomainName();
+          const user = app.authorizedUser?.();
+
+          const requestParams = {
+            domain,
+            limit: 1,
+            show_nsfw: true,
+            show_all_encrypted_posts: true,
+            savva_cid: b.savva_cid || currentCid,
+          };
+          if (user?.address) {
+            requestParams.my_addr = toChecksumAddress(user.address);
+          }
+
+          const res = await contentList(requestParams);
+          const arr = Array.isArray(res) ? res : Array.isArray(res?.list) ? res.list : [];
+          const updatedPost = arr[0];
+
+          if (updatedPost) {
+            const encData = updatedPost.savva_content?.encryption;
+            const userAddr = app.authorizedUser?.()?.address;
+            const normalizedAddr = userAddr?.toLowerCase();
+
+            // Check both root level and recipients object
+            const recipientData = normalizedAddr && encData?.recipients?.[normalizedAddr];
+            const userEncData = (encData?.reading_key_nonce && encData?.pass)
+              ? encData
+              : recipientData;
+
+            dbg.log("PostCard", "Got updated post data after purchase", {
+              hasEncryption: !!encData,
+              recipientCount: Object.keys(encData?.recipients || {}).length,
+              recipientKeys: Object.keys(encData?.recipients || {}),
+              userAddr: normalizedAddr,
+              // Root level data
+              hasReadingKeyNonceAtRoot: !!encData?.reading_key_nonce,
+              hasReadingPublicKeyAtRoot: !!encData?.reading_public_key,
+              hasPassAtRoot: !!encData?.pass,
+              readingPublicKeyAtRoot: encData?.reading_public_key,
+              // Recipient-specific data
+              hasRecipientData: !!recipientData,
+              recipientDataKeys: recipientData ? Object.keys(recipientData) : [],
+              recipientReadingPublicKey: recipientData?.reading_public_key,
+              recipientReadingKeyNonce: recipientData?.reading_key_nonce,
+              recipientHasPass: !!recipientData?.pass,
+              // Final user encryption data
+              hasUserEncData: !!userEncData,
+              userEncDataReadingPublicKey: userEncData?.reading_public_key,
+            });
+
+            // Check if local storage has the key
+            const searchPublicKey = userEncData?.reading_public_key || encData?.reading_public_key;
+            if (userAddr && searchPublicKey) {
+              const { findStoredSecretKeyByPublicKey, getStoredReadingKeys } = await import("../crypto/readingKeyStorage.js");
+              const storedKeys = getStoredReadingKeys(userAddr);
+              const foundKey = findStoredSecretKeyByPublicKey(userAddr, searchPublicKey);
+              dbg.log("PostCard", "Checking local storage for key", {
+                userAddr,
+                storedKeysCount: storedKeys.length,
+                storedPublicKeys: storedKeys.map(k => k.publicKey?.toLowerCase()),
+                searchingFor: searchPublicKey?.toLowerCase(),
+                foundKey: !!foundKey,
+                keysMatch: storedKeys.some(k => k.publicKey?.toLowerCase() === searchPublicKey?.toLowerCase()),
+              });
+            } else {
+              dbg.log("PostCard", "Cannot check local storage - missing userAddr or searchPublicKey", {
+                userAddr,
+                searchPublicKey,
+              });
+            }
+
+            // Update the store with fresh data
+            const normalized = normalize(updatedPost);
+            setItem(reconcile(normalized));
+
+            // Trigger re-check of decryption capability
+            setKeyUpdateTrigger(prev => prev + 1);
+          }
+        } catch (error) {
+          dbg.error("PostCard", "Failed to refetch post after purchase", error);
+          // Still trigger re-check in case local key is available
+          setKeyUpdateTrigger(prev => prev + 1);
+        }
+      }
+    };
+
+    window.addEventListener("savva:purchase-access-granted", handlePurchaseAccessGranted);
+    onCleanup(() => {
+      window.removeEventListener("savva:purchase-access-granted", handlePurchaseAccessGranted);
+    });
+  });
+
+  // Purchase handler
+  const handlePurchase = async () => {
+    const info = purchaseInfo();
+    if (!info) return;
+
+    const authorAddress = author()?.address;
+    const savvaCid = base()?.savva_cid || base()?.short_cid;
+    if (!authorAddress || !savvaCid) {
+      pushToast({ type: "error", message: t("post.purchase.errorMissingData") || "Missing post data" });
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      const actorAddr = app.actorAddress?.() || app.authorizedUser?.()?.address;
+
+      if (!actorAddr) {
+        throw new Error(t("post.purchase.errorNotConnected") || "Wallet not connected");
+      }
+
+      // Step 1: Check if user has a published reading key
+      pushToast({ type: "info", message: t("post.purchase.checkingReadingKey") || "Checking reading key...", autohideMs: 0, id: "purchase_check" });
+
+      const existingKey = await fetchReadingKey(app, actorAddr);
+      app.dismissToast?.("purchase_check");
+
+      if (!existingKey) {
+        // User needs to generate and publish a reading key first
+        pushToast({ type: "info", message: t("post.purchase.generatingReadingKey") || "Generating reading key...", autohideMs: 0, id: "purchase_keygen" });
+
+        try {
+          // Generate the reading key (will prompt for wallet signature)
+          const { nonce, publicKey, secretKey } = await generateReadingKey(actorAddr);
+
+          // Publish to contract
+          await publishReadingKey(app, publicKey, nonce);
+
+          // Store locally for future decryption
+          storeReadingKey(actorAddr, { nonce, publicKey, secretKey });
+
+          app.dismissToast?.("purchase_keygen");
+          pushToast({ type: "success", message: t("post.purchase.readingKeyPublished") || "Reading key published!", autohideMs: 3000 });
+        } catch (keyError) {
+          app.dismissToast?.("purchase_keygen");
+          throw new Error(t("post.purchase.errorReadingKey") || "Failed to publish reading key. Please try again.");
+        }
+      }
+
+      // Step 2: Check and ensure allowance
+      const purchaseContract = await getSavvaContract(app, "SavvaPurchase");
+      const savvaToken = await getSavvaContract(app, "SavvaToken");
+      const priceWei = BigInt(info.priceWei);
+      const allowance = await savvaToken.read.allowance([actorAddr, purchaseContract.address]);
+
+      if (allowance < priceWei) {
+        pushToast({ type: "info", message: t("post.purchase.approving") || "Approving SAVVA token...", autohideMs: 0, id: "purchase_approve" });
+
+        const MAX_UINT = (1n << 256n) - 1n;
+        await sendAsActor(app, {
+          contractName: "SavvaToken",
+          functionName: "approve",
+          args: [purchaseContract.address, MAX_UINT],
+        });
+
+        app.dismissToast?.("purchase_approve");
+      }
+
+      // Step 3: Build metadata and call buy
+      const metadata = {
+        sku: "access_to_post",
+        savva_cid: savvaCid,
+        processor_address: info.processorAddress,
+      };
+      const metadataBytes = toHex(stringToBytes(JSON.stringify(metadata)));
+
+      pushToast({ type: "info", message: t("post.purchase.processing") || "Processing purchase...", autohideMs: 0, id: "purchase_tx" });
+
+      // Call buy function
+      await sendAsActor(app, {
+        contractName: "SavvaPurchase",
+        functionName: "buy",
+        args: [info.purchaseToken, priceWei, authorAddress, metadataBytes],
+      });
+
+      app.dismissToast?.("purchase_tx");
+      setShowPurchaseDialog(false);
+
+      // Show pending message - the actual access will be granted via WebSocket alert
+      pushToast({
+        type: "info",
+        message: t("post.purchase.pending") || "Purchase submitted! Waiting for confirmation...",
+        autohideMs: 10000,
+      });
+
+    } catch (error) {
+      dbg.error("PostCard", "Purchase failed", error);
+      app.dismissToast?.("purchase_check");
+      app.dismissToast?.("purchase_keygen");
+      app.dismissToast?.("purchase_approve");
+      app.dismissToast?.("purchase_tx");
+      pushToast({
+        type: "error",
+        message: t("post.purchase.errorFailed") || `Purchase failed: ${error.message}`,
+        autohideMs: 8000,
+      });
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   // Live updates
   let lastPostUpdate;
@@ -188,15 +407,29 @@ export default function PostCard(props) {
       postId,
       trigger,
       isEncrypted: encrypted,
+      isDecrypted: base()?._decrypted,
+      contentEncrypted: content()?.encrypted,
       hasAddr: !!addr,
+      addr: addr,
       hasEncData: !!encData,
       readingPublicKey: encData?.reading_public_key,
       readingKeyNonce: encData?.reading_key_nonce,
+      hasPass: !!encData?.pass,
+      recipientCount: encData?.recipients ? Object.keys(encData.recipients).length : 0,
     });
 
-    if (!encrypted) return false;
-    if (!addr) return false;
-    if (!encData) return false;
+    if (!encrypted) {
+      console.log("[PostCard] canDecrypt: returning false because not encrypted");
+      return false;
+    }
+    if (!addr) {
+      console.log("[PostCard] canDecrypt: returning false because no addr");
+      return false;
+    }
+    if (!encData) {
+      console.log("[PostCard] canDecrypt: returning false because no encData");
+      return false;
+    }
 
     const result = canDecryptPost(addr, encData);
     console.log("[PostCard] canDecrypt result for", postId, ":", result);
@@ -232,19 +465,32 @@ export default function PostCard(props) {
       const postContent = originalBase?.savva_content || originalBase?.content;
       const encryptionData = postContent?.encryption;
 
+      // Get user-specific encryption data (might be at root or in recipients object)
+      const userEncData = getUserEncryptionData(addr, encryptionData);
+      if (!userEncData) {
+        console.error("[PostCard] User not in recipients list - no user-specific encryption data");
+        return;
+      }
+
+      console.log("[PostCard] Got user encryption data:", {
+        hasReadingKeyNonce: !!userEncData.reading_key_nonce,
+        hasReadingPublicKey: !!userEncData.reading_public_key,
+        hasPass: !!userEncData.pass,
+      });
+
       // Get the post secret key for decryption (pass publicKey for cross-post key lookup)
       const readingKey = await getReadingSecretKey(
         addr,
-        encryptionData.reading_key_nonce,
+        userEncData.reading_key_nonce,
         false, // forceRecover
-        encryptionData.reading_public_key // publicKey for lookup
+        userEncData.reading_public_key // publicKey for lookup
       );
       if (!readingKey) {
         console.error("[PostCard] Failed to get reading secret key");
         return;
       }
 
-      const postSecretKey = decryptPostEncryptionKey(encryptionData, readingKey);
+      const postSecretKey = await decryptPostEncryptionKey(userEncData, readingKey);
       if (!postSecretKey) {
         console.error("[PostCard] Failed to decrypt post encryption key");
         return;
@@ -350,21 +596,6 @@ export default function PostCard(props) {
     }
   });
 
-  // Calculate USD value for purchase price
-  const purchaseUsdValue = createMemo(() => {
-    const info = purchaseInfo();
-    if (!info) return null;
-    const priceData = app.savvaTokenPrice?.();
-    if (!priceData?.price) return null;
-    try {
-      const units = parseFloat(info.priceFormatted);
-      const total = units * Number(priceData.price);
-      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
-    } catch {
-      return null;
-    }
-  });
-
   // Banned ribbons
   const isBannedPost = createMemo(() => !!base()?.banned);
   const isBannedAuthor = createMemo(() => !!(base()?.author_banned || base()?.author?.banned));
@@ -454,14 +685,13 @@ export default function PostCard(props) {
                     setShowPurchaseDialog(true);
                   }}
                 >
-                  <svg class="w-6 h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span class="text-xs font-medium">
-                    {t("post.encrypted.buyAccess") || "Buy access"} — {purchaseInfo().priceFormatted} SAVVA
-                    <Show when={purchaseUsdValue()}>
-                      <span class="opacity-75"> ({purchaseUsdValue()})</span>
-                    </Show>
+                  <span class="text-xs font-medium flex items-center gap-1">
+                    {t("post.encrypted.buyAccess") || "Buy access"} —
+                    <TokenValue
+                      amount={purchaseInfo().priceWei}
+                      tokenAddress={purchaseInfo().purchaseToken}
+                      format="inline"
+                    />
                   </span>
                 </button>
                 <div class="text-[10px] text-[hsl(var(--muted-foreground))] italic">
@@ -700,20 +930,11 @@ export default function PostCard(props) {
                   {t("common.cancel") || "Cancel"}
                 </button>
                 <button
-                  class="flex-1 px-4 py-3 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium"
-                  onClick={() => {
-                    // TODO: Implement actual purchase logic
-                    console.log("[PostCard] Purchase clicked", {
-                      postId: base()?.savva_cid || base()?.short_cid,
-                      price: purchaseInfo()?.priceWei,
-                      processor: purchaseInfo()?.processorAddress,
-                      token: purchaseInfo()?.purchaseToken,
-                    });
-                    alert(t("post.purchase.comingSoon") || "Purchase feature coming soon!");
-                    setShowPurchaseDialog(false);
-                  }}
+                  class="flex-1 px-4 py-3 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isPurchasing()}
+                  onClick={handlePurchase}
                 >
-                  {t("post.purchase.confirm") || "Purchase Now"}
+                  {isPurchasing() ? (t("post.purchase.processing") || "Processing...") : (t("post.purchase.confirm") || "Purchase Now")}
                 </button>
               </div>
 

@@ -19,6 +19,7 @@ export const alertRegistry = {
   fund_contributed: h.handleFundContributed,
   fund_prize: h.handleFundPrize,
   fundraiser_contribution: h.handleFundraiserContribution,
+  purchase_access_granted: h.handlePurchaseAccessGranted,
 
   banned_post: bh.handleBannedPost,
   banned_user: bh.handleBannedUser,

@@ -130,7 +130,7 @@ export function encryptPostKeyForRecipient(postSecretKeyHex, recipientPublicKeyH
  * @param {string} recipientSecretKeyHex - Recipient's reading secret key (hex)
  * @returns {string} - Decrypted post secret key (hex)
  */
-export function decryptPostKey(encryptedKeyHex, ephemeralPublicKeyHex, nonceHex, recipientSecretKeyHex) {
+export async function decryptPostKey(encryptedKeyHex, ephemeralPublicKeyHex, nonceHex, recipientSecretKeyHex, expectedRecipientPublicKeyHex = null) {
   console.log('[POST_DECRYPT] ========== decryptPostKey START ==========');
 
   // Log input parameters (hex strings before conversion)
@@ -157,11 +157,80 @@ export function decryptPostKey(encryptedKeyHex, ephemeralPublicKeyHex, nonceHex,
   console.log('  - nonce:', nonce.length, 'bytes');
   console.log('  - recipientSecretKey:', recipientSecretKey.length, 'bytes');
 
+  // DIAGNOSTIC: Derive our public key from the secret key and compare with expected
+  const derivedPublicKey = x25519.getPublicKey(recipientSecretKey);
+  const derivedPublicKeyHex = bytesToHex(derivedPublicKey);
+  console.log('[POST_DECRYPT] KEY VERIFICATION:');
+  console.log('  - Derived public key from our secret:', derivedPublicKeyHex);
+  if (expectedRecipientPublicKeyHex) {
+    console.log('  - Expected public key (from backend):', expectedRecipientPublicKeyHex);
+    const keysMatch = derivedPublicKeyHex.toLowerCase() === expectedRecipientPublicKeyHex.toLowerCase();
+    console.log('  - Keys match:', keysMatch ? '✓ YES' : '✗ NO - THIS IS THE PROBLEM!');
+    if (!keysMatch) {
+      console.error('[POST_DECRYPT] KEY MISMATCH! The secret key we have does not match the public key the backend encrypted for.');
+      console.error('  - This means either:');
+      console.error('    1. The stored secret key is from a different nonce/signing session');
+      console.error('    2. The backend fetched the wrong public key for this user');
+      console.error('    3. The user has multiple reading keys and we are using the wrong one');
+    }
+  }
+
+  // DIAGNOSTIC: Test local encryption/decryption with same params to verify crypto works
+  console.log('[POST_DECRYPT] LOCAL CRYPTO TEST:');
+  try {
+    // Create a test message
+    const testMessage = new Uint8Array(32).fill(0x42); // 32 bytes of 0x42
+    const testNonce = randomBytes(24);
+
+    // Generate ephemeral keypair and compute shared secret (like server would)
+    const testEphemeralSecret = x25519.utils.randomPrivateKey();
+    const testEphemeralPublic = x25519.getPublicKey(testEphemeralSecret);
+
+    // Server computes: sharedSecret = ECDH(ephemeralSecret, recipientPublic)
+    const testSharedSecretServer = x25519.getSharedSecret(testEphemeralSecret, derivedPublicKey);
+
+    // Client computes: sharedSecret = ECDH(recipientSecret, ephemeralPublic)
+    const testSharedSecretClient = x25519.getSharedSecret(recipientSecretKey, testEphemeralPublic);
+
+    const secretsMatch = bytesToHex(testSharedSecretServer) === bytesToHex(testSharedSecretClient);
+    console.log('  - Local ECDH secrets match:', secretsMatch ? '✓ YES' : '✗ NO');
+
+    // Encrypt with server's shared secret
+    const testCipher = xsalsa20poly1305(testSharedSecretServer, testNonce);
+    const testCiphertext = testCipher.encrypt(testMessage);
+
+    // Decrypt with client's shared secret
+    const testDecipher = xsalsa20poly1305(testSharedSecretClient, testNonce);
+    const testDecrypted = testDecipher.decrypt(testCiphertext);
+
+    const decryptedCorrectly = bytesToHex(testDecrypted) === bytesToHex(testMessage);
+    console.log('  - Local encrypt/decrypt works:', decryptedCorrectly ? '✓ YES' : '✗ NO');
+
+    if (!secretsMatch || !decryptedCorrectly) {
+      console.error('[POST_DECRYPT] Local crypto test FAILED - there may be a library issue');
+    }
+  } catch (e) {
+    console.error('[POST_DECRYPT] Local crypto test error:', e.message);
+  }
+
   // Compute shared secret
   console.log('[POST_DECRYPT] Computing X25519 ECDH shared secret...');
   const sharedSecret = x25519.getSharedSecret(recipientSecretKey, ephemeralPublicKey);
   console.log('  - sharedSecret length:', sharedSecret.length, 'bytes');
   console.log('  - sharedSecret (full hex):', bytesToHex(sharedSecret));
+
+  // DIAGNOSTIC: Try with reversed ephemeral public key (byte order issue?)
+  const ephemeralPublicKeyReversed = new Uint8Array(ephemeralPublicKey).reverse();
+  const sharedSecretReversed = x25519.getSharedSecret(recipientSecretKey, ephemeralPublicKeyReversed);
+  console.log('[POST_DECRYPT] BYTE ORDER TEST (reversed ephemeral pub key):');
+  console.log('  - sharedSecret (reversed):', bytesToHex(sharedSecretReversed));
+
+  // DIAGNOSTIC: Try with HKDF-derived key (some servers do this)
+  const { hkdf } = await import("@noble/hashes/hkdf");
+  const { sha256 } = await import("@noble/hashes/sha256");
+  const hkdfDerivedKey = hkdf(sha256, sharedSecret, new Uint8Array(0), new Uint8Array(0), 32);
+  console.log('[POST_DECRYPT] HKDF TEST (if server applies HKDF to shared secret):');
+  console.log('  - HKDF-derived key:', bytesToHex(hkdfDerivedKey));
 
   // Decrypt the post key
   console.log('[POST_DECRYPT] Creating XSalsa20-Poly1305 cipher...');
@@ -184,8 +253,40 @@ export function decryptPostKey(encryptedKeyHex, ephemeralPublicKeyHex, nonceHex,
 
     return postKeyHex;
   } catch (error) {
-    console.error('[POST_DECRYPT] ✗ Decryption FAILED');
-    console.error('  - Error:', error.message);
+    console.error('[POST_DECRYPT] ✗ Decryption with raw shared secret FAILED:', error.message);
+
+    // Try with HKDF-derived key
+    console.log('[POST_DECRYPT] Trying decryption with HKDF-derived key...');
+    try {
+      const hkdfCipher = xsalsa20poly1305(hkdfDerivedKey, nonce);
+      const postKeyBytes = hkdfCipher.decrypt(encryptedKey);
+      const postKeyHex = bytesToHex(postKeyBytes);
+
+      console.log('[POST_DECRYPT] ✓ Decryption with HKDF key SUCCESS!');
+      console.log('  - postKeyHex (full):', postKeyHex);
+      console.log('[POST_DECRYPT] ========== decryptPostKey END ==========');
+      console.warn('[POST_DECRYPT] WARNING: Server is using HKDF on shared secret. Update client code to match!');
+      return postKeyHex;
+    } catch (hkdfError) {
+      console.error('[POST_DECRYPT] ✗ Decryption with HKDF key also FAILED:', hkdfError.message);
+    }
+
+    // Try with reversed ephemeral public key
+    console.log('[POST_DECRYPT] Trying decryption with reversed ephemeral public key...');
+    try {
+      const reversedCipher = xsalsa20poly1305(sharedSecretReversed, nonce);
+      const postKeyBytes = reversedCipher.decrypt(encryptedKey);
+      const postKeyHex = bytesToHex(postKeyBytes);
+
+      console.log('[POST_DECRYPT] ✓ Decryption with reversed key SUCCESS!');
+      console.log('  - postKeyHex (full):', postKeyHex);
+      console.log('[POST_DECRYPT] ========== decryptPostKey END ==========');
+      console.warn('[POST_DECRYPT] WARNING: Server has byte-order issue with ephemeral public key!');
+      return postKeyHex;
+    } catch (reversedError) {
+      console.error('[POST_DECRYPT] ✗ Decryption with reversed key also FAILED:', reversedError.message);
+    }
+
     console.log('[POST_DECRYPT] ========== decryptPostKey END ==========');
     throw error;
   }
