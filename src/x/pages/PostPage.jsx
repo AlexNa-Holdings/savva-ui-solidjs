@@ -49,6 +49,7 @@ import { swManager } from "../crypto/serviceWorkerManager.js";
 import { loadNsfwPreference } from "../preferences/storage.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { connectWallet } from "../../blockchain/wallet.js";
 import { pushToast } from "../../ui/toast.js";
 import { toHex, stringToBytes } from "viem";
 import { fetchReadingKey, generateReadingKey, publishReadingKey } from "../crypto/readingKey.js";
@@ -1111,9 +1112,31 @@ export default function PostPage() {
                               </Show>
                             </Show>
                             <Show when={!userAddress()}>
-                              <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                                {t("post.encrypted.loginRequired") || "Please connect your wallet to unlock"}
-                              </p>
+                              <Show when={purchaseInfo()}>
+                                <div class="p-4 rounded-md bg-[hsl(var(--muted))] border border-[hsl(var(--border))] text-center w-full max-w-xs mx-auto">
+                                  <div class="text-sm font-medium mb-2">
+                                    {t("post.encrypted.buyAccessTitle") || "Buy access to this post"}
+                                  </div>
+                                  <div class="text-xs text-[hsl(var(--muted-foreground))] mb-3 flex justify-center">
+                                    <TokenValue
+                                      amount={purchaseInfo().priceWei}
+                                      tokenAddress={purchaseInfo().purchaseToken}
+                                      format="inline"
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={async () => await connectWallet()}
+                                    class="px-4 py-2 rounded-md text-sm font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+                                  >
+                                    {t("wallet.connect") || "Connect wallet"}
+                                  </button>
+                                </div>
+                              </Show>
+                              <Show when={!purchaseInfo()}>
+                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                  {t("post.encrypted.loginRequired") || "Please connect your wallet to unlock"}
+                                </p>
+                              </Show>
                             </Show>
                             <Show when={decryptError()}>
                               <p class="text-sm text-[hsl(var(--destructive))]">{decryptError()}</p>

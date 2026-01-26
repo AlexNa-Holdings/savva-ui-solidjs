@@ -99,13 +99,24 @@ function safeChecksum(addr) {
 }
 
 function getPostTitle(record, lang) {
-  if (!record?.locales) return "";
-  const locales = record.locales;
-  // Try current lang, then en, then first available
-  const title = locales[lang]?.title || locales.en?.title || Object.values(locales)[0]?.title || "";
-  // Truncate to ~40 chars
-  if (title.length > 40) return title.slice(0, 40) + "…";
-  return title;
+  // Try locales first
+  if (record?.locales) {
+    const locales = record.locales;
+    // Try current lang, then en, then first available
+    const title = locales[lang]?.title || locales.en?.title || Object.values(locales)[0]?.title || "";
+    if (title) {
+      // Truncate to ~40 chars
+      if (title.length > 40) return title.slice(0, 40) + "…";
+      return title;
+    }
+  }
+  // Try other possible title fields
+  const title = record?.post_title || record?.title || record?.postTitle || "";
+  if (title) {
+    if (title.length > 40) return title.slice(0, 40) + "…";
+    return title;
+  }
+  return "";
 }
 
 function getPostCid(record) {
@@ -226,7 +237,7 @@ export default function HistoryTab(props) {
                           <div class="flex flex-col leading-tight">
                             <span class="text-[hsl(var(--foreground))] font-medium">{contractLabel}</span>
                             <span class="text-[hsl(var(--muted-foreground))]">{typeLabel}</span>
-                            <Show when={record.locales && getPostCid(record)}>
+                            <Show when={getPostCid(record)}>
                               <button
                                 type="button"
                                 class="flex items-center gap-1 text-xs hover:underline mt-0.5 text-left"

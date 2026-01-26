@@ -14,7 +14,7 @@ import ContextMenu from "../ui/ContextMenu.jsx";
 import { getPostAdminItems } from "../../ui/contextMenuBuilder.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 import { resolvePostCidPath, getPostContentBaseCid } from "../../ipfs/utils.js";
-import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey, getUserEncryptionData } from "../crypto/postDecryption.js";
+import { canDecryptPost, decryptPostMetadata, getReadingSecretKey, decryptPostEncryptionKey, getUserEncryptionData, isUserInRecipientsList } from "../crypto/postDecryption.js";
 import { setEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { READING_KEY_UPDATED_EVENT, storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
@@ -23,6 +23,7 @@ import { formatUnits, toHex, stringToBytes } from "viem";
 import TokenValue from "../ui/TokenValue.jsx";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { connectWallet } from "../../blockchain/wallet.js";
 import { pushToast } from "../../ui/toast.js";
 import { fetchReadingKey, generateReadingKey, publishReadingKey } from "../crypto/readingKey.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
@@ -436,6 +437,25 @@ export default function PostCard(props) {
     return result;
   });
 
+  // Check if user is in recipients list (has encryption data, even if key not stored yet)
+  const isUserInRecipients = createMemo(() => {
+    const postId = base()?.savva_cid || base()?.short_cid;
+    if (!isEncrypted()) return false;
+    const encData = content()?.encryption;
+    console.log("[PostCard] isUserInRecipients check:", {
+      postId,
+      hasEncData: !!encData,
+      reading_key_nonce: encData?.reading_key_nonce,
+      hasRecipients: !!encData?.recipients,
+      userAddress: userAddress(),
+      encDataKeys: encData ? Object.keys(encData) : [],
+    });
+    if (!encData) return false;
+    const result = isUserInRecipientsList(userAddress(), encData);
+    console.log("[PostCard] isUserInRecipients result:", { postId, result });
+    return result;
+  });
+
   // Auto-decrypt if we have the key stored
   createEffect(async () => {
     const postId = base()?.savva_cid || base()?.short_cid;
@@ -675,8 +695,24 @@ export default function PostCard(props) {
                 {t("post.encrypted.subscribersOnly") || "This post is encrypted for subscribers only"}
               </div>
 
-              {/* Purchase access option */}
-              <Show when={purchaseInfo()}>
+              {/* Unlock button when user has access (is in recipients) */}
+              <Show when={isUserInRecipients()}>
+                <button
+                  class="mt-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCardClick(e);
+                  }}
+                >
+                  <span class="text-xs font-medium">
+                    {t("post.encrypted.unlock") || "Unlock Content"}
+                  </span>
+                </button>
+              </Show>
+
+              {/* Purchase access option - only when user is authorized and NOT in recipients */}
+              <Show when={userAddress() && !isUserInRecipients() && purchaseInfo()}>
                 <button
                   class="mt-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity flex items-center gap-2"
                   onClick={(e) => {
@@ -696,6 +732,25 @@ export default function PostCard(props) {
                 </button>
                 <div class="text-[10px] text-[hsl(var(--muted-foreground))] italic">
                   {t("post.encrypted.buyAccessHint") || "One-time payment for permanent access"}
+                </div>
+              </Show>
+
+              {/* Connect wallet prompt - when not authorized but purchase is available */}
+              <Show when={!userAddress() && purchaseInfo()}>
+                <button
+                  class="mt-2 px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    await connectWallet();
+                  }}
+                >
+                  <span class="text-xs font-medium">
+                    {t("wallet.connect") || "Connect wallet"}
+                  </span>
+                </button>
+                <div class="text-[10px] text-[hsl(var(--muted-foreground))] italic">
+                  {t("post.encrypted.connectToBuy") || "Connect to buy access"}
                 </div>
               </Show>
             </div>
