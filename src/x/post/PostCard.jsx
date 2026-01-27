@@ -239,6 +239,9 @@ export default function PostCard(props) {
 
   // Purchase handler
   const handlePurchase = async () => {
+    // Guard against multiple calls
+    if (isPurchasing()) return;
+
     const info = purchaseInfo();
     if (!info) return;
 
@@ -333,16 +336,17 @@ export default function PostCard(props) {
 
     } catch (error) {
       dbg.error("PostCard", "Purchase failed", error);
-      app.dismissToast?.("purchase_check");
-      app.dismissToast?.("purchase_keygen");
-      app.dismissToast?.("purchase_approve");
-      app.dismissToast?.("purchase_tx");
       pushToast({
         type: "error",
         message: t("post.purchase.errorFailed") || `Purchase failed: ${error.message}`,
         autohideMs: 8000,
       });
     } finally {
+      // Always dismiss all purchase-related toasts
+      app.dismissToast?.("purchase_check");
+      app.dismissToast?.("purchase_keygen");
+      app.dismissToast?.("purchase_approve");
+      app.dismissToast?.("purchase_tx");
       setIsPurchasing(false);
     }
   };
