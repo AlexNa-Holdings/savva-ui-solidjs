@@ -38,6 +38,7 @@ import CreateProposalPage from "./pages/CreateProposalPage.jsx";
 import ReadingKeyInviteManager from "./main/ReadingKeyInviteManager.jsx";
 import PromoPostManager from "./main/PromoPostManager.jsx";
 import ExportImportPage from "./pages/ExportImportPage.jsx";
+import ExchangePage from "./pages/ExchangePage.jsx";
 
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
@@ -61,6 +62,7 @@ export default function App() {
     if (r.startsWith("/governance/create-proposal")) return "create-proposal";
     if (r.startsWith("/governance")) return "governance";
     if (r.startsWith("/fr/")) return "contribute";
+    if (r.startsWith("/exchange")) return "exchange";
     if (r.startsWith("/admin")) return "admin";
     if (r.startsWith("/export-import")) return "export-import";
     if (r.startsWith("/@") || r.startsWith("/0x")) return "profile";
@@ -180,6 +182,7 @@ export default function App() {
                 <Show when={currentView() === "create-proposal"}><CreateProposalPage /></Show>
                 <Show when={currentView() === "admin"}><AdminPage /></Show>
                 <Show when={currentView() === "export-import"}><ExportImportPage /></Show>
+                <Show when={currentView() === "exchange"}><ExchangePage /></Show>
               </main>
             </>
           </Show>

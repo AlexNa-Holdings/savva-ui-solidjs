@@ -206,8 +206,22 @@ export default function RightPane({ isOpen, onClose }) {
                 </li>
               </Show>
 
-              {/* Admin link */}
+              {/* Admin-only links */}
               <Show when={app.authorizedUser()?.isAdmin}>
+                <li>
+                  <div
+                    class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
+                    role="button" tabIndex={0}
+                    onClick={() => {
+                      app.setSavedScrollY(window.scrollY);
+                      navigate("/exchange");
+                      onClose();
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); app.setSavedScrollY(window.scrollY); navigate("/exchange"); onClose(); } }}
+                  >
+                    {t("rightPane.exchange")}
+                  </div>
+                </li>
                 <li>
                   <div
                     class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"

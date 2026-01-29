@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon, HistoryIcon } from "../ui/icons/ProfileIcons.jsx";
+import { HeartIcon } from "../ui/icons/TabIcons.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
 import { navigate } from "../../routing/smartRouter.js";
 
@@ -121,6 +122,17 @@ function getPostTitle(record, lang) {
 
 function getPostCid(record) {
   return record?.short_cid || record?.savva_cid || "";
+}
+
+function getCampaignId(record) {
+  // Campaign ID is in the info field for fundraiser contributions
+  const info = record?.info;
+  if (!info) return null;
+  // info might be like "123" or "contribution" with campaign_id field
+  // Check if info is a numeric string (campaign ID directly)
+  if (/^\d+$/.test(info)) return info;
+  // Or check for campaign_id field
+  return record?.campaign_id || null;
 }
 
 export default function HistoryTab(props) {
@@ -249,6 +261,20 @@ export default function HistoryTab(props) {
                               >
                                 <PostsIcon class="w-3 h-3" />
                                 <span class="truncate max-w-[150px]">{getPostTitle(record, app.lang()) || t("profile.history.post")}</span>
+                              </button>
+                            </Show>
+                            <Show when={getCampaignId(record)}>
+                              <button
+                                type="button"
+                                class="flex items-center gap-1 text-xs hover:underline mt-0.5 text-left"
+                                style={{ color: "#FF7100" }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/fr/${getCampaignId(record)}`);
+                                }}
+                              >
+                                <HeartIcon class="w-3 h-3" />
+                                <span>{t("profile.history.campaign")} #{getCampaignId(record)}</span>
                               </button>
                             </Show>
                           </div>
