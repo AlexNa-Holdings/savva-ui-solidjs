@@ -15,6 +15,7 @@
 # Common settings (apply to all chains)
 domain: savva.app
 gear: true
+devMode: true
 
 # List of supported chains (mainnets first, then testnets)
 chains:

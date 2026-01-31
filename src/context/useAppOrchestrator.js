@@ -162,12 +162,17 @@ export function useAppOrchestrator({ auth, i18n }) {
         requestedDomain = norm(override.domain || siteYaml.domain);
         // preserve gear (site-only)
         prevCfg.gear = !!siteYaml.gear;
+        // preserve devMode (site-only)
+        prevCfg.devMode = !!siteYaml.devMode;
         // store chains for future use
         prevCfg.chains = siteYaml.chains || null;
+        // store site domain from default_connect.yaml (used when switching chains)
+        prevCfg.siteDomain = norm(siteYaml.domain);
         dlog("boot:siteYaml", {
           backendLink: yamlBackendLink,
           domain: siteYaml.domain,
           gear: !!siteYaml.gear,
+          devMode: !!siteYaml.devMode,
           chains: siteYaml.chains,
         });
         dlog("boot:overrideLoaded", overrideBefore);
@@ -220,7 +225,9 @@ export function useAppOrchestrator({ auth, i18n }) {
         backendLink: requestedBackend,
         domain: finalDomain,
         gear: prevCfg.gear, // never altered after boot
+        devMode: prevCfg.devMode, // never altered after boot
         chains: prevCfg.chains, // preserve chains for UI (chain selector)
+        siteDomain: prevCfg.siteDomain, // preserve site domain from default_connect.yaml
       };
 
       // persist UI override (domain + backendLink only)

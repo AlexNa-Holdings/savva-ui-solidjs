@@ -76,6 +76,7 @@ export function useAppConnection() {
         domain: yaml.domain || "",
         backendLink: ensureSlash(backendLink),
         gear: !!yaml.gear,
+        devMode: !!yaml.devMode,
         chains: yaml.chains || null, // Store chains for future use
       };
       const override = loadOverride();

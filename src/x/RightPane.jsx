@@ -206,8 +206,8 @@ export default function RightPane({ isOpen, onClose }) {
                 </li>
               </Show>
 
-              {/* Admin-only links */}
-              <Show when={app.authorizedUser()?.isAdmin}>
+              {/* Exchange link (devMode only) */}
+              <Show when={app.config()?.devMode}>
                 <li>
                   <div
                     class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"
@@ -222,6 +222,10 @@ export default function RightPane({ isOpen, onClose }) {
                     {t("rightPane.exchange")}
                   </div>
                 </li>
+              </Show>
+
+              {/* Admin-only links */}
+              <Show when={app.authorizedUser()?.isAdmin}>
                 <li>
                   <div
                     class="px-2  rounded cursor-pointer hover:bg-[hsl(var(--accent)))]"

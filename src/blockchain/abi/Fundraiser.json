@@ -162,9 +162,15 @@
         "internalType": "address",
         "name": "creator",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
       }
     ],
-    "name": "ContributionReceived",
+    "name": "ContributionReceivedWithFee",
     "type": "event"
   },
   {

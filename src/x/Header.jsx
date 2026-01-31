@@ -117,11 +117,11 @@ export default function Header({ onTogglePane, onToggleMobileNav }) {
     }
     dbg.log("Header:handleChainSelect", "Switching to chain:", chain);
     try {
-      // Get domain from current config (shared across all chains)
-      const currentDomain = app.config?.()?.domain || "";
+      // Use siteDomain from default_connect.yaml (preserved during boot)
+      const siteDomain = app.config?.()?.siteDomain || "";
       await app.initializeOrSwitch({
         backendLink: chain.rpc,
-        domain: currentDomain,
+        domain: siteDomain,
       });
     } catch (e) {
       dbg.error("Header:handleChainSelect", "Failed to switch chain:", e);
