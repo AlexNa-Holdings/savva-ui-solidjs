@@ -56,10 +56,25 @@ export function errorDetails(err, extra = {}) {
   return { ...base, ...extra };
 }
 
+// Check if error is a network/RPC overload error
+function isOverloadedError(err) {
+  const msg = (err?.message || "").toLowerCase();
+  const causeMsg = (err?.cause?.message || "").toLowerCase();
+  return msg.includes("overloaded") || causeMsg.includes("overloaded") ||
+         msg.includes("try again later") || causeMsg.includes("try again later");
+}
+
 export function pushErrorToast(err, context = {}) {
+  let message = err?.message || "Unexpected error";
+
+  // Provide friendlier message for overloaded network errors
+  if (isOverloadedError(err)) {
+    message = "Network is overloaded. Please try again in a few moments.";
+  }
+
   return pushToast({
     type: "error",
-    message: err?.message || "Unexpected error",
+    message,
     details: errorDetails(err, context),
     autohideMs: 10000,
   });
