@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support - SAVVA</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: "#0a0a0a",
+            panel: "#1a1a1a",
+            panel2: "#151515",
+            text: "#e5e5e5",
+            muted: "#a3a3a3",
+            accent: "#FF7100",
+            border: "rgba(229,229,229,0.12)"
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    h2 { scroll-margin-top: 90px; }
+    a { text-decoration-thickness: 2px; text-underline-offset: 3px; }
+    ul { list-style: disc; padding-left: 1.25rem; }
+    li { margin: 0.35rem 0; }
+  </style>
+</head>
+
+<body class="bg-bg text-text min-h-screen px-4">
+  <div class="w-full max-w-3xl mx-auto py-10">
+    <header class="mb-8">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold">Support</h1>
+          <p class="text-muted mt-2">We're here to help</p>
+        </div>
+        <a href="/" class="shrink-0 inline-flex items-center rounded-lg border border-border px-3 py-2 text-sm text-muted hover:text-text hover:border-[rgba(229,229,229,0.22)]">
+          Return to SAVVA
+        </a>
+      </div>
+    </header>
+
+    <main class="bg-panel rounded-xl border border-border p-6 md:p-8">
+      <!-- Contact Section -->
+      <section class="bg-panel2 rounded-xl border border-border p-5 mb-7">
+        <h2 class="text-lg font-semibold text-accent mb-3">Contact Us</h2>
+        <p class="text-muted mb-4">
+          For support inquiries, bug reports, or general questions, please email us at:
+        </p>
+        <a href="mailto:support@savva.app" class="inline-flex items-center gap-2 text-accent hover:underline font-medium text-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          support@savva.app
+        </a>
+      </section>
+
+      <!-- FAQ Section -->
+      <section>
+        <h2 class="text-xl font-semibold text-accent mb-4">Frequently Asked Questions</h2>
+
+        <div class="space-y-4">
+          <div class="bg-panel2 rounded-lg border border-border p-4">
+            <h3 class="font-semibold mb-2">What is SAVVA?</h3>
+            <p class="text-muted text-sm">
+              SAVVA is a decentralized social platform built on blockchain technology. It allows users to publish content,
+              interact with communities, and maintain ownership of their data through blockchain wallets.
+            </p>
+          </div>
+
+          <div class="bg-panel2 rounded-lg border border-border p-4">
+            <h3 class="font-semibold mb-2">How do I create an account?</h3>
+            <p class="text-muted text-sm">
+              SAVVA uses blockchain wallets instead of traditional accounts. When you first open the app, you can either
+              create a new wallet (which generates a 12-word recovery phrase) or import an existing wallet using your recovery phrase.
+            </p>
+          </div>
+
+          <div class="bg-panel2 rounded-lg border border-border p-4">
+            <h3 class="font-semibold mb-2">What is a recovery phrase?</h3>
+            <p class="text-muted text-sm">
+              A recovery phrase (also called seed phrase or mnemonic) is a set of 12 words that gives you access to your wallet.
+              <strong class="text-text">Keep it safe and never share it with anyone.</strong> If you lose your recovery phrase,
+              you will lose access to your wallet permanently.
+            </p>
+          </div>
+
+          <div class="bg-panel2 rounded-lg border border-border p-4">
+            <h3 class="font-semibold mb-2">Can I delete my content?</h3>
+            <p class="text-muted text-sm">
+              Due to the decentralized nature of blockchain technology, content published to the blockchain is permanent and
+              cannot be deleted. Please consider this before publishing. You can delete your local account data through
+              Settings → Account Management → Delete Account.
+            </p>
+          </div>
+
+          <div class="bg-panel2 rounded-lg border border-border p-4">
+            <h3 class="font-semibold mb-2">How do I report inappropriate content?</h3>
+            <p class="text-muted text-sm">
+              On any post, tap the "..." menu and select "Report". You can also block users to prevent seeing their content
+              in your feeds. Blocked users can be managed in Settings → Account Management → Blocked Users.
+            </p>
+          </div>
+
+          <div class="bg-panel2 rounded-lg border border-border p-4">
+            <h3 class="font-semibold mb-2">What are network fees?</h3>
+            <p class="text-muted text-sm">
+              Some actions on SAVVA require blockchain transactions, which incur small network fees (called "gas fees").
+              These fees go to the blockchain network, not to SAVVA. Make sure you have enough native tokens (e.g., PLS on PulseChain)
+              to cover transaction fees.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Safety Section -->
+      <section class="mt-8">
+        <h2 class="text-xl font-semibold text-accent mb-4">Safety Information</h2>
+
+        <div class="bg-panel2 rounded-xl border border-border p-5">
+          <h3 class="font-semibold mb-3 text-red-400">⚠️ Important Security Tips</h3>
+          <ul class="text-muted text-sm space-y-2">
+            <li><strong class="text-text">Never share your recovery phrase</strong> with anyone, including SAVVA support.</li>
+            <li><strong class="text-text">SAVVA will never ask</strong> for your private keys or recovery phrase.</li>
+            <li><strong class="text-text">Beware of phishing</strong> - always verify you're on the official SAVVA app or website.</li>
+            <li><strong class="text-text">Back up your recovery phrase</strong> in a secure, offline location.</li>
+            <li><strong class="text-text">Report suspicious activity</strong> using the report feature or by contacting support.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Community Guidelines -->
+      <section class="mt-8">
+        <h2 class="text-xl font-semibold text-accent mb-4">Community Guidelines</h2>
+        <p class="text-muted mb-3">
+          To maintain a safe and welcoming environment, please follow these guidelines:
+        </p>
+        <ul class="text-muted">
+          <li>Be respectful and considerate of others.</li>
+          <li>Do not post illegal, harmful, or threatening content.</li>
+          <li>Do not harass, bully, or discriminate against others.</li>
+          <li>Do not share sexually explicit content involving minors.</li>
+          <li>Do not spam or engage in fraudulent activities.</li>
+          <li>Respect intellectual property rights.</li>
+          <li>Do not impersonate others or spread misinformation.</li>
+        </ul>
+        <p class="text-muted mt-3">
+          Violations may result in content removal and/or account restrictions.
+          See our <a href="/terms.html" class="text-accent hover:underline">Terms of Service</a> for more details.
+        </p>
+      </section>
+
+      <!-- Bug Reports -->
+      <section class="mt-8">
+        <h2 class="text-xl font-semibold text-accent mb-4">Bug Reports</h2>
+        <p class="text-muted mb-3">
+          Found a bug? Please help us improve by reporting it:
+        </p>
+        <ul class="text-muted">
+          <li>Email us at <a href="mailto:support@savva.app" class="text-accent hover:underline">support@savva.app</a> with:
+            <ul class="ml-4 mt-2">
+              <li>A description of the issue</li>
+              <li>Steps to reproduce the problem</li>
+              <li>Your device model and OS version</li>
+              <li>Screenshots (if applicable)</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Legal Links -->
+      <section class="mt-8">
+        <h2 class="text-xl font-semibold text-accent mb-4">Legal</h2>
+        <div class="flex flex-wrap gap-4">
+          <a href="/terms.html" class="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Terms of Service
+          </a>
+          <a href="/privacy.html" class="inline-flex items-center gap-2 text-muted hover:text-accent transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            Privacy Policy
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="text-center text-muted text-sm mt-8">
+      © <span id="y"></span> AlexNa Holdings, Inc. All rights reserved.
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
