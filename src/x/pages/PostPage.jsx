@@ -43,6 +43,7 @@ import useUserProfile, { selectField } from "../profile/userProfileStore.js";
 
 // ⬇️ Encryption imports
 import { canDecryptPost, getReadingSecretKey, decryptPostEncryptionKey, decryptPost, isUserInRecipientsList, getUserEncryptionData } from "../crypto/postDecryption.js";
+import { decryptText } from "../crypto/postEncryption.js";
 import { storeReadingKey } from "../crypto/readingKeyStorage.js";
 import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/encryptedFetch.js";
 import { swManager } from "../crypto/serviceWorkerManager.js";
@@ -751,8 +752,36 @@ export default function PostPage() {
     const contentLocales = p?.savva_content?.locales || p?.content?.locales;
     const fromContent = contentLocales?.[postLang()]?.chapters;
     const fromDescriptor = details()?.descriptor?.locales?.[postLang()]?.chapters;
-    // Prefer content chapters if they exist, otherwise use descriptor chapters
-    return fromContent || fromDescriptor || [];
+
+    // Prefer content chapters if they exist (these are already decrypted)
+    if (fromContent) return fromContent;
+
+    // If chapters come from descriptor and we have the post secret key, decrypt encrypted titles
+    if (fromDescriptor && Array.isArray(fromDescriptor)) {
+      const key = postSecretKey();
+
+      // If no key or post was not originally encrypted, return chapters as-is
+      if (!key || !isEncryptedPost()) return fromDescriptor;
+
+      // Decrypt chapter titles if they're encrypted (nonce:data format)
+      return fromDescriptor.map(chapter => {
+        if (chapter.title && typeof chapter.title === 'string' && chapter.title.includes(':')) {
+          try {
+            // Title is in nonce:data format, decrypt it
+            return {
+              ...chapter,
+              title: decryptText(chapter.title, null, key)
+            };
+          } catch (error) {
+            console.error("[PostPage] Failed to decrypt chapter title:", error);
+            return chapter; // Return original if decryption fails
+          }
+        }
+        return chapter; // Title is not encrypted or not in expected format
+      });
+    }
+
+    return [];
   });
 
   const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
