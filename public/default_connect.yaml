@@ -16,6 +16,9 @@
 domain: savva.app
 gear: true
 devMode: true
+# SHA-256 hash of the site password. Remove to disable password gate.
+# Generate with: node -e "console.log(require('crypto').createHash('sha256').update('YOUR_PASSWORD').digest('hex'))"
+devPassword: "9926355d68da965dbdab0a869d5c7082a3182ffb251aa0938d96539e4719bc41"
 
 # List of supported chains (mainnets first, then testnets)
 chains:

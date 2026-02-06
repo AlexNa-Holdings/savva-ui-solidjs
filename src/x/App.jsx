@@ -40,11 +40,55 @@ import PromoPostManager from "./main/PromoPostManager.jsx";
 import ExportImportPage from "./pages/ExportImportPage.jsx";
 import ExchangePage from "./pages/ExchangePage.jsx";
 
+// SHA-256 hex hash of input string using Web Crypto API
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const DEV_PW_KEY = "dev_password_ok";
+
 export default function App() {
   const [isPaneOpen, setIsPaneOpen] = createSignal(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = createSignal(false);
   const { route } = useHashRouter();
   const app = useApp();
+
+  // --- Dev password gate ---
+  const [passwordUnlocked, setPasswordUnlocked] = createSignal(false);
+  const [passwordInput, setPasswordInput] = createSignal("");
+  const [passwordError, setPasswordError] = createSignal(false);
+
+  const devPasswordHash = createMemo(() => app.config?.()?.devPassword || null);
+  const needsPassword = createMemo(() => {
+    // While config hasn't loaded yet, don't show password prompt (loading spinner is shown)
+    if (app.loading()) return false;
+    // No devPassword configured — no gate needed
+    if (!devPasswordHash()) return false;
+    return !passwordUnlocked();
+  });
+
+  // Check localStorage when config becomes available
+  createEffect(() => {
+    const hash = devPasswordHash();
+    if (!hash) return; // no password configured, needsPassword() handles this
+    const stored = localStorage.getItem(DEV_PW_KEY);
+    if (stored === hash) setPasswordUnlocked(true);
+  });
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordError(false);
+    const input = passwordInput().trim();
+    const hash = await sha256hex(input);
+    console.log("[devPassword] input:", JSON.stringify(input), "hash:", hash, "expected:", devPasswordHash());
+    if (hash === devPasswordHash()) {
+      localStorage.setItem(DEV_PW_KEY, devPasswordHash());
+      setPasswordUnlocked(true);
+    } else {
+      setPasswordError(true);
+    }
+  };
 
   const currentView = createMemo(() => {
     const r = route();
@@ -142,6 +186,29 @@ export default function App() {
         </div>
       }
     >
+      {/* Dev password gate */}
+      <Show when={needsPassword()}>
+        <div class="fixed inset-0 flex items-center justify-center bg-[hsl(var(--background))]">
+          <form onSubmit={handlePasswordSubmit} class="flex flex-col items-center gap-3 p-6 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] w-80">
+            <div class="text-sm font-medium text-[hsl(var(--foreground))]">Enter password to continue</div>
+            <input
+              type="password"
+              value={passwordInput()}
+              onInput={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
+              class="w-full px-3 py-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--ring))]"
+              placeholder="Password"
+              autofocus
+            />
+            <Show when={passwordError()}>
+              <div class="text-xs text-[hsl(var(--destructive))]">Wrong password</div>
+            </Show>
+            <button type="submit" class="w-full px-4 py-2 rounded-md text-sm font-medium bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 transition-opacity">
+              Enter
+            </button>
+          </form>
+        </div>
+      </Show>
+      <Show when={!needsPassword()}>
       <Show when={!app.error()} fallback={<ConnectionError error={app.error()} />}>
         <div class="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] transition-colors duration-300">
           <DomainCssLoader />
@@ -198,6 +265,7 @@ export default function App() {
             onCancel={app.rejectSwitchAccountPrompt}
           />
         </div>
+      </Show>
       </Show>
     </Show>
   );

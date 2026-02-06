@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "release": "node scripts/release.mjs",
     "deploy-test": "node scripts/deploy_test.mjs",
-    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs"
+    "i18n": "node scripts/i18n.mjs && node scripts/i18n-docs.mjs",
+    "setPassword": "node scripts/setDevPassword.mjs"
   },
   "dependencies": {
     "@infolektuell/noto-color-emoji": "^0.2.0",
