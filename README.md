@@ -19,6 +19,35 @@ A decentralized social media platform built on blockchain technology, featuring 
 - **Storage**: IPFS for decentralized content storage
 - **Styling**: TailwindCSS with custom theming
 
+## Architecture
+
+```mermaid
+graph TD
+    subgraph Clients
+        WEB["Web App<br/>(SolidJS + Vite)"]
+        IOS["iOS App"]
+        ANDROID["Android App"]
+    end
+
+    subgraph Backend
+        API["SAVVA Backend Server<br/>(API Gateway)"]
+    end
+
+    subgraph Infrastructure
+        IPFS["IPFS<br/>Decentralized Storage"]
+        DB["Database"]
+        BC["Blockchain Node<br/>(PulseChain / Monad)"]
+    end
+
+    WEB -- "REST API" --> API
+    IOS -- "REST API" --> API
+    ANDROID -- "REST API" --> API
+
+    API -- "Store & Retrieve Content" --> IPFS
+    API -- "Read / Write Data" --> DB
+    API -- "Smart Contract Calls" --> BC
+```
+
 ## Prerequisites
 
 - Node.js 18+
