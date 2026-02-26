@@ -17,7 +17,7 @@ import { createTestPng } from "./helpers/test-image.js";
  * Connect wallet and login. Reusable helper.
  */
 async function connectAndLogin(page) {
-  const connectBtn = page.locator('button:has-text("Connect wallet")');
+  const connectBtn = page.getByRole('banner').getByRole('button', { name: 'Connect wallet' });
   await connectBtn.waitFor({ state: "visible", timeout: 30_000 });
   await connectBtn.click();
   await expect(connectBtn).not.toBeVisible({ timeout: 15_000 });
@@ -142,23 +142,15 @@ test.describe("Post Publishing", () => {
     await catChevron.click();
     await page.waitForTimeout(500);
 
-    // Wait for the dropdown to appear with checkboxes
-    const catDropdown = page.locator('.absolute.z-20');
-    await catDropdown.waitFor({ state: "visible", timeout: 5_000 });
+    // Select the first 2 category checkboxes by role
+    const savvaCheckbox = page.getByRole("checkbox", { name: "SAVVA" });
+    await savvaCheckbox.waitFor({ state: "visible", timeout: 5_000 });
+    await savvaCheckbox.click();
+    console.log("  Selected category: SAVVA");
 
-    // Select the first 2 available category checkboxes
-    const categoryCheckboxes = catDropdown.locator('input[type="checkbox"]:not([disabled])');
-    const checkboxCount = await categoryCheckboxes.count();
-    console.log(`  Found ${checkboxCount} selectable categories`);
-
-    if (checkboxCount > 0) {
-      await categoryCheckboxes.first().click();
-      console.log("  Selected category 1");
-    }
-    if (checkboxCount > 1) {
-      await categoryCheckboxes.nth(1).click();
-      console.log("  Selected category 2");
-    }
+    const pulseChainCheckbox = page.getByRole("checkbox", { name: "PulseChain" });
+    await pulseChainCheckbox.click();
+    console.log("  Selected category: PulseChain");
 
     // Close the dropdown by clicking outside
     await bodyArea.click();

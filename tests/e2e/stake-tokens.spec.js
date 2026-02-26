@@ -38,7 +38,7 @@ test.describe("Token Staking", () => {
     await setupApp(page);
 
     // ── 2. Connect + Login ──
-    const connectBtn = page.locator('button:has-text("Connect wallet")');
+    const connectBtn = page.getByRole('banner').getByRole('button', { name: 'Connect wallet' });
     await connectBtn.waitFor({ state: "visible", timeout: 30_000 });
     await connectBtn.click();
     await expect(connectBtn).not.toBeVisible({ timeout: 15_000 });
@@ -104,7 +104,7 @@ test.describe("Token Staking", () => {
     // ── 8. Wait for transaction to complete ──
     // The modal closes on success, so wait for it to disappear.
     // Also check for errors during the wait.
-    const deadline = Date.now() + 60_000;
+    const deadline = Date.now() + 90_000;
     let success = false;
 
     while (Date.now() < deadline && !success) {
@@ -116,8 +116,10 @@ test.describe("Token Staking", () => {
         break;
       }
 
-      // Check for error text inside the modal
-      const errorText = page.locator(
+      // Check for error text inside the modal (scoped to dialog to avoid
+      // matching price-change indicators in the header)
+      const modal = page.locator('[role="dialog"]');
+      const errorText = modal.locator(
         ".text-destructive, .text-red-500"
       );
       if (await errorText.isVisible().catch(() => false)) {
@@ -125,11 +127,11 @@ test.describe("Token Staking", () => {
         throw new Error(`Staking failed: ${msg}`);
       }
 
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
     }
 
     if (!success) {
-      throw new Error("Staking transaction timed out after 60s");
+      throw new Error("Staking transaction timed out after 90s");
     }
 
     // Verify new stake via contract

@@ -13,7 +13,7 @@ import { ensureStaked } from "./helpers/staking-helper.js";
  * Connect wallet and login. Reusable helper.
  */
 async function connectAndLogin(page) {
-  const connectBtn = page.locator('button:has-text("Connect wallet")');
+  const connectBtn = page.getByRole('banner').getByRole('button', { name: 'Connect wallet' });
   await connectBtn.waitFor({ state: "visible", timeout: 30_000 });
   await connectBtn.click();
   await expect(connectBtn).not.toBeVisible({ timeout: 15_000 });

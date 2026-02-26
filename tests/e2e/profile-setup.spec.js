@@ -13,7 +13,7 @@ import { createRobotAvatar1, createRobotAvatar2 } from "./helpers/test-image.js"
  * Connect wallet and login. Reusable across profile tests.
  */
 async function connectAndLogin(page) {
-  const connectBtn = page.locator('button:has-text("Connect wallet")');
+  const connectBtn = page.getByRole('banner').getByRole('button', { name: 'Connect wallet' });
   await connectBtn.waitFor({ state: "visible", timeout: 30_000 });
   await connectBtn.click();
   await expect(connectBtn).not.toBeVisible({ timeout: 15_000 });

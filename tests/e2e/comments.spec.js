@@ -10,7 +10,7 @@ import { testConfig } from "./helpers/test-config.js";
 import { ensureStaked } from "./helpers/staking-helper.js";
 
 async function connectAndLogin(page) {
-  const connectBtn = page.locator('button:has-text("Connect wallet")');
+  const connectBtn = page.getByRole('banner').getByRole('button', { name: 'Connect wallet' });
   await connectBtn.waitFor({ state: "visible", timeout: 30_000 });
   await connectBtn.click();
   await expect(connectBtn).not.toBeVisible({ timeout: 15_000 });
@@ -40,11 +40,28 @@ async function navigateToPost(page) {
     await page.waitForTimeout(1500);
 
     const hash = await page.evaluate(() => window.location.hash);
-    if (hash.includes("/post/")) {
-      console.log(`  Navigated to post page: ${hash}`);
-      return hash;
+    if (!hash.includes("/post/")) {
+      console.log(`  Post click didn't navigate (NSFW?), trying next...`);
+      continue;
     }
-    console.log(`  Post click didn't navigate (NSFW?), trying next...`);
+
+    // Verify the post is commentable (not encrypted/blocked)
+    const addComment = page.locator('text="Add a comment..."');
+    const commentable = await addComment
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => addComment.click({ trial: true, timeout: 3_000 }))
+      .then(() => true)
+      .catch(() => false);
+
+    if (!commentable) {
+      console.log(`  Post not commentable (encrypted?), trying next...`);
+      await page.goBack();
+      await page.waitForTimeout(1000);
+      continue;
+    }
+
+    console.log(`  Navigated to post page: ${hash}`);
+    return hash;
   }
 
   throw new Error("No navigable posts found in feed");

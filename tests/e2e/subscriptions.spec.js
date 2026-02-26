@@ -9,7 +9,7 @@ import { testConfig, testConfig2 } from "./helpers/test-config.js";
 import { ensureStaked } from "./helpers/staking-helper.js";
 
 async function connectAndLogin(page) {
-  const connectBtn = page.locator('button:has-text("Connect wallet")');
+  const connectBtn = page.getByRole('banner').getByRole('button', { name: 'Connect wallet' });
   await connectBtn.waitFor({ state: "visible", timeout: 30_000 });
   await connectBtn.click();
   await expect(connectBtn).not.toBeVisible({ timeout: 15_000 });
@@ -26,18 +26,21 @@ async function connectAndLogin(page) {
  * Handles both fresh subscriptions and renewals (button may say "Unsubscribe" if already subscribed).
  */
 async function subscribeOnProfile(page, weeklyAmount = "10", weeks = "1") {
-  // Check if already subscribed (exact match to avoid "Subscribers" tab)
+  // Wait for either "Subscribe" or "Unsubscribe" button to appear
+  const subscribeBtn = page.getByRole("button", { name: "Subscribe", exact: true });
   const unsubBtn = page.getByRole("button", { name: "Unsubscribe", exact: true });
-  const alreadySubscribed = await unsubBtn.isVisible().catch(() => false);
 
+  // Race: wait for whichever button appears first
+  await expect(subscribeBtn.or(unsubBtn)).toBeVisible({ timeout: 15_000 });
+
+  // Check if already subscribed
+  const alreadySubscribed = await unsubBtn.isVisible().catch(() => false);
   if (alreadySubscribed) {
     console.log("  Already subscribed — test passes");
     return true;
   }
 
-  // Click "Subscribe" button (below avatar, exact match to avoid "Subscribers"/"Subscriptions" tabs)
-  const subscribeBtn = page.getByRole("button", { name: "Subscribe", exact: true });
-  await subscribeBtn.waitFor({ state: "visible", timeout: 15_000 });
+  // Click "Subscribe" button
   await subscribeBtn.click();
   console.log("  Clicked Subscribe button");
 
@@ -87,6 +90,11 @@ async function subscribeOnProfile(page, weeklyAmount = "10", weeks = "1") {
   }
 
   await expect(submitBtn).toBeEnabled({ timeout: 10_000 });
+
+  // Count pre-existing destructive elements (e.g. "Expired" status text)
+  // so we only flag NEW errors that appear after clicking submit
+  const preExistingCount = await modal.locator('[class*="destructive"]').count().catch(() => 0);
+
   await submitBtn.click();
   console.log("  Clicked Subscribe submit button");
 
@@ -102,11 +110,11 @@ async function subscribeOnProfile(page, weeklyAmount = "10", weeks = "1") {
       break;
     }
 
-    // Check for error in modal
-    const errEl = modal.locator('[class*="destructive"]');
-    const hasError = await errEl.isVisible().catch(() => false);
-    if (hasError) {
-      const errText = await errEl.textContent().catch(() => "unknown");
+    // Check for NEW error text in modal (ignore pre-existing "Expired" status)
+    const errEls = modal.locator('[class*="destructive"]');
+    const currentCount = await errEls.count().catch(() => 0);
+    if (currentCount > preExistingCount) {
+      const errText = await errEls.last().textContent().catch(() => "unknown");
       throw new Error(`Subscription failed: ${errText}`);
     }
 
