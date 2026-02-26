@@ -318,11 +318,42 @@ export default function PostCard(props) {
       pushToast({ type: "info", message: t("post.purchase.processing") || "Processing purchase...", autohideMs: 0, id: "purchase_tx" });
 
       // Call buy function
-      await sendAsActor(app, {
-        contractName: "SavvaPurchase",
-        functionName: "buy",
-        args: [info.purchaseToken, priceWei, authorAddress, metadataBytes],
-      });
+      const pv = app.info()?.protocol_version ?? 1;
+      if (pv >= 2) {
+        let amountOutMin = 0n;
+        const savvaTokenAddr = app.info()?.savva_contracts?.SavvaToken?.address || "";
+        const zeroAddr = "0x0000000000000000000000000000000000000000";
+        const isNative = !info.purchaseToken || info.purchaseToken === "0" || info.purchaseToken === zeroAddr;
+        const isSavva = savvaTokenAddr && info.purchaseToken.toLowerCase() === savvaTokenAddr.toLowerCase();
+
+        if (!isNative && !isSavva) {
+          const feeBps = purchaseFee();
+          if (feeBps && feeBps > 0) {
+            const fee = (priceWei * BigInt(feeBps)) / 10000n;
+            const prices = app.allTokenPrices?.() || {};
+            const tokenPrice = prices[info.purchaseToken.toLowerCase()]?.price;
+            const savvaPrice = app.savvaTokenPrice()?.price;
+            if (tokenPrice && savvaPrice && savvaPrice > 0) {
+              const ratio = tokenPrice / savvaPrice;
+              const scale = 10000n;
+              const ratioScaled = BigInt(Math.floor(ratio * Number(scale)));
+              amountOutMin = (fee * ratioScaled * 9n) / (scale * 10n);
+            }
+          }
+        }
+
+        await sendAsActor(app, {
+          contractName: "SavvaPurchase",
+          functionName: "buy",
+          args: [info.purchaseToken, priceWei, authorAddress, amountOutMin, metadataBytes],
+        });
+      } else {
+        await sendAsActor(app, {
+          contractName: "SavvaPurchase",
+          functionName: "buy",
+          args: [info.purchaseToken, priceWei, authorAddress, metadataBytes],
+        });
+      }
 
       app.dismissToast?.("purchase_tx");
       setShowPurchaseDialog(false);

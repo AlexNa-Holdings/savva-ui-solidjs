@@ -1,6 +1,6 @@
 // src/x/pages/BuyBurnPage.jsx
 import { Show, onMount, createSignal, createResource, createMemo, createEffect, on } from "solid-js";
-import { createPublicClient } from "viem";
+import { createPublicClient, formatUnits } from "viem";
 import { configuredHttp } from "../../blockchain/contracts.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
@@ -25,6 +25,7 @@ export default function BuyBurnPage() {
   const [isTransferringGain, setIsTransferringGain] = createSignal(false);
   const [refreshKey, setRefreshKey] = createSignal(0);
 
+  const pv = () => app.info()?.protocol_version ?? 1;
   const savvaTokenAddress = createMemo(() => app.info()?.savva_contracts?.SavvaToken?.address || "");
   const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
 
@@ -62,6 +63,22 @@ export default function BuyBurnPage() {
   }));
 
   const claimableGain = createMemo(() => statsData().claimableGain ?? 0n);
+
+  // v2: calculate minimum SAVVA output with 10% slippage
+  const amountOutMin = createMemo(() => {
+    if (pv() < 2) return 0n;
+    const baseBalance = statsData().baseBalance ?? 0n;
+    if (baseBalance <= 0n) return 0n;
+    const basePrice = app.baseTokenPrice()?.price;
+    const savvaPrice = app.savvaTokenPrice()?.price;
+    if (!basePrice || !savvaPrice || savvaPrice <= 0) return 0n;
+    // expectedSavva = baseBalance * (basePrice / savvaPrice), then apply 10% slippage
+    const ratio = basePrice / savvaPrice;
+    const scale = 10000n;
+    const ratioScaled = BigInt(Math.floor(ratio * Number(scale)));
+    return (baseBalance * ratioScaled * 9n) / (scale * 10n);
+  });
+
   const hasBalanceToBurn = createMemo(
     () => (statsData().baseBalance ?? 0n) > 0n || (statsData().savvaBalance ?? 0n) > 0n,
   );
@@ -123,7 +140,9 @@ export default function BuyBurnPage() {
       const contract = await getSavvaContract(app, "BuyBurn", { write: true });
       const publicClient = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
 
-      const hash = await contract.write.buyAndBurn([]);
+      const hash = pv() >= 2
+        ? await contract.write.buyAndBurn([amountOutMin()])
+        : await contract.write.buyAndBurn([]);
       await publicClient.waitForTransactionReceipt({ hash });
 
       pushToast({ type: "success", message: t("buyburn.toast.success") });
@@ -263,6 +282,11 @@ export default function BuyBurnPage() {
                       {t("buyburn.stats.baseLabel", { symbol: baseTokenSymbol() })}
                     </div>
                     <TokenValue amount={statsData().baseBalance} tokenAddress="0" />
+                    <Show when={pv() >= 2 && amountOutMin() > 0n}>
+                      <div class="text-xs text-[hsl(var(--muted-foreground))]">
+                        Minimum {parseFloat(formatUnits(amountOutMin(), 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} SAVVA
+                      </div>
+                    </Show>
                   </div>
 
                   <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-2">

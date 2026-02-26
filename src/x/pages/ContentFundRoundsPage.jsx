@@ -1,6 +1,6 @@
 // src/x/pages/ContentFundRoundsPage.jsx
 import { Show, For, createSignal, onMount, createResource, createMemo, createEffect, on } from "solid-js";
-import { createPublicClient, keccak256, decodeErrorResult } from "viem";
+import { createPublicClient, createWalletClient, custom, keccak256, decodeErrorResult, formatUnits, toHex } from "viem";
 import { configuredHttp } from "../../blockchain/contracts.js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
@@ -17,9 +17,22 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import RandomOracleAbi from "../../blockchain/abi/RandomOracle.json";
 
+const DELIVER_CALLBACK_ABI = [{
+    inputs: [
+        { name: "provider", type: "address" },
+        { name: "randomNumber", type: "bytes32" },
+    ],
+    name: "deliverCallback",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+}];
+
 export default function ContentFundRoundsPage() {
     const app = useApp();
     const { t } = app;
+
+    const pv = () => app.info()?.protocol_version ?? 1;
 
     const [walletDetected, setWalletDetected] = createSignal(isWalletAvailable());
     const [isConnecting, setIsConnecting] = createSignal(false);
@@ -30,8 +43,9 @@ export default function ContentFundRoundsPage() {
     const [loadingRounds, setLoadingRounds] = createSignal(false);
     const [isProcessing, setIsProcessing] = createSignal(false);
 
-    // Random Oracle data source
+    // Random Oracle v1 data source (only on v1)
     const oracleSource = createMemo(() => {
+        if (pv() >= 2) return null;
         const info = app.info();
         const oracleAddr = info?.savva_contracts?.RandomOracle?.address;
         if (!oracleAddr) return null;
@@ -61,6 +75,187 @@ export default function ContentFundRoundsPage() {
         numberOfPreviousBlocks: 0n,
     });
 
+    // v2 Random Oracle data source (Pyth-based)
+    const oracleV2Source = createMemo(() => {
+        if (pv() < 2) return null;
+        const info = app.info();
+        const oracleAddr = info?.savva_contracts?.RandomOracle?.address;
+        if (!oracleAddr) return null;
+        return `${oracleAddr}|${refreshKey()}`;
+    });
+
+    const [oracleV2Data] = createResource(oracleV2Source, async () => {
+        try {
+            const contract = await getSavvaContract(app, "RandomOracle");
+            const fundContract = await getSavvaContract(app, "ContentFund");
+            const [entropy, hasEntropy, isTimeToProcess] = await Promise.all([
+                contract.read.entropy(),
+                contract.read.hasEntropy(),
+                fundContract.read.isTimeToProcess(),
+            ]);
+            // getRequestFee may revert if Pyth isn't configured yet
+            let requestFee = 0n;
+            try {
+                requestFee = await contract.read.getRequestFee();
+            } catch (e) {
+                console.warn("getRequestFee() failed (Pyth not configured?):", e.shortMessage || e.message);
+            }
+            return { entropy, hasEntropy, requestFee, isTimeToProcess };
+        } catch (error) {
+            console.error("Failed to load v2 RandomOracle data:", error);
+            throw error;
+        }
+    });
+
+    const oracleV2Info = createMemo(() => oracleV2Data() || {
+        entropy: 0n,
+        hasEntropy: false,
+        requestFee: 0n,
+        isTimeToProcess: false,
+    });
+
+    const [isRequestingEntropy, setIsRequestingEntropy] = createSignal(false);
+    const [isWaitingForEntropy, setIsWaitingForEntropy] = createSignal(false);
+
+    const baseTokenDecimals = () => app.desiredChain()?.nativeCurrency?.decimals ?? 18;
+    const baseTokenSymbol = () => app.desiredChain()?.nativeCurrency?.symbol || "ETH";
+
+    const feeDisplay = createMemo(() => {
+        const fee = oracleV2Info().requestFee;
+        if (!fee || fee === 0n) return null;
+        const decimals = baseTokenDecimals();
+        const formatted = parseFloat(formatUnits(fee, decimals));
+        const basePrice = app.baseTokenPrice()?.price;
+        const usd = basePrice ? (formatted * basePrice) : null;
+        return {
+            amount: formatted.toLocaleString(undefined, { maximumFractionDigits: 6 }),
+            symbol: baseTokenSymbol(),
+            usd: usd !== null ? usd.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 4 }) : null,
+        };
+    });
+
+    const handleRequestEntropy = async () => {
+        if (!walletAccount()) {
+            await handleConnect();
+            if (!walletAccount()) return;
+        }
+
+        try {
+            await app.ensureWalletOnDesiredChain?.();
+        } catch (err) {
+            pushErrorToast(err, { context: t("contentFundRounds.randomOracle.v2.requestError") });
+            return;
+        }
+
+        const chain = app.desiredChain?.();
+        if (!chain?.rpcUrls?.[0]) {
+            pushToast({ type: "error", message: t("contentFundRounds.randomOracle.v2.requestError") });
+            return;
+        }
+
+        setIsRequestingEntropy(true);
+        const pendingToastId = pushToast({
+            type: "info",
+            message: t("contentFundRounds.randomOracle.v2.requesting"),
+            autohideMs: 0,
+        });
+
+        try {
+            const publicClient = createPublicClient({
+                chain,
+                transport: configuredHttp(chain.rpcUrls[0]),
+            });
+
+            const contract = await getSavvaContract(app, "RandomOracle", { write: true });
+            const fee = oracleV2Info().requestFee;
+
+            const hash = await contract.write.requestEntropy([], { value: fee });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+            if (receipt.status === "reverted") {
+                throw new Error("Transaction reverted on-chain");
+            }
+
+            app.dismissToast?.(pendingToastId);
+            setIsRequestingEntropy(false);
+
+            // Deliver the callback manually (test chains have no Pyth keeper)
+            // On production, deliverCallback will fail gracefully and we fall back to polling
+            setIsWaitingForEntropy(true);
+            const deliverToastId = pushToast({
+                type: "info",
+                message: t("contentFundRounds.randomOracle.v2.deliveringEntropy"),
+                autohideMs: 0,
+            });
+
+            try {
+                const readContract = await getSavvaContract(app, "RandomOracle");
+                const oracleAddr = app.info()?.savva_contracts?.RandomOracle?.address;
+                const pythAddr = await readContract.read.pythEntropy();
+
+                const randomSeed = keccak256(toHex("entropy_" + Date.now()));
+
+                const walletClient = createWalletClient({
+                    chain,
+                    transport: custom(window.ethereum),
+                });
+
+                const deliverHash = await walletClient.writeContract({
+                    account: walletAccount(),
+                    address: pythAddr,
+                    abi: DELIVER_CALLBACK_ABI,
+                    functionName: "deliverCallback",
+                    args: [oracleAddr, randomSeed],
+                });
+
+                const deliverReceipt = await publicClient.waitForTransactionReceipt({ hash: deliverHash });
+
+                if (deliverReceipt.status === "reverted") {
+                    throw new Error("Deliver callback reverted on-chain");
+                }
+
+                pushToast({ type: "success", message: t("contentFundRounds.randomOracle.v2.requestSuccess") });
+                app.dismissToast?.(deliverToastId);
+                setIsWaitingForEntropy(false);
+                handleRefresh();
+            } catch (deliverErr) {
+                // deliverCallback failed — fall back to polling (production Pyth keeper will deliver)
+                console.warn("deliverCallback failed, falling back to polling:", deliverErr.shortMessage || deliverErr.message);
+                app.dismissToast?.(deliverToastId);
+
+                const pollStart = Date.now();
+                const POLL_INTERVAL = 3000;
+                const POLL_TIMEOUT = 60000;
+
+                const pollTimer = setInterval(async () => {
+                    try {
+                        const c = await getSavvaContract(app, "RandomOracle");
+                        const has = await c.read.hasEntropy();
+                        if (has) {
+                            clearInterval(pollTimer);
+                            setIsWaitingForEntropy(false);
+                            handleRefresh();
+                        } else if (Date.now() - pollStart > POLL_TIMEOUT) {
+                            clearInterval(pollTimer);
+                            setIsWaitingForEntropy(false);
+                            pushToast({ type: "warning", message: t("contentFundRounds.randomOracle.v2.entropyTimeout") });
+                            handleRefresh();
+                        }
+                    } catch (e) {
+                        console.warn("Entropy poll error:", e);
+                    }
+                }, POLL_INTERVAL);
+            }
+
+            return;
+        } catch (err) {
+            console.error("Request entropy error:", err);
+            pushErrorToast(err, { context: t("contentFundRounds.randomOracle.v2.requestError") });
+            app.dismissToast?.(pendingToastId);
+            setIsRequestingEntropy(false);
+        }
+    };
+
     // Check if we can process rounds
     const canProcessRounds = createMemo(() => {
         const roundsList = rounds();
@@ -73,7 +268,12 @@ export default function ContentFundRoundsPage() {
         // 1. First round must be finished (round time is in the past)
         const isFirstRoundFinished = firstRoundTime <= nowSeconds;
 
-        // 2. Last update time in oracle must be more than first round time
+        if (pv() >= 2) {
+            // v2: entropy must be available (hasEntropy == true)
+            return isFirstRoundFinished && oracleV2Info().hasEntropy;
+        }
+
+        // v1: Last update time in oracle must be more than first round time
         const lastUpdateTime = Number(oracleInfo().lastUpdateTime);
         const isOracleUpdatedAfterRound = lastUpdateTime > firstRoundTime;
 
@@ -505,9 +705,10 @@ export default function ContentFundRoundsPage() {
             });
 
             const writeContract = await getSavvaContract(app, "ContentFund", { write: true });
-            console.log("Calling processRounds with max_rounds = 10");
+            const maxRounds = pv() >= 2 ? 32n : 10n;
+            console.log("Calling processRounds with max_rounds =", maxRounds.toString());
 
-            const hash = await writeContract.write.processRounds([10n]);
+            const hash = await writeContract.write.processRounds([maxRounds]);
             console.log(`Transaction hash: ${hash}`);
 
             const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -589,115 +790,237 @@ export default function ContentFundRoundsPage() {
                         </section>
                     }
                 >
-                    {/* Random Oracle Section */}
-                    <Show
-                        when={app.info()?.savva_contracts?.RandomOracle?.address}
-                        fallback={
-                            <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-3 text-center">
-                                <h3 class="text-xl font-semibold text-[hsl(var(--card-foreground))]">
-                                    {t("contentFundRounds.randomOracle.title")}
-                                </h3>
-                                <p class="text-sm text-[hsl(var(--muted-foreground))]">
-                                    {t("contentFundRounds.randomOracle.notConfigured")}
-                                </p>
-                            </section>
-                        }
-                    >
-                        <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-6">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-xl font-semibold text-[hsl(var(--card-foreground))]">
-                                    {t("contentFundRounds.randomOracle.title")}
-                                </h3>
-                                <button
-                                    type="button"
-                                    class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                                    onClick={handleRefresh}
-                                    disabled={oracleData.loading}
-                                >
-                                    {t("common.refresh")}
-                                </button>
-                            </div>
-
-                            <Show when={oracleData.loading}>
-                                <div class="flex items-center justify-center py-6">
-                                    <Spinner class="w-6 h-6" />
-                                </div>
-                            </Show>
-
-                            <Show when={oracleData.error}>
-                                <div class="space-y-3 text-center">
-                                    <p class="text-sm text-[hsl(var(--destructive))]">
-                                        {t("contentFundRounds.randomOracle.loadError")}
+                    {/* Random Oracle Section — v1 (PoW mining) */}
+                    <Show when={pv() < 2}>
+                        <Show
+                            when={app.info()?.savva_contracts?.RandomOracle?.address}
+                            fallback={
+                                <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-3 text-center">
+                                    <h3 class="text-xl font-semibold text-[hsl(var(--card-foreground))]">
+                                        {t("contentFundRounds.randomOracle.title")}
+                                    </h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                        {t("contentFundRounds.randomOracle.notConfigured")}
                                     </p>
-                                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
-                                        {t("contentFundRounds.randomOracle.contractError")}
-                                    </p>
+                                </section>
+                            }
+                        >
+                            <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-6">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-xl font-semibold text-[hsl(var(--card-foreground))]">
+                                        {t("contentFundRounds.randomOracle.title")}
+                                    </h3>
                                     <button
                                         type="button"
-                                        class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                                        class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
                                         onClick={handleRefresh}
+                                        disabled={oracleData.loading}
                                     >
-                                        {t("common.retry")}
+                                        {t("common.refresh")}
                                     </button>
                                 </div>
-                            </Show>
 
-                            <Show when={!oracleData.loading && !oracleData.error}>
-                                <div class="space-y-4">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div class="space-y-2">
+                                <Show when={oracleData.loading}>
+                                    <div class="flex items-center justify-center py-6">
+                                        <Spinner class="w-6 h-6" />
+                                    </div>
+                                </Show>
+
+                                <Show when={oracleData.error}>
+                                    <div class="space-y-3 text-center">
+                                        <p class="text-sm text-[hsl(var(--destructive))]">
+                                            {t("contentFundRounds.randomOracle.loadError")}
+                                        </p>
+                                        <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                                            {t("contentFundRounds.randomOracle.contractError")}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                                            onClick={handleRefresh}
+                                        >
+                                            {t("common.retry")}
+                                        </button>
+                                    </div>
+                                </Show>
+
+                                <Show when={!oracleData.loading && !oracleData.error}>
+                                    <div class="space-y-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div class="space-y-2">
+                                                <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                                                    {t("contentFundRounds.randomOracle.entropy")}
+                                                </div>
+                                                <div class="text-sm font-mono break-all text-[hsl(var(--card-foreground))]">
+                                                    {formatHex(oracleInfo().entropy)}
+                                                </div>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                                                    {t("contentFundRounds.randomOracle.lastUpdateTime")}
+                                                </div>
+                                                <div class="text-sm text-[hsl(var(--card-foreground))]">
+                                                    {formatTimestamp(oracleInfo().lastUpdateTime)}
+                                                </div>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                                                    {t("contentFundRounds.randomOracle.difficulty")}
+                                                </div>
+                                                <div class="text-sm text-[hsl(var(--card-foreground))]">
+                                                    {oracleInfo().difficulty.toString()}
+                                                </div>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                                                    {t("contentFundRounds.randomOracle.blocks")}
+                                                </div>
+                                                <div class="text-sm text-[hsl(var(--card-foreground))]">
+                                                    {oracleInfo().numberOfPreviousBlocks.toString()}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="pt-4 border-t border-[hsl(var(--border))]">
+                                            <button
+                                                type="button"
+                                                class="w-full px-4 py-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                                onClick={handleMineEntropy}
+                                                disabled={isMining()}
+                                            >
+                                                {isMining()
+                                                    ? `${t("contentFundRounds.randomOracle.mining")} (${miningProgress()} hashes)`
+                                                    : t("contentFundRounds.randomOracle.mineButton")
+                                                }
+                                            </button>
+                                            <p class="mt-2 text-xs text-center text-[hsl(var(--muted-foreground))]">
+                                                {t("contentFundRounds.randomOracle.mineDescription")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Show>
+                            </section>
+                        </Show>
+                    </Show>
+
+                    {/* Random Oracle Section — v2 (Pyth Entropy) */}
+                    <Show when={pv() >= 2}>
+                        <Show
+                            when={app.info()?.savva_contracts?.RandomOracle?.address}
+                            fallback={
+                                <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-3 text-center">
+                                    <h3 class="text-xl font-semibold text-[hsl(var(--card-foreground))]">
+                                        {t("contentFundRounds.randomOracle.title")}
+                                    </h3>
+                                    <p class="text-sm text-[hsl(var(--muted-foreground))]">
+                                        {t("contentFundRounds.randomOracle.notConfigured")}
+                                    </p>
+                                </section>
+                            }
+                        >
+                            <section class="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 space-y-6">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-xl font-semibold text-[hsl(var(--card-foreground))]">
+                                        {t("contentFundRounds.randomOracle.title")}
+                                    </h3>
+                                    <button
+                                        type="button"
+                                        class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                                        onClick={handleRefresh}
+                                        disabled={oracleV2Data.loading}
+                                    >
+                                        {t("common.refresh")}
+                                    </button>
+                                </div>
+
+                                <Show when={oracleV2Data.loading}>
+                                    <div class="flex items-center justify-center py-6">
+                                        <Spinner class="w-6 h-6" />
+                                    </div>
+                                </Show>
+
+                                <Show when={oracleV2Data.error}>
+                                    <div class="space-y-3 text-center">
+                                        <p class="text-sm text-[hsl(var(--destructive))]">
+                                            {t("contentFundRounds.randomOracle.loadError")}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            class="px-3 py-1.5 text-sm rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                                            onClick={handleRefresh}
+                                        >
+                                            {t("common.retry")}
+                                        </button>
+                                    </div>
+                                </Show>
+
+                                <Show when={!oracleV2Data.loading && !oracleV2Data.error}>
+                                    <div class="space-y-4">
+                                        {/* Entropy status */}
+                                        <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-2">
                                             <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                                                 {t("contentFundRounds.randomOracle.entropy")}
                                             </div>
-                                            <div class="text-sm font-mono break-all text-[hsl(var(--card-foreground))]">
-                                                {formatHex(oracleInfo().entropy)}
-                                            </div>
+                                            <Show
+                                                when={oracleV2Info().hasEntropy}
+                                                fallback={
+                                                    <div class="text-sm text-[hsl(var(--muted-foreground))]">
+                                                        {t("contentFundRounds.randomOracle.v2.noEntropy")}
+                                                    </div>
+                                                }
+                                            >
+                                                <div class="text-sm font-mono break-all text-[hsl(var(--card-foreground))]">
+                                                    {formatHex(oracleV2Info().entropy)}
+                                                </div>
+                                            </Show>
                                         </div>
-                                        <div class="space-y-2">
-                                            <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                                                {t("contentFundRounds.randomOracle.lastUpdateTime")}
-                                            </div>
-                                            <div class="text-sm text-[hsl(var(--card-foreground))]">
-                                                {formatTimestamp(oracleInfo().lastUpdateTime)}
-                                            </div>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                                                {t("contentFundRounds.randomOracle.difficulty")}
-                                            </div>
-                                            <div class="text-sm text-[hsl(var(--card-foreground))]">
-                                                {oracleInfo().difficulty.toString()}
-                                            </div>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                                                {t("contentFundRounds.randomOracle.blocks")}
-                                            </div>
-                                            <div class="text-sm text-[hsl(var(--card-foreground))]">
-                                                {oracleInfo().numberOfPreviousBlocks.toString()}
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div class="pt-4 border-t border-[hsl(var(--border))]">
-                                        <button
-                                            type="button"
-                                            class="w-full px-4 py-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                                            onClick={handleMineEntropy}
-                                            disabled={isMining()}
-                                        >
-                                            {isMining()
-                                                ? `${t("contentFundRounds.randomOracle.mining")} (${miningProgress()} hashes)`
-                                                : t("contentFundRounds.randomOracle.mineButton")
-                                            }
-                                        </button>
-                                        <p class="mt-2 text-xs text-center text-[hsl(var(--muted-foreground))]">
-                                            {t("contentFundRounds.randomOracle.mineDescription")}
-                                        </p>
+                                        {/* Waiting for entropy delivery (polling) */}
+                                        <Show when={isWaitingForEntropy()}>
+                                            <div class="pt-2 border-t border-[hsl(var(--border))] space-y-3">
+                                                <div class="flex items-center justify-center gap-2 py-3">
+                                                    <Spinner class="w-5 h-5" />
+                                                    <span class="text-sm text-[hsl(var(--muted-foreground))]">
+                                                        {t("contentFundRounds.randomOracle.v2.waitingForEntropy")}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Show>
+
+                                        {/* Request button — only when entropy is 0 and not polling */}
+                                        <Show when={!oracleV2Info().hasEntropy && !isWaitingForEntropy()}>
+                                            <div class="pt-2 border-t border-[hsl(var(--border))] space-y-3">
+                                                <Show when={feeDisplay()}>
+                                                    <div class="text-sm text-[hsl(var(--muted-foreground))] text-center">
+                                                        {t("contentFundRounds.randomOracle.v2.fee")}: {feeDisplay().amount} {feeDisplay().symbol}
+                                                        <Show when={feeDisplay().usd}>
+                                                            {" "}({feeDisplay().usd})
+                                                        </Show>
+                                                    </div>
+                                                </Show>
+                                                <button
+                                                    type="button"
+                                                    class="w-full px-4 py-3 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                                    onClick={handleRequestEntropy}
+                                                    disabled={isRequestingEntropy() || !oracleV2Info().isTimeToProcess}
+                                                >
+                                                    {isRequestingEntropy()
+                                                        ? t("common.working")
+                                                        : t("contentFundRounds.randomOracle.v2.requestButton")
+                                                    }
+                                                </button>
+                                                <p class="text-xs text-center text-[hsl(var(--muted-foreground))]">
+                                                    {oracleV2Info().isTimeToProcess
+                                                        ? t("contentFundRounds.randomOracle.v2.requestDescription")
+                                                        : t("contentFundRounds.randomOracle.v2.noRoundsToProcess")
+                                                    }
+                                                </p>
+                                            </div>
+                                        </Show>
                                     </div>
-                                </div>
-                            </Show>
-                        </section>
+                                </Show>
+                            </section>
+                        </Show>
                     </Show>
 
                     {/* Upcoming Rounds Section */}
@@ -759,10 +1082,19 @@ export default function ContentFundRoundsPage() {
                                                 }
                                             >
                                                 <For each={rounds()}>
-                                                    {(round) => {
+                                                    {(round, idx) => {
                                                         const roundTimeSeconds = Number(round.roundTime);
                                                         const nowSeconds = Math.floor(Date.now() / 1000);
                                                         const isFuture = roundTimeSeconds > nowSeconds;
+
+                                                        const onCountdownDone = () => {
+                                                            if (idx() === 0) {
+                                                                setTimeout(() => {
+                                                                    handleRefresh();
+                                                                    fetchUpcomingRounds();
+                                                                }, 5000);
+                                                            }
+                                                        };
 
                                                         return (
                                                             <tr class="border-t border-[hsl(var(--border))]">
@@ -795,6 +1127,7 @@ export default function ContentFundRoundsPage() {
                                                                             size="sm"
                                                                             labelPosition="top"
                                                                             labelStyle="short"
+                                                                            onDone={onCountdownDone}
                                                                         />
                                                                     </Show>
                                                                 </td>

@@ -12,7 +12,7 @@ import { connectWallet, walletAccount } from "../../blockchain/wallet.js";
 import { authorize } from "../../blockchain/auth.js";
 import { whenWsOpen } from "../../net/wsRuntime.js";
 import TokenSelector from "./TokenSelector.jsx";
-import { createPublicClient, getContract } from "viem";
+import { createPublicClient, getContract, formatUnits } from "viem";
 import { getConfigParam } from "../../blockchain/config.js";
 import DonatorsList from "./DonatorsList.jsx";
 
@@ -138,11 +138,51 @@ export default function ContributeView(props) {
     const [isProcessing, setIsProcessing] = createSignal(false);
     const [err, setErr] = createSignal("");
 
+    const pv = () => app.info()?.protocol_version ?? 1;
     const targetWei = createMemo(() => campaign()?.targetAmount || 0n);
     const raisedWei = createMemo(() => campaign()?.totalContributed || 0n);
     const percentage = createMemo(() => percentOf(raisedWei(), targetWei()));
     const savvaTokenAddress = () => app.info()?.savva_contracts?.SavvaToken?.address;
     const showDonators = createMemo(() => raisedWei() > 0n);
+
+    // v2: get price of selected contribution token
+    const selectedTokenPrice = createMemo(() => {
+        if (pv() < 2) return null;
+        const tok = selectedToken();
+        const prices = app.allTokenPrices?.() || {};
+        if (tok === "0") return prices[""] || null;
+        return prices[tok.toLowerCase()] || null;
+    });
+
+    const savvaPrice = createMemo(() => {
+        if (pv() < 2) return null;
+        return app.savvaTokenPrice()?.price || null;
+    });
+
+    const hasPriceData = createMemo(() => {
+        if (pv() < 2) return true;
+        const tok = selectedToken();
+        // SAVVA token doesn't need swap, no slippage
+        if (tok && savvaTokenAddress() && tok.toLowerCase() === savvaTokenAddress().toLowerCase()) return true;
+        return !!(selectedTokenPrice()?.price && savvaPrice());
+    });
+
+    // v2: calculate amountOutMin with 10% slippage
+    const amountOutMin = createMemo(() => {
+        if (pv() < 2) return 0n;
+        const tok = selectedToken();
+        // SAVVA contribution: no swap needed
+        if (tok && savvaTokenAddress() && tok.toLowerCase() === savvaTokenAddress().toLowerCase()) return 0n;
+        const amt = amountWei();
+        if (amt <= 0n) return 0n;
+        const tokPrice = selectedTokenPrice()?.price;
+        const svPrice = savvaPrice();
+        if (!tokPrice || !svPrice || svPrice <= 0) return 0n;
+        const ratio = tokPrice / svPrice;
+        const scale = 10000n;
+        const ratioScaled = BigInt(Math.floor(ratio * Number(scale)));
+        return (amt * ratioScaled * 9n) / (scale * 10n);
+    });
     
     const handleTokenSelect = (tokenAddress) => {
         setSelectedToken(tokenAddress);
@@ -179,7 +219,9 @@ export default function ContributeView(props) {
             
             if (isBase) {
                 sendingToastId = pushToast({ type: "info", message: t("fundraising.contribute.toast.sending"), autohideMs: 0 });
-                txHash = await fundraiserContract.write.contribute([props.campaignId, "0x0000000000000000000000000000000000000000", amountWei()], { value: amountWei() });
+                txHash = pv() >= 2
+                    ? await fundraiserContract.write.contribute([props.campaignId, "0x0000000000000000000000000000000000000000", amountWei(), amountOutMin()], { value: amountWei() })
+                    : await fundraiserContract.write.contribute([props.campaignId, "0x0000000000000000000000000000000000000000", amountWei()], { value: amountWei() });
             } else {
                 const tokenContract = getContract({ address: selectedToken(), abi: ERC20_MIN_ABI, client: walletClient });
                 const allowance = await tokenContract.read.allowance([user().address, fundraiserContract.address]);
@@ -190,9 +232,11 @@ export default function ContributeView(props) {
                     await publicClient.waitForTransactionReceipt({ hash: approveHash });
                     app.dismissToast(approveToastId);
                 }
-                
+
                 sendingToastId = pushToast({ type: "info", message: t("fundraising.contribute.toast.sending"), autohideMs: 0 });
-                txHash = await fundraiserContract.write.contribute([props.campaignId, selectedToken(), amountWei()]);
+                txHash = pv() >= 2
+                    ? await fundraiserContract.write.contribute([props.campaignId, selectedToken(), amountWei(), amountOutMin()])
+                    : await fundraiserContract.write.contribute([props.campaignId, selectedToken(), amountWei()]);
             }
             
             await publicClient.waitForTransactionReceipt({ hash: txHash });
@@ -277,6 +321,16 @@ export default function ContributeView(props) {
                                             value={amountText()}
                                             onInput={(txt, wei) => { setAmountText(txt); setAmountWei(wei ?? 0n); }}
                                         />
+                                        <Show when={pv() >= 2 && amountOutMin() > 0n}>
+                                            <div class="text-xs text-[hsl(var(--muted-foreground))]">
+                                                Minimum {parseFloat(formatUnits(amountOutMin(), 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} SAVVA
+                                            </div>
+                                        </Show>
+                                        <Show when={pv() >= 2 && !hasPriceData()}>
+                                            <div class="text-xs text-[hsl(var(--destructive))]">
+                                                {t("fundraising.contribute.noPriceData") || "Price data unavailable for selected token"}
+                                            </div>
+                                        </Show>
                                     </div>
                                 </Show>
                             </div>
@@ -307,7 +361,7 @@ export default function ContributeView(props) {
                                     {t("common.cancel")}
                                 </button>
                             </Show>
-                            <button type="submit" disabled={isProcessing() || amountWei() <= 0n || !selectedToken()} class="px-4 py-2 min-w-[140px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60">
+                            <button type="submit" disabled={isProcessing() || amountWei() <= 0n || !selectedToken() || !hasPriceData()} class="px-4 py-2 min-w-[140px] flex items-center justify-center rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60">
                                 <Show when={isProcessing()} fallback={t("fundraising.card.contribute")}>
                                     <Spinner class="w-5 h-5" />
                                 </Show>
