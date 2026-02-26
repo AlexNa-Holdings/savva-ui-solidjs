@@ -323,12 +323,12 @@ export default function ContributeView(props) {
                                         />
                                         <Show when={pv() >= 2 && amountOutMin() > 0n}>
                                             <div class="text-xs text-[hsl(var(--muted-foreground))]">
-                                                Minimum {parseFloat(formatUnits(amountOutMin(), 18)).toLocaleString(undefined, { maximumFractionDigits: 4 })} SAVVA
+                                                {t("fundraising.contribute.minimumOutput", { amount: parseFloat(formatUnits(amountOutMin(), 18)).toLocaleString(undefined, { maximumFractionDigits: 4 }) })}
                                             </div>
                                         </Show>
                                         <Show when={pv() >= 2 && !hasPriceData()}>
                                             <div class="text-xs text-[hsl(var(--destructive))]">
-                                                {t("fundraising.contribute.noPriceData") || "Price data unavailable for selected token"}
+                                                {t("fundraising.contribute.noPriceData")}
                                             </div>
                                         </Show>
                                     </div>

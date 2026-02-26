@@ -1119,7 +1119,7 @@ export default function ContentFundRoundsPage() {
                                                                     <Show
                                                                         when={isFuture}
                                                                         fallback={
-                                                                            <div class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">FINISHED</div>
+                                                                            <div class="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{t("contentFundRounds.upcomingRounds.finished")}</div>
                                                                         }
                                                                     >
                                                                         <Countdown
