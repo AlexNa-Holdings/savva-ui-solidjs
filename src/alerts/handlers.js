@@ -302,6 +302,13 @@ export function handlePurchaseAccessGranted(app, payload) {
   });
 }
 
+export function handleAdminBroadcast(app, payload) {
+  dbg.log("Alerts:admin_broadcast", payload);
+  const message = payload?.data?.message || payload?.message || "";
+  if (!message) return;
+  app.setAdminBroadcastMessage?.(message);
+}
+
 export function handleError(app, payload) {
   try {
     dbg.log("Alerts:error", payload);

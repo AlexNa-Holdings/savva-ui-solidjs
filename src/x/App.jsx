@@ -31,6 +31,7 @@ import { closeAllModals } from "../utils/modalBus.js";
 import NavigationPanel from "./navigation/NavigationPanel.jsx";
 import VersionChecker from "./main/VersionChecker.jsx";
 import AdminActionsBridge from "./admin/AdminActionsBridge.jsx";
+import AdminBroadcastOverlay from "./AdminBroadcastOverlay.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import ContentFundRoundsPage from "./pages/ContentFundRoundsPage.jsx";
 import GovernancePage from "./pages/GovernancePage.jsx";
@@ -218,6 +219,7 @@ export default function App() {
           <AlertManager />
           <VersionChecker />
           <AdminActionsBridge />
+          <AdminBroadcastOverlay />
           <ReadingKeyInviteManager />
           <PromoPostManager isMainView={currentView() === "main"} />
 

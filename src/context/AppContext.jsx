@@ -42,6 +42,7 @@ export function AppProvider(props) {
 
   const [newFeedItems, setNewFeedItems] = Solid.createSignal([]);
   const [newContentAvailable, setNewContentAvailable] = Solid.createSignal(null);
+  const [adminBroadcastMessage, setAdminBroadcastMessage] = Solid.createSignal(null);
   const [newTabRefreshKey, setNewTabRefreshKey] = Solid.createSignal(Date.now());
   const [activeProposalsCount, setActiveProposalsCount] = Solid.createSignal(0);
 
@@ -308,6 +309,7 @@ export function AppProvider(props) {
     savedScrollY, setSavedScrollY,
     newFeedItems, setNewFeedItems,
     newContentAvailable, setNewContentAvailable,
+    adminBroadcastMessage, setAdminBroadcastMessage,
     newTabRefreshKey, setNewTabRefreshKey,
     activeProposalsCount,
     checkActiveProposals,
