@@ -3,7 +3,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { createMemo, createResource, Show, createSignal, For, createEffect, onCleanup } from "solid-js";
 import { getSavvaContract, configuredHttp } from "../../blockchain/contracts.js";
-import { createPublicClient } from "viem";
+import { createPublicClient, formatUnits } from "viem";
 import Spinner from "../ui/Spinner.jsx";
 import RefreshIcon from "../ui/icons/RefreshIcon.jsx";
 import ContextMenu from "../ui/ContextMenu.jsx";
@@ -16,6 +16,7 @@ import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import SavvaTokenAbi from "../../blockchain/abi/SavvaToken.json";
 import StakingAbi from "../../blockchain/abi/Staking.json";
 import ContentFundAbi from "../../blockchain/abi/ContentFund.json";
+import airdropData from "../../airdrop/airdrop_detailed_block_25943525.json";
 
 export default function WalletTab(props) {
   const app = useApp();
@@ -263,6 +264,15 @@ export default function WalletTab(props) {
     });
   });
 
+  const isPulseChainMainnet = createMemo(() => app.desiredChain()?.id === 369);
+
+  const airdropInfo = createMemo(() => {
+    if (!isPulseChainMainnet()) return null;
+    const addr = (viewedUser()?.address || "").toLowerCase();
+    if (!addr) return null;
+    return airdropData[addr] || null;
+  });
+
   const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
   const savvaTokenSymbol = createMemo(() => app.desiredChain()?.savvaTokenSymbol || "SAVVA");
   const savvaTokenAddress = () => walletData()?.savvaTokenAddress || "";
@@ -441,6 +451,37 @@ export default function WalletTab(props) {
     <div class="px-2 space-y-6 mx-auto max-w-3xl">
       <Show when={!walletData.loading} fallback={<div class="flex justify-center p-8"><Spinner /></div>}>
         <Show when={!walletData.error} fallback={<p class="text-sm text-center text-[hsl(var(--destructive))]">{t("common.error")}: {walletData.error?.message}</p>}>
+          <Show when={airdropInfo()}>
+            {(info) => {
+              const fmt = (v) => parseFloat(formatUnits(BigInt(v || "0"), 18)).toLocaleString(undefined, { maximumFractionDigits: 2 });
+              return (
+                <section class="rounded-lg shadow p-4 space-y-3 border-2 border-[hsl(var(--primary)/.4)] bg-[hsl(var(--primary)/.06)]">
+                  <h3 class="text-lg font-medium">{t("wallet.airdrop.title")}</h3>
+                  <div class="text-sm text-[hsl(var(--muted-foreground))] mb-3">
+                    {t("wallet.airdrop.description")}
+                  </div>
+                  <Show when={info().name}>
+                    <WalletRow title={t("wallet.airdrop.name")} description="">
+                      <span class="px-2 py-1 font-semibold">{info().name}</span>
+                    </WalletRow>
+                  </Show>
+                  <WalletRow title={t("wallet.airdrop.staked")} description={t("wallet.airdrop.stakedDesc")}>
+                    <span class="px-2 py-1">{fmt(info().staked)} SAVVA</span>
+                  </WalletRow>
+                  <WalletRow title={t("wallet.airdrop.lpSavvaDai")} description={t("wallet.airdrop.lpDesc")}>
+                    <span class="px-2 py-1">{fmt(info().lpSavvaDai)} SAVVA</span>
+                  </WalletRow>
+                  <WalletRow title={t("wallet.airdrop.lpWplsSavva")} description={t("wallet.airdrop.lpDesc")}>
+                    <span class="px-2 py-1">{fmt(info().lpWplsSavva)} SAVVA</span>
+                  </WalletRow>
+                  <WalletRow title={t("wallet.airdrop.total")} description="">
+                    <span class="px-2 py-1 font-bold text-[hsl(var(--primary))]">{fmt(info().total)} SAVVA.M</span>
+                  </WalletRow>
+                </section>
+              );
+            }}
+          </Show>
+
           <WalletSection title={t("profile.wallet.balances.title")} headerAction={<RefreshButton />}>
             <WalletRow title={savvaTokenSymbol()} description={t("profile.wallet.savva.description")}>
               <ValueWithMenu amount={walletData()?.savvaBalance} tokenAddress={walletData()?.savvaTokenAddress} items={savvaMenuItems()} />
