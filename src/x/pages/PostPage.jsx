@@ -164,17 +164,10 @@ async function fetchMainContent(details, app, lang, chapterIndex, postSecretKey 
   }
 
   if (contentPath) {
-    try {
-      const postGateways = descriptor?.gateways || [];
-      // Use fetchBestWithDecryption - it will automatically decrypt if context is set
-      const { res, decrypted } = await fetchBestWithDecryption(app, contentPath, { postGateways });
-      const rawContent = await res.arrayBuffer();
-
-      // Convert to text (already decrypted if needed)
-      return new TextDecoder().decode(rawContent);
-    } catch (error) {
-      return `## ${app.t("post.loadError")}\n\n\`\`\`\n${error.message}\n\`\`\``;
-    }
+    const postGateways = descriptor?.gateways || [];
+    const { res, decrypted } = await fetchBestWithDecryption(app, contentPath, { postGateways });
+    const rawContent = await res.arrayBuffer();
+    return new TextDecoder().decode(rawContent);
   }
 
   return "";
@@ -687,7 +680,7 @@ export default function PostPage() {
     return true;
   });
 
-  const [mainContent] = createResource(
+  const [mainContent, { refetch: refetchMainContent }] = createResource(
     () => {
       if (!readyToFetchContent()) return null;
       return { details: details(), lang: postLang(), chapterIndex: selectedChapterIndex(), postSecretKey: postSecretKey() };
@@ -1213,6 +1206,22 @@ export default function PostPage() {
                         <Switch>
                           <Match when={details.loading || mainContent.loading}>
                             <div class="flex justify-center p-8"><Spinner /></div>
+                          </Match>
+                          <Match when={mainContent.error}>
+                            <div class="flex flex-col items-center justify-center p-8 space-y-4 text-center">
+                              <div class="text-4xl">⏳</div>
+                              <h3 class="text-lg font-semibold">{t("post.ipfsError.title")}</h3>
+                              <p class="text-sm text-[hsl(var(--muted-foreground))] max-w-md">
+                                {t("post.ipfsError.description")}
+                              </p>
+                              <button
+                                type="button"
+                                class="px-4 py-2 rounded-md bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90"
+                                onClick={() => refetchMainContent()}
+                              >
+                                {t("post.ipfsError.retry")}
+                              </button>
+                            </div>
                           </Match>
                           <Match when={!details.loading && !mainContent.loading}>
                             <Show when={chapters().length > 0}>

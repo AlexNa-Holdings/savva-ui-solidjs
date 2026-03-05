@@ -41,13 +41,8 @@ async function fetchContent(params) {
   }
 
   if (contentPath) {
-    try {
-      const { res } = await ipfs.fetchBest(app, contentPath, { postGateways: descriptor.gateways });
-      return await res.text();
-    } catch (error) {
-      dbg.error('useMarkdownContent', 'Failed to fetch content', { path: contentPath, error });
-      return `## Error loading content\n\n\`\`\`\n${error.message}\n\`\`\``;
-    }
+    const { res } = await ipfs.fetchBest(app, contentPath, { postGateways: descriptor.gateways });
+    return await res.text();
   }
   return "";
 }
@@ -55,7 +50,7 @@ async function fetchContent(params) {
 export function useMarkdownContent(props) {
   const [details] = createResource(() => props.contentObject(), (content) => fetchDetails(props.app, content));
   
-  const [mainContent] = createResource(
+  const [mainContent, { refetch: refetchMainContent }] = createResource(
     () => ({ details: details(), app: props.app, lang: props.lang(), chapterIndex: props.chapterIndex() }),
     fetchContent
   );
@@ -83,5 +78,5 @@ export function useMarkdownContent(props) {
     [rehypeRewriteLinks, { base: ipfsBaseUrl() }]
   ]);
 
-  return { details, mainContent, markdownPlugins, ipfsBaseUrl };
+  return { details, mainContent, refetchMainContent, markdownPlugins, ipfsBaseUrl };
 }
