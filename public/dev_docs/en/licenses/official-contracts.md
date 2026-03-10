@@ -1,5 +1,21 @@
 # Official Contract Addresses
 
+## Monad
+
+| Contract | Address |
+|----------|---------|
+| Config | `0xEeDf3fd85b8C955160CBee10FB45e02add055e39` |
+| SavvaToken | `0x080Ec98FB587892c76d55eeabF3D52f0d7EAFE74` |
+| RandomOracle | `0xC9aECe5eC3c8D4234EBd30E83ec501eEb31730Cf` |
+| ContentNFT | `0x8E1Cc3C088b1D254c1703C1c38B2087deBE6EA10` |
+| ContentRegistry | `0xA4abB09470db6d0935A4c62e93Ca1239A6EDe81c` |
+| Staking | `0xCCcE67d829Ce386Cf7336F38A2a364f0dbE45097` |
+| ContentFund | `0x8E4609530bc59528F00292933b9de155E74d6411` |
+| SavvaFaucet | `0x25775DCA4D77fA1cDd4574f6C27e6e27F693F607` |
+| UserProfile | `0x68b1edC2184388A1D258Bc01c81Aa1974c64DDEE` |
+| Governance | `0xc12090b5db8b32eE4034cecA49AA7CA2E2597bAa` |
+| BuyBurn | `0x443f71AdFD1085f1eBAEd4De2Eb822c5DB99921B` |
+
 ## PulseChain
 
 | Contract | Address |

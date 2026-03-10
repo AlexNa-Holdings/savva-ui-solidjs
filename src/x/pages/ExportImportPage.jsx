@@ -2,7 +2,8 @@
 import { createSignal, Show } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
-import { httpBase } from "../../net/endpoints.js";
+import UserCard from "../ui/UserCard.jsx";
+import { httpBase, currentDomain } from "../../net/endpoints.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import { toHexBytes32 } from "../../blockchain/utils.js";
@@ -20,7 +21,12 @@ export default function ExportImportPage() {
   async function handleExportPosts() {
     setExporting(true);
     try {
-      const res = await fetch(`${httpBase()}my-posts`, {
+      const domain = currentDomain();
+      const params = new URLSearchParams();
+      if (domain) params.set("domain", domain);
+      if (app.isActingAsNpo?.()) params.set("npo_addr", app.actorAddress?.() || "");
+      const qs = params.toString();
+      const res = await fetch(`${httpBase()}my-posts${qs ? `?${qs}` : ""}`, {
         credentials: "include",
         headers: { Accept: "application/json" },
       });
@@ -38,7 +44,7 @@ export default function ExportImportPage() {
       const actorName = app.actorProfile?.()?.name || actorAddress().slice(0, 10);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = `savva-posts-${actorName}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `${domain || "savva"}-posts-${actorName}-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -133,15 +139,23 @@ export default function ExportImportPage() {
 
   const actorAddress = () => app.actorAddress?.() || app.authorizedUser?.()?.address || "";
 
-  // Extract post count from various possible data structures
+  // Extract posts array from various possible data structures
+  function getPostsArray(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.posts)) return data.posts;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.data)) return data.data;
+    return [];
+  }
+
   function getPostCount(data) {
-    if (!data) return 0;
-    if (Array.isArray(data)) return data.length;
-    if (Array.isArray(data.posts)) return data.posts.length;
-    if (Array.isArray(data.items)) return data.items.length;
-    if (Array.isArray(data.data)) return data.data.length;
-    if (typeof data === "object") return Object.keys(data).length;
-    return 0;
+    return getPostsArray(data).length;
+  }
+
+  function getPreviewRecords(data) {
+    const posts = getPostsArray(data);
+    return posts.slice(0, 3);
   }
 
   return (
@@ -164,6 +178,12 @@ export default function ExportImportPage() {
         <p class="text-sm text-[hsl(var(--muted-foreground))]">
           {t("exportImport.export.description")}
         </p>
+        <Show when={app.actorProfile?.()}>
+          <div class="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+            <span>{t("exportImport.export.actorLabel")}:</span>
+            <UserCard author={app.actorProfile()} />
+          </div>
+        </Show>
         <button
           type="button"
           class="px-4 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -206,6 +226,16 @@ export default function ExportImportPage() {
           <div class="text-sm">
             {t("exportImport.import.postsFound")}: <span class="font-semibold">{getPostCount(importData())}</span>
           </div>
+          <Show when={getPreviewRecords(importData()).length > 0}>
+            <div class="text-xs space-y-1 border border-[hsl(var(--border))] rounded p-3 bg-[hsl(var(--muted)/.3)]">
+              <div class="font-medium text-[hsl(var(--muted-foreground))] mb-2">{t("exportImport.import.preview")}:</div>
+              {getPreviewRecords(importData()).map((post, i) => (
+                <div class="font-mono truncate text-[hsl(var(--foreground)/.7)]">
+                  {i + 1}. {post.title || post.name || post.ipfs || post.guid || JSON.stringify(post).slice(0, 80)}
+                </div>
+              ))}
+            </div>
+          </Show>
         </Show>
 
         <button
@@ -225,12 +255,16 @@ export default function ExportImportPage() {
             <h3 class="text-lg font-semibold">{t("exportImport.import.confirmTitle")}</h3>
 
             <div class="space-y-3 text-sm text-[hsl(var(--muted-foreground))]">
-              <p>
-                {t("exportImport.import.confirmActor")}:
-                <span class="block font-mono text-xs mt-1 break-all text-[hsl(var(--foreground))]">
-                  {actorAddress()}
-                </span>
-              </p>
+              <div>
+                <p class="mb-2">{t("exportImport.import.confirmActor")}:</p>
+                <Show when={app.actorProfile?.()} fallback={
+                  <span class="block font-mono text-xs break-all text-[hsl(var(--foreground))]">
+                    {actorAddress()}
+                  </span>
+                }>
+                  <UserCard author={app.actorProfile()} />
+                </Show>
+              </div>
 
               <p class="text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)] p-3 rounded">
                 {t("exportImport.import.warningAuthor")}

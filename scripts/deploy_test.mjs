@@ -15,6 +15,7 @@ const DEPLOY_HOST = process.env.DEPLOY_HOST || "";
 const DEPLOY_USER = process.env.DEPLOY_USER || "";
 const DEPLOY_PATH = process.env.DEPLOY_PATH || "";
 const DEPLOY_PORT = process.env.DEPLOY_PORT || "";
+const DEPLOY_SSH_KEY = process.env.DEPLOY_SSH_KEY || "";
 
 function sh(cmd, opts = {}) {
   console.log(`$ ${cmd}`);
@@ -84,12 +85,27 @@ function deploy() {
   }
 
   const portOpt = DEPLOY_PORT ? `-P ${DEPLOY_PORT}` : "";
+  const sshPortOpt = DEPLOY_PORT ? `-p ${DEPLOY_PORT}` : "";
+  const sshKeyOpt = DEPLOY_SSH_KEY ? `-i ${DEPLOY_SSH_KEY}` : "";
+  const sshTarget = `${DEPLOY_USER}@${DEPLOY_HOST}`;
+  const archiveName = "dist-release.tar.gz";
 
-  // Ensure path exists, then scp
-  sh(`ssh ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p '${DEPLOY_PATH}'"`);
-  sh(`scp ${portOpt} -r dist/* ${DEPLOY_USER}@${DEPLOY_HOST}:"${DEPLOY_PATH}/"`);
+  // 1. Create compressed archive locally
+  sh(`tar -czf ${archiveName} -C dist .`);
 
-  console.log("\n=== Deploy complete ===\n");
+  // 2. Ensure remote path exists
+  sh(`ssh ${sshPortOpt} ${sshKeyOpt} ${sshTarget} "mkdir -p '${DEPLOY_PATH}'"`);
+
+  // 3. Transfer single archive
+  sh(`scp ${portOpt} ${sshKeyOpt} ${archiveName} ${sshTarget}:"${DEPLOY_PATH}/${archiveName}"`);
+
+  // 4. Extract on server and clean up remote archive
+  sh(`ssh ${sshPortOpt} ${sshKeyOpt} ${sshTarget} "cd '${DEPLOY_PATH}' && tar -xzf ${archiveName} && rm ${archiveName}"`);
+
+  // 5. Clean up local archive
+  fs.unlinkSync(path.join(ROOT, archiveName));
+
+  console.log("\n=== Deploy complete (tar transfer) ===\n");
 }
 
 (async function main() {

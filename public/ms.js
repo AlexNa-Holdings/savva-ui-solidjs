@@ -86,7 +86,33 @@ document.addEventListener("DOMContentLoaded", () => {
     "function nonce() public view returns (uint256)",
     "function execTransaction(address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, bytes calldata signatures) external payable returns (bool success)",
     "function getTransactionHash(address to, uint256 value, bytes memory data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce) public view returns (bytes32)",
+    "function approveHash(bytes32 hashToApprove) external",
+    "event ExecutionSuccess(bytes32 txHash, uint256 payment)",
+    "event ExecutionFailure(bytes32 txHash, uint256 payment)",
   ];
+
+  // --- Chain-aware labels ---
+  const CHAIN_SYMBOLS = {
+    369:   { native: "PLS", token: "SAVVA" },
+    1:     { native: "ETH", token: "SAVVA" },
+    8453:  { native: "ETH", token: "SAVVA" },
+    143:   { native: "MON", token: "SAVVA.M" },
+    10143: { native: "MON", token: "SAVVA.M" },
+  };
+
+  const getChainSymbols = () => {
+    const chainId = document.getElementById("chainId").value;
+    return CHAIN_SYMBOLS[chainId] || CHAIN_SYMBOLS[369];
+  };
+
+  const displayUnits = (rawUnits) => {
+    const { native, token } = getChainSymbols();
+    return rawUnits.replace(/\bPLS\b/g, native).replace(/\bSAVVA\b/g, token);
+  };
+
+  // --- Per-chain storage helpers ---
+  const getSelectedChainId = () => document.getElementById("chainId").value;
+  const chainKey = (key) => `chain_${getSelectedChainId()}_${key}`;
 
   // --- State Variables ---
   let provider, signer, connectedAccount;
@@ -118,18 +144,46 @@ document.addEventListener("DOMContentLoaded", () => {
     connectWalletBtn.addEventListener("click", connectWallet);
     saveSettingsBtn.addEventListener("click", saveSettings);
 
-    // Auto-save Safe address on change
-    document.getElementById("safeAddress").addEventListener("input", (e) => {
-      localStorage.setItem("safeAddress", e.target.value);
+    // Auto-save Safe address on change (per-chain)
+    const safeInput = document.getElementById("safeAddress");
+    safeInput.addEventListener("input", (e) => {
+      localStorage.setItem(chainKey("safeAddress"), e.target.value);
+    });
+    // Re-initialize contracts when Safe address changes and wallet is connected
+    safeInput.addEventListener("change", async () => {
+      if (connectedAccount) {
+        await initializeContracts();
+      }
     });
 
-    // Auto-save chain ID on change
-    document.getElementById("chainId").addEventListener("change", (e) => {
+    // Auto-save chain ID on change, restore per-chain values, refresh panels
+    document.getElementById("chainId").addEventListener("change", async (e) => {
       localStorage.setItem("targetChainId", e.target.value);
+      loadChainSettings();
+      for (const key in CONTRACT_DEFINITIONS) {
+        populatePanel(key);
+      }
+      // Re-initialize contracts if wallet is already connected
+      if (connectedAccount) {
+        await connectWallet();
+      }
     });
 
     if (window.ethereum && window.ethereum.selectedAddress) {
       connectWallet();
+    }
+  };
+
+  // Restore Safe address + contract addresses for the currently selected chain
+  const loadChainSettings = () => {
+    document.getElementById("safeAddress").value =
+      localStorage.getItem(chainKey("safeAddress")) || "";
+    for (const key in CONTRACT_DEFINITIONS) {
+      const input = document.getElementById(`${key}Address`);
+      if (input) {
+        input.value =
+          localStorage.getItem(chainKey(`${key}Address`)) || CONTRACT_DEFINITIONS[key].address || "";
+      }
     }
   };
 
@@ -154,17 +208,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
       dynamicContractsContainer.appendChild(div);
 
-      // After adding to DOM, set value from localStorage or default
+      // Auto-save contract address on change (per-chain)
       const input = document.getElementById(`${key}Address`);
-      input.value =
-        localStorage.getItem(`${key}Address`) || contract.address || "";
+      const contractKey_ = key;
+      input.addEventListener("input", () => {
+        localStorage.setItem(chainKey(`${contractKey_}Address`), input.value);
+      });
+      // Re-fetch params when config address changes and wallet is connected
+      if (key === "config") {
+        input.addEventListener("change", async () => {
+          if (connectedAccount && ethers.utils.isAddress(input.value)) {
+            await initializeContracts();
+          }
+        });
+      }
     }
 
-    // Load static settings
-    document.getElementById("safeAddress").value =
-      localStorage.getItem("safeAddress") || "";
+    // Load chain ID first (so chainKey works), then load per-chain values
     document.getElementById("chainId").value =
       localStorage.getItem("targetChainId") || "369"; // Default to PulseChain
+    loadChainSettings();
   };
 
   const setupTabsAndPanels = () => {
@@ -218,7 +281,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }" class="font-bold text-lg">${param.name}</label>
                     ${
                       param.units
-                        ? `<p class="text-sm text-gray-400">Units: ${param.units}</p>`
+                        ? `<p class="text-sm text-gray-400">Units: ${displayUnits(param.units)}</p>`
                         : ""
                     }
                 </div>
@@ -246,17 +309,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const saveSettings = () => {
     localStorage.setItem(
-      "safeAddress",
-      document.getElementById("safeAddress").value
-    );
-    localStorage.setItem(
       "targetChainId",
       document.getElementById("chainId").value
+    );
+    // Save Safe address and contract addresses per-chain
+    localStorage.setItem(
+      chainKey("safeAddress"),
+      document.getElementById("safeAddress").value
     );
     for (const key in CONTRACT_DEFINITIONS) {
       const addressVal = document.getElementById(`${key}Address`).value;
       if (ethers.utils.isAddress(addressVal) || addressVal === "") {
-        localStorage.setItem(`${key}Address`, addressVal);
+        localStorage.setItem(chainKey(`${key}Address`), addressVal);
       }
     }
     logStatus("Settings saved to browser storage.");
@@ -297,6 +361,20 @@ document.addEventListener("DOMContentLoaded", () => {
       nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
       rpcUrls: ["https://mainnet.base.org"],
       blockExplorerUrls: ["https://basescan.org"],
+    },
+    143: {
+      chainId: "0x8f",
+      chainName: "Monad",
+      nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+      rpcUrls: ["https://rpc.monad.xyz"],
+      blockExplorerUrls: ["https://monadscan.com"],
+    },
+    10143: {
+      chainId: "0x279f",
+      chainName: "Monad Testnet",
+      nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+      rpcUrls: ["https://testnet-rpc.monad.xyz"],
+      blockExplorerUrls: ["https://testnet.monadscan.com"],
     },
   };
 
@@ -409,11 +487,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const initializeContracts = async () => {
     const safeAddr = document.getElementById("safeAddress").value;
-    if (!ethers.utils.isAddress(safeAddr)) {
-      logStatus("Error: Invalid Gnosis Safe address provided.", true);
-      return;
+    if (ethers.utils.isAddress(safeAddr)) {
+      state.safeContract = new ethers.Contract(safeAddr, SAFE_ABI, signer);
+    } else {
+      state.safeContract = null;
+      logStatus("No valid Safe address — read-only mode (no proposals).");
     }
-    state.safeContract = new ethers.Contract(safeAddr, SAFE_ABI, signer);
 
     for (const key in CONTRACT_DEFINITIONS) {
       const contractAddr = document.getElementById(`${key}Address`).value;
@@ -431,7 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    logStatus("Contracts initialized. Fetching Safe details...");
+    logStatus("Contracts initialized. Fetching data...");
     await displaySafeDetails();
     await fetchAndDisplayAllParams();
   };
@@ -490,6 +569,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Attach the click handler
         buttonEl.addEventListener("click", handleUpdateClick);
+        // Enable/disable proposals based on Safe availability
+        if (!state.safeContract) {
+          buttonEl.disabled = true;
+          buttonEl.title = "No Safe address configured";
+        } else {
+          buttonEl.disabled = false;
+          buttonEl.title = "";
+        }
 
         // Fetch values only for the 'config' contract
         if (key === "config") {
@@ -630,37 +717,98 @@ document.addEventListener("DOMContentLoaded", () => {
         calldata = contractInterface.encodeFunctionData(methodName, args);
       }
 
-      logStatus(`Encoded calldata: ${calldata.substring(0, 50)}...`);
+      const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+      const signerAddress = await signer.getAddress();
 
-      const safeTxNonce = await state.safeContract.nonce();
-      logStatus(
-        `Current Safe nonce is ${safeTxNonce}. Creating transaction proposal.`
-      );
+      // Check if we have a Safe configured
+      const hasSafe = state.safeContract != null;
 
-      // This is a simplified call for proposing. Gnosis Safe UIs often build more complex meta-transactions.
-      // This direct `execTransaction` call will work if the connected signer is an owner and has permissions.
-      const tx = await state.safeContract.execTransaction(
-        contract.address,
-        0,
-        calldata,
-        0,
-        0,
-        0,
-        0,
-        "0x0000000000000000000000000000000000000000",
-        "0x0000000000000000000000000000000000000000",
-        `0x000000000000000000000000${(
-          await signer.getAddress()
-        ).slice(
-          2
-        )}000000000000000000000000000000000000000000000000000000000000000001`
-      );
+      if (!hasSafe) {
+        // --- Direct call (no Safe) ---
+        logStatus(`Sending direct transaction to ${contractDef.displayName}...`);
+        const tx = await signer.sendTransaction({
+          to: contract.address,
+          data: calldata,
+          gasLimit: 2000000,
+        });
+        logStatus(`Tx submitted: ${tx.hash}. Waiting...`);
+        const receipt = await tx.wait();
+        if (receipt.status === 0) {
+          logStatus(`Transaction reverted on-chain. Check tx: ${tx.hash}`, true);
+        } else {
+          logStatus(`Parameter '${param.name}' updated successfully!`);
+          await fetchAndDisplayParam(contractKey, param);
+        }
+      } else {
+        // --- Safe call ---
+        const safeTxNonce = await state.safeContract.nonce();
+        const threshold = await state.safeContract.getThreshold();
+        const owners = await state.safeContract.getOwners();
 
-      logStatus(`Transaction proposed to Safe. Tx Hash: ${tx.hash}`);
-      await tx.wait();
-      logStatus(
-        `Transaction proposal confirmed on-chain for '${param.name}'. Check your Safe UI to collect signatures and execute.`
-      );
+        console.log("=== Safe Info ===");
+        console.log("Safe:", state.safeContract.address, "Signer:", signerAddress);
+        console.log("Owners:", owners, "Threshold:", threshold.toString(), "Nonce:", safeTxNonce.toString());
+
+        const isOwner = owners.map(o => o.toLowerCase()).includes(signerAddress.toLowerCase());
+        if (!isOwner) {
+          logStatus(`ERROR: ${signerAddress} is NOT a Safe owner. Owners: ${owners.join(", ")}`, true);
+          return;
+        }
+
+        // Simulate the inner call (as if from Safe)
+        try {
+          await provider.call({ from: state.safeContract.address, to: contract.address, data: calldata });
+          logStatus("Pre-check: inner call simulation OK.");
+        } catch (simErr) {
+          logStatus(`WARNING: Inner call simulation failed: ${simErr.reason || simErr.message}`, true);
+        }
+
+        logStatus(`Safe nonce: ${safeTxNonce}, threshold: ${threshold}. Approving hash...`);
+
+        const safeTxHash = await state.safeContract.getTransactionHash(
+          contract.address, 0, calldata, 0, 0, 0, 0, ZERO_ADDR, ZERO_ADDR, safeTxNonce
+        );
+        console.log("Safe tx hash:", safeTxHash);
+
+        // Approve hash on-chain
+        const approveTx = await state.safeContract.connect(signer).approveHash(safeTxHash, { gasLimit: 200000 });
+        logStatus(`Approve tx: ${approveTx.hash}. Waiting...`);
+        const approveReceipt = await approveTx.wait();
+        if (approveReceipt.status === 0) {
+          logStatus(`approveHash reverted! Check tx: ${approveTx.hash}`, true);
+          return;
+        }
+        logStatus(`Hash approved! Executing Safe transaction...`);
+
+        // Build pre-approved signature (v=1)
+        const signature = ethers.utils.solidityPack(
+          ["uint256", "uint256", "uint8"],
+          [signerAddress, 0, 1]
+        );
+
+        // Execute — use high gas limit to avoid out-of-gas
+        const tx = await state.safeContract.connect(signer).execTransaction(
+          contract.address, 0, calldata, 0, 0, 0, 0, ZERO_ADDR, ZERO_ADDR, signature,
+          { gasLimit: 2000000 }
+        );
+
+        logStatus(`Exec tx: ${tx.hash}. Waiting...`);
+        const receipt = await tx.wait();
+        console.log("Receipt status:", receipt.status, "gasUsed:", receipt.gasUsed.toString(), "logs:", receipt.logs.length);
+
+        if (receipt.status === 0) {
+          logStatus(`execTransaction reverted on-chain (used ${receipt.gasUsed} gas). This Safe may not be standard Gnosis Safe. Try without Safe (clear Safe address).`, true);
+        } else {
+          const failureTopic = ethers.utils.id("ExecutionFailure(bytes32,uint256)");
+          const hasFailed = receipt.logs?.some(l => l.topics[0] === failureTopic);
+          if (hasFailed) {
+            logStatus(`Safe executed but inner call failed. The config contract rejected the call.`, true);
+          } else {
+            logStatus(`Parameter '${param.name}' updated successfully!`);
+            await fetchAndDisplayParam(contractKey, param);
+          }
+        }
+      }
     } catch (error) {
       const message =
         error.reason ||
