@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "function getUInt(bytes32 name) public view returns (uint256)",
       ],
       params: [
+        { name: "protocol_version", type: "uint" },
         { name: "authorShare", type: "uint", units: "% * 100" },
         { name: "nftOwnerCut", type: "uint", units: "% * 100" },
         { name: "minContribution", type: "uint", units: "SAVVA" },

@@ -140,11 +140,23 @@ export default function BuyBurnPage() {
       const contract = await getSavvaContract(app, "BuyBurn", { write: true });
       const publicClient = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
 
-      const hash = pv() >= 2
-        ? await contract.write.buyAndBurn([amountOutMin()])
-        : await contract.write.buyAndBurn([]);
-      await publicClient.waitForTransactionReceipt({ hash });
+      // Estimate gas with 1.5x buffer — DEX swaps can be underestimated on some chains
+      const args = pv() >= 2 ? [amountOutMin()] : [];
+      const gasEstimate = await publicClient.estimateContractGas({
+        address: contract.address,
+        abi: contract.abi,
+        functionName: "buyAndBurn",
+        args,
+        account: walletAccount(),
+      });
+      const gas = gasEstimate * 3n / 2n;
 
+      const hash = await contract.write.buyAndBurn(args, { gas });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status === "reverted") {
+        throw new Error(t("buyburn.toast.reverted") || "Transaction reverted on-chain");
+      }
       pushToast({ type: "success", message: t("buyburn.toast.success") });
       handleRefresh();
     } catch (err) {
@@ -184,8 +196,11 @@ export default function BuyBurnPage() {
       const publicClient = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
 
       const hash = await authorsClubs.write.claimStakingGain([]);
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
+      if (receipt.status === "reverted") {
+        throw new Error(t("buyburn.toast.reverted") || "Transaction reverted on-chain");
+      }
       pushToast({ type: "success", message: t("buyburn.toast.transferSuccess") });
       handleRefresh();
     } catch (err) {

@@ -79,10 +79,15 @@ export default function TokenValue(props) {
   }, { defer: true }));
 
 
-  // SAVVA & SAVVA_VOTES share the same USD price source
+  // SavvaToken and Staking token share the same USD price source (by address, not symbol)
   const isSavvaLike = createMemo(() => {
-    const sym = tokenMeta()?.symbol;
-    return sym === "SAVVA" || sym === "SAVVA_VOTES";
+    if (isBaseToken()) return false;
+    const addr = tokenAddressForMeta();
+    if (!addr) return false;
+    const contracts = app.info()?.savva_contracts;
+    const savvaAddr = contracts?.SavvaToken?.address?.toLowerCase();
+    const stakingAddr = contracts?.Staking?.address?.toLowerCase();
+    return addr === savvaAddr || addr === stakingAddr;
   });
 
   // USD approximate value and animation
@@ -91,32 +96,17 @@ export default function TokenValue(props) {
     const isSavva = isSavvaLike();
     const isBase = isBaseToken();
 
-    console.log("[TokenValue] USD calculation:", {
-      isSavvaLike: isSavva,
-      isBaseToken: isBase,
-      tokenAddress: tokenAddressRaw(),
-      savvaPrice: app.savvaTokenPrice?.(),
-      basePrice: app.baseTokenPrice?.(),
-      amount: props.amount,
-    });
-
     if (isSavva)        priceData = app.savvaTokenPrice?.();
     else if (isBase)   priceData = app.baseTokenPrice?.();
 
-    if (!priceData?.price) {
-      console.log("[TokenValue] No price data available");
-      return null;
-    }
+    if (!priceData?.price) return null;
     try {
       const dec = Number(tokenMeta()?.decimals ?? 18);
       const amt = BigInt(props.amount ?? 0);
       const units = parseFloat(formatUnits(amt, isNaN(dec) ? 18 : dec));
       const total = units * Number(priceData.price);
-      const formatted = total.toLocaleString(undefined, { style: "currency", currency: "USD" });
-      console.log("[TokenValue] USD value calculated:", formatted);
-      return formatted;
-    } catch (err) {
-      console.error("[TokenValue] Error calculating USD:", err);
+      return total.toLocaleString(undefined, { style: "currency", currency: "USD" });
+    } catch {
       return null;
     }
   });

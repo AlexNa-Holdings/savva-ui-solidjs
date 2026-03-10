@@ -120,6 +120,7 @@ export default {
   "buyburn.title": "Buy & Burn",
   "buyburn.toast.error": "Не вдалося виконати Buy & Burn.",
   "buyburn.toast.pending": "Надсилання транзакції Buy & Burn…",
+  "buyburn.toast.reverted": "Транзакція скасована — кошти не були переведені.",
   "buyburn.toast.success": "Операцію Buy & Burn виконано успішно.",
   "buyburn.toast.transferError": "Не вдалося перевести стейкінг-дохід.",
   "buyburn.toast.transferPending": "Отримуємо стейкінг-дохід…",

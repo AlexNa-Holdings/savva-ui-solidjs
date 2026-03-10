@@ -120,6 +120,7 @@ export default {
   "buyburn.title": "Buy & Burn",
   "buyburn.toast.error": "Échec de l'opération Buy & Burn.",
   "buyburn.toast.pending": "Envoi de la transaction Buy & Burn…",
+  "buyburn.toast.reverted": "Transaction annulée — aucun fonds n'a été transféré.",
   "buyburn.toast.success": "Buy & Burn exécuté avec succès.",
   "buyburn.toast.transferError": "Impossible de transférer le gain de staking.",
   "buyburn.toast.transferPending": "Réclamation du gain de staking…",

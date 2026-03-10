@@ -120,6 +120,7 @@ export default {
   "buyburn.title": "Buy & Burn",
   "buyburn.toast.error": "Buy & Burn nije uspeo.",
   "buyburn.toast.pending": "Šaljem Buy & Burn transakciju…",
+  "buyburn.toast.reverted": "Transakcija je poništena — sredstva nisu preneta.",
   "buyburn.toast.success": "Buy & Burn je uspešno izvršen.",
   "buyburn.toast.transferError": "Nije uspelo prebacivanje staking dobiti.",
   "buyburn.toast.transferPending": "Preuzimam staking dobit…",
