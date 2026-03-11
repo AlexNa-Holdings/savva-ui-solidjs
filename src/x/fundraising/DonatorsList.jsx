@@ -38,6 +38,16 @@ export default function DonatorsList(props) {
 
     let scrollContainerRef;
 
+    const refresh = async () => {
+        setDonators([]);
+        setOffset(0);
+        setHasMore(true);
+        const result = await fetchDonators({ app, campaignId: props.campaignId, offset: 0 });
+        if (result.list.length > 0) setDonators(result.list);
+        if (result.nextOffset !== null) setOffset(result.nextOffset);
+        else setHasMore(false);
+    };
+
     const loadMore = async () => {
         if (loading() || !hasMore()) return;
         setLoading(true);

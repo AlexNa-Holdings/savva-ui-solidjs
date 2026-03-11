@@ -179,9 +179,16 @@ export default function ContributeView(props) {
         const svPrice = savvaPrice();
         if (!tokPrice || !svPrice || svPrice <= 0) return 0n;
         const ratio = tokPrice / svPrice;
+        // Account for decimal difference: input token may have != 18 decimals (e.g. USDC=6)
+        const tokMeta = acceptedTokens().find(t => t.address.toLowerCase() === tok.toLowerCase());
+        const tokDecimals = tokMeta?.decimals ?? 18;
+        const decimalDiff = 18 - tokDecimals; // SAVVA always has 18 decimals
         const scale = 10000n;
         const ratioScaled = BigInt(Math.floor(ratio * Number(scale)));
-        return (amt * ratioScaled * 9n) / (scale * 10n);
+        const adjusted = decimalDiff > 0
+            ? amt * (10n ** BigInt(decimalDiff))
+            : amt / (10n ** BigInt(-decimalDiff));
+        return (adjusted * ratioScaled * 9n) / (scale * 10n);
     });
     
     const handleTokenSelect = (tokenAddress) => {
@@ -229,7 +236,8 @@ export default function ContributeView(props) {
                 if (allowance < amountWei()) {
                     approveToastId = pushToast({ type: "info", message: t("fundraising.contribute.toast.approving"), autohideMs: 0 });
                     const approveHash = await tokenContract.write.approve([fundraiserContract.address, MAX_UINT]);
-                    await publicClient.waitForTransactionReceipt({ hash: approveHash });
+                    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
+                    if (approveReceipt.status !== "success") throw new Error("Approve transaction failed");
                     app.dismissToast(approveToastId);
                 }
 
@@ -239,8 +247,9 @@ export default function ContributeView(props) {
                     : await fundraiserContract.write.contribute([props.campaignId, selectedToken(), amountWei()]);
             }
             
-            await publicClient.waitForTransactionReceipt({ hash: txHash });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
             app.dismissToast(sendingToastId);
+            if (receipt.status !== "success") throw new Error("Transaction failed with status: " + receipt.status);
             pushToast({ type: "success", message: t("fundraising.contribute.toast.success") });
             
             refetch();
