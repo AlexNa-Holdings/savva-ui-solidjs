@@ -71,12 +71,12 @@ export default function NewFundraisingModal(props) {
         args: [title().trim(), amountWei()],
       });
 
+      setIsProcessing(false);
       pushToast({ type: "success", message: t("fundraising.createModal.toast.success") });
       props.onSuccess?.();
       handleClose();
     } catch (err) {
       pushErrorToast(err, { context: t("fundraising.createModal.toast.error") });
-    } finally {
       setIsProcessing(false);
     }
   };

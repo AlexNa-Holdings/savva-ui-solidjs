@@ -97,7 +97,11 @@ export default function TokenValue(props) {
     const isBase = isBaseToken();
 
     if (isSavva)        priceData = app.savvaTokenPrice?.();
-    else if (isBase)   priceData = app.baseTokenPrice?.();
+    else if (isBase)    priceData = app.baseTokenPrice?.();
+    else {
+      const addr = tokenAddressForMeta();
+      if (addr) priceData = app.allTokenPrices?.()?.[addr] || null;
+    }
 
     if (!priceData?.price) return null;
     try {

@@ -2,7 +2,7 @@
 
 ## Monad
 
-| Contrato | Dirección |
+| Contract | Dirección |
 |----------|---------|
 | Config | `0xEeDf3fd85b8C955160CBee10FB45e02add055e39` |
 | SavvaToken | `0x080Ec98FB587892c76d55eeabF3D52f0d7EAFE74` |
@@ -15,10 +15,11 @@
 | UserProfile | `0x68b1edC2184388A1D258Bc01c81Aa1974c64DDEE` |
 | Governance | `0xc12090b5db8b32eE4034cecA49AA7CA2E2597bAa` |
 | BuyBurn | `0x0EF3912f043cD112F8bb46823978eB12D3e69739` |
+| Fundraiser | `0xFFD626410B81641691F8CB9Ab8ac04855e7d6D66` |
 
 ## PulseChain
 
-| Contrato | Dirección |
+| Contract | Dirección |
 |----------|---------|
 | Config | `0x4ED8321722ACB984aB6B249C4AE74a58CAD7E4e8` |
 | SavvaToken | `0xb528a9DB27A74dB802C74D0CCc40657efE5F0A45` |
@@ -31,3 +32,4 @@
 | UserProfile | `0x015398a7b4fd51de49c8ae9e3b59c1466b6d87fe` |
 | Governance | `0x464502310833abC067CEBCC76E9C9Ac65753b6AA` |
 | BuyBurn | `0x6F80bBb3048Acb1CECE3cA71Da402ee85a4ADD5a` |
+| Fundraiser | `0x3a673f80dC5c5111Ea30541495a806F2D18A0565` |
