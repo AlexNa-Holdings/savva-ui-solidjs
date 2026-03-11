@@ -5,6 +5,16 @@
         "internalType": "address",
         "name": "_initialOwner",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_pythEntropy",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_config",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -38,30 +48,11 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "difficulty",
-        "type": "uint256"
-      }
-    ],
-    "name": "DifficultyUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
         "name": "entropy",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
       }
     ],
-    "name": "EntropyUpdated",
+    "name": "EntropyReceived",
     "type": "event"
   },
   {
@@ -69,12 +60,12 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "numberOfPreviousBlocks",
-        "type": "uint256"
+        "internalType": "uint64",
+        "name": "sequenceNumber",
+        "type": "uint64"
       }
     ],
-    "name": "NumberOfPreviousBlocksUpdated",
+    "name": "EntropyRequested",
     "type": "event"
   },
   {
@@ -101,22 +92,58 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "timeDelta",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "pythEntropy",
+        "type": "address"
       }
     ],
-    "name": "TimeDeltaUpdated",
+    "name": "PythEntropyUpdated",
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "random",
+        "type": "uint256"
+      }
+    ],
+    "name": "RandomGenerated",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "sequence",
+        "type": "uint64"
+      },
+      {
+        "internalType": "address",
+        "name": "provider",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "randomNumber",
+        "type": "bytes32"
+      }
+    ],
+    "name": "_entropyCallback",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
-    "name": "difficulty",
+    "name": "config",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "contract IConfig",
         "name": "",
-        "type": "uint256"
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -137,7 +164,7 @@
   },
   {
     "inputs": [],
-    "name": "getLastUpdateTime",
+    "name": "generateRandom",
     "outputs": [
       {
         "internalType": "uint256",
@@ -145,17 +172,17 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [],
-    "name": "getRandom",
+    "name": "getRequestFee",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint128",
         "name": "",
-        "type": "uint256"
+        "type": "uint128"
       }
     ],
     "stateMutability": "view",
@@ -163,38 +190,12 @@
   },
   {
     "inputs": [],
-    "name": "lastUpdateBlock",
+    "name": "hasEntropy",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "bool",
         "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "lastUpdateTime",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "numberOfPreviousBlocks",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -215,74 +216,42 @@
   },
   {
     "inputs": [],
+    "name": "pythEntropy",
+    "outputs": [
+      {
+        "internalType": "contract IEntropyV2",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_difficulty",
-        "type": "uint256"
-      }
-    ],
-    "name": "setDifficulty",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "nonce",
-        "type": "uint256"
-      }
-    ],
-    "name": "setEntropy",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_numberOfPreviousBlocks",
-        "type": "uint256"
-      }
-    ],
-    "name": "setNumberOfPreviousBlocks",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_timeDelta",
-        "type": "uint256"
-      }
-    ],
-    "name": "setTimeDelta",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [],
-    "name": "timeDelta",
-    "outputs": [
+    "name": "requestEntropy",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "_pythEntropy",
+        "type": "address"
       }
     ],
-    "stateMutability": "view",
+    "name": "setPythEntropy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -299,62 +268,7 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "hasEntropy",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getRequestFee",
-    "outputs": [
-      {
-        "internalType": "uint128",
-        "name": "",
-        "type": "uint128"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "requestEntropy",
-    "outputs": [],
     "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "generateRandom",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "pythEntropy",
-    "outputs": [
-      {
-        "internalType": "contract IEntropyV2",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
+    "type": "receive"
   }
 ]

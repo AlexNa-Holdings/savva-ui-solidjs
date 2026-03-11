@@ -3,7 +3,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "fromToken",
+        "name": "",
         "type": "address"
       },
       {
@@ -13,7 +13,7 @@
       },
       {
         "internalType": "address",
-        "name": "toToken",
+        "name": "",
         "type": "address"
       }
     ],
@@ -25,7 +25,7 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "pure",
     "type": "function"
   },
   {

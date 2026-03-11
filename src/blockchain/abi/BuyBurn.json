@@ -128,15 +128,14 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amountOutMin",
+        "type": "uint256"
+      }
+    ],
     "name": "buy",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "buyAndBurn",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -150,6 +149,24 @@
       }
     ],
     "name": "buyAndBurn",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "nativeAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amountOutMin",
+        "type": "uint256"
+      }
+    ],
+    "name": "buyPartial",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -195,6 +212,19 @@
   },
   {
     "inputs": [],
+    "name": "minBuyAmount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "owner",
     "outputs": [
       {
@@ -209,6 +239,19 @@
   {
     "inputs": [],
     "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_minBuyAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMinBuyAmount",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

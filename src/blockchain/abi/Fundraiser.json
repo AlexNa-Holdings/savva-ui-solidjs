@@ -319,29 +319,6 @@
         "internalType": "uint256",
         "name": "amountIn",
         "type": "uint256"
-      }
-    ],
-    "name": "contribute",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "campaignId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "fromToken",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amountIn",
-        "type": "uint256"
       },
       {
         "internalType": "uint256",
@@ -369,6 +346,11 @@
       {
         "internalType": "uint256",
         "name": "amountIn",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amountOutMin",
         "type": "uint256"
       },
       {
