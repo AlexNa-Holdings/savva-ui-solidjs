@@ -3,20 +3,20 @@ import { fetchWithTimeout } from "../utils/net.js";
 
 export const AI_PROVIDERS = [
   // OpenAI & compatibles
-  { id: "openai",             labelKey: "settings.ai.providers.openai",           kind: "openai",        defaultBaseUrl: "https://api.openai.com/v1",        defaultModel: "gpt-4o-mini",                      modelHint: "gpt-4o, gpt-4.1, o4-mini" },
+  { id: "openai",             labelKey: "settings.ai.providers.openai",           kind: "openai",        defaultBaseUrl: "https://api.openai.com/v1",        defaultModel: "gpt-4o-mini",                      modelHint: "gpt-4o, gpt-4.1, o4-mini",   keyUrl: "https://platform.openai.com/api-keys" },
   { id: "openai-compatible",  labelKey: "settings.ai.providers.openaiCompatible", kind: "openai",        defaultBaseUrl: "https://api.example.com/v1",       defaultModel: "gpt-4o-mini",                      modelHint: "OpenAI-compatible path, e.g. /v1" },
-  { id: "groq",               labelKey: "settings.ai.providers.groq",             kind: "openai",        defaultBaseUrl: "https://api.groq.com/openai/v1",   defaultModel: "llama-3.1-70b-versatile",           modelHint: "llama-3.1-70b-versatile" },
-  { id: "together",           labelKey: "settings.ai.providers.together",         kind: "openai",        defaultBaseUrl: "https://api.together.xyz/v1",      defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", modelHint: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo" },
-  { id: "mistral",            labelKey: "settings.ai.providers.mistral",          kind: "openai",        defaultBaseUrl: "https://api.mistral.ai/v1",        defaultModel: "open-mixtral-8x7b",                modelHint: "open-mixtral-8x7b" },
+  { id: "groq",               labelKey: "settings.ai.providers.groq",             kind: "openai",        defaultBaseUrl: "https://api.groq.com/openai/v1",   defaultModel: "llama-3.1-70b-versatile",           modelHint: "llama-3.1-70b-versatile",     keyUrl: "https://console.groq.com/keys" },
+  { id: "together",           labelKey: "settings.ai.providers.together",         kind: "openai",        defaultBaseUrl: "https://api.together.xyz/v1",      defaultModel: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", modelHint: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", keyUrl: "https://api.together.xyz/settings/api-keys" },
+  { id: "mistral",            labelKey: "settings.ai.providers.mistral",          kind: "openai",        defaultBaseUrl: "https://api.mistral.ai/v1",        defaultModel: "open-mixtral-8x7b",                modelHint: "open-mixtral-8x7b",           keyUrl: "https://console.mistral.ai/api-keys" },
 
   // Anthropic
-  { id: "anthropic",          labelKey: "settings.ai.providers.anthropic",        kind: "anthropic",     defaultBaseUrl: "https://api.anthropic.com/v1",     defaultModel: "claude-3-5-sonnet-20240620",         modelHint: "claude-3-5-sonnet-20240620", anthropicVersion: "2023-06-01" },
+  { id: "anthropic",          labelKey: "settings.ai.providers.anthropic",        kind: "anthropic",     defaultBaseUrl: "https://api.anthropic.com/v1",     defaultModel: "claude-3-5-sonnet-20240620",         modelHint: "claude-3-5-sonnet-20240620", anthropicVersion: "2023-06-01", keyUrl: "https://console.anthropic.com/settings/keys" },
 
   // Google Gemini
-  { id: "gemini",             labelKey: "settings.ai.providers.gemini",           kind: "gemini",        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1", defaultModel: "gemini-1.5-pro", modelHint: "gemini-1.5-pro" },
+  { id: "gemini",             labelKey: "settings.ai.providers.gemini",           kind: "gemini",        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1", defaultModel: "gemini-1.5-pro", modelHint: "gemini-1.5-pro", keyUrl: "https://aistudio.google.com/apikey" },
 
   // Azure OpenAI
-  { id: "azure-openai",       labelKey: "settings.ai.providers.azure",            kind: "azure_openai",  defaultBaseUrl: "",                                 defaultModel: "", apiVersion: "2024-02-15-preview", modelHint: "gpt-4o (deployed name)" },
+  { id: "azure-openai",       labelKey: "settings.ai.providers.azure",            kind: "azure_openai",  defaultBaseUrl: "",                                 defaultModel: "", apiVersion: "2024-02-15-preview", modelHint: "gpt-4o (deployed name)", keyUrl: "https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub" },
 ];
 
 export function findProvider(id) {

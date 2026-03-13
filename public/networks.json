@@ -1,6 +1,6 @@
 [
   {
-    "api": "https://monad.savva.app",
+    "api": "https://monad.savva.app/api",
     "domain": "savva.app",
     "url": "https://savva.app",
     "chainId": 143,
@@ -14,7 +14,7 @@
     }
   },
   {
-    "api": "https://pls.savva.app",
+    "api": "https://pls.savva.app/api",
     "domain": "paris.camp",
     "url": "https://paris.camp",
     "chainId": 369,
@@ -28,7 +28,7 @@
     }
   },
   {
-    "api": "https://pls.savva.app",
+    "api": "https://pls.savva.app/api",
     "domain": "pacta-civitas.org",
     "url": "https://pacta-civitas.org",
     "chainId": 369,
@@ -42,7 +42,7 @@
     }
   },
   {
-    "api": "https://pls.savva.app",
+    "api": "https://pls.savva.app/api",
     "domain": "stihi.io",
     "url": "https://stihi.io",
     "chainId": 369,
@@ -56,7 +56,7 @@
     }
   },
   {
-    "api": "https://pls.savva.app",
+    "api": "https://pls.savva.app/api",
     "domain": "dolly.club",
     "url": "https://dolly.club",
     "chainId": 369,

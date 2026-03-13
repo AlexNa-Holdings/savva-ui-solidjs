@@ -602,6 +602,14 @@ export default function EditorPage() {
       const currentLang = (app.lang?.() || "").toLowerCase();
       const url = (langCount > 1 && currentLang) ? `/post/${savvaCid}?lang=${currentLang}` : `/post/${savvaCid}`;
       navigate(url);
+    } else if (editorMode() === "new_comment" || editorMode() === "edit_comment") {
+      // Navigate to the root post (top-level post, not the parent comment)
+      const rootCid = postParams().root_savva_cid;
+      if (rootCid) {
+        navigate(`/post/${rootCid}`);
+      } else {
+        NavigateBack("post");
+      }
     } else {
       NavigateBack("post");
     }

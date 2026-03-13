@@ -1164,6 +1164,7 @@ export default {
   "settings.ai.advanced": "Расширенные",
   "settings.ai.advancedHint": "Для саморазмещенных или Azure конечных точек.",
   "settings.ai.apiKey": "API ключ",
+  "settings.ai.getKey": "Получить API ключ",
   "settings.ai.apiKey.placeholder": "Введите ваш API ключ",
   "settings.ai.apiVersion": "Версия API",
   "settings.ai.auto": "Использовать ИИ автоматически",

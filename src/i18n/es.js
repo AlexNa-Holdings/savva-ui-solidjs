@@ -1164,6 +1164,7 @@ export default {
   "settings.ai.advanced": "Avanzado",
   "settings.ai.advancedHint": "Para endpoints autoalojados o de Azure.",
   "settings.ai.apiKey": "Clave API",
+  "settings.ai.getKey": "Obtener clave API",
   "settings.ai.apiKey.placeholder": "Introduce tu clave API",
   "settings.ai.apiVersion": "Versión de la API",
   "settings.ai.auto": "Usar IA automáticamente",

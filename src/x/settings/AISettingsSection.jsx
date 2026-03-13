@@ -323,7 +323,19 @@ export default function AISettingsSection() {
           </div>
 
           <label class="grid gap-1 sm:col-span-2">
-            <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiKey")}</span>
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-[hsl(var(--muted-foreground))]">{t("settings.ai.apiKey")}</span>
+              <Show when={provider()?.keyUrl}>
+                <a
+                  href={provider().keyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs text-[hsl(var(--primary))] hover:underline"
+                >
+                  {t("settings.ai.getKey") || "Get API key"} &rarr;
+                </a>
+              </Show>
+            </div>
             <input
               type="password"
               autocomplete="off"

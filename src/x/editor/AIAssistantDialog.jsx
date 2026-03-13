@@ -128,10 +128,10 @@ export default function AIAssistantDialog(props) {
                 type="button"
                 onClick={handlePrepareForPublishing}
                 disabled={!hasContent()}
-                class="w-full px-4 py-3 rounded-lg bg-blue-500/20 border border-blue-500/50 text-blue-200 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                class="w-full px-4 py-3 rounded-lg bg-[hsl(var(--primary)/0.15)] border border-[hsl(var(--primary)/0.4)] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--primary)/0.25)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
               >
                 <div class="font-medium mb-1">{t("editor.ai.dialog.prepareForPublishing")}</div>
-                <div class="text-sm opacity-80">
+                <div class="text-sm text-[hsl(var(--muted-foreground))]">
                   <Show when={!isComment()}>
                     {t("editor.ai.dialog.prepareDescription")}
                   </Show>

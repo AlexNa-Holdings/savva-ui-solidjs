@@ -1164,6 +1164,7 @@ export default {
   "settings.ai.advanced": "Napredno",
   "settings.ai.advancedHint": "Za samostalno hostovane ili Azure krajnje tačke.",
   "settings.ai.apiKey": "API ključ",
+  "settings.ai.getKey": "Nabavite API ključ",
   "settings.ai.apiKey.placeholder": "Unesite svoj API ključ",
   "settings.ai.apiVersion": "API verzija",
   "settings.ai.auto": "Automatski koristi AI",

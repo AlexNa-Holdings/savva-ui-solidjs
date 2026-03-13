@@ -49,6 +49,8 @@ export async function getSwapQuote(app, { fromAddress, toAddress, amountIn }) {
  */
 export async function executeSwap(app, { fromAddress, toAddress, amountIn, amountOutMin = 0n, onStatus }) {
   const isFromNative = !fromAddress || fromAddress === "0";
+  const isToNative = !toAddress || toAddress === "0";
+  const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
   const walletClient = await app.getGuardedWalletClient();
   const pc = _publicClient(app);
   const userAddress = walletClient.account.address;
@@ -77,9 +79,9 @@ export async function executeSwap(app, { fromAddress, toAddress, amountIn, amoun
 
   let hash;
   if (isFromNative) {
-    hash = await swapWrite.write.swapExactNative([toAddress, userAddress, amountOutMin], { value: amountIn });
+    hash = await swapWrite.write.swapExactNative([isToNative ? ZERO_ADDR : toAddress, userAddress, amountOutMin], { value: amountIn });
   } else {
-    hash = await swapWrite.write.swapExact([fromAddress, amountIn, toAddress, userAddress, amountOutMin]);
+    hash = await swapWrite.write.swapExact([fromAddress, amountIn, isToNative ? ZERO_ADDR : toAddress, userAddress, amountOutMin]);
   }
 
   dbg.log("Swap", "Transaction hash:", hash);
