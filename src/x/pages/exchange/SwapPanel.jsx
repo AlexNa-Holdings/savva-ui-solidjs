@@ -80,11 +80,11 @@ export default function SwapPanel() {
     if (!addr || addr === "0") return await pc.getBalance({ address: owner });
     return await pc.readContract({ address: addr, abi: ERC20_BAL_ABI, functionName: "balanceOf", args: [owner] });
   };
-  const [fromBalance] = createResource(
+  const [fromBalance, { refetch: refetchFromBalance }] = createResource(
     () => walletAccount() && fromAddr() ? { owner: walletAccount(), addr: fromAddr() } : null,
     fetchBalance,
   );
-  const [toBalance] = createResource(
+  const [toBalance, { refetch: refetchToBalance }] = createResource(
     () => walletAccount() && toAddr() ? { owner: walletAccount(), addr: toAddr() } : null,
     fetchBalance,
   );
@@ -273,6 +273,8 @@ export default function SwapPanel() {
       });
       pushToast({ type: "success", message: t("exchange.swap.success") || "Swap completed!" });
       setInputAmount("");
+      // Refresh balances after swap — small delay to let RPC reflect new state
+      setTimeout(() => { refetchFromBalance(); refetchToBalance(); }, 1500);
     } catch (e) {
       pushErrorToast(e, { context: t("exchange.swap.error") || "Swap failed" });
     } finally {
