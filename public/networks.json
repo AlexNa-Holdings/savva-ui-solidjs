@@ -1,0 +1,72 @@
+[
+  {
+    "api": "https://monad.savva.app",
+    "domain": "savva.app",
+    "url": "https://savva.app",
+    "chainId": 143,
+    "note": {
+      "en": "Official SAVVA network on Monad",
+      "ru": "Официальная сеть SAVVA на Monad",
+      "es": "Red oficial de SAVVA en Monad",
+      "fr": "Réseau officiel SAVVA sur Monad",
+      "sr": "Званична SAVVA мрежа на Monad",
+      "ua": "Офіційна мережа SAVVA на Monad"
+    }
+  },
+  {
+    "api": "https://pls.savva.app",
+    "domain": "paris.camp",
+    "url": "https://paris.camp",
+    "chainId": 369,
+    "note": {
+      "en": "Art, music, and culture community for creators and supporters",
+      "ru": "Сообщество искусства, музыки и культуры для авторов и ценителей",
+      "es": "Comunidad de arte, música y cultura para creadores y admiradores",
+      "fr": "Communauté d'art, de musique et de culture pour créateurs et passionnés",
+      "sr": "Заједница уметности, музике и културе за ствараоце и поклонике",
+      "ua": "Спільнота мистецтва, музики та культури для авторів та шанувальників"
+    }
+  },
+  {
+    "api": "https://pls.savva.app",
+    "domain": "pacta-civitas.org",
+    "url": "https://pacta-civitas.org",
+    "chainId": 369,
+    "note": {
+      "en": "Community of free individuals responsible for their words and actions",
+      "ru": "Сообщество свободных людей, ответственных за свои слова и поступки",
+      "es": "Comunidad de personas libres responsables de sus palabras y acciones",
+      "fr": "Communauté de personnes libres responsables de leurs paroles et actes",
+      "sr": "Заједница слободних појединаца одговорних за своје речи и дела",
+      "ua": "Спільнота вільних людей, відповідальних за свої слова та вчинки"
+    }
+  },
+  {
+    "api": "https://pls.savva.app",
+    "domain": "stihi.io",
+    "url": "https://stihi.io",
+    "chainId": 369,
+    "note": {
+      "en": "Poetry and literary portal for Russian-language authors",
+      "ru": "Поэтический и литературный портал свободной публикации для авторов на русском языке",
+      "es": "Portal poético y literario para autores en lengua rusa",
+      "fr": "Portail poétique et littéraire pour auteurs russophones",
+      "sr": "Поетски и књижевни портал за ауторе на руском језику",
+      "ua": "Поетичний та літературний портал вільної публікації для авторів російською мовою"
+    }
+  },
+  {
+    "api": "https://pls.savva.app",
+    "domain": "dolly.club",
+    "url": "https://dolly.club",
+    "chainId": 369,
+    "note": {
+      "en": "Club for doll makers, collectors, and aspiring crafters",
+      "ru": "Клуб кукольных мастеров, коллекционеров и желающих научиться творить чудеса своими руками",
+      "es": "Club de artesanos de muñecas, coleccionistas y aprendices creativos",
+      "fr": "Club de créateurs de poupées, collectionneurs et artisans en herbe",
+      "sr": "Клуб мајстора лутака, колекционара и оних који желе да стварају",
+      "ua": "Клуб лялькових майстрів, колекціонерів та бажаючих навчитися творити дива своїми руками"
+    }
+  }
+]

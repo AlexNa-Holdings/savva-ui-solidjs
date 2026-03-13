@@ -74,15 +74,30 @@ export default function SwapPanel() {
   const ERC20_BAL_ABI = [
     { name: "balanceOf", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   ];
+  const fetchBalance = async ({ owner, addr }) => {
+    const chain = app.desiredChain();
+    const pc = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
+    if (!addr || addr === "0") return await pc.getBalance({ address: owner });
+    return await pc.readContract({ address: addr, abi: ERC20_BAL_ABI, functionName: "balanceOf", args: [owner] });
+  };
   const [fromBalance] = createResource(
     () => walletAccount() && fromAddr() ? { owner: walletAccount(), addr: fromAddr() } : null,
-    async ({ owner, addr }) => {
-      const chain = app.desiredChain();
-      const pc = createPublicClient({ chain, transport: configuredHttp(chain.rpcUrls[0]) });
-      if (!addr || addr === "0") return await pc.getBalance({ address: owner });
-      return await pc.readContract({ address: addr, abi: ERC20_BAL_ABI, functionName: "balanceOf", args: [owner] });
-    }
+    fetchBalance,
   );
+  const [toBalance] = createResource(
+    () => walletAccount() && toAddr() ? { owner: walletAccount(), addr: toAddr() } : null,
+    fetchBalance,
+  );
+
+  const formatBalance = (bal, decimals) => {
+    if (bal == null) return "";
+    const f = parseFloat(formatUnits(bal, decimals ?? 18));
+    return f.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  };
+
+  const fromBalanceText = createMemo(() => formatBalance(fromBalance(), fromMeta()?.decimals));
+  const toBalanceText = createMemo(() => formatBalance(toBalance(), toMeta()?.decimals));
+
   const insufficientBalance = createMemo(() => {
     const amt = parsedAmountIn();
     const bal = fromBalance();
@@ -303,9 +318,35 @@ export default function SwapPanel() {
           onInput={(e) => setInputAmount(e.target.value)}
           disabled={isSwapping()}
         />
-        <Show when={fromUsdText()}>
-          <div class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{fromUsdText()}</div>
-        </Show>
+        <div class="flex items-center justify-between mt-1">
+          <Show when={fromUsdText()}>
+            <span class="text-xs text-[hsl(var(--muted-foreground))]">{fromUsdText()}</span>
+          </Show>
+          <Show when={fromBalanceText()}>
+            <Show
+              when={fromAddr() && fromAddr() !== "0"}
+              fallback={
+                <span class={`text-xs ml-auto ${insufficientBalance() ? "text-red-400" : "text-[hsl(var(--muted-foreground))]"}`}>
+                  {t("exchange.swap.balance") || "Balance"}: {fromBalanceText()}
+                </span>
+              }
+            >
+              <button
+                type="button"
+                class={`text-xs ml-auto underline decoration-dotted cursor-pointer hover:opacity-80 ${insufficientBalance() ? "text-red-400" : "text-[hsl(var(--muted-foreground))]"}`}
+                onClick={() => {
+                  const bal = fromBalance();
+                  if (bal == null) return;
+                  const dec = fromMeta()?.decimals ?? 18;
+                  setInputAmount(formatUnits(bal, dec));
+                }}
+                title={t("exchange.swap.useMax") || "Use max balance"}
+              >
+                {t("exchange.swap.balance") || "Balance"}: {fromBalanceText()}
+              </button>
+            </Show>
+          </Show>
+        </div>
       </div>
 
       {/* Flip button */}
@@ -333,9 +374,16 @@ export default function SwapPanel() {
             {formattedOutput() || "0.0"}
           </Show>
         </span>
-        <Show when={toUsdText()}>
-          <div class="text-xs text-[hsl(var(--muted-foreground))] mt-1">{toUsdText()}</div>
-        </Show>
+        <div class="flex items-center justify-between mt-1">
+          <Show when={toUsdText()}>
+            <span class="text-xs text-[hsl(var(--muted-foreground))]">{toUsdText()}</span>
+          </Show>
+          <Show when={toBalanceText()}>
+            <span class="text-xs ml-auto text-[hsl(var(--muted-foreground))]">
+              {t("exchange.swap.balance") || "Balance"}: {toBalanceText()}
+            </span>
+          </Show>
+        </div>
       </div>
 
       {/* Minimum output */}

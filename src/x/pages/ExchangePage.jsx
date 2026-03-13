@@ -2,10 +2,8 @@
 import { createMemo, Switch, Match } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
-import ExchangePulseChain from "./exchange/ExchangePulseChain.jsx";
 import ExchangeMonad from "./exchange/ExchangeMonad.jsx";
 
-const PULSECHAIN_MAINNET_ID = 369;
 const MONAD_MAINNET_ID = 143;
 
 export default function ExchangePage() {
@@ -27,9 +25,6 @@ export default function ExchangePage() {
           </section>
         }
       >
-        <Match when={chainId() === PULSECHAIN_MAINNET_ID}>
-          <ExchangePulseChain />
-        </Match>
         <Match when={chainId() === MONAD_MAINNET_ID}>
           <ExchangeMonad />
         </Match>
