@@ -76,6 +76,9 @@ t("social.facebook")
 t("social.youtube")
 
 t("admin.domainConfig.navTitle")
+t("admin.page.section.domain")
+t("admin.page.section.communication")
+t("admin.broadcast.navTitle")
 
 t("delete.confirm.post.title")
 t("delete.confirm.comment.title")
