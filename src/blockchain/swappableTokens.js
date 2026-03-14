@@ -8,6 +8,7 @@ export const SWAPPABLE_TOKENS = {
     { address: "0" },  // MON (native)
     { address: "savva" },  // resolved at runtime from app.info()
     { address: "0xe7cd86e13ac4309349f30b3435a9d337750fc82d" },  // USDT0
+    { address: "0x754704bc059f8c67012fed69bc8a327a5aafb603" },  // USDC
   ],
 };
 
