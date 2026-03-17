@@ -56,7 +56,7 @@
     }
   },
   {
-    "api": "https://pls.savva.app/api",
+    "api": "https://monad.savva.app/api",
     "domain": "dolly.club",
     "url": "https://dolly.club",
     "chainId": 369,
