@@ -9,7 +9,7 @@ import CommanderActionBar from "./domain_config/CommanderActionBar.jsx";
 import { resetDir, getDirHandle, writeFile, listFiles, deleteEntry, createDir } from "./domain_config/fs.js";
 import { discoverEntriesOrThrow } from "./domain_config/remoteScan.js";
 import { pushToast, pushErrorToast } from "../../../ui/toast.js";
-import { MaximizeIcon, MinimizeIcon } from "../../ui/icons/ToolbarIcons.jsx";
+import { MaximizeIcon, MinimizeIcon, SaveToDiskIcon, RestoreFromDiskIcon } from "../../ui/icons/ToolbarIcons.jsx";
 import { dbg } from "../../../utils/debug.js";
 import { uploadFilesToTempAssets } from "./domain_config/publishToTest.js";
 import { collectOpfsDomainFiles } from "./domain_config/collectDomainFiles.js";
@@ -108,6 +108,8 @@ export default function DomainConfigPage() {
   const [busyPublishProd, setBusyPublishProd] = createSignal(false);
 
   const [canSave, setCanSave] = createSignal(false);
+  const [busySaveDisk, setBusySaveDisk] = createSignal(false);
+  const [busyRestoreDisk, setBusyRestoreDisk] = createSignal(false);
   let viewerApi = null;
 
   /* fullscreen */
@@ -349,6 +351,106 @@ export default function DomainConfigPage() {
   };
 
 
+  /* Save entire OPFS domain folder to a disk directory */
+  const onSaveToDisk = async () => {
+    if (busySaveDisk()) return;
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    } catch {
+      return; // user cancelled
+    }
+    setBusySaveDisk(true);
+    try {
+      const files = await collectOpfsDomainFiles(currentConfigDir());
+      if (!files.length) {
+        pushToast({ type: "warning", message: t("admin.domainConfig.disk.noFiles") });
+        return;
+      }
+      let ok = 0;
+      for (const entry of files) {
+        const parts = entry.path.split("/");
+        const fileName = parts.pop();
+        let dir = dirHandle;
+        for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: true });
+        const fh = await dir.getFileHandle(fileName, { create: true });
+        const w = await fh.createWritable();
+        await w.write(entry.file || entry.blob || new Blob([entry.text || ""]));
+        await w.close();
+        ok++;
+      }
+      pushToast({ type: "success", message: t("admin.domainConfig.disk.saveOk", { n: ok }) });
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.disk.saveErr") });
+    } finally {
+      setBusySaveDisk(false);
+    }
+  };
+
+  /* Restore entire domain folder from a disk directory into OPFS */
+  const onRestoreFromDisk = async () => {
+    if (busyRestoreDisk()) return;
+    let dirHandle;
+    try {
+      dirHandle = await window.showDirectoryPicker({ mode: "read" });
+    } catch {
+      return; // user cancelled
+    }
+    setBusyRestoreDisk(true);
+    try {
+      // Validate config.yaml at root
+      try {
+        await dirHandle.getFileHandle("config.yaml");
+      } catch {
+        pushToast({ type: "error", message: t("admin.domainConfig.disk.noConfigYaml") });
+        return;
+      }
+
+      const proceed = await confirmAndMaybeSave();
+      if (!proceed) return;
+
+      // Collect all files from the picked directory
+      const entries = [];
+      async function walkDisk(dh, prefix) {
+        for await (const [name, handle] of dh.entries()) {
+          if (handle.kind === "file") {
+            const file = await handle.getFile();
+            entries.push({ path: prefix ? `${prefix}/${name}` : name, file });
+          } else if (handle.kind === "directory") {
+            const child = await dh.getDirectoryHandle(name);
+            await walkDisk(child, prefix ? `${prefix}/${name}` : name);
+          }
+        }
+      }
+      await walkDisk(dirHandle, "");
+
+      if (!entries.length) {
+        pushToast({ type: "warning", message: t("admin.domainConfig.disk.noFiles") });
+        return;
+      }
+
+      // Reset OPFS dir and write all files
+      const targetDirName = `domain_config_edit/${domainName() || "default"}`;
+      await resetDir(targetDirName);
+      const targetDirHandle = await getDirHandle(targetDirName, { create: true });
+      for (const entry of entries) await writeFile(targetDirHandle, entry.path, entry.file);
+
+      setCurrentConfigDir(targetDirName);
+      try {
+        localStorage.setItem(LS_KEY(domainName() || "default"), targetDirName);
+      } catch {}
+      setCurrentPath("/");
+      setSelectedItem(null);
+      setRefreshKey((k) => k + 1);
+      await refetch();
+      pushToast({ type: "success", message: t("admin.domainConfig.disk.restoreOk", { n: entries.length }) });
+    } catch (e) {
+      pushErrorToast(e, { context: t("admin.domainConfig.disk.restoreErr") });
+    } finally {
+      setBusyRestoreDisk(false);
+    }
+  };
+
   const handleDownloadSelect = async (sourceType) => {
     const proceed = await confirmAndMaybeSave();
     if (!proceed) return;
@@ -384,7 +486,23 @@ export default function DomainConfigPage() {
       <div class="mb-2 flex items-center gap-2">
         <h3 class="text-xl font-semibold">{t("admin.domainConfig.title", { domain: domainName() })}</h3>
 
-        <div class="ml-auto flex items-center gap-2">
+        <div class="ml-auto flex items-center gap-1">
+          <button
+            class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+            onClick={onSaveToDisk}
+            disabled={busySaveDisk()}
+            title={t("admin.domainConfig.disk.saveTitle")}
+          >
+            <SaveToDiskIcon class="w-4 h-4" />
+          </button>
+          <button
+            class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+            onClick={onRestoreFromDisk}
+            disabled={busyRestoreDisk()}
+            title={t("admin.domainConfig.disk.restoreTitle")}
+          >
+            <RestoreFromDiskIcon class="w-4 h-4" />
+          </button>
           <button
             class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
             onClick={() => setMaximized((v) => !v)}
