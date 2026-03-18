@@ -1,0 +1,24 @@
+{
+  "domain": "savva.app",
+  "gear": true,
+  "devMode": true,
+  "devPassword": "9926355d68da965dbdab0a869d5c7082a3182ffb251aa0938d96539e4719bc41",
+  "chains": [
+    {
+      "chainId": 369,
+      "rpc": "https://savva.app/api/"
+    },
+    {
+      "chainId": 143,
+      "rpc": "https://monad.savva.app/api/"
+    },
+    {
+      "chainId": 943,
+      "rpc": "https://test.savva.app/api/"
+    },
+    {
+      "chainId": 10143,
+      "rpc": "https://monad-test.savva.app/api/"
+    }
+  ]
+}

@@ -1,101 +1,101 @@
-<!-- public/dev_docs/sr/core-concepts/connection-orchestration.md -->
+<!-- public/dev_docs/en/core-concepts/connection-orchestration.md -->
 
-# Orkestracija konekcije, `/info` skladištenje i konfiguracija domena
+# Orkestracija konekcije, skladištenje `/info` & konfiguracija domena
 
-Ova stranica objašnjava tačno kako aplikacija pokreće, povezuje se sa backend-om, bira domen i kako skladišti/koristi odgovor `/info` sa backend-a i konfiguraciju domena. Napisana je za profesionalne inženjere koji treba da prošire ili otklone greške u toku.
+Ova stranica objašnjava tačno kako aplikacija startuje, povezuje se sa backendom, bira domen i kako čuva/koristi backendovu `/info` reakciju i konfiguraciju domena. Napisana je za profesionalne inženjere kojima je potrebno da prošire ili debug-uju tok.
 
 > **TL;DR** — Postoji jedan orkestrator (`useAppOrchestrator`) koji:
 >
-> * čita `/default_connect.yaml` (+ opcioni lokalni preklop),
-> * konfiguriše HTTP/WS krajnje tačke,
+> * učitava `/default_connect.json` (sa fall‑back na `.yaml`) + opciono lokalno prepisivanje,
+> * konfiguriše HTTP/WS endpoint-e,
 > * preuzima `/info`,
 > * finalizuje domen,
-> * bira osnovu sredstava (prod/test), učitava paket domena,
+> * bira bazu za assets (prod/test) i učitava paket domena,
 > * ponovo povezuje WebSocket, i
-> * (na eksplicitnom prebacivanju) navigira na `/`.
+> * (pri eksplicitnoj promeni) navigira na `/`.
 
 ---
 
-## Pojmovi i primitivni tipovi
+## Pojmovi i osnovne komponente
 
 * **Backend** — SAVVA čvor (HTTP API + WebSocket).
-* **Domen** — koja mreža (brendiranje, kartice, sredstva) da se prikaže.
-* **Paket domena** — folder `\<assetsBase\>/\<domain\>/` sa `config.yaml`, `domain.css`, i18n, slikama, modulima, itd. Aplikacija može učitati pakete iz **prod** (`assets_url`) ili **test** (`temp_assets_url`).
-* **Preklop** — mali `{ backendLink, domain }` snimak koji se čuva u `localStorage` pod ključem `connect_override`.
+* **Domen** — koja mreža (brendiranje, tabovi, assets) će se prikazivati.
+* **Domain Pack** — folder `\<assetsBase\>/\<domain\>/` sa `config.yaml`, `domain.css`, i18n fajlovima, slikama, modulima itd. Aplikacija može da učitava pakete iz **prod** (`assets_url`) ili **test** (`temp_assets_url`).
+* **Override** — mali snimak `{ backendLink, domain }` koji se perzistira u `localStorage` pod ključem `connect_override`.
 
 ---
 
 ## Mapa fajlova (gde se šta nalazi)
 
-* **Orkestrator (izvor istine):** `src/context/useAppOrchestrator.js` — logika pokretanja i prebacivanja, `/info`, okruženje sredstava, paket domena, WS ponovna povezanost. Izlaže `initializeOrSwitch()`, `setDomain()`, `clearConnectOverride()`, i signale za `config`, `info`, `assetsEnv`, `domainAssets*`.
-* **Obavijač konteksta aplikacije:** `src/context/AppContext.jsx` — koristi orkestrator i izvodi `supportedDomains`, `selectedDomain`, lanac/mrežu, IPFS prolaze, i `assetUrl()`; takođe osigurava doslednost autentifikacije prilikom promena domena.
-* **HTTP/WS krajnje tačke:** `src/net/endpoints.js` — izračunava `httpBase()` i `wsUrl()` iz `{ backendLink, domain }`, pokreće događaj promene prilikom rekonfiguracije, i pruža pomoćne funkcije.
-* **WebSocket runtime:** preuzima promene krajnjih tačaka i ponovo se povezuje u skladu s tim.
-* **UI za prebacivanje:** `src/x/modals/SwitchConnectModal.jsx` — preuzima `<backend>/info`, normalizuje listu domena, i primenjuje promene putem API-ja aplikacije.
-* **Glavna ljuska:** dinamički primenjuje `domain.css`, favicone/meta, GA, i povezuje WS konektor.
-* **Napomena o nasleđu.** Možda ćete videti stariji `useAppConnection` hook; nastavite da koristite **orkestrator** (trenutni dizajn) kao jedini izvor istine.
+* **Orkestrator (izvor istine):** `src/context/useAppOrchestrator.js` — logika startovanja i menjanja, `/info`, okruženje za assets, paket domena, WS reconnect. Eksponira `initializeOrSwitch()`, `setDomain()`, `clearConnectOverride()` i signale za `config`, `info`, `assetsEnv`, `domainAssets*`.
+* **App context wrapper:** `src/context/AppContext.jsx` — koristi orkestrator i izvodi `supportedDomains`, `selectedDomain`, chain/network, IPFS gateway-e i `assetUrl()`; takođe obezbeđuje konzistentnost autentifikacije pri promeni domena.
+* **HTTP/WS endpoint-i:** `src/net/endpoints.js` — računa `httpBase()` i `wsUrl()` iz `{ backendLink, domain }`, emituje događaj promena pri re‑konfiguraciji i pruža helper-e.
+* **WebSocket runtime:** prima promene endpoint-a i ponovo se povezuje po potrebi.
+* **Switch UI:** `src/x/modals/SwitchConnectModal.jsx` — preuzima `<backend>/info`, normalizuje listu domena i primenjuje izmene kroz app API.
+* **Main shell:** dinamički primenjuje `domain.css`, favikon/metapodake, GA i povezuje WS konektor.
+* **Legacy napomena.** Možete naići na stariji hook `useAppConnection`; nastavite da koristite **orkestrator** (trenutni dizajn) kao jedini izvor istine.
 
 ---
 
-## 1) Sekvenca pokretanja — Korak po korak
+## 1) Sekvenca pokretanja — korak po korak
 
-Orkestrator se pokreće jednom prilikom montiranja:
+Orkestrator se izvršava jednom pri mount‑u:
 
-1. **Učitaj podrazumevane postavke**
-   `GET /default_connect.yaml`, analiziraj `backendLink`, `domain`, i (opciono) `gear`. Ove vrednosti se kombinuju sa sačuvanim **preklopom** (ako je prisutan).
+1. **Učitaj podrazumevana podešavanja sajta**
+   Pokušaj `GET /default_connect.json` prvo; ako nije dostupan, revertuj na `GET /default_connect.yaml`. Parsiraj `backendLink`, `domain` i (opciono) `gear`. Ove vrednosti se kombinuju sa sačuvanim **override**-om (ako postoji).
 
-2. **Normalizuj i prethodno konfiguriši krajnje tačke (pre‑info)**
-   Pre `/info`, postavljamo krajnje tačke koristeći **traženi** domen onako kako jeste:
-   `configureEndpoints({ backendLink, domain }, "orch:pre-info")`. Ovo izračunava `httpBase()` i `wsUrl()` i emituje događaj promene kako bi runtime mogao da ukazuje na pravi server.
+2. **Normalizuj & predkonfiguriši endpoint-e (pre `/info`)**
+   Pre `/info`, postavimo endpoint-e koristeći **zahtevani** domen kako jeste:
+   `configureEndpoints({ backendLink, domain }, "orch:pre-info")`. Ovo računa `httpBase()` i `wsUrl()` i emituje događaj promene tako da runtime može da pokazuje na pravi server.
 
 3. **Preuzmi `/info`**
-   `GET <backendLink>/info` (bez keširanja). JSON se skladišti u `orchestrator.info`.
+   `GET <backendLink>/info` (no-cache). JSON se skladišti u `orchestrator.info`.
 
-4. **Reši konačni domen**
-   Ako je korisnik eksplicitno zatražio domen, to se **poštuje**; u suprotnom, biramo **prvi** domen iz `/info.domains` (ako ih ima). Rešeni `{ backendLink, domain }` postaje `config`. Ako je ovo bilo prebacivanje, **čuvamo** preklop.
+4. **Odredi konačni domen**
+   Ako je korisnik eksplicitno zatražio domen, on se **poštuje**; u suprotnom biramo **prvi** domen iz `/info.domains` (ako postoji). Rezultujući `{ backendLink, domain }` postaje `config`. Ako je ovo bila promena, **sačuvamo** override.
 
-5. **Finalizuj krajnje tačke (post‑info)**
-   Ponovo pokreni `configureEndpoints` sa **konačnim** domenom. Sve HTTP pozive treba da koriste `httpBase()`, a **WS URL uključuje** `?domain=...`.
+5. **Finalizuj endpoint-e (posle `/info`)**
+   Ponovo pozovi `configureEndpoints` sa **konačnim** domenom. Svi HTTP pozivi treba da koriste `httpBase()`, a **WS URL uključuje** `?domain=...`.
 
-6. **Okruženje sredstava → učitaj paket domena**
-   Izaberi osnovu iz `/info`: `assets_url` (prod) ili `temp_assets_url` (test). Pokušaj `\<assetsBase\>/\<domain\>/config.yaml`, inače se vraća na `/domain_default/config.yaml`. Skladišti `domainAssetsPrefix`, `domainAssetsConfig`, i izvor (`domain` vs `default`).
+6. **Okruženje za assets → učitaj paket domena**
+   Izaberi bazu iz `/info`: `assets_url` (prod) ili `temp_assets_url` (test). Pokušaj `\<assetsBase\>/\<domain\>/config.yaml`, inače fall‑back na `/domain_default/config.yaml`. Sačuvaj `domainAssetsPrefix`, `domainAssetsConfig` i izvor (`domain` vs `default`).
 
-7. **Prisilna WS ponovna povezanost**
-   Ažuriraj ws klijent URL, ponovo se poveži, čekaj da se otvori (do ~8s). Ovo osigurava da je runtime usklađen sa novim domenom i backend-om.
+7. **Forsiraj ponovno povezivanje WS**
+   Ažuriraj ws klijent URL, reconnectuj, sačekaj open (do ~8s). Ovo obezbeđuje da runtime bude sinhronizovan sa novim domenom i backendom.
 
 8. **Navigacija**
-   Na eksplicitnom prebacivanju, navigiraj na `/` (održava stanje usmeravanja zdravim nakon velike promene konteksta).
+   Pri eksplicitnoj promeni, navigiraj na `/` (očuva stanje rutiranja konzistentnim nakon značajne promene konteksta).
 
-> Orkestrator izlaže isti API za ponovno pokretanje ove sekvence u bilo kojem trenutku; `setDomain()` koristi isti put ispod haube.
+> Orkestrator eksponira isti API za ponovno pokretanje ove sekvence u bilo kom trenutku; `setDomain()` koristi isti put ispod haube.
 
 ---
 
-## 2) Izračunavanje krajnjih tačaka (HTTP & WS)
+## 2) Računanje endpoint‑a (HTTP & WS)
 
-`src/net/endpoints.js` je **jedino** mesto koje zna aktivnu osnovu i ws url:
+`src/net/endpoints.js` je **jedino** mesto koje zna aktivnu bazu i ws url:
 
 ### `configureEndpoints({ backendLink, domain }, reason)`
 
-* Normalizuje osnovu (osigurava `https://…/`).
-* Čuva **domen** (string).
+* Normalizuje bazu (osigurava `https://…/`).
+* Skladišti **domen** (string).
 * Izvodi WebSocket URL (`ws:`/`wss:`) sa `?domain=<name>&space=public`.
 * Emituje događaj `ENDPOINTS_CHANGED`.
 
-Sav ostali kod poziva gettere (`httpBase()`, `wsUrl()`, `wsQuery()`) i/ili se pretplaćuje na promene.
+Sav ostali kod poziva getter‑e (`httpBase()`, `wsUrl()`, `wsQuery()`) i/ili se pretplaćuje na promene.
 
 ### WS runtime reaguje na promene
 
-Runtime sluša promene krajnjih tačaka i može se ponovo povezati. Orkestrator takođe eksplicitno postavlja URL i poziva `reconnect`.
+Runtime sluša promene endpoint‑a i može da se ponovo poveže. Orkestrator takođe eksplicitno postavlja URL i poziva `reconnect`.
 
 ### HTTP pozivi
 
-Za krajnje tačke koje zahtevaju `domain` u upitu (autentifikacija, admin provere, itd.), pozivaoci ga dodaju putem `URLSearchParams` protiv `httpBase()`. (Pogledajte primere u `auth.js`.)
+Za endpoint‑e kojima je potreban `domain` u query‑ju (auth, admin provere, itd.), pozivaoci ga dodaju preko `URLSearchParams` protiv `httpBase()`. (Vidi primere u `auth.js`.)
 
 ---
 
-## 3) `/info` — Šta skladištimo i kako to koristimo
+## 3) `/info` — šta skladištimo i kako koristimo
 
-Siromašni `/info` JSON se skladišti kao **signal**: `orchestrator.info()`.
+Sirovi `/info` JSON čuva se kao **signal**: `orchestrator.info()`.
 
 **Tipičan oblik (skraćeno):**
 
@@ -111,87 +111,87 @@ Siromašni `/info` JSON se skladišti kao **signal**: `orchestrator.info()`.
 
 **Gde se koristi:**
 
-* **Domeni** — `AppContext` izvodi `supportedDomains` (normalizovano, bez duplikata) i `selectedDomain`. Ako je `config.domain` postavljen, on se preferira; u suprotnom se koristi prvi podržani domen.
-* **Lanac/mreža** — `desiredChainId = info.blockchain_id` → `desiredChain()` izvodi pune metapodatke; `ensureWalletOnDesiredChain()` može biti pozvan pre tx tokova.
-* **IPFS prolazi** — `remoteIpfsGateways` dolazi iz `info.ipfs_gateways`, a `activeIpfsGateways` opcionalno dodaje **lokalni** prolaz ako je omogućeno u postavkama.
-* **Osnova sredstava** — Orkestrator bira `assets_url` (prod) ili `temp_assets_url` (test), izračunava `\<assetsBase\>/\<domain\>/`, a zatim učitava paket domena. Aktivni prefiks + analizirana konfiguracija se objavljuju putem `domainAssetsPrefix()` / `domainAssetsConfig()`.
-* **Funkcije aplikacije koje koriste `/info`** — npr., mapiranje cena tokena traži `/info.savva_contracts.SavvaToken.address` da bi stavio osnovni SAVVA token u tabelu cena.
+* **Domeni** — `AppContext` izvodi `supportedDomains` (normalizovano, bez duplikata) i `selectedDomain`. Ako je `config.domain` postavljen, on ima prednost; u suprotnom koristi se prvi podržani domen.
+* **Chain/network** — `desiredChainId = info.blockchain_id` → `desiredChain()` izvodi kompletnu metapodatak; `ensureWalletOnDesiredChain()` se može pozvati pre tokova transakcija.
+* **IPFS gateway‑i** — `remoteIpfsGateways` dolazi iz `info.ipfs_gateways`, a `activeIpfsGateways` opciono dodaje **lokalni** gateway ako je uključen u podešavanjima.
+* **Baza za assets** — Orkestrator bira `assets_url` (prod) ili `temp_assets_url` (test), računa `\<assetsBase\>/\<domain\>/`, pa učitava paket domena. Aktivni prefix + parsirana konfiguracija se objavljuju kroz `domainAssetsPrefix()` / `domainAssetsConfig()`.
+* **Funkcionalnosti aplikacije koje koriste `/info`** — npr. mapiranje cena tokena traži `/info.savva_contracts.SavvaToken.address` da ubaci osnovni SAVVA token u tabelu cena.
 
 ---
 
-## 4) Konfiguracija domena — Skladištenje i konzumacija
+## 4) Konfiguracija domena — skladištenje i konzumacija
 
-Nakon koraka (6) u toku pokretanja, aplikacija ima:
+Nakon koraka (6) u toku podizanja, aplikacija ima:
 
-* `assetsEnv()` — `"prod"` ili `"test"` (prebacivanje u postavkama, koristi se od strane admina).
-* `assetsBaseUrl()` — izračunato iz `/info` + okruženje.
+* `assetsEnv()` — `"prod"` ili `"test"` (preklop u Settings, koristi se od strane admina).
+* `assetsBaseUrl()` — izračunato iz `/info` + env.
 * `domainAssetsPrefix()` — ili `\<assetsBase\>/\<domain\>/` ili `/domain_default/`.
-* `domainAssetsConfig()` — analizirani `config.yaml`.
+* `domainAssetsConfig()` — parsiran `config.yaml`.
 
-### Šta čita konfiguraciju domena?
+### Ko čita konfiguraciju domena?
 
-* **CSS i brendiranje**
+* **CSS & brendiranje**
 
-  * `DomainCssLoader` učitava `assetUrl("domain.css")`, kešira se sa revizijom `(env|domain|assets_cid)`.
-  * `FaviconLoader` čita odeljak `favicon` (veličine ikona, manifest, maska ikone, meta) i ažurira `<link rel="icon">` itd.; URL-ovi se rešavaju putem `assetUrl(relPath)` i keširaju.
+  * `DomainCssLoader` učitava `assetUrl("domain.css")`, cache‑bustovano sa revizijom `(env|domain|assets_cid)`.
+  * `FaviconLoader` čita sekciju `favicon` (veličine ikonica, manifest, mask icon, meta) i ažurira `<link rel="icon">` itd.; URL‑ovi se rešavaju preko `assetUrl(relPath)` i cache‑bastuju.
 
-* **Međunarodna lokalizacija (jezici po domenu)**
+* **Internacionalizacija (po‑domen jezicima)**
 
-  * Prilikom svakog učitavanja konfiguracije, aplikacija objavljuje kodove jezika domena u i18n sistem i prilagođava dokument `<title>` trenutnom lokalnom `title`. Takođe **validira** trenutni jezik u odnosu na novi domen i prebacuje se na podržani kada je to potrebno.
+  * Pri svakom učitavanju konfiguracije, aplikacija objavljuje jezičke kodove domena u i18n sistem i podešava `<title>` dokumenta za trenutnu lokalizaciju. Takođe **validira** trenutni jezik prema novom domenu i menja ga na podržani ako je potrebno.
 
-* **Moduli / Kartice**
+* **Moduli / tabovi**
 
-  * Glavna navigaciona traka (`TabsBar`) čita `config.modules.tabs` (podrazumevano na `modules/tabs.yaml`) i učitava YAML putem **učitača sredstava** koristeći `assetUrl()`. Kartice su lokalizovane putem i18n ključeva i/ili metapodataka po kartici.
+  * Glavni navigacioni bar (`TabsBar`) čita `config.modules.tabs` (podrazumevano `modules/tabs.yaml`) i učitava YAML preko **asset loader‑a** koristeći `assetUrl()`. Tabovi su lokalizovani preko i18n ključeva i/ili metapodataka po tabu.
 
-* **HTML blokovi i druga sredstva**
+* **HTML blokovi & ostali assets**
 
-  * Widgeti (npr., `HtmlBlock`) pozivaju `loadAssetResource(app, relPath)` koji rešava relativne putanje kroz `assetUrl()` i preuzima tekst/YAML u skladu s tim.
+  * Widgeti (npr. `HtmlBlock`) pozivaju `loadAssetResource(app, relPath)` koji rešava relativne putanje preko `assetUrl()` i preuzima tekst/YAML po potrebi.
 
-> Aktivni `assetUrl(relPath)` je **samo** `domainAssetsPrefix()` + `relPath` (bez vodeće `/`); ovo održava sve potrošače doslednim.
+> Aktivni `assetUrl(relPath)` je **samo** `domainAssetsPrefix()` + `relPath` (bez vodećeg `/`); to održava konzistentnost među potrošačima.
 
-### Postavke → Sredstva (dijagnostika)
+### Settings → Assets (diagnostika)
 
-Admini mogu prebaciti **prod/test**, videti **aktivni prefiks/izvor**, i pokrenuti dijagnostiku koja potvrđuje prisustvo ključnih polja (logotipi, lokali, kartice, favicon). Ova prikaz čita *samo* objavljene signale orkestratora.
+Admini mogu da prebacuju **prod/test**, vide **aktivni prefix/izvor**, i pokreću dijagnostiku koja potvrđuje prisustvo ključnih polja (logoi, lokalizacije, tabovi, favicon). Ovaj prikaz čita *samo* objavljene orkestrator signale.
 
 ---
 
-## 5) Kako funkcioniše prebacivanje (backend/domen)
+## 5) Kako funkcioniše promena (backend/domen)
 
 ### UI tok
 
-1. Dijalog **Prebaci backend / domen** prihvata URL backend-a.
+1. Dijalog **Switch backend / domain** prihvata backend URL.
 2. Poziva `<backend>/info` da popuni normalizovanu listu domena (`[{name, …}]`).
-3. Primena selekcije pozivanjem API-ja aplikacije.
+3. Primeni selekciju pozivom app API‑ja.
 
 ### Tok orkestratora
 
-* Ako se **backend** promenio, prvo se **odjavljujemo** da bismo izbegli stanje kolačića između backend-a.
-* Prethodno konfiguriši krajnje tačke (traženi domen), preuzmi `/info`, reši konačni domen.
-* Sačuvaj preklop, postavi `config`, **finalizuj krajnje tačke**, učitaj paket domena, **ponovo poveži WS**, navigiraj kući.
+* Ako se promenio **backend**, prvo se **odjavljujemo** da bismo izbegli stanje kolačića između backend‑ova.
+* Predkonfiguriši endpoint‑e (zahtevani domen), preuzmi `/info`, odredi konačni domen.
+* Perzistiraj override, postavi `config`, **finalizuj endpoint‑e**, učitaj paket domena, **ponovo poveži WS**, navigiraj na početnu stranu.
 
-### Doslednost autentifikacije
+### Konzistentnost autentifikacije
 
-Ako je korisnik prijavljen i **domen** u `config` se menja, aplikacija proaktivno odjavljuje da bi izbegla delovanje u nesaglasnom kontekstu. Toast objašnjava zašto.
+Ako je korisnik ulogovan i **domen** u `config` se promeni, aplikacija proaktivno odjavljuje korisnika da bi izbegla rad u pogrešnom kontekstu. Prikazuje se obaveštenje (toast) koje objašnjava razlog.
 
 ---
 
-## 6) `AppContext` — Na šta se vaš kod može osloniti
+## 6) `AppContext` — na šta se vaš kod može osloniti
 
-`useApp()` izlaže stabilnu površinu, podržanu od strane orkestratora:
+`useApp()` eksponira stabilan interfejs, potkovan orkestratorom:
 
 * **Stanje konekcije:** `loading()`, `error()`, `config()`, `info()` (sirovi `/info`).
 * **Domeni:** `supportedDomains()`, `selectedDomain()`, `selectedDomainName()`.
 * **Mreža:** `desiredChainId()`, `desiredChain()`, `ensureWalletOnDesiredChain()`.
 * **IPFS:** `remoteIpfsGateways()`, `activeIpfsGateways()`.
-* **Sredstva:** `assetsEnv()`, `assetsBaseUrl()`, `domainAssetsPrefix()`, `domainAssetsConfig()`, i `assetUrl(relPath)`.
-* **API za prebacivanje:** `initializeOrSwitch(newSettings)`, `setDomain(name)`, `clearConnectOverride()`.
+* **Assets:** `assetsEnv()`, `assetsBaseUrl()`, `domainAssetsPrefix()`, `domainAssetsConfig()`, i `assetUrl(relPath)`.
+* **API za promenu:** `initializeOrSwitch(newSettings)`, `setDomain(name)`, `clearConnectOverride()`.
 * **i18n pomoćnici:** `t(key, vars?)`, `lang()`, `setLang(code)`.
 
-### Primer: učitavanje YAML isječka iz paketa domena
+### Primer: učitavanje YAML isečka iz paketa domena
 
 ```js
 // (nije komponenta, samo skica)
-// Sve vidljive stringove MORAJU biti lokalizovane; ovde nijedna nije prikazana korisniku.
+// Sve vidljive stringove MORAJU biti lokalizovane; ovde se ništa ne prikazuje korisniku.
 import { useApp } from "../context/AppContext.jsx";
 import { loadAssetResource } from "../utils/assetLoader.js";
 
@@ -206,7 +206,7 @@ async function loadDomainTabs() {
 ### Primer: izgradnja autentifikovanog poziva koji zahteva domen
 
 ```js
-// Svi stringovi vidljivi korisnicima moraju biti lokalizovani putem t():
+// All user-visible strings must be localized via t():
 import { useApp } from "../context/AppContext.jsx";
 
 async function fetchAdminFlag(address) {
@@ -222,47 +222,47 @@ async function fetchAdminFlag(address) {
 
 ---
 
-## 7) Obrada grešaka i prazna stanja
+## 7) Rukovanje greškama & prazna stanja
 
-Kada konekcija ne uspe prilikom pokretanja (npr., neispravan YAML, `/info` nedostupan), `AppContext` izlaže `error()` i ljuska prikazuje centriranu kartu greške sa i18n stringovima i dugmetom **Ponovo**.
-
----
-
-## 8) Napomene o i18n i UX invariantima
-
-* **Svaki** string vidljiv korisnicima u UI kodu mora biti `t("…")` iz `useApp()` (navigacija, postavke, toasti, itd.).
-* `document.title` se izvodi iz lokalizovanog `title` domena konfiguracije. Promena **domena** ili **okruženja** odmah ažurira brendiranje bez ponovnog izgradnje.
+Kada konekcija zakaže pri pokretanju (npr. malformisan config, `/info` nedostupan), `AppContext` eksponira `error()` i shell prikazuje centriranu grešku karticu sa i18n stringovima i dugmetom **Retry**.
 
 ---
 
-## 9) Referentni isječci
+## 8) Napomene o i18n & UX invariantama
 
-* Pre‑info konfiguriši → `/info` → konačna konfiguracija — jezgro orkestratora.
-* Osnova sredstava i rezervna konfiguracija paketa domena — orkestrator.
-* Krajnje tačke i WS URL (`?domain=...`) — jedini izvor.
-* WS runtime + ponovna povezanost na promenu krajnje tačke — detalji runtime-a.
-* Dijalog za prebacivanje `/info` preuzimanje i normalizacija domena — UI detalj.
+* **Svaki** string vidljiv korisniku u UI kodu mora biti `t("…")` iz `useApp()` (navigacija, podešavanja, toast‑ovi itd.).
+* `document.title` potiče iz lokalizovanog `title` polja u konfiguraciji domena. Promena **domena** ili **env** odmah ažurira brendiranje bez ponovnog build‑a.
 
 ---
 
-## 10) Operativna kontrolna lista
+## 9) Referentni isečci
 
-* Da biste promenili podrazumevane postavke u implementaciji, ažurirajte **`/default_connect.yaml`** na hosting web serveru.
-* Da biste prebacili u toku rada, koristite **Dijalog za prebacivanje** (oprema mora biti omogućena YAML-om sajta).
-* Da biste pregledali paket domena, prebacite **Postavke → Sredstva → Okruženje: Test**. Aplikacija će učitati iz `temp_assets_url`.
-* Ako prebacite **backend**, aplikacija se **odjavljuje** prvo da bi izbegla kolačiće između backend-a.
+* Pred‑info konfiguracija → `/info` → finalna konfiguracija — jezgro orkestratora.
+* Baza za assets & fallback paket domena — orkestrator.
+* Endpoint‑i & WS URL (`?domain=...`) — jedini izvor.
+* WS runtime + reconnect pri promeni endpoint‑a — detalji runtime‑a.
+* Switch dijalog `/info` fetch & normalizacija domena — UI detalj.
 
 ---
 
-## Dodatak: Model podataka na prvi pogled
+## 10) Operativna lista za proveru
+
+* Da biste promenili podrazumevana podešavanja na deployment‑u, ažurirajte **`/default_connect.json`** (ili `/default_connect.yaml`) na hosting web serveru.
+* Da biste promenili u runtime‑u, koristite **Switch dialog** (gear mora biti omogućena kroz site config).
+* Da biste pregledali paket domena, u Settings → Assets postavite Environment: Test. Aplikacija će učitati iz `temp_assets_url`.
+* Ako promenite **backend**, aplikacija se **prvo odjavljuje** da bi izbegla kolačiće između backend‑ova.
+
+---
+
+## Dodatak: model podataka na brzinu
 
 ```ts
-// P pojednostavljeni konceptualni model
+// Simplified conceptual model
 
 type AppConfig = {
-  backendLink: string;   // normalizovano sa završnim slash-om
-  domain: string;        // izabrano ime domena
-  gear: boolean;         // UI oprema omogućena (iz YAML-a sajta)
+  backendLink: string;   // normalized with trailing slash
+  domain: string;        // chosen domain name
+  gear: boolean;         // UI gear enabled (from site YAML)
 };
 
 type Info = {
@@ -271,7 +271,7 @@ type Info = {
   ipfs_gateways?: string[];
   assets_url?: string;
   temp_assets_url?: string;
-  // ...ostala polja (npr., savva_contracts)
+  // ...other fields (e.g., savva_contracts)
 };
 
 type Orchestrator = {
@@ -280,20 +280,20 @@ type Orchestrator = {
   loading(): boolean;
   error(): Error | null;
 
-  // orkestracija
+  // orchestration
   initializeOrSwitch(newSettings?: Partial<AppConfig>): Promise<void>;
   setDomain(name: string): Promise<void>;
   clearConnectOverride(): void;
 
-  // sredstva
+  // assets
   assetsEnv(): "prod" | "test";
   setAssetsEnv(next: "prod" | "test"): void;
   assetsBaseUrl(): string;
-  domainAssetsPrefix(): string;           // '/domain_default/' ili '<assetsBase>/<domain>/'
-  domainAssetsConfig(): any | null;       // analizirani config.yaml
+  domainAssetsPrefix(): string;           // '/domain_default/' or '<assetsBase>/<domain>/'
+  domainAssetsConfig(): any | null;       // parsed config.yaml
 };
 ```
 
 ---
 
-To je cela slika. Sa ovim primitivima možete sigurno proširiti UI, uvereni da krajnje tačke, `/info`, i resursi domena ostaju **dosledni** i **reaktivni** širom aplikacije.
+To je cela slika. Sa ovim primitivima možete bezbedno proširivati UI, sigurni da su endpoint‑i, `/info` i resursi domena **konzistentni** i **reaktivni** kroz celu aplikaciju.

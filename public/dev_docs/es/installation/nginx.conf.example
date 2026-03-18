@@ -24,7 +24,7 @@ server {
 	keepalive_timeout 70;
 
 	# Configuration variables
-	# These are used in default_connect.yaml endpoint
+	# These are used in default_connect.json endpoint
 	set $default_domain "yourdomain.com";
 	set $default_backend "https://yourdomain.com/api/";
 
@@ -52,11 +52,10 @@ server {
 
 	# Special endpoint for UI configuration
 	# The UI fetches this to know backend and IPFS gateway URLs
-	location = /default_connect.yaml {
-		add_header Content-Type text/plain;
-		return 200 'domain: $default_domain
-backendLink: $default_backend
-default_ipfs_link: $default_ipfs';
+	# JSON is the preferred format; YAML is also supported as fallback
+	location = /default_connect.json {
+		default_type application/json;
+		return 200 '{"domain":"$default_domain","backendLink":"$default_backend","default_ipfs_link":"$default_ipfs"}';
 	}
 
 	# Main location block - serves UI and handles prerendering for bots
@@ -81,7 +80,7 @@ default_ipfs_link: $default_ipfs';
 		}
 
 		# Don't prerender the config endpoint
-		if ($uri = "/default_connect.yaml") {
+		if ($uri = "/default_connect.json") {
 			set $prerender 0;
 		}
 

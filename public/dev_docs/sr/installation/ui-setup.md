@@ -1,17 +1,17 @@
-# UI Website Setup
+# Podešavanje UI veb-sajta
 
-Ovaj vodič obuhvata instalaciju i raspoređivanje SAVVA UI frontenda.
+Ovaj vodič pokriva instalaciju i postavljanje (deploy) frontenda SAVVA UI.
 
-## Overview
+## Pregled
 
-SAVVA UI je aplikacija jedne stranice zasnovana na SolidJS-u koja pruža:
+SAVVA UI je jednostranična aplikacija zasnovana na SolidJS-u koja obezbeđuje:
 - Interfejs za kreiranje i pregled sadržaja
 - Integraciju Web3 novčanika
-- Otpremanje fajlova na IPFS
-- Interakcije sa pametnim ugovorima
-- Višejezičnu podršku
+- Upload fajlova na IPFS
+- Interakcije sa smart kontraktima
+- Podršku za više jezika
 
-## 1. Clone the Repository
+## 1. Klonirajte repozitorijum
 
 ```bash
 # Clone the UI repository
@@ -22,7 +22,7 @@ cd savva-ui-solidjs
 git checkout $(git describe --tags --abbrev=0)
 ```
 
-## 2. Install Dependencies
+## 2. Instalirajte zavisnosti
 
 ```bash
 # Install Node.js dependencies
@@ -32,9 +32,9 @@ npm install
 yarn install
 ```
 
-## 3. Configuration
+## 3. Konfiguracija
 
-### Create Environment File
+### Kreirajte fajl za okruženje
 
 ```bash
 # Copy example environment file
@@ -44,7 +44,7 @@ cp .env.example .env
 nano .env
 ```
 
-### Environment Variables
+### Environment promenljive
 
 ```bash
 # .env - SAVVA UI Configuration
@@ -83,15 +83,15 @@ DEPLOY_PATH=/var/www/savva-ui
 DEPLOY_PORT=22
 ```
 
-### Additional Configuration
+### Dodatna konfiguracija
 
-UI automatski preuzima adrese blockchain ugovora sa backend `/info` endpoint-a, koji čita iz Config ugovora.
+UI automatski preuzima adrese smart kontrakata sa backend `/info` endpoint-a, koji čita vrednosti iz Config kontrakta.
 
-Nema potrebe za hardkodiranim adresama ugovora u UI konfiguraciji.
+Nije potrebno hardkodirati adrese kontrakata u UI konfiguraciji.
 
-## 4. Build the UI
+## 4. Izgradnja UI
 
-### Development Build
+### Razvojna izgradnja
 
 ```bash
 # Run development server
@@ -100,7 +100,7 @@ npm run dev
 # Access at http://localhost:5173
 ```
 
-### Production Build
+### Produkcijska izgradnja
 
 ```bash
 # Build for production
@@ -110,7 +110,7 @@ npm run build
 # Contains optimized static files ready for deployment
 ```
 
-### Build with Deployment
+### Izgradnja sa deploy-om
 
 ```bash
 # Automated build + deploy (if DEPLOY_* vars configured)
@@ -125,22 +125,22 @@ npm run release
 # 6. Deploy via SCP (if configured)
 ```
 
-## 5. Deploy to Production
+## 5. Postavljanje u produkciju
 
-### Option A: Static File Hosting
+### Opcija A: Hosting statičkih fajlova
 
-Sastavljeni `dist/` direktorijum sadrži statičke fajlove koji se mogu služiti preko bilo kog web servera.
+Izgrađeni `dist/` direktorijum sadrži statičke fajlove koje svaki web server može servirati.
 
-#### Using Nginx (Recommended)
+#### Korišćenje Nginx-a (preporučeno)
 
-SAVVA zahteva sveobuhvatnu Nginx konfiguraciju koja obuhvata:
+SAVVA zahteva kompletnu Nginx konfiguraciju koja obuhvata:
 - Serviranje statičkih fajlova UI-a
 - Proxy za backend API na `/api`
-- Prerenderovanje za SEO botove
+- Prerendering za SEO botove
 - Endpoint za dinamičku konfiguraciju
 - Podršku za WebSocket
 
-**Download the complete Nginx configuration template:**
+**Preuzmite kompletan Nginx konfiguracioni šablon:**
 
 ```bash
 # Download the example configuration
@@ -153,21 +153,21 @@ wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/publi
 nano nginx.conf.example
 ```
 
-**View the complete example**: [nginx.conf.example](nginx.conf.example)
+**Pogledajte kompletan primer**: [nginx.conf.example](nginx.conf.example)
 
-**Ključne uključene funkcije:**
-1. Preusmeravanje HTTP -> HTTPS
-2. Podešavanje SSL/TLS (Cloudflare Origin Certificates ili Let's Encrypt)
-3. `/default_connect.yaml` endpoint - **obavezna** dinamička konfiguracija za UI
-4. Prerenderovanje za botove - server-side render za pretraživače i društvene mreže
-5. `/api` proxy - prosleđuje API zahteve na backend na port 7000
+**Ključne funkcije koje su uključene:**
+1. Preusmeravanje sa HTTP na HTTPS
+2. SSL/TLS podešavanje (Cloudflare Origin sertifikati ili Let's Encrypt)
+3. `/default_connect.json` endpoint - **obavezna** dinamička konfiguracija za UI (`.yaml` je podržan kao fallback)
+4. Prerendering za botove - SEO-prijateljsko renderovanje na serverskoj strani za pretraživače i društvene mreže
+5. `/api` proxy - prosleđuje API zahteve na backend na portu 7000
 6. Podrška za WebSocket - za real-time funkcionalnosti
 7. Serviranje statičkih fajlova sa SPA rutiranjem
-8. Pametno keširanje - index.html se nikada ne kešira, resursi se keširaju 1 godinu
+8. Pametno keširanje - index.html se nikada ne kešira, asseti se keširaju 1 godinu
 
-### Understanding default_connect.yaml
+### Razumevanje default_connect.json
 
-UI zahteva `/default_connect.yaml` endpoint koji mu govori gde da pronađe backend i IPFS gateway. Ovo se konfiguriše direktno u Nginx-u koristeći promenljive:
+UI zahteva endpoint `/default_connect.json` koji mu kaže gde da pronađe backend i IPFS gateway (takođe podržava `/default_connect.yaml` kao fallback). Ovo se konfiguriše direktno u Nginx-u koristeći varijable:
 
 ```nginx
 # Define your deployment settings
@@ -176,26 +176,26 @@ set $default_backend "https://yourdomain.com/api/";
 set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
 
 # Serve dynamic configuration to the UI
-location = /default_connect.yaml {
-    add_header Content-Type text/plain;
-    return 200 'domain: $default_domain
-backendLink: $default_backend
-default_ipfs_link: $default_ipfs';
+location = /default_connect.json {
+    default_type application/json;
+    return 200 '{"domain":"$default_domain","backendLink":"$default_backend","default_ipfs_link":"$default_ipfs"}';
 }
 ```
 
-Ovaj endpoint vraća YAML odgovor poput:
-```yaml
-domain: yourdomain.com
-backendLink: https://yourdomain.com/api/
-default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+Ovaj endpoint vraća JSON odgovor poput:
+```json
+{
+  "domain": "yourdomain.com",
+  "backendLink": "https://yourdomain.com/api/",
+  "default_ipfs_link": "https://gateway.pinata.cloud/ipfs/"
+}
 ```
 
 UI preuzima ovu konfiguraciju pri pokretanju da bi znao gde da se poveže.
 
-**Customize the configuration:**
+**Prilagodite konfiguraciju:**
 
-Izmenite ove ključne promenljive u preuzetom fajlu:
+Izmenite ove ključne varijable u preuzetom fajlu:
 
 ```nginx
 # Your domain
@@ -214,7 +214,7 @@ ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
 
-**Deploy files and enable site:**
+**Postavite fajlove i omogućite sajt:**
 
 ```bash
 # Create web directory
@@ -239,9 +239,9 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Option B: Automated Deployment Script
+### Opcija B: Automatizovani deployment skript
 
-Kreirajte deployment skript:
+Napravite deployment skript:
 
 ```bash
 nano deploy.sh
@@ -273,13 +273,13 @@ echo "Deployment complete!"
 echo "Visit https://yourdomain.com"
 ```
 
-Pokrenite raspoređivanje:
+Pokrenite deployment:
 
 ```bash
 ./deploy.sh
 ```
 
-## 6. Verify Installation
+## 6. Proverite instalaciju
 
 Testirajte UI:
 
@@ -295,11 +295,11 @@ Otvorite u pregledaču:
 - UI bi trebalo da se učita i poveže sa backend-om
 - Proverite konzolu pregledača za eventualne greške
 
-## 7. Post-Deployment Configuration
+## 7. Konfiguracija posle deploy-a
 
-### Update Backend CORS
+### Ažurirajte CORS na backend-u
 
-Obezbedite da backend dozvoljava vašu UI domenu:
+Osigurajte da backend dozvoljava vašu UI domenu:
 
 ```yaml
 # In backend config.yaml
@@ -309,26 +309,26 @@ cors:
     - "https://www.yourdomain.com"
 ```
 
-### Configure CDN (Optional)
+### Konfigurišite CDN (opciono)
 
-Za bolje performanse, razmotrite korišćenje CDN-a:
+Za bolje performanse razmotrite korišćenje CDN-a:
 
-- **Cloudflare**: Dodajte sajt na Cloudflare, ažurirajte DNS
+- **Cloudflare**: Dodajte sajt u Cloudflare, ažurirajte DNS
 - **AWS CloudFront**: Kreirajte distribuciju koja pokazuje na origin
-- **Other CDNs**: Pratite dokumentaciju provajdera
+- **Ostali CDN-ovi**: Pratite dokumentaciju provajdera
 
-### Setup Monitoring
+### Podesite monitoring
 
-Dodajte nadzor za dostupnost i greške:
+Dodajte monitoring za dostupnost i greške:
 
 ```bash
 # Using UptimeRobot, Pingdom, or similar services
 # Monitor: https://yourdomain.com
 ```
 
-## Troubleshooting
+## Otklanjanje problema
 
-### Build Fails
+### Build ne uspeva
 
 ```bash
 # Clear cache and reinstall
@@ -339,23 +339,23 @@ npm install
 node --version  # Should be v18+
 ```
 
-### Backend Connection Issues
+### Problemi sa povezivanjem na backend
 
 - Proverite `VITE_BACKEND_URL` u `.env`
-- Verifikujte CORS podešavanja backend-a
-- Pogledajte konzolu pregledača za greške
+- Potvrdite CORS podešavanja na backend-u
+- Proverite konzolu pregledača za greške
 - Testirajte zdravlje backend-a: `curl https://api.yourdomain.com/api/info`
 
-### Blank Page / White Screen
+### Prazna stranica / beli ekran
 
 - Proverite konzolu pregledača za JavaScript greške
-- Verifikujte da su svi asset-i uspešno učitani
+- Potvrdite da su svi asseti učitani ispravno
 - Proverite Nginx konfiguraciju za SPA rutiranje
 - Osigurajte da je `try_files` direktiva pravilno podešena
 
-### Web3 Wallet Not Connecting
+### Web3 novčanik se ne povezuje
 
-- Proverite da li je HTTPS omogućen (neophodno za Web3)
-- Verifikujte da je blockchain RPC URL dostupan
+- Proverite da li je HTTPS omogućen (zahtevano za Web3)
+- Potvrdite da je blockchain RPC URL dostupan
 - Proverite da li je ekstenzija novčanika instalirana u pregledaču
 - Pregledajte Content Security Policy zaglavlja

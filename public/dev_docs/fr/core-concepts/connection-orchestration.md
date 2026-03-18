@@ -1,101 +1,101 @@
-<!-- public/dev_docs/fr/core-concepts/connection-orchestration.md -->
+<!-- public/dev_docs/en/core-concepts/connection-orchestration.md -->
 
-# Orchestration de Connexion, Stockage `/info` & Configuration de Domaine
+# Orchestration de la connexion, stockage de `/info` et configuration de domaine
 
-Cette page explique exactement comment l'application démarre, se connecte à un backend, choisit un domaine, et comment elle stocke/utilise la réponse `/info` du backend et la configuration de domaine. Elle est écrite pour des ingénieurs professionnels qui ont besoin d'étendre ou de déboguer le flux.
+Cette page explique précisément comment l’application démarre, se connecte à un backend, choisit un domaine, et comment elle stocke/utilise la réponse `/info` du backend ainsi que la configuration du domaine. Elle est rédigée pour des ingénieurs professionnels qui doivent étendre ou déboguer le flux.
 
-> **TL;DR** — Il y a un seul orchestrateur (`useAppOrchestrator`) qui :
+> **TL;DR** — Il existe un seul orchestrateur (`useAppOrchestrator`) qui :
 >
-> * lit `/default_connect.yaml` (+ optionnellement un remplacement local),
-> * configure les points de terminaison HTTP/WS,
+> * lit `/default_connect.json` (avec repli sur `.yaml`) + un override local optionnel,
+> * configure les endpoints HTTP/WS,
 > * récupère `/info`,
 > * finalise le domaine,
-> * choisit la base d'actifs (prod/test), charge le pack de domaine,
+> * choisit la base des assets (prod/test), charge le domain pack,
 > * reconnecte le WebSocket, et
-> * (sur changement explicite) navigue vers `/`.
+> * (sur switch explicite) navigue vers `/`.
 
 ---
 
-## Termes & Primitives
+## Termes & primitives
 
 * **Backend** — le nœud SAVVA (API HTTP + WebSocket).
-* **Domaine** — quel réseau (branding, onglets, actifs) rendre.
-* **Pack de Domaine** — dossier `\<assetsBase\>/\<domain\>/` avec `config.yaml`, `domain.css`, i18n, images, modules, etc. L'application peut charger des packs depuis **prod** (`assets_url`) ou **test** (`temp_assets_url`).
-* **Remplacement** — un petit instantané `{ backendLink, domain }` persistant dans `localStorage` sous la clé `connect_override`.
+* **Domaine** — quel réseau (branding, onglets, assets) afficher.
+* **Domain Pack** — dossier `\<assetsBase\>/\<domain\>/` contenant `config.yaml`, `domain.css`, i18n, images, modules, etc. L’app peut charger des packs depuis **prod** (`assets_url`) ou **test** (`temp_assets_url`).
+* **Override** — un petit instantané `{ backendLink, domain }` persisté dans `localStorage` sous la clé `connect_override`.
 
 ---
 
-## Carte des Fichiers (où se trouvent les choses)
+## Arborescence des fichiers (où se trouvent les choses)
 
-* **Orchestrateur (source de vérité) :** `src/context/useAppOrchestrator.js` — logique de démarrage et de changement, `/info`, environnement des actifs, pack de domaine, reconnexion WS. Expose `initializeOrSwitch()`, `setDomain()`, `clearConnectOverride()`, et des signaux pour `config`, `info`, `assetsEnv`, `domainAssets*`.
-* **Enveloppe du contexte de l'application :** `src/context/AppContext.jsx` — consomme l'orchestrateur et dérive `supportedDomains`, `selectedDomain`, chaîne/réseau, passerelles IPFS, et `assetUrl()` ; impose également la cohérence d'authentification lors des changements de domaine.
-* **Points de terminaison HTTP/WS :** `src/net/endpoints.js` — calcule `httpBase()` et `wsUrl()` à partir de `{ backendLink, domain }`, déclenche un événement de changement lors de la reconfiguration, et fournit des helpers.
-* **Runtime WebSocket :** prend en compte les changements de point de terminaison et se reconnecte en conséquence.
-* **UI de Changement :** `src/x/modals/SwitchConnectModal.jsx` — récupère `<backend>/info`, normalise une liste de domaines, et applique les changements via l'API de l'application.
+* **Orchestrator (source de vérité) :** `src/context/useAppOrchestrator.js` — logique de boot & switch, `/info`, env des assets, domain pack, reconnexion WS. Expose `initializeOrSwitch()`, `setDomain()`, `clearConnectOverride()`, et des signaux pour `config`, `info`, `assetsEnv`, `domainAssets*`.
+* **Wrapper du contexte App :** `src/context/AppContext.jsx` — consomme l’orchestrateur et dérive `supportedDomains`, `selectedDomain`, chaîne/réseau, gateways IPFS, et `assetUrl()` ; fait aussi respecter la consistance d’auth lors des changements de domaine.
+* **Endpoints HTTP/WS :** `src/net/endpoints.js` — calcule `httpBase()` et `wsUrl()` à partir de `{ backendLink, domain }`, émet un événement de changement lors de la reconfiguration, et fournit des helpers.
+* **Runtime WebSocket :** reprend les changements d’endpoints et se reconnecte en conséquence.
+* **UI de switch :** `src/x/modals/SwitchConnectModal.jsx` — récupère `<backend>/info`, normalise la liste des domaines, et applique les changements via l’API de l’app.
 * **Shell principal :** applique dynamiquement `domain.css`, favicons/meta, GA, et lie le connecteur WS.
-* **Remarque sur l'héritage.** Vous pouvez voir un ancien hook `useAppConnection` ; continuez à utiliser l'**orchestrateur** (design actuel) comme la seule source de vérité.
+* **Note legacy.** Vous pouvez voir un hook plus ancien `useAppConnection` ; continuez d’utiliser l’**orchestrateur** (design actuel) comme source unique de vérité.
 
 ---
 
-## 1) Séquence de Démarrage — Étape par Étape
+## 1) Séquence de démarrage — étape par étape
 
-L'orchestrateur s'exécute une fois au montage :
+L’orchestrateur s’exécute une fois au montage :
 
 1. **Charger les valeurs par défaut du site**
-   `GET /default_connect.yaml`, analyser `backendLink`, `domain`, et (optionnellement) `gear`. Ces valeurs sont combinées avec un **remplacement** persistant (si présent).
+   Tenter `GET /default_connect.json` d’abord ; si absent, retomber sur `GET /default_connect.yaml`. Parser `backendLink`, `domain`, et (optionnellement) `gear`. Ces valeurs sont combinées avec un **override** persisté (si présent).
 
-2. **Normaliser & pré-configurer les points de terminaison (pré-info)**
-   Avant `/info`, nous définissons les points de terminaison en utilisant le domaine **demandé** tel quel :
-   `configureEndpoints({ backendLink, domain }, "orch:pre-info")`. Cela calcule `httpBase()` et `wsUrl()` et émet un événement de changement afin que le runtime puisse pointer vers le bon serveur.
+2. **Normaliser & pré‑configurer les endpoints (avant `/info`)**
+   Avant `/info`, on définit les endpoints en utilisant le domaine **demandé** tel quel :
+   `configureEndpoints({ backendLink, domain }, "orch:pre-info")`. Cela calcule `httpBase()` et `wsUrl()` et émet un événement de changement afin que le runtime pointe vers le bon serveur.
 
 3. **Récupérer `/info`**
-   `GET <backendLink>/info` (sans cache). Le JSON est stocké dans `orchestrator.info`.
+   `GET <backendLink>/info` (no-cache). Le JSON est stocké dans `orchestrator.info`.
 
 4. **Résoudre le domaine final**
-   Si l'utilisateur a explicitement demandé un domaine, il est **honoré** ; sinon, nous prenons le **premier** domaine de `/info.domains` (s'il y en a). Le `{ backendLink, domain }` résolu devient `config`. Si cela était un changement, nous **persistons** le remplacement.
+   Si l’utilisateur a explicitement demandé un domaine, il est **respecté** ; sinon on prend le **premier** domaine de `/info.domains` (s’il existe). Le `{ backendLink, domain }` résolu devient `config`. Si c’était un switch, on **persiste** l’override.
 
-5. **Finaliser les points de terminaison (post-info)**
-   Relancer `configureEndpoints` avec le domaine **final**. Tous les appels HTTP doivent utiliser `httpBase()`, et l'**URL WS inclut** `?domain=...`.
+5. **Finaliser les endpoints (après `/info`)**
+   Relancer `configureEndpoints` avec le domaine **final**. Tous les appels HTTP doivent utiliser `httpBase()`, et l’**URL WS inclut** `?domain=...`.
 
-6. **Environnement des actifs → charger le pack de domaine**
-   Choisir la base à partir de `/info` : `assets_url` (prod) ou `temp_assets_url` (test). Essayer `\<assetsBase\>/\<domain\>/config.yaml`, sinon revenir à `/domain_default/config.yaml`. Stocker `domainAssetsPrefix`, `domainAssetsConfig`, et la source (`domain` vs `default`).
+6. **Env des assets → charger le domain pack**
+   Choisir la base depuis `/info` : `assets_url` (prod) ou `temp_assets_url` (test). Tenter `\<assetsBase\>/\<domain\>/config.yaml`, sinon retomber sur `/domain_default/config.yaml`. Stocker `domainAssetsPrefix`, `domainAssetsConfig`, et la source (`domain` vs `default`).
 
 7. **Forcer la reconnexion WS**
-   Mettre à jour l'URL du client ws, se reconnecter, attendre l'ouverture (jusqu'à ~8s). Cela garantit que le runtime est synchronisé avec le nouveau domaine et backend.
+   Mettre à jour l’URL du client ws, reconnecter, attendre l’ouverture (jusqu’à ~8s). Cela garantit que le runtime est en phase avec le nouveau domaine et backend.
 
 8. **Navigation**
-   Sur un changement explicite, naviguer vers `/` (maintient l'état de routage sain après un changement de contexte majeur).
+   Lors d’un switch explicite, naviguer vers `/` (garde l’état du routing cohérent après un changement de contexte majeur).
 
-> L'orchestrateur expose la même API pour relancer cette séquence à tout moment ; `setDomain()` utilise le même chemin en interne.
+> L’orchestrateur expose la même API pour relancer cette séquence à tout moment ; `setDomain()` utilise le même chemin en interne.
 
 ---
 
-## 2) Calcul des Points de Terminaison (HTTP & WS)
+## 2) Calcul des endpoints (HTTP & WS)
 
-`src/net/endpoints.js` est le **seul** endroit qui connaît la base active et l'URL ws :
+`src/net/endpoints.js` est le **seul** endroit qui connaît la base active et l’URL ws :
 
 ### `configureEndpoints({ backendLink, domain }, reason)`
 
 * Normalise la base (assure `https://…/`).
-* Stocke le **domaine** (chaîne).
-* Dérive l'URL WebSocket (`ws:`/`wss:`) avec `?domain=<name>&space=public`.
+* Stocke le **domain** (string).
+* Dérive l’URL WebSocket (`ws:`/`wss:`) avec `?domain=<name>&space=public`.
 * Émet un événement `ENDPOINTS_CHANGED`.
 
-Tout autre code appelle des getters (`httpBase()`, `wsUrl()`, `wsQuery()`) et/ou s'abonne aux changements.
+Tout le reste du code appelle des getters (`httpBase()`, `wsUrl()`, `wsQuery()`) et/ou s’abonne aux changements.
 
 ### Le runtime WS réagit aux changements
 
-Le runtime écoute le changement de points de terminaison et peut se reconnecter. L'orchestrateur définit également explicitement l'URL et appelle `reconnect`.
+Le runtime écoute l’événement de changement des endpoints et peut se reconnecter. L’orchestrateur définit aussi explicitement l’URL et appelle `reconnect`.
 
 ### Appels HTTP
 
-Pour les points de terminaison qui nécessitent `domain` dans la requête (auth, vérifications administratives, etc.), les appelants l'attachent via `URLSearchParams` contre `httpBase()`. (Voir les exemples dans `auth.js`.)
+Pour les endpoints qui requièrent `domain` dans la query (auth, vérifs admin, etc.), les appelants l’ajoutent via `URLSearchParams` sur `httpBase()`. (Voir les exemples dans `auth.js`.)
 
 ---
 
-## 3) `/info` — Ce que Nous Stockons et Comment Nous l'Utilisons
+## 3) `/info` — Ce que nous stockons et comment nous l’utilisons
 
-Le JSON brut `/info` est stocké comme un **signal** : `orchestrator.info()`.
+Le JSON brut de `/info` est stocké comme un **signal** : `orchestrator.info()`.
 
 **Forme typique (abrégée) :**
 
@@ -111,87 +111,87 @@ Le JSON brut `/info` est stocké comme un **signal** : `orchestrator.info()`.
 
 **Où il est utilisé :**
 
-* **Domaines** — `AppContext` dérive `supportedDomains` (normalisé, dé-duplicaté) et le `selectedDomain`. Si `config.domain` est défini, il est préféré ; sinon, le premier domaine supporté est utilisé.
-* **Chaîne/réseau** — `desiredChainId = info.blockchain_id` → `desiredChain()` dérive les métadonnées complètes ; `ensureWalletOnDesiredChain()` peut être appelé avant les flux de tx.
-* **Passerelles IPFS** — `remoteIpfsGateways` provient de `info.ipfs_gateways`, et `activeIpfsGateways` préfixe éventuellement une passerelle **locale** si activée dans les paramètres.
-* **Base des actifs** — L'orchestrateur choisit `assets_url` (prod) ou `temp_assets_url` (test), calcule `\<assetsBase\>/\<domain\>/`, puis charge le pack de domaine. Le préfixe actif + la configuration analysée sont publiés via `domainAssetsPrefix()` / `domainAssetsConfig()`.
-* **Fonctionnalités de l'application utilisant `/info`** — par exemple, la cartographie des prix des tokens recherche `/info.savva_contracts.SavvaToken.address` pour placer le token SAVVA de base dans le tableau des prix.
+* **Domains** — `AppContext` dérive `supportedDomains` (normalisés, dé‑dupliqués) et le `selectedDomain`. Si `config.domain` est défini, il est préféré ; sinon le premier domaine supporté est utilisé.
+* **Chaîne/réseau** — `desiredChainId = info.blockchain_id` → `desiredChain()` dérive les métadonnées complètes ; `ensureWalletOnDesiredChain()` peut être appelé avant les flows de tx.
+* **Gateways IPFS** — `remoteIpfsGateways` vient de `info.ipfs_gateways`, et `activeIpfsGateways` préfixe éventuellement une gateway **locale** si activée dans les settings.
+* **Base des assets** — L’orchestrateur choisit `assets_url` (prod) ou `temp_assets_url` (test), calcule `\<assetsBase\>/\<domain\>/`, puis charge le domain pack. Le préfixe actif + la config parsée sont publiés via `domainAssetsPrefix()` / `domainAssetsConfig()`.
+* **Fonctionnalités de l’app utilisant `/info`** — p.ex., le mapping des prix des tokens consulte `/info.savva_contracts.SavvaToken.address` pour placer le token SAVVA de base dans le tableau des prix.
 
 ---
 
-## 4) Configuration de Domaine — Stockage & Consommation
+## 4) Configuration du domaine — stockage & consommation
 
-Après l'étape (6) dans le flux de démarrage, l'application a :
+Après l’étape (6) du flow de boot, l’app dispose de :
 
-* `assetsEnv()` — `"prod"` ou `"test"` (toggle dans les paramètres, utilisé par les administrateurs).
-* `assetsBaseUrl()` — calculé à partir de `/info` + env.
-* `domainAssetsPrefix()` — soit `\<assetsBase\>/\<domain\>/` ou `/domain_default/`.
-* `domainAssetsConfig()` — `config.yaml` analysé.
+* `assetsEnv()` — `"prod"` ou `"test"` (toggle dans Settings, utilisé par les admins).
+* `assetsBaseUrl()` — calculé depuis `/info` + env.
+* `domainAssetsPrefix()` — soit `\<assetsBase\>/\<domain\>/` soit `/domain_default/`.
+* `domainAssetsConfig()` — `config.yaml` parsé.
 
-### Qui lit la configuration du domaine ?
+### Qui lit la config du domaine ?
 
 * **CSS & branding**
 
-  * `DomainCssLoader` charge `assetUrl("domain.css")`, avec un cache busté par une révision de `(env|domain|assets_cid)`.
-  * `FaviconLoader` lit la section `favicon` (tailles d'icône, manifeste, icône de masque, méta) et met à jour `<link rel="icon">` et autres ; les URL sont résolues via `assetUrl(relPath)` et cache busté.
+  * `DomainCssLoader` charge `assetUrl("domain.css")`, avec un cache‑bust via une révision `(env|domain|assets_cid)`.
+  * `FaviconLoader` lit la section `favicon` (tailles d’icônes, manifest, mask icon, meta) et met à jour `<link rel="icon">` etc. ; les URLs sont résolues via `assetUrl(relPath)` et cache‑bustées.
 
 * **Internationalisation (langues par domaine)**
 
-  * À chaque chargement de configuration, l'application publie les codes de langue du domaine dans le système i18n et ajuste le `<title>` du document au `title` de la locale actuelle. Elle **valide** également la langue actuelle par rapport au nouveau domaine et passe à une langue supportée si nécessaire.
+  * À chaque chargement de config, l’app publie les codes de langue du domaine vers le système i18n et ajuste le `<title>` du document selon le `title` localisé du locale courant. Elle **valide** aussi la langue courante contre le nouveau domaine et bascule vers une langue supportée si nécessaire.
 
 * **Modules / Onglets**
 
-  * La barre de navigation principale (`TabsBar`) lit `config.modules.tabs` (par défaut `modules/tabs.yaml`) et charge le YAML via le **chargeur d'actifs** en utilisant `assetUrl()`. Les onglets sont localisés via des clés i18n et/ou des métadonnées par onglet.
+  * La barre de navigation principale (`TabsBar`) lit `config.modules.tabs` (par défaut `modules/tabs.yaml`) et charge le YAML via le **asset loader** en utilisant `assetUrl()`. Les onglets sont localisés via des clés i18n et/ou des méta‑données par onglet.
 
-* **Blocs HTML & autres actifs**
+* **Blocs HTML & autres assets**
 
-  * Les widgets (par exemple, `HtmlBlock`) appellent `loadAssetResource(app, relPath)` qui résout les chemins relatifs via `assetUrl()` et récupère le texte/YAML en conséquence.
+  * Les widgets (p.ex. `HtmlBlock`) appellent `loadAssetResource(app, relPath)` qui résout les chemins relatifs via `assetUrl()` et récupère le texte/YAML en conséquence.
 
-> L'URL active `assetUrl(relPath)` est **juste** `domainAssetsPrefix()` + `relPath` (sans `/` au début) ; cela garde tous les consommateurs cohérents.
+> L’`assetUrl(relPath)` actif est **simplement** `domainAssetsPrefix()` + `relPath` (sans `/` initial) ; cela garde tous les consommateurs cohérents.
 
-### Paramètres → Actifs (diagnostics)
+### Settings → Assets (diagnostic)
 
-Les administrateurs peuvent basculer **prod/test**, voir le **préfixe/source actif**, et exécuter des diagnostics qui confirment la présence de champs clés (logos, locales, onglets, favicon). Cette vue lit *uniquement* les signaux publiés par l'orchestrateur.
+Les admins peuvent basculer **prod/test**, voir le **préfixe/source actif**, et lancer des diagnostics qui confirment la présence des champs clés (logos, locales, tabs, favicon). Cette vue lit *uniquement* les signaux publiés par l’orchestrateur.
 
 ---
 
-## 5) Comment Fonctionne le Changement (backend/domaine)
+## 5) Comment fonctionne le switch (backend/domaine)
 
 ### Flux UI
 
-1. La boîte de dialogue **Changer backend / domaine** accepte une URL de backend.
-2. Appelle `<backend>/info` pour peupler une liste de domaines normalisée (`[{name, …}]`).
-3. Applique une sélection en appelant l'API de l'application.
+1. Le dialogue **Switch backend / domain** accepte une URL de backend.
+2. Appelle `<backend>/info` pour peupler une liste normalisée de domaines (`[{name, …}]`).
+3. Applique une sélection en appelant l’API de l’app.
 
-### Flux de l'Orchestrateur
+### Flux de l’orchestrateur
 
-* Si le **backend** a changé, nous **déconnectons** d'abord pour éviter un état de cookie croisé entre les backends.
-* Pré-configurer les points de terminaison (domaine demandé), récupérer `/info`, résoudre le domaine final.
-* Persister le remplacement, définir `config`, **finaliser les points de terminaison**, charger le pack de domaine, **reconnecter WS**, naviguer vers la maison.
+* Si le **backend** a changé, on **déconnecte** d’abord l’utilisateur pour éviter l’état de cookie cross‑backend.
+* Pré‑configurer les endpoints (domaine demandé), fetch `/info`, résoudre le domaine final.
+* Persister l’override, définir `config`, **finaliser les endpoints**, charger le domain pack, **reconnecter WS**, naviguer vers l’accueil.
 
-### Cohérence d'authentification
+### Consistance d’auth
 
-Si un utilisateur est connecté et que le **domaine** dans `config` change, l'application se déconnecte proactivement pour éviter d'agir dans un contexte non apparié. Un toast explique pourquoi.
+Si un utilisateur est connecté et que le **domaine** dans `config` change, l’app déconnecte proactivement pour éviter d’agir dans un contexte non‑correspondant. Un toast explique la raison.
 
 ---
 
-## 6) `AppContext` — Sur Quoi Votre Code Peut Compter
+## 6) `AppContext` — Sur quoi votre code peut se reposer
 
-`useApp()` expose une surface stable, soutenue par l'orchestrateur :
+`useApp()` expose une surface stable, soutenue par l’orchestrateur :
 
-* **État de connexion :** `loading()`, `error()`, `config()`, `info()` (brut `/info`).
+* **État de connexion :** `loading()`, `error()`, `config()`, `info()` (le `/info` brut).
 * **Domaines :** `supportedDomains()`, `selectedDomain()`, `selectedDomainName()`.
 * **Réseau :** `desiredChainId()`, `desiredChain()`, `ensureWalletOnDesiredChain()`.
 * **IPFS :** `remoteIpfsGateways()`, `activeIpfsGateways()`.
-* **Actifs :** `assetsEnv()`, `assetsBaseUrl()`, `domainAssetsPrefix()`, `domainAssetsConfig()`, et `assetUrl(relPath)`.
-* **API de Changement :** `initializeOrSwitch(newSettings)`, `setDomain(name)`, `clearConnectOverride()`.
+* **Assets :** `assetsEnv()`, `assetsBaseUrl()`, `domainAssetsPrefix()`, `domainAssetsConfig()`, et `assetUrl(relPath)`.
+* **API de switch :** `initializeOrSwitch(newSettings)`, `setDomain(name)`, `clearConnectOverride()`.
 * **Helpers i18n :** `t(key, vars?)`, `lang()`, `setLang(code)`.
 
-### Exemple : chargement d'un extrait YAML depuis le pack de domaine
+### Exemple : charger un snippet YAML depuis le domain pack
 
 ```js
-// (pas un composant, juste un croquis)
-// Toutes les chaînes visibles doivent être localisées ; ici, aucune n'est montrée à l'utilisateur.
+// (not a component, just a sketch)
+// All visible strings MUST be localized; here none are shown to the user.
 import { useApp } from "../context/AppContext.jsx";
 import { loadAssetResource } from "../utils/assetLoader.js";
 
@@ -203,10 +203,10 @@ async function loadDomainTabs() {
 }
 ```
 
-### Exemple : construction d'un appel authentifié qui nécessite un domaine
+### Exemple : construire un appel authentifié qui nécessite un domain
 
 ```js
-// Toutes les chaînes visibles par l'utilisateur doivent être localisées via t():
+// All user-visible strings must be localized via t():
 import { useApp } from "../context/AppContext.jsx";
 
 async function fetchAdminFlag(address) {
@@ -222,47 +222,47 @@ async function fetchAdminFlag(address) {
 
 ---
 
-## 7) Gestion des Erreurs & États Vides
+## 7) Gestion des erreurs & états vides
 
-Lorsque la connexion échoue au démarrage (par exemple, YAML mal formé, `/info` hors service), `AppContext` expose `error()` et le shell rend une carte d'erreur centrée avec des chaînes i18n et un bouton **Réessayer**.
-
----
-
-## 8) Remarques sur l'i18n & Invariants UX
-
-* **Chaque** chaîne visible par l'utilisateur dans le code UI doit être `t("…")` de `useApp()` (navigation, paramètres, toasts, etc.).
-* `document.title` est dérivé du `title` localisé de la configuration du domaine. Changer le **domaine** ou l'**env** met à jour le branding immédiatement sans reconstruction.
+Quand la connexion échoue au démarrage (p.ex., config malformée, `/info` indisponible), `AppContext` expose `error()` et le shell affiche une carte d’erreur centrée avec des chaînes i18n et un bouton **Retry**.
 
 ---
 
-## 9) Extraits de Référence
+## 8) Notes sur l’i18n & invariants UX
 
-* Pré-configurer avant info → `/info` → configuration finale — cœur de l'orchestrateur.
-* Base des actifs & fallback du pack de domaine — orchestrateur.
-* Points de terminaison & URL WS (`?domain=...`) — source unique.
-* Runtime WS + reconnexion sur changement de point de terminaison — détails du runtime.
-* Boîte de dialogue de changement `/info` fetch & normalisation de domaine — détail UI.
+* **Chaque** chaîne visible par l’utilisateur dans le code UI doit provenir de `t("…")` via `useApp()` (navigation, settings, toasts, etc.).
+* `document.title` est dérivé du `title` localisé de la config du domaine. Changer le **domaine** ou l’**env** met à jour le branding immédiatement sans rebuild.
 
 ---
 
-## 10) Liste de Contrôle Opérationnelle
+## 9) Extraits de référence
 
-* Pour changer les valeurs par défaut dans un déploiement, mettez à jour **`/default_connect.yaml`** sur le serveur web d'hébergement.
-* Pour changer à l'exécution, utilisez la **boîte de dialogue de changement** (le gear doit être activé par le YAML du site).
-* Pour prévisualiser un pack de domaine, basculez **Paramètres → Actifs → Environnement : Test**. L'application chargera depuis `temp_assets_url`.
-* Si vous changez de **backend**, l'application **se déconnecte** d'abord pour éviter les cookies croisés entre backends.
+* Pré‑info configure → `/info` → configure final — cœur de l’orchestrateur.
+* Base des assets & fallback du domain pack — orchestrateur.
+* Endpoints & URL WS (`?domain=...`) — source unique.
+* Runtime WS + reconnexion sur changement d’endpoints — détails runtime.
+* Dialogue de switch fetch `/info` & normalisation des domaines — détail UI.
 
 ---
 
-## Annexe : Modèle de Données en Un Coup d'Œil
+## 10) Checklist opérationnelle
+
+* Pour changer les valeurs par défaut dans un déploiement, mettre à jour **`/default_connect.json`** (ou `/default_connect.yaml`) sur le serveur d’hébergement.
+* Pour switcher à runtime, utiliser le **Switch dialog** (l’engrenage doit être activé par la config du site).
+* Pour prévisualiser un domain pack, basculer **Settings → Assets → Environment: Test**. L’app chargera depuis `temp_assets_url`.
+* Si vous changez de **backend**, l’app **déconnecte** d’abord pour éviter les cookies cross‑backend.
+
+---
+
+## Annexe : Modèle de données en un coup d’œil
 
 ```ts
-// Modèle conceptuel simplifié
+// Simplified conceptual model
 
 type AppConfig = {
-  backendLink: string;   // normalisé avec une barre oblique finale
-  domain: string;        // nom de domaine choisi
-  gear: boolean;         // gear UI activé (depuis le YAML du site)
+  backendLink: string;   // normalized with trailing slash
+  domain: string;        // chosen domain name
+  gear: boolean;         // UI gear enabled (from site YAML)
 };
 
 type Info = {
@@ -271,7 +271,7 @@ type Info = {
   ipfs_gateways?: string[];
   assets_url?: string;
   temp_assets_url?: string;
-  // ...autres champs (par exemple, savva_contracts)
+  // ...other fields (e.g., savva_contracts)
 };
 
 type Orchestrator = {
@@ -289,11 +289,11 @@ type Orchestrator = {
   assetsEnv(): "prod" | "test";
   setAssetsEnv(next: "prod" | "test"): void;
   assetsBaseUrl(): string;
-  domainAssetsPrefix(): string;           // '/domain_default/' ou '<assetsBase>/<domain>/'
-  domainAssetsConfig(): any | null;       // config.yaml analysé
+  domainAssetsPrefix(): string;           // '/domain_default/' or '<assetsBase>/<domain>/'
+  domainAssetsConfig(): any | null;       // parsed config.yaml
 };
 ```
 
 ---
 
-Voilà le tableau complet. Avec ces primitives, vous pouvez étendre l'UI en toute sécurité, en étant sûr que les points de terminaison, `/info`, et les ressources de domaine restent **cohérents** et **réactifs** à travers l'application.
+Voilà le panorama complet. Avec ces primitives vous pouvez étendre l’UI en toute sécurité, en ayant l’assurance que les endpoints, `/info` et les ressources de domaine restent **cohérents** et **réactifs** dans toute l’application.

@@ -4,10 +4,10 @@ Ce guide couvre l'installation et le déploiement du frontend SAVVA UI.
 
 ## Aperçu
 
-L'UI SAVVA est une application mono-page (SPA) basée sur SolidJS qui fournit :
-- Interface de création et de navigation de contenu
+Le SAVVA UI est une application monopage basée sur SolidJS qui fournit :
+- Une interface de création et de navigation de contenu
 - Intégration de portefeuilles Web3
-- Téléversements de fichiers vers IPFS
+- Téléversement de fichiers sur IPFS
 - Interactions avec des smart contracts
 - Support multilingue
 
@@ -85,11 +85,11 @@ DEPLOY_PORT=22
 
 ### Configuration supplémentaire
 
-L'UI récupère automatiquement les adresses des contrats blockchain depuis le point de terminaison backend `/info`, qui lit depuis le contrat Config.
+L'UI récupère automatiquement les adresses des contrats blockchain depuis l'endpoint `/info` du backend, qui lit depuis le contract Config.
 
-Aucune adresse de contrat codée en dur n'est nécessaire dans la configuration de l'UI.
+Aucune adresse de contract codée en dur n'est nécessaire dans la configuration de l'UI.
 
-## 4. Construire l'UI
+## 4. Builder l'UI
 
 ### Build de développement
 
@@ -129,18 +129,18 @@ npm run release
 
 ### Option A : Hébergement de fichiers statiques
 
-Le dossier construit `dist/` contient des fichiers statiques pouvant être servis par n'importe quel serveur web.
+Le dossier `dist/` construit contient des fichiers statiques qui peuvent être servis par n'importe quel serveur web.
 
-#### Utiliser Nginx (recommandé)
+#### Utilisation de Nginx (recommandé)
 
 SAVVA nécessite une configuration Nginx complète qui gère :
-- Service des fichiers statiques de l'UI
-- Proxy de l'API backend sur `/api`
-- Prérendu pour les bots SEO
-- Point de terminaison de configuration dynamique
-- Support WebSocket
+- Le service des fichiers statiques de l'UI
+- Le proxy de l'API backend sur `/api`
+- Le prérendu pour les bots SEO
+- L'endpoint de configuration dynamique
+- Le support WebSocket
 
-**Téléchargez le modèle complet de configuration Nginx :**
+**Télécharger le modèle complet de configuration Nginx :**
 
 ```bash
 # Download the example configuration
@@ -153,21 +153,21 @@ wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/publi
 nano nginx.conf.example
 ```
 
-**Voir l'exemple complet** : [nginx.conf.example](nginx.conf.example)
+**Voir l'exemple complet**: [nginx.conf.example](nginx.conf.example)
 
 **Fonctionnalités clés incluses :**
 1. Redirection HTTP vers HTTPS
 2. Configuration SSL/TLS (certificats Cloudflare Origin ou Let's Encrypt)
-3. **/default_connect.yaml** - point de terminaison **requis** pour la configuration dynamique de l'UI
-4. Prérendu pour bots - rendu côté serveur adapté au SEO et aux réseaux sociaux
+3. Endpoint `/default_connect.json` - configuration dynamique **requise** pour l'UI (`.yaml` également supporté en fallback)
+4. Prérendu pour les bots - rendu côté serveur adapté au SEO et aux partages sur les réseaux sociaux
 5. Proxy `/api` - redirige les requêtes API vers le backend sur le port 7000
 6. Support WebSocket - pour les fonctionnalités en temps réel
-7. Service de fichiers statiques avec routage SPA
-8. Caching intelligent - `index.html` jamais mis en cache, actifs mis en cache pendant 1 an
+7. Service des fichiers statiques avec routage SPA
+8. Mise en cache intelligente - `index.html` jamais mis en cache, ressources mises en cache pendant 1 an
 
-### Comprendre default_connect.yaml
+### Comprendre default_connect.json
 
-L'UI requiert un point de terminaison `/default_connect.yaml` qui lui indique où trouver le backend et la passerelle IPFS. Ceci est configuré directement dans Nginx à l'aide de variables :
+L'UI requiert un endpoint `/default_connect.json` qui lui indique où trouver le backend et la passerelle IPFS (il supporte aussi `/default_connect.yaml` en fallback). Cela se configure directement dans Nginx à l'aide de variables :
 
 ```nginx
 # Define your deployment settings
@@ -176,19 +176,19 @@ set $default_backend "https://yourdomain.com/api/";
 set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
 
 # Serve dynamic configuration to the UI
-location = /default_connect.yaml {
-    add_header Content-Type text/plain;
-    return 200 'domain: $default_domain
-backendLink: $default_backend
-default_ipfs_link: $default_ipfs';
+location = /default_connect.json {
+    default_type application/json;
+    return 200 '{"domain":"$default_domain","backendLink":"$default_backend","default_ipfs_link":"$default_ipfs"}';
 }
 ```
 
-Ce point de terminaison renvoie une réponse YAML comme :
-```yaml
-domain: yourdomain.com
-backendLink: https://yourdomain.com/api/
-default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+Cet endpoint renvoie une réponse JSON comme :
+```json
+{
+  "domain": "yourdomain.com",
+  "backendLink": "https://yourdomain.com/api/",
+  "default_ipfs_link": "https://gateway.pinata.cloud/ipfs/"
+}
 ```
 
 L'UI récupère cette configuration au démarrage pour savoir où se connecter.
@@ -241,7 +241,7 @@ sudo systemctl reload nginx
 
 ### Option B : Script de déploiement automatisé
 
-Créer le script de déploiement :
+Créez le script de déploiement :
 
 ```bash
 nano deploy.sh
@@ -273,7 +273,7 @@ echo "Deployment complete!"
 echo "Visit https://yourdomain.com"
 ```
 
-Lancer le déploiement :
+Exécuter le déploiement :
 
 ```bash
 ./deploy.sh
@@ -291,9 +291,9 @@ curl https://yourdomain.com
 ```
 
 Ouvrir dans le navigateur :
-- Rendez-vous sur `https://yourdomain.com`
+- Aller sur `https://yourdomain.com`
 - L'UI doit se charger et se connecter au backend
-- Vérifiez la console du navigateur pour d'éventuelles erreurs
+- Vérifier la console du navigateur pour d'éventuelles erreurs
 
 ## 7. Configuration post-déploiement
 
@@ -309,17 +309,17 @@ cors:
     - "https://www.yourdomain.com"
 ```
 
-### Configurer un CDN (optionnel)
+### Configurer un CDN (Optionnel)
 
 Pour de meilleures performances, envisagez d'utiliser un CDN :
 
-- **Cloudflare** : Ajoutez le site à Cloudflare, mettez à jour les DNS
-- **AWS CloudFront** : Créez une distribution pointant vers l'origine
-- **Autres CDN** : Suivez la documentation du fournisseur
+- **Cloudflare** : Ajouter le site sur Cloudflare, mettre à jour les DNS
+- **AWS CloudFront** : Créer une distribution pointant vers l'origine
+- **Autres CDN** : Suivre la documentation du fournisseur
 
-### Mettre en place la surveillance
+### Mettre en place la supervision
 
-Ajoutez une surveillance pour la disponibilité et les erreurs :
+Ajoutez une surveillance pour le temps de disponibilité et les erreurs :
 
 ```bash
 # Using UptimeRobot, Pingdom, or similar services
@@ -328,7 +328,7 @@ Ajoutez une surveillance pour la disponibilité et les erreurs :
 
 ## Dépannage
 
-### Échec de la compilation
+### Échec du build
 
 ```bash
 # Clear cache and reinstall
@@ -341,21 +341,21 @@ node --version  # Should be v18+
 
 ### Problèmes de connexion au backend
 
-- Vérifiez `VITE_BACKEND_URL` dans `.env`
-- Vérifiez la configuration CORS du backend
-- Consultez la console du navigateur pour les erreurs
-- Testez la santé du backend : `curl https://api.yourdomain.com/api/info`
+- Vérifier `VITE_BACKEND_URL` dans `.env`
+- Vérifier les paramètres CORS du backend
+- Consulter la console du navigateur pour les erreurs
+- Tester la santé du backend : `curl https://api.yourdomain.com/api/info`
 
-### Page blanche / écran blanc
+### Page blanche / écran vide
 
-- Vérifiez la console du navigateur pour les erreurs JavaScript
-- Vérifiez que tous les assets sont chargés correctement
-- Vérifiez la configuration Nginx pour le routage SPA
-- Assurez-vous que la directive `try_files` est configurée correctement
+- Vérifier la console du navigateur pour les erreurs JavaScript
+- Vérifier que toutes les ressources sont correctement chargées
+- Vérifier la configuration Nginx pour le routage SPA
+- S'assurer que la directive `try_files` est correctement configurée
 
-### Le portefeuille Web3 ne se connecte pas
+### Portefeuille Web3 ne se connecte pas
 
-- Vérifiez si HTTPS est activé (requis pour Web3)
-- Vérifiez que l'URL RPC blockchain est accessible
-- Assurez-vous que l'extension de portefeuille du navigateur est installée
-- Vérifiez les en-têtes de Content Security Policy
+- Vérifier que HTTPS est activé (requis pour Web3)
+- Vérifier que l'URL RPC de la blockchain est accessible
+- Vérifier que l'extension de portefeuille du navigateur est installée
+- Vérifier les en-têtes de Content Security Policy
