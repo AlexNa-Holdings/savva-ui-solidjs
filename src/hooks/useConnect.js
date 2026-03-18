@@ -1,7 +1,7 @@
 // src/hooks/useConnect.js
 import { createSignal, onMount } from "solid-js";
-import { parse } from "yaml";
 import { configureEndpoints, httpBase } from "../net/endpoints";
+import { loadSiteConfig } from "../utils/loadSiteConfig";
 
 export function useConnect() {
   const [config, setConfig] = createSignal(null);
@@ -11,10 +11,7 @@ export function useConnect() {
 
   onMount(async () => {
     try {
-      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
-      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
-      const text = await res.text();
-      const data = parse(text);
+      const data = await loadSiteConfig();
 
       // Support both legacy format (backendLink) and new multi-chain format (chains array)
       let backendLink = data.backendLink;

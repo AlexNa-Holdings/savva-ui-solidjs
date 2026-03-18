@@ -1,9 +1,9 @@
 // src/context/useAppConnection.js
 import { createSignal, onMount } from "solid-js";
-import { parse } from "yaml";
 import { configureEndpoints } from "../net/endpoints.js";
 import { pushErrorToast } from "../ui/toast.js";
 import { dbg } from "../utils/debug.js";
+import { loadSiteConfig } from "../utils/loadSiteConfig.js";
 
 function ensureSlash(s) { return s ? (s.endsWith("/") ? s : s + "/") : ""; }
 const OVERRIDE_KEY = "connect_override";
@@ -55,12 +55,8 @@ export function useAppConnection() {
     dbg.log("AppConnection", "init: start");
 
     try {
-      const res = await fetch("/default_connect.yaml", { cache: "no-store" });
-      dbg.log("AppConnection", "init: fetched /default_connect.yaml", { status: res.status });
-      if (!res.ok) throw new Error(`YAML load failed: ${res.status}`);
-
-      const yaml = parse(await res.text()) || {};
-      dbg.log("AppConnection", "init: parsed YAML", yaml);
+      const yaml = await loadSiteConfig();
+      dbg.log("AppConnection", "init: parsed site config", yaml);
 
       // Support both legacy format (backendLink) and new multi-chain format (chains array)
       let backendLink = yaml.backendLink;

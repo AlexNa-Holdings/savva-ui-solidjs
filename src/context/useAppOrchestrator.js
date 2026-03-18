@@ -2,6 +2,7 @@
 import { createSignal, onMount } from "solid-js";
 import { parse } from "yaml";
 import { configureEndpoints, httpBase, wsUrl } from "../net/endpoints.js";
+import { loadSiteConfig } from "../utils/loadSiteConfig.js";
 import { getWsClient, whenWsOpen } from "../net/wsRuntime.js";
 import { navigate } from "../routing/smartRouter.js";
 import dbg from "../utils/debug.js";
@@ -143,9 +144,7 @@ export function useAppOrchestrator({ auth, i18n }) {
 
       if (!isSwitching) {
         // first boot: site YAML + override
-        const res = await fetch("/default_connect.yaml", { cache: "no-store" });
-        if (!res.ok) throw new Error("YAML load failed: " + res.status);
-        const siteYaml = parse(await res.text()) || {};
+        const siteYaml = await loadSiteConfig();
         const override = overrideBefore || {};
 
         // Support both legacy format (backendLink) and new multi-chain format (chains array)

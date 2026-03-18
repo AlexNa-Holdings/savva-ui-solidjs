@@ -6,7 +6,7 @@ This page explains exactly how the app boots, connects to a backend, chooses a d
 
 > **TL;DR** — There is a single orchestrator (`useAppOrchestrator`) that:
 >
-> * reads `/default_connect.yaml` (+ optional local override),
+> * reads `/default_connect.json` (falling back to `.yaml`) + optional local override,
 > * configures HTTP/WS endpoints,
 > * fetches `/info`,
 > * finalizes the domain,
@@ -42,7 +42,7 @@ This page explains exactly how the app boots, connects to a backend, chooses a d
 The orchestrator runs once on mount:
 
 1. **Load site defaults**
-   `GET /default_connect.yaml`, parse `backendLink`, `domain`, and (optionally) `gear`. These values are combined with a persisted **override** (if present).
+   Try `GET /default_connect.json` first; if unavailable, fall back to `GET /default_connect.yaml`. Parse `backendLink`, `domain`, and (optionally) `gear`. These values are combined with a persisted **override** (if present).
 
 2. **Normalize & pre‑configure endpoints (pre‑info)**
    Before `/info`, we set endpoints using the **requested** domain as‑is:
@@ -224,7 +224,7 @@ async function fetchAdminFlag(address) {
 
 ## 7) Error Handling & Empty States
 
-When connection fails at boot (e.g., malformed YAML, `/info` down), `AppContext` exposes `error()` and the shell renders a centered error card with i18n strings and a **Retry** button.
+When connection fails at boot (e.g., malformed config, `/info` down), `AppContext` exposes `error()` and the shell renders a centered error card with i18n strings and a **Retry** button.
 
 ---
 
@@ -247,8 +247,8 @@ When connection fails at boot (e.g., malformed YAML, `/info` down), `AppContext`
 
 ## 10) Operational Checklist
 
-* To change defaults in a deployment, update **`/default_connect.yaml`** on the hosting web server.
-* To switch at runtime, use the **Switch dialog** (gear must be enabled by the site’s YAML).
+* To change defaults in a deployment, update **`/default_connect.json`** (or `/default_connect.yaml`) on the hosting web server.
+* To switch at runtime, use the **Switch dialog** (gear must be enabled by the site config).
 * To preview a domain pack, toggle **Settings → Assets → Environment: Test**. The app will load from `temp_assets_url`.
 * If you switch **backend**, the app **logs out** first to avoid cross‑backend cookies.
 

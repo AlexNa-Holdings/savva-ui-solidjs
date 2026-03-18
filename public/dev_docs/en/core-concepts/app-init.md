@@ -10,42 +10,45 @@ On startup the web app needs two inputs:
 1. **Backend URL** – the base URL of the SAVVA backend.
 2. **Domain name** – which SAVVA domain (social network) to render by default.
 
-Defaults come from a tiny YAML file at the web root:
+Defaults come from a tiny JSON file at the web root (YAML is also supported as a fallback):
 
-### `/default_connect.yaml`
-```yaml
-# /default_connect.yaml
-domain: savva.app
-backendLink: https://ui.savva.app/api/
-gear: true
-# optional:
-# default_ipfs_link: ipfs://bafy.../something.json
-````
+### `/default_connect.json`
+```json
+{
+  "domain": "savva.app",
+  "backendLink": "https://ui.savva.app/api/",
+  "gear": true,
+  "default_ipfs_link": "ipfs://bafy.../something.json"
+}
+```
 
 * `backendLink` — base HTTP endpoint of the SAVVA backend (the app normalizes it).
 * `domain` — initial domain to render; can be switched later in the UI.
 * `gear` — enables developer gear in the UI (optional).
 * `default_ipfs_link` — optional convenience default used in some flows.
 
+> **Format note**
+> The app tries `/default_connect.json` first. If that request fails, it falls back to `/default_connect.yaml` for backward compatibility. New deployments should use JSON.
+
 > **Production note**
 > In production this file is usually served by your HTTP server (e.g., Nginx) and effectively **chooses which domain** a deployed web app shows by default. One common pattern is to serve a specific file from disk:
 >
 > ```nginx
-> # example: serve a static default_connect.yaml
-> location = /default_connect.yaml {
->   default_type text/yaml;
->   alias /etc/savva/default_connect.yaml;
+> # example: serve a static default_connect.json
+> location = /default_connect.json {
+>   default_type application/json;
+>   alias /etc/savva/default_connect.json;
 > }
 > ```
 >
-> Adjust to your infra; the key is that the app can `GET /default_connect.yaml`.
+> Adjust to your infra; the key is that the app can `GET /default_connect.json`.
 
 ---
 
 ## Boot sequence
 
-1. **Load `/default_connect.yaml`**
-   The app fetches the YAML file, validates `backendLink`, and stores `domain`. It immediately **configures endpoints** (HTTP base + WS URL) using those values. &#x20;
+1. **Load site config (`/default_connect.json` or `.yaml`)**
+   The app tries to fetch `/default_connect.json` first; if unavailable, it falls back to `/default_connect.yaml`. It validates `backendLink`, stores `domain`, and immediately **configures endpoints** (HTTP base + WS URL) using those values. &#x20;
 
 2. **Configure endpoints**
 
@@ -103,7 +106,7 @@ gear: true
 
 ## Where this lives in the code (for quick reference)
 
-* Boot & `/default_connect.yaml` load, then `/info`: **`src/context/AppContext.jsx`** and **`src/hooks/useConnect.js`**. &#x20;
+* Boot & site config load (`/default_connect.json` with `.yaml` fallback), then `/info`: **`src/context/AppContext.jsx`** and **`src/hooks/useConnect.js`**. The shared loader lives in **`src/utils/loadSiteConfig.js`**. &#x20;
 * Endpoint source of truth (HTTP base + WS URL): **`src/net/endpoints.js`**.&#x20;
 * Domain list resolution, chain ID, IPFS gateways, assets env & domain assets loading: **`src/context/AppContext.jsx`**.  &#x20;
 * Switch dialog that fetches `/info` and normalizes `domains`: **`src/x/SwitchConnectModal.jsx`**.&#x20;

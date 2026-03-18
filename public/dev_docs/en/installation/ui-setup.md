@@ -158,16 +158,16 @@ nano nginx.conf.example
 **Key features included:**
 1. HTTP to HTTPS redirect
 2. SSL/TLS setup (Cloudflare Origin Certificates or Let's Encrypt)
-3. `/default_connect.yaml` endpoint - **required** dynamic configuration for the UI
+3. `/default_connect.json` endpoint - **required** dynamic configuration for the UI (`.yaml` also supported as fallback)
 4. Bot prerendering - SEO-friendly server-side rendering for search engines and social media
 5. `/api` proxy - forwards API requests to backend on port 7000
 6. WebSocket support - for real-time features
 7. Static file serving with SPA routing
 8. Smart caching - index.html never cached, assets cached for 1 year
 
-### Understanding default_connect.yaml
+### Understanding default_connect.json
 
-The UI requires a `/default_connect.yaml` endpoint that tells it where to find the backend and IPFS gateway. This is configured directly in Nginx using variables:
+The UI requires a `/default_connect.json` endpoint that tells it where to find the backend and IPFS gateway (it also supports `/default_connect.yaml` as a fallback). This is configured directly in Nginx using variables:
 
 ```nginx
 # Define your deployment settings
@@ -176,19 +176,19 @@ set $default_backend "https://yourdomain.com/api/";
 set $default_ipfs "https://gateway.pinata.cloud/ipfs/";
 
 # Serve dynamic configuration to the UI
-location = /default_connect.yaml {
-    add_header Content-Type text/plain;
-    return 200 'domain: $default_domain
-backendLink: $default_backend
-default_ipfs_link: $default_ipfs';
+location = /default_connect.json {
+    default_type application/json;
+    return 200 '{"domain":"$default_domain","backendLink":"$default_backend","default_ipfs_link":"$default_ipfs"}';
 }
 ```
 
-This endpoint returns a YAML response like:
-```yaml
-domain: yourdomain.com
-backendLink: https://yourdomain.com/api/
-default_ipfs_link: https://gateway.pinata.cloud/ipfs/
+This endpoint returns a JSON response like:
+```json
+{
+  "domain": "yourdomain.com",
+  "backendLink": "https://yourdomain.com/api/",
+  "default_ipfs_link": "https://gateway.pinata.cloud/ipfs/"
+}
 ```
 
 The UI fetches this configuration on startup to know where to connect.
