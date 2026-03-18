@@ -45,31 +45,46 @@ function parseAmount(raw) {
 
 function HistoryUser(props) {
   const user = () => props.user;
-  const hasAddress = () => Boolean(user()?.address);
+  const isZeroAddress = () => /^0x0+$/.test(user()?.address || "");
+  const hasAddress = () => Boolean(user()?.address) && !isZeroAddress();
   const name = () => user()?.display_name || user()?.name || "";
+  const contractName = () => {
+    const addr = user()?.address;
+    if (!addr || !props.contractNameByAddress) return null;
+    return props.contractNameByAddress[addr.toLowerCase()] || null;
+  };
   return (
     <Show when={user()} fallback={<span class="text-[hsl(var(--muted-foreground))]">—</span>}>
       <Show
-        when={hasAddress()}
+        when={!contractName()}
         fallback={
           <div class="flex flex-col text-sm max-w-[170px]">
-            <Show
-              when={name()}
-              fallback={<span class="text-[hsl(var(--muted-foreground))]">—</span>}
-            >
-              <span class="font-medium text-[hsl(var(--foreground))] leading-tight break-words">{name()}</span>
-            </Show>
+            <span class="font-medium text-[hsl(var(--accent-foreground,var(--foreground)))] leading-tight break-words">{contractName()}</span>
           </div>
         }
       >
-        <div class="max-w-[200px] min-w-0">
-          <UserCard
-            author={user()}
-            compact
-            textColorClass="text-[hsl(var(--foreground))]"
-            mutedTextColorClass="text-[hsl(var(--muted-foreground))]"
-          />
-        </div>
+        <Show
+          when={hasAddress()}
+          fallback={
+            <div class="flex flex-col text-sm max-w-[170px]">
+              <Show
+                when={name()}
+                fallback={<span class="text-[hsl(var(--muted-foreground))]">—</span>}
+              >
+                <span class="font-medium text-[hsl(var(--foreground))] leading-tight break-words">{name()}</span>
+              </Show>
+            </div>
+          }
+        >
+          <div class="max-w-[200px] min-w-0">
+            <UserCard
+              author={user()}
+              compact
+              textColorClass="text-[hsl(var(--foreground))]"
+              mutedTextColorClass="text-[hsl(var(--muted-foreground))]"
+            />
+          </div>
+        </Show>
       </Show>
     </Show>
   );
@@ -140,6 +155,19 @@ export default function HistoryTab(props) {
   const { t } = app;
   const profileAddressChecksum = createMemo(() => safeChecksum(props.user?.address || ""));
   const profileAddressLc = createMemo(() => profileAddressChecksum().toLowerCase());
+
+  const contractNameByAddress = createMemo(() => {
+    const contracts = app.info()?.savva_contracts;
+    if (!contracts) return {};
+    const map = {};
+    for (const [name, info] of Object.entries(contracts)) {
+      if (info?.address) {
+        map[info.address.toLowerCase()] = name;
+      }
+    }
+    return map;
+  });
+
   const [selectedRange, setSelectedRange] = createSignal(RANGES[0].id);
 
   const rangeConfig = createMemo(() => RANGES.find((r) => r.id === selectedRange()) || RANGES[0]);
@@ -238,10 +266,10 @@ export default function HistoryTab(props) {
                         <div class="opacity-80">{ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
                       </td>
                       <td class="py-3 pr-4 align-top">
-                        <HistoryUser user={record.from} />
+                        <HistoryUser user={record.from} contractNameByAddress={contractNameByAddress()} />
                       </td>
                       <td class="py-3 pr-4 align-top">
-                        <HistoryUser user={record.to} />
+                        <HistoryUser user={record.to} contractNameByAddress={contractNameByAddress()} />
                       </td>
                       <td class="py-3 pr-4">
                         <div class="flex gap-2 text-sm">
