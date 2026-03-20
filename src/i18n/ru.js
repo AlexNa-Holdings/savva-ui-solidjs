@@ -1094,7 +1094,7 @@ export default {
   "rightPane.switch.reload": "Загрузить домены",
   "rightPane.switch.reload.title": "Получить /info и обновить список доменов",
   "rightPane.switch.reset": "Сбросить к настройкам по умолчанию",
-  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.yaml",
+  "rightPane.switch.reset.title": "Очистить локальное переопределение и перезагрузить настройки из default_connect.json",
   "rightPane.switch.title": "Сменить бэкенд / домен",
   "rightPane.switch.validation.protocol": "URL бэкенда должен начинаться с http:// или https://",
   "rightPane.theme": "Тема",

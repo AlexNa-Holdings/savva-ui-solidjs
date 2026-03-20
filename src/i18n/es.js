@@ -1094,7 +1094,7 @@ export default {
   "rightPane.switch.reload": "Cargar dominios",
   "rightPane.switch.reload.title": "Obtener /info y actualizar la lista de dominios",
   "rightPane.switch.reset": "Restablecer valores por defecto",
-  "rightPane.switch.reset.title": "Borrar la anulación local y recargar los valores por defecto desde default_connect.yaml",
+  "rightPane.switch.reset.title": "Borrar la anulación local y recargar los valores por defecto desde default_connect.json",
   "rightPane.switch.title": "Cambiar backend / dominio",
   "rightPane.switch.validation.protocol": "La URL del backend debe empezar por http:// o https://",
   "rightPane.theme": "Tema",

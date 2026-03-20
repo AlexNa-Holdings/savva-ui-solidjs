@@ -1094,7 +1094,7 @@ export default {
   "rightPane.switch.reload": "Učitaj domene",
   "rightPane.switch.reload.title": "Preuzmi /info i osveži listu domena",
   "rightPane.switch.reset": "Vrati na podrazumevano",
-  "rightPane.switch.reset.title": "Obriši lokalne izmene i ponovo učitaj podrazumevane vrednosti iz default_connect.yaml",
+  "rightPane.switch.reset.title": "Obriši lokalne izmene i ponovo učitaj podrazumevane vrednosti iz default_connect.json",
   "rightPane.switch.title": "Promeni backend / domen",
   "rightPane.switch.validation.protocol": "Backend URL mora početi sa http:// ili https://",
   "rightPane.theme": "Tema",

@@ -1094,7 +1094,7 @@ export default {
   "rightPane.switch.reload": "Завантажити домени",
   "rightPane.switch.reload.title": "Отримати /info та оновити список доменів",
   "rightPane.switch.reset": "Скинути до значень за замовчуванням",
-  "rightPane.switch.reset.title": "Очистити локальне переопределення та перезавантажити значення за замовчуванням з default_connect.yaml",
+  "rightPane.switch.reset.title": "Очистити локальне переопределення та перезавантажити значення за замовчуванням з default_connect.json",
   "rightPane.switch.title": "Переключити бекенд / домен",
   "rightPane.switch.validation.protocol": "URL бекенду має починатися з http:// або https://",
   "rightPane.theme": "Тема",

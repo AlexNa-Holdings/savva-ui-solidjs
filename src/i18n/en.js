@@ -1094,7 +1094,7 @@ export default {
   "rightPane.switch.reload": "Load domains",
   "rightPane.switch.reload.title": "Fetch /info and refresh the domain list",
   "rightPane.switch.reset": "Reset to defaults",
-  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.yaml",
+  "rightPane.switch.reset.title": "Clear local override and reload defaults from default_connect.json",
   "rightPane.switch.title": "Switch backend / domain",
   "rightPane.switch.validation.protocol": "Backend URL must start with http:// or https://",
   "rightPane.theme": "Theme",

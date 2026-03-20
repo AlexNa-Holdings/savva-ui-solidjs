@@ -165,7 +165,7 @@ export function useAppOrchestrator({ auth, i18n }) {
         prevCfg.devMode = !!siteYaml.devMode;
         // store chains for future use
         prevCfg.chains = siteYaml.chains || null;
-        // store site domain from default_connect.yaml (used when switching chains)
+        // store site domain from default_connect.json (used when switching chains)
         prevCfg.siteDomain = norm(siteYaml.domain);
         // store devPassword hash (site-only, for password-gating the app)
         prevCfg.devPassword = siteYaml.devPassword || null;
@@ -228,7 +228,7 @@ export function useAppOrchestrator({ auth, i18n }) {
         gear: prevCfg.gear, // never altered after boot
         devMode: prevCfg.devMode, // never altered after boot
         chains: prevCfg.chains, // preserve chains for UI (chain selector)
-        siteDomain: prevCfg.siteDomain, // preserve site domain from default_connect.yaml
+        siteDomain: prevCfg.siteDomain, // preserve site domain from default_connect.json
         devPassword: prevCfg.devPassword, // SHA-256 hash for password gate
       };
 

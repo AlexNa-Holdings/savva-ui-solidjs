@@ -1094,7 +1094,7 @@ export default {
   "rightPane.switch.reload": "Charger les domaines",
   "rightPane.switch.reload.title": "Récupérer /info et rafraîchir la liste des domaines",
   "rightPane.switch.reset": "Réinitialiser aux valeurs par défaut",
-  "rightPane.switch.reset.title": "Effacer la surcharge locale et recharger les valeurs par défaut depuis default_connect.yaml",
+  "rightPane.switch.reset.title": "Effacer la surcharge locale et recharger les valeurs par défaut depuis default_connect.json",
   "rightPane.switch.title": "Changer de backend / domaine",
   "rightPane.switch.validation.protocol": "L'URL du backend doit commencer par http:// ou https://",
   "rightPane.theme": "Thème",
