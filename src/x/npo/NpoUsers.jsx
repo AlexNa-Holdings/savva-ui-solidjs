@@ -1,9 +1,12 @@
 // src/x/npo/NpoUsers.jsx
-import { Show, For, createSignal, createEffect, createMemo } from "solid-js";
+import { Show, For, createSignal, createEffect, createMemo, createResource } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import { createPublicClient, getContract } from "viem";
 import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
+import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
+import { formatAmountWithDecimals } from "../../blockchain/tokenAmount.js";
 
 import UserCard from "../ui/UserCard.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -26,6 +29,26 @@ function Badge({ ok }) {
 }
 
 const norm = (a) => String(a || "").toLowerCase();
+
+function TokenLimitChip(props) {
+  const app = useApp();
+  const [meta] = createResource(() => props.token, (addr) => getTokenInfo(app, addr));
+  const decimals = () => Number(meta()?.decimals ?? 18);
+  return (
+    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]"
+          title={props.token}>
+      <Show when={meta()?.Icon}>
+        <Dynamic component={meta().Icon} class="w-3.5 h-3.5" />
+      </Show>
+      <span class="font-medium">{meta()?.symbol || "…"}</span>
+      <span class="opacity-80">
+        {formatAmountWithDecimals(props.spent, decimals())}
+        {" / "}
+        {formatAmountWithDecimals(props.limit, decimals())}
+      </span>
+    </span>
+  );
+}
 
 export default function NpoUsers(props) {
   const app = useApp();
@@ -162,7 +185,39 @@ export default function NpoUsers(props) {
                       </Show>
                     </td>
 
-                    <td class="px-3 py-2"><span class="opacity-60">—</span></td>
+                    <td class="px-3 py-2">
+                      <Show when={!m.isAdmin} fallback={
+                        <span class="text-xs italic opacity-70">{t("npo.page.members.adminNoLimits")}</span>
+                      }>
+                        {(() => {
+                          const tokens = (m.tokenLimits || []).filter(
+                            (l) => (l.limit && l.limit !== 0n) || (l.spent && l.spent !== 0n)
+                          );
+                          const hasSupported = (props.supportedTokens?.length || 0) > 0;
+                          return (
+                            <div class="flex flex-wrap items-center gap-1">
+                              <Show when={tokens.length > 0} fallback={<span class="opacity-60">—</span>}>
+                                <For each={tokens}>
+                                  {(l) => <TokenLimitChip token={l.token} limit={l.limit} spent={l.spent} />}
+                                </For>
+                              </Show>
+                              <Show when={effIsAdmin() && hasSupported}>
+                                <button
+                                  type="button"
+                                  class="ml-1 p-1 rounded border border-[hsl(var(--input))] hover:bg-[hsl(var(--accent))]"
+                                  title={t("npo.page.members.editLimits")}
+                                  aria-label={t("npo.page.members.editLimits")}
+                                  onClick={() => props.onOpenLimits?.(addr, m.user || null, m.tokenLimits || [])}
+                                  disabled={adminResolving()}
+                                >
+                                  <EditIcon class="w-4 h-4" />
+                                </button>
+                              </Show>
+                            </div>
+                          );
+                        })()}
+                      </Show>
+                    </td>
 
                     <td class="px-3 py-2">
                       <input

@@ -158,22 +158,27 @@ export default function AmountInput(props) {
   });
 
   // ── UI ────────────────────────────────────────────────────────────────────────
+  const showHeader  = () => props.showHeader  !== false; // default true
+  const showBalance = () => props.showBalance !== false; // default true
+
   return (
     <div class={props.class || ""}>
       <label class="block text-sm font-medium">
-        <div class="mb-1 flex items-center justify-between">
-          <span>{props.label || t("wallet.transfer.amount")}</span>
-          <Show when={!isBaseToken() && (props.showMax ?? true)}>
-            <button
-              type="button"
-              onClick={useMax}
-              class="text-xs underline hover:opacity-80 disabled:opacity-50"
-              disabled={balanceRes.loading}
-            >
-              {t("wallet.transfer.max")}
-            </button>
-          </Show>
-        </div>
+        <Show when={showHeader()}>
+          <div class="mb-1 flex items-center justify-between">
+            <span>{props.label || t("wallet.transfer.amount")}</span>
+            <Show when={!isBaseToken() && (props.showMax ?? true)}>
+              <button
+                type="button"
+                onClick={useMax}
+                class="text-xs underline hover:opacity-80 disabled:opacity-50"
+                disabled={balanceRes.loading}
+              >
+                {t("wallet.transfer.max")}
+              </button>
+            </Show>
+          </div>
+        </Show>
 
         <div class="flex items-stretch gap-2">
           <input
@@ -181,7 +186,8 @@ export default function AmountInput(props) {
             onInput={onInput}
             inputmode="decimal"
             placeholder={props.placeholder || "0.0"}
-            class="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+            disabled={props.disabled}
+            class="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] disabled:opacity-60"
             autocomplete="off"
           />
           <div class="min-w-[64px] px-2 py-2 text-sm text-[hsl(var(--muted-foreground))] flex items-center justify-end">
@@ -189,18 +195,21 @@ export default function AmountInput(props) {
           </div>
         </div>
 
-        {/* Balance + USD line (one line) */}
-        <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))] flex items-center justify-between gap-2">
-          <div class="flex items-center gap-1">
-            <span>{t("wallet.transfer.balance")}:</span>
-            <Show when={typeof balanceRes() === "bigint"} fallback={<span>—</span>}>
-              <TokenValue amount={balanceRes() || 0n} tokenAddress={isBaseToken() ? "0" : props.tokenAddress} />
+        <Show when={showBalance() || usdText()}>
+          <div class="mt-1 text-xs text-[hsl(var(--muted-foreground))] flex items-center justify-between gap-2">
+            <Show when={showBalance()} fallback={<span />}>
+              <div class="flex items-center gap-1">
+                <span>{t("wallet.transfer.balance")}:</span>
+                <Show when={typeof balanceRes() === "bigint"} fallback={<span>—</span>}>
+                  <TokenValue amount={balanceRes() || 0n} tokenAddress={isBaseToken() ? "0" : props.tokenAddress} />
+                </Show>
+              </div>
+            </Show>
+            <Show when={usdText()}>
+              <div class="tabular-nums">{usdText()}</div>
             </Show>
           </div>
-          <Show when={usdText()}>
-            <div class="tabular-nums">{usdText()}</div>
-          </Show>
-        </div>
+        </Show>
 
         <Show when={error()}>
           <div class="mt-1 text-sm text-[hsl(var(--destructive))]">{error()}</div>

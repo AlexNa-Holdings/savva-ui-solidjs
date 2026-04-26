@@ -12,10 +12,11 @@ import { configuredHttp } from "../../blockchain/contracts.js";
 import SavvaNPOAbi from "../../blockchain/abi/SavvaNPO.json";
 import AddMemberModal from "../modals/AddMemberModal.jsx";
 import EditPermissionsModal from "../modals/EditPermissionsModal.jsx";
+import EditMemberTokenLimitsModal from "../modals/EditMemberTokenLimitsModal.jsx";
 import { pushErrorToast } from "../../ui/toast.js";
 import { dbg } from "../../utils/debug.js";
 import NpoUsers from "../npo/NpoUsers.jsx";
-import NpoTOokens from "../npo/NpoTOokens.jsx";
+import NpoTokens from "../npo/NpoTokens.jsx";
 import NpoRoles from "../npo/NpoRoles.jsx";
 
 function bytes32ToString(hex) {
@@ -64,6 +65,7 @@ export default function NpoPage() {
   const [membersLoading, setMembersLoading] = createSignal(false);
   const [selfIsAdmin, setSelfIsAdmin] = createSignal(false);
   const [publicClient, setPublicClient] = createSignal(null);
+  const [supportedTokens, setSupportedTokens] = createSignal([]);
 
   const [refreshEpoch, setRefreshEpoch] = createSignal(0);
 
@@ -92,6 +94,8 @@ export default function NpoPage() {
   const [showAdd, setShowAdd] = createSignal(false);
   const [editOpen, setEditOpen] = createSignal(false);
   const [editTarget, setEditTarget] = createSignal({ address: "", user: null });
+  const [limitsOpen, setLimitsOpen] = createSignal(false);
+  const [limitsTarget, setLimitsTarget] = createSignal({ address: "", user: null, tokens: [] });
 
   createEffect(() => dbg.log("NPO:init", { route: route(), identifier: identifier() }));
 
@@ -159,19 +163,59 @@ export default function NpoPage() {
     }
   }
 
-  async function fetchMembersList(addr, client) {
+  async function fetchSupportedTokens(addr, client) {
+    if (!addr || !client) return [];
+    try {
+      const c = getContract({ address: addr, abi: SavvaNPOAbi, client });
+      const list = await c.read.getSupportedTokens();
+      return [...(list || [])];
+    } catch {
+      return [];
+    }
+  }
+
+  async function fetchMemberTokenLimits(addr, client, memberAddr, tokens) {
+    if (!tokens || tokens.length === 0) return [];
+    const c = getContract({ address: addr, abi: SavvaNPOAbi, client });
+    return Promise.all(tokens.map(async (tok) => {
+      const [limit, spent] = await Promise.all([
+        c.read.getMemberWeeklyLimit([memberAddr, tok]).catch(() => 0n),
+        c.read.getSpentByTokenAndWeek([memberAddr, tok]).catch(() => 0n),
+      ]);
+      return { token: tok, limit, spent };
+    }));
+  }
+
+  async function fetchMembersList(addr, client, tokens = []) {
     if (!addr || !client) return [];
     try {
       setMembersLoading(true);
       const c = getContract({ address: addr, abi: SavvaNPOAbi, client });
       const list = await c.read.getMemberList();
+      const roleOrderRaw = await c.read.getRoleList().catch(() => []);
+      const roleOrder = new Map((roleOrderRaw || []).map((hex, i) => [String(hex).toLowerCase(), i]));
       const structs = await Promise.all(list.map((m) => c.read.members([m]).catch(() => null)));
       const admins = await Promise.all(list.map((m) => c.read.isAdmin([m]).catch(() => false)));
       const rolesRaw = await Promise.all(list.map((m) => c.read.getMemberRoles([m]).catch(() => [])));
+      const limitsRaw = await Promise.all(list.map((m, i) =>
+        admins[i] ? Promise.resolve([]) : fetchMemberTokenLimits(addr, client, m, tokens)
+      ));
       const rows = list.map((memberAddr, i) => {
         const nm = normalizeMemberStruct(structs[i]);
-        const roleNames = (rolesRaw[i] || []).map((r) => bytes32ToString(r)).filter(Boolean);
-        return { address: memberAddr, confirmed: nm.confirmed, lastWeekChecked: nm.lastWeekChecked, isAdmin: !!admins[i], roles: roleNames };
+        const sortedHex = [...(rolesRaw[i] || [])].sort((a, b) => {
+          const ai = roleOrder.get(String(a).toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+          const bi = roleOrder.get(String(b).toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
+          return ai - bi;
+        });
+        const roleNames = sortedHex.map((r) => bytes32ToString(r)).filter(Boolean);
+        return {
+          address: memberAddr,
+          confirmed: nm.confirmed,
+          lastWeekChecked: nm.lastWeekChecked,
+          isAdmin: !!admins[i],
+          roles: roleNames,
+          tokenLimits: limitsRaw[i] || [],
+        };
       });
       const wsBase = { domain: app.selectedDomainName() };
       const me = app.authorizedUser?.();
@@ -269,7 +313,9 @@ export default function NpoPage() {
       const pc = makePublicClient();
       setPublicClient(pc);
       await fetchSelfAdmin(core.address, pc);
-      const rows = await fetchMembersList(core.address, pc);
+      const tokens = await fetchSupportedTokens(core.address, pc);
+      setSupportedTokens(tokens);
+      const rows = await fetchMembersList(core.address, pc, tokens);
       setMembers(rows);
     } finally {
       setBusy(false);
@@ -278,7 +324,9 @@ export default function NpoPage() {
 
   async function refreshMembers() {
     if (!npoAddr() || !publicClient()) return;
-    const rows = await fetchMembersList(npoAddr(), publicClient());
+    const tokens = await fetchSupportedTokens(npoAddr(), publicClient());
+    setSupportedTokens(tokens);
+    const rows = await fetchMembersList(npoAddr(), publicClient(), tokens);
     setMembers(rows);
   }
 
@@ -321,11 +369,22 @@ export default function NpoPage() {
               selfIsAdmin={selfIsAdmin()}
               members={members()}
               membersLoading={membersLoading()}
+              supportedTokens={supportedTokens()}
               isAdminBusy={isAdminBusy}
               isActionBusy={isActionBusy}
               refreshEpoch={refreshEpoch()}
               onOpenAdd={() => setShowAdd(true)}
               onOpenEdit={(addr, user) => { setEditTarget({ address: addr, user }); setEditOpen(true); }}
+              onOpenLimits={(addr, user, tokens) => {
+                const supported = supportedTokens();
+                const byAddr = new Map((tokens || []).map((l) => [String(l.token).toLowerCase(), l]));
+                const merged = supported.map((tk) => {
+                  const found = byAddr.get(String(tk).toLowerCase());
+                  return { address: tk, limit: found?.limit ?? 0n, spent: found?.spent ?? 0n };
+                });
+                setLimitsTarget({ address: addr, user, tokens: merged });
+                setLimitsOpen(true);
+              }}
               onToggleAdmin={handleAdminToggle}
               onConfirmMembership={handleConfirmMembership}
               onUnconfirmMembership={handleUnconfirmMembership}
@@ -342,7 +401,11 @@ export default function NpoPage() {
           </Show>
 
           <Show when={activeTab() === "tokens"}>
-            <NpoTOokens t={t} />
+            <NpoTokens
+              npoAddr={npoAddr()}
+              selfIsAdmin={selfIsAdmin()}
+              refreshEpoch={refreshEpoch()}
+            />
           </Show>
         </div>
 
@@ -366,6 +429,20 @@ export default function NpoPage() {
           user={editTarget().user}
           onChanged={async () => {
             setEditOpen(false);
+            await refreshMembers();
+            setRefreshEpoch((e) => e + 1);
+          }}
+        />
+
+        <EditMemberTokenLimitsModal
+          isOpen={limitsOpen()}
+          onClose={() => setLimitsOpen(false)}
+          npoAddr={npoAddr()}
+          memberAddress={limitsTarget().address}
+          user={limitsTarget().user}
+          tokens={limitsTarget().tokens}
+          onSaved={async () => {
+            setLimitsOpen(false);
             await refreshMembers();
             setRefreshEpoch((e) => e + 1);
           }}
