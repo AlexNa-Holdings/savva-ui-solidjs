@@ -9,7 +9,7 @@ import UserCard from "../ui/UserCard.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import Spinner from "../ui/Spinner.jsx";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendAsActor, sendBatchAsActor } from "../../blockchain/npoMulticall.js";
 import Modal from "../modals/Modal.jsx";
 
 export default function SubscribeModal(props) {
@@ -127,19 +127,6 @@ export default function SubscribeModal(props) {
 
   // Allowance on STAKING token to AuthorsClubs (actor-aware)
   const MAX_UINT = (1n << 256n) - 1n;
-  async function ensureAllowance(needed) {
-    const owner = actorAddr();
-    if (!owner) throw new Error("WALLET_NOT_CONNECTED");
-    const stakingRead = await getSavvaContract(app, "Staking");
-    const clubs = await getSavvaContract(app, "AuthorsClubs");
-    const allowance = await stakingRead.read.allowance([owner, clubs.address]);
-    if (allowance >= needed) return;
-    await sendAsActor(app, {
-      contractName: "Staking",
-      functionName: "approve",
-      args: [clubs.address, MAX_UINT],
-    });
-  }
 
   function validate() {
     if (!authorAddr()) return t("subscriptions.errors.noAuthor");
@@ -158,13 +145,47 @@ export default function SubscribeModal(props) {
     setIsBusy(true);
     try {
       const need = totalWei();
-      if (need > 0n) await ensureAllowance(need);
+      const isNpo = (app.isActingAsNpo?.() ?? app.actorProfile?.()?.is_npo ?? false) === true;
+      const owner = actorAddr();
+      if (!owner) throw new Error("WALLET_NOT_CONNECTED");
 
-      await sendAsActor(app, {
+      const buyCall = {
         contractName: "AuthorsClubs",
         functionName: "buy",
         args: [domain(), authorAddr(), amountWei(), BigInt(weeksNum())],
-      });
+      };
+
+      if (isNpo) {
+        // NPO non-admin members get their token allowances reset to 0 at the end of every
+        // multicall (SavvaNPO.sol _enforceSpendingLimits path) — so the approve MUST live in
+        // the same multicall as the spending call. Always bundle when acting as NPO.
+        const clubs = await getSavvaContract(app, "AuthorsClubs");
+        const calls = [];
+        if (need > 0n) {
+          calls.push({
+            contractName: "Staking",
+            functionName: "approve",
+            args: [clubs.address, need],
+          });
+        }
+        calls.push(buyCall);
+        await sendBatchAsActor(app, calls);
+      } else {
+        // Self mode: separate approve tx (only if needed), then buy.
+        if (need > 0n) {
+          const stakingRead = await getSavvaContract(app, "Staking");
+          const clubs = await getSavvaContract(app, "AuthorsClubs");
+          const allowance = await stakingRead.read.allowance([owner, clubs.address]);
+          if (allowance < need) {
+            await sendAsActor(app, {
+              contractName: "Staking",
+              functionName: "approve",
+              args: [clubs.address, MAX_UINT],
+            });
+          }
+        }
+        await sendAsActor(app, buyCall);
+      }
 
       props.onSubmit?.();
       setIsBusy(false);

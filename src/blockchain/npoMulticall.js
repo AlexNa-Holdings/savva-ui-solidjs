@@ -130,6 +130,49 @@ export async function sendAsActor(app, spec) {
   return isNpo ? sendViaNpoMulticall(app, spec) : sendAsUser(app, spec);
 }
 
+// Batch variant. In NPO mode, bundles all specs into a single npo.multicall(...) tx.
+// In self mode, sends each spec sequentially via sendAsUser. Returns the last receipt.
+export async function sendBatchAsActor(app, specs) {
+  const list = (specs || []).filter(Boolean);
+  if (list.length === 0) throw new Error("sendBatchAsActor: empty specs");
+  const { isNpo } = requireActor(app);
+  if (!isNpo) {
+    let last;
+    for (const spec of list) last = await sendAsUser(app, spec);
+    return last;
+  }
+  return sendBatchViaNpoMulticall(app, list);
+}
+
+async function sendBatchViaNpoMulticall(app, specs) {
+  const { t } = app;
+  const toastId = pushToast({ type: "info", message: t("npo.multicall.pending"), autohideMs: 0 });
+  try {
+    const { address: npoAddr } = requireActor(app);
+    const { walletClient, publicClient } = await getClients(app);
+
+    const calls = await Promise.all(specs.map(async (spec) => {
+      if (!spec?.functionName) throw new Error("functionName is required");
+      const valueToSend = toBigInt(spec?.valueWei ?? spec?.value ?? 0n);
+      return spec.contractName
+        ? await buildCallByContractName(app, spec.contractName, spec.functionName, spec.args || [], valueToSend)
+        : buildCall({ target: spec.target, abi: spec.abi, functionName: spec.functionName, args: spec.args || [], valueWei: valueToSend });
+    }));
+
+    const npo = getContract({ address: npoAddr, abi: SavvaNPOAbi, client: walletClient });
+    const hash = await npo.write.multicall([calls]);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error(`Transaction failed with status: ${receipt.status}`);
+    pushToast({ type: "success", message: t("npo.multicall.success") });
+    return receipt;
+  } catch (e) {
+    pushErrorToast(e, { context: t("npo.multicall.error") });
+    throw e;
+  } finally {
+    try { app.dismissToast?.(toastId); } catch {}
+  }
+}
+
 async function sendViaNpoMulticall(app, spec) {
   const { functionName, args = [] } = spec || {};
   if (!functionName) throw new Error("functionName is required");
