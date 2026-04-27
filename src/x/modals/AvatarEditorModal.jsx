@@ -24,14 +24,23 @@ export default function AvatarEditorModal(props) {
   let fileInput;
 
   const dpr = () => (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
+  // Logical canvas coords used by all drawing/crop math (cssW × cssH).
   const cssRect = () => {
-    const wCss = parseInt(canvas?.style.width || "0", 10) || Math.round((canvas?.width || 0) / dpr());
-    const hCss = parseInt(canvas?.style.height || "0", 10) || Math.round((canvas?.height || 0) / dpr());
-    return { wCss, hCss };
+    const ratio = dpr();
+    return {
+      wCss: Math.round((canvas?.width || 0) / ratio),
+      hCss: Math.round((canvas?.height || 0) / ratio),
+    };
   };
+  // Convert pointer coords from screen pixels to logical canvas coords.
+  // The canvas element may be displayed smaller than cssW × cssH when constrained by
+  // max-w-full / max-h-[60vh] on narrow viewports — scale accordingly.
   const canvasPoint = (e) => {
     const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    const { wCss, hCss } = cssRect();
+    const scaleX = r.width > 0 ? wCss / r.width : 1;
+    const scaleY = r.height > 0 ? hCss / r.height : 1;
+    return { x: (e.clientX - r.left) * scaleX, y: (e.clientY - r.top) * scaleY };
   };
 
   const inRect = (p, x, y, w, h) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
@@ -58,8 +67,14 @@ export default function AvatarEditorModal(props) {
     const ratio = dpr();
     canvas.width = Math.round(cssW * ratio);
     canvas.height = Math.round(cssH * ratio);
-    canvas.style.width = cssW + "px";
-    canvas.style.height = cssH + "px";
+    // Don't pin both dimensions explicitly — the inline height was breaking aspect ratio
+    // when max-w-full shrunk the displayed width. Caps via min() so both inline limits and
+    // the class-level max-w-full / max-h-[60vh] still apply, and the canvas's intrinsic
+    // ratio (from canvas.width/height attrs) keeps the displayed shape correct.
+    canvas.style.width = "";
+    canvas.style.height = "";
+    canvas.style.maxWidth = `min(${cssW}px, 100%)`;
+    canvas.style.maxHeight = `min(${cssH}px, 60vh)`;
 
     const initial = Math.floor(Math.min(cssW, cssH) * 0.8);
     setCrop({
