@@ -51,9 +51,12 @@ import { loadNsfwPreference } from "../preferences/storage.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
 import { sendAsActor } from "../../blockchain/npoMulticall.js";
 import { connectWallet } from "../../blockchain/wallet.js";
-import { pushToast } from "../../ui/toast.js";
+import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { toHex, stringToBytes } from "viem";
 import { fetchReadingKey, generateReadingKey, publishReadingKey } from "../crypto/readingKey.js";
+import { getChainLogo } from "../../blockchain/chainLogos.js";
+import { getChainMeta } from "../../blockchain/chains.js";
+import { findPostOnOtherChains } from "../post/crossChainPostLookup.js";
 
 const getIdentifier = (route) => {
   const path = route().split("?")[0]; // Strip query parameters
@@ -200,6 +203,52 @@ export default function PostPage() {
 
   const [post, setPost] = createSignal(null);
   createEffect(() => setPost(postResource() || null));
+
+  // Cross-chain fallback: when the post isn't on the active chain, probe the
+  // other configured chains in parallel so we can offer a chain-switch button.
+  let crossChainAbort = null;
+  const [otherChainResource] = createResource(
+    () => {
+      if (postResource.loading || postResource() || !identifier()) return false;
+      const cfg = app.config?.();
+      const chains = cfg?.chains;
+      if (!Array.isArray(chains) || chains.length <= 1) return false;
+      return {
+        identifier: identifier(),
+        currentBackendLink: cfg.backendLink,
+        siteDomain: cfg.siteDomain,
+        lang: uiLang(),
+        myAddr: app.authorizedUser?.()?.address,
+        chains,
+      };
+    },
+    async (params) => {
+      crossChainAbort?.abort();
+      crossChainAbort = new AbortController();
+      return findPostOnOtherChains({ ...params, signal: crossChainAbort.signal });
+    }
+  );
+  onCleanup(() => crossChainAbort?.abort());
+
+  const [isSwitchingChain, setIsSwitchingChain] = createSignal(false);
+  async function switchToChainAndOpenPost(targetChain) {
+    if (!targetChain?.rpc || isSwitchingChain()) return;
+    const id = identifier();
+    setIsSwitchingChain(true);
+    try {
+      await app.initializeOrSwitch({
+        backendLink: targetChain.rpc,
+        domain: app.config?.()?.siteDomain || "",
+        noNavigate: true,
+      });
+      navigate(`/post/${id}`, { replace: true });
+    } catch (e) {
+      console.error("[PostPage] switchToChainAndOpenPost failed", e);
+      pushErrorToast(e, { context: "Failed to switch blockchain" });
+    } finally {
+      setIsSwitchingChain(false);
+    }
+  }
 
   // Refetch post when authorized user changes (for encryption access check)
   let lastAuthUser = null;
@@ -1008,10 +1057,54 @@ export default function PostPage() {
 
         {/* Empty-state when no content found */}
         <Match when={!postResource.loading && !post()}>
-          <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
-            <h3 class="font-semibold">{t("post.notFound.title")}</h3>
-            <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
-          </div>
+          <Switch>
+            <Match when={otherChainResource.loading}>
+              <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+                <div class="flex items-center justify-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+                  <Spinner class="w-4 h-4" />
+                  <span>{t("post.searchingOtherChains")}</span>
+                </div>
+              </div>
+            </Match>
+
+            <Match when={otherChainResource()}>
+              {(target) => {
+                const meta = getChainMeta(target().chainId);
+                const Logo = getChainLogo(target().chainId);
+                const chainName = meta?.name || `Chain ${target().chainId}`;
+                return (
+                  <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+                    <h3 class="font-semibold">{t("post.foundOnOtherChain.title")}</h3>
+                    <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">
+                      {t("post.foundOnOtherChain.message", { chain: chainName })}
+                    </p>
+                    <button
+                      type="button"
+                      class="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 disabled:opacity-60"
+                      disabled={isSwitchingChain()}
+                      onClick={() => switchToChainAndOpenPost(target())}
+                    >
+                      <Show when={isSwitchingChain()} fallback={
+                        <Show when={Logo}>
+                          <Logo class="w-5 h-5 flex-shrink-0" />
+                        </Show>
+                      }>
+                        <Spinner class="w-4 h-4" />
+                      </Show>
+                      <span>{t("post.foundOnOtherChain.switchButton", { chain: chainName })}</span>
+                    </button>
+                  </div>
+                );
+              }}
+            </Match>
+
+            <Match when={!otherChainResource.loading}>
+              <div class="p-4 rounded border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-center">
+                <h3 class="font-semibold">{t("post.notFound.title")}</h3>
+                <p class="text-sm mt-1 text-[hsl(var(--muted-foreground))]">{t("post.notFound.message")}</p>
+              </div>
+            </Match>
+          </Switch>
         </Match>
 
         <Match when={post()}>
