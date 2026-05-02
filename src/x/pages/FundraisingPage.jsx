@@ -2,6 +2,9 @@
 import { For, Show, createMemo, createSignal, onMount, onCleanup, createEffect, on } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { navigate } from "../../routing/smartRouter.js";
+import { useMeta } from "../../lib/seo/headManager.js";
+import { buildCanonical, getSiteName } from "../../lib/seo/canonical.js";
+import { titleList } from "../../lib/seo/templates.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
@@ -56,6 +59,22 @@ function percentOf(raisedWei, targetWei) {
 export default function FundraisingPage() {
   const app = useApp();
   const { t } = app;
+
+  useMeta(() => {
+    const lang = app.lang?.() || "en";
+    const siteName = getSiteName(app);
+    const label = t("fundraising.title");
+    return {
+      title: titleList(label, siteName),
+      description: label,
+      canonical: buildCanonical(app, "/fundraising", lang),
+      ogType: "website",
+      twitterCard: "summary",
+      siteName,
+      locale: lang,
+      robots: "index,follow",
+    };
+  });
 
   const [onlyMy, setOnlyMy] = createSignal(true);
   const [showFinished, setShowFinished] = createSignal(false);

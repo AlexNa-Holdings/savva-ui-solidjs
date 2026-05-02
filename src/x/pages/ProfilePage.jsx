@@ -3,6 +3,9 @@ import { createMemo, createResource, createSignal, Show, Switch, Match, createEf
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/smartRouter.js";
+import { useMeta } from "../../lib/seo/headManager.js";
+import { buildCanonical, getSiteName, ipfsPublicUrl, truncateDescription } from "../../lib/seo/canonical.js";
+import { titleProfile } from "../../lib/seo/templates.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import IpfsImage from "../ui/IpfsImage.jsx";
@@ -173,6 +176,31 @@ export default function ProfilePage() {
       return details.about;
     }
     return "";
+  });
+
+  // SEO meta. Canonical preserves whatever identifier form the URL uses
+  // (/@handle or /0xAddr) — both are accepted by the backend; pinning to
+  // one would mean a redirect on the other and split sharing signal. The
+  // ?tab= query param is intentionally dropped so all tabs of a profile
+  // share the same canonical (per locked URL convention).
+  useMeta(() => {
+    const u = userResource();
+    if (!u || u.error) return null;
+    const lang = uiLang();
+    const siteName = getSiteName(app);
+    const display = displayName() || u.name || u.address || "";
+    if (!display) return null;
+    return {
+      title: titleProfile(display, u.name || "", siteName),
+      description: truncateDescription(aboutText()),
+      canonical: identifier() ? buildCanonical(app, `/${identifier()}`, lang) : "",
+      image: ipfsPublicUrl(app, u.avatar),
+      ogType: "profile",
+      twitterCard: "summary",
+      siteName,
+      locale: lang,
+      robots: u.banned ? "noindex,nofollow" : "index,follow",
+    };
   });
 
   // Actor/profile context

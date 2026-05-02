@@ -9,8 +9,11 @@ import { ipfs } from "../../ipfs/index.js";
 import { fetchBestWithDecryption } from "../../ipfs/encryptedFetch.js";
 import { dbg } from "../../utils/debug.js";
 import { toChecksumAddress } from "../../blockchain/utils.js";
-import { getPostContentBaseCid } from "../../ipfs/utils.js";
+import { getPostContentBaseCid, resolvePostCidPath } from "../../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
+import { useMeta } from "../../lib/seo/headManager.js";
+import { buildCanonical, getSiteName, ipfsPublicUrl, truncateDescription } from "../../lib/seo/canonical.js";
+import { titlePost } from "../../lib/seo/templates.js";
 
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -786,6 +789,37 @@ export default function PostPage() {
     const contentLocales = p?.savva_content?.locales || p?.content?.locales;
     const loc = contentLocales?.[postLang()] || details()?.descriptor?.locales?.[postLang()];
     return (loc?.title || "").trim();
+  });
+
+  // SEO meta — runs whenever post / lang / title resolves. Encrypted posts
+  // get noindex,nofollow even after meta hydrates (matches backend policy).
+  useMeta(() => {
+    const p = post();
+    if (!p) return null;
+    const t = title();
+    if (!t) return null;
+    const lang = postLang() || uiLang();
+    const contentLocales = p.savva_content?.locales || p.content?.locales;
+    const loc = contentLocales?.[lang] || contentLocales?.en || Object.values(contentLocales || {})[0];
+    const author = p.author || {};
+    const authorName = author.display_name || author.name || author.address || "";
+    const siteName = getSiteName(app);
+    const shortCid = p.short_cid || p.savva_cid;
+    const thumb = p.savva_content?.thumbnail || p.content?.thumbnail;
+    const image = thumb
+      ? ipfsPublicUrl(app, resolvePostCidPath(p, thumb))
+      : ipfsPublicUrl(app, author.avatar);
+    return {
+      title: titlePost(t, authorName, siteName),
+      description: truncateDescription(loc?.text_preview),
+      canonical: shortCid ? buildCanonical(app, `/post/${shortCid}`, lang) : "",
+      image,
+      ogType: "article",
+      twitterCard: "summary_large_image",
+      siteName,
+      locale: lang,
+      robots: isEncryptedPost() || p.banned || p.author_banned ? "noindex,nofollow" : "index,follow",
+    };
   });
 
   const chapters = createMemo(() => {

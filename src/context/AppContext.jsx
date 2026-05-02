@@ -68,6 +68,12 @@ export function AppProvider(props) {
   const prices = useTokenPrices({ loading: orchestrator.loading, info: orchestrator.info });
 
   Solid.createEffect(() => {
+    // Re-fire on route change too: entity pages set their own title via the
+    // SEO head manager, but on navigate-back to home/list routes we need to
+    // restore the locale default rather than leave the previous entity's
+    // title stale. (Entity pages' useMeta runs after this effect, so on an
+    // entity route their title overrides this default.)
+    route();
     const cfg = orchestrator.domainAssetsConfig?.();
     if (!cfg) return;
     const norm = (c) => String(c || "").trim().toLowerCase().split(/[-_]/)[0];

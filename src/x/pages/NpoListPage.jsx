@@ -2,6 +2,9 @@
 import { For, Show, createSignal, createMemo, onMount } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
+import { useMeta } from "../../lib/seo/headManager.js";
+import { buildCanonical, getSiteName } from "../../lib/seo/canonical.js";
+import { titleList } from "../../lib/seo/templates.js";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
 import { navigate } from "../../routing/smartRouter.js";
@@ -16,6 +19,22 @@ const DEFAULT_LIMIT = 20;
 export default function NpoListPage() {
   const app = useApp();
   const { t } = app;
+
+  useMeta(() => {
+    const lang = app.lang?.() || "en";
+    const siteName = getSiteName(app);
+    const label = t("npo.list.title");
+    return {
+      title: titleList(label, siteName),
+      description: label,
+      canonical: buildCanonical(app, "/npo-list", lang),
+      ogType: "website",
+      twitterCard: "summary",
+      siteName,
+      locale: lang,
+      robots: "index,follow",
+    };
+  });
 
   const [items, setItems] = createSignal([]);
   const [loading, setLoading] = createSignal(false);

@@ -2,6 +2,9 @@
 import { Show, createMemo, createSignal, onMount, createEffect } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/smartRouter.js";
+import { useMeta } from "../../lib/seo/headManager.js";
+import { buildCanonical, getSiteName, ipfsPublicUrl } from "../../lib/seo/canonical.js";
+import { titleNpo } from "../../lib/seo/templates.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
 import UserCard from "../ui/UserCard.jsx";
@@ -98,6 +101,28 @@ export default function NpoPage() {
   const [limitsTarget, setLimitsTarget] = createSignal({ address: "", user: null, tokens: [] });
 
   createEffect(() => dbg.log("NPO:init", { route: route(), identifier: identifier() }));
+
+  useMeta(() => {
+    const id = identifier();
+    if (!id) return null;
+    const lang = app.lang?.() || "en";
+    const siteName = getSiteName(app);
+    const u = npoUser();
+    const display = u?.display_name || u?.name || u?.address || id;
+    return {
+      title: u ? titleNpo(display, siteName) : `${display} | ${siteName}`,
+      description: u?.about || `${display} ${t("npo.page.title")}`,
+      // SPA route is /npo/{addr-or-handle}; backend accepts /{addr} as an
+      // alias but the SPA-shareable URL is the /npo/... form.
+      canonical: buildCanonical(app, `/npo/${id}`, lang),
+      image: ipfsPublicUrl(app, u?.avatar),
+      ogType: "profile",
+      twitterCard: "summary",
+      siteName,
+      locale: lang,
+      robots: u?.banned ? "noindex,nofollow" : "index,follow",
+    };
+  });
 
   async function ensureWallet() {
     if (walletAccount()) return true;
