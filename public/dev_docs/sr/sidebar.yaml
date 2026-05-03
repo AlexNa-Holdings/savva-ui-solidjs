@@ -1,89 +1,91 @@
 sections:
-  - title: Opšte
+  - title: Опште
     items:
-      - label: Dobrodošli
+      - label: Добродошли
         file: index.md
-      - label: Šta radimo
+      - label: Шта радимо
         file: general/what-we-do.md
-  - title: Funkcionalnosti
+  - title: Карактеристике
     items:
-      - label: Mreže zajednice
+      - label: Мреже на нивоу заједнице
         file: features/grassroot.md
-      - label: Više od lajkova
+      - label: Више од лајкова
         file: features/beyond-likes.md
-      - label: Autorizacija
+      - label: Ауторизација
         file: features/authorization.md
-      - label: Kontrola sadržaja
+      - label: Контрола садржаја
         file: features/content-control.md
-      - label: Višejezično
+      - label: Вишејезично
         file: features/multi-lingual.md
-      - label: Prošireni format sadržaja
+      - label: Проширени формат садржаја
         file: features/content-format.md
-      - label: Šifrovan sadržaj
+      - label: Шифровани садржај
         file: features/encrypted-content.md
-  - title: Tokenomija
+  - title: Токеномика
     items:
-      - label: SAVVA token
+      - label: SAVVA токен
         file: tokenomics/savva-token.md
-      - label: Stalno žrtvovanje
+      - label: Континуирано жртвовање
         file: tokenomics/sacrifice.md
-      - label: Staking
+      - label: Стејкинг
         file: tokenomics/staking.md
-      - label: Ulog za objavu
+      - label: Уложи да објавиш
         file: tokenomics/stake-to-post.md
-      - label: Sredstva za objavu
+      - label: Средства за објаву
         file: tokenomics/post-funds.md
-      - label: Pretplate u stilu Patreon
+      - label: Претплате у стилу Patreon-а
         file: tokenomics/patreon.md
-      - label: NFT-ovi
+      - label: NFT-ови
         file: tokenomics/nfts.md
-      - label: Kupovina i spaljivanje
+      - label: Купи и спали
         file: tokenomics/buy-and-burn.md
-      - label: Upravljanje
+      - label: Управљање
         file: tokenomics/governance.md
-  - title: Osnovni koncepti
+  - title: Основни концепти
     items:
-      - label: Pregled
+      - label: Преглед
         file: core-concepts/index.md
-      - label: Inicijalizacija aplikacije i povezivanje sa backendom
+      - label: Иницијализација апликације и повезивање са бекендом
         file: core-concepts/app-init.md
-      - label: Rad sa domenima
+      - label: Рад са доменима
         file: core-concepts/domain.md
-      - label: Autentifikacija
+      - label: Аутентификација
         file: core-concepts/auth.md
-      - label: Prikaz objava
+      - label: Приказивање објава
         file: core-concepts/showing-posts.md
-      - label: Objavljivanje objava
+      - label: Објављивање објава
         file: core-concepts/publishing-posts.md
-      - label: Šifrovane objave
+      - label: Шифроване објаве
         file: core-concepts/encrypted-posts.md
-      - label: Ugovor o korisničkom profilu
+      - label: Уговор о корисничком профилу
         file: core-concepts/user-profile.md
-      - label: Ugovor za konfiguraciju
+      - label: Уговор о конфигурацији
         file: core-concepts/config-contract.md
-      - label: Orkestracija konekcija
+      - label: Оркестрација веза
         file: core-concepts/connection-orchestration.md
-  - title: Vodič za instalaciju
+  - title: Упутство за инсталацију
     items:
-      - label: Pregled
+      - label: Преглед
         file: installation/index.md
-      - label: Preduslovi
+      - label: Преуслови
         file: installation/prerequisites.md
-      - label: Podešavanje backend servera
+      - label: Инсталација Docker нода
+        file: installation/docker-setup.md
+      - label: Подешавање бекенд сервера
         file: installation/backend-setup.md
-      - label: Podešavanje UI veb-sajta
+      - label: Подешавање UI веб-сајта
         file: installation/ui-setup.md
-      - label: Konfiguracija
+      - label: Конфигурација
         file: installation/configuration.md
-      - label: Otklanjanje problema
+      - label: Решавање проблема
         file: installation/troubleshooting.md
-  - title: Licence
+  - title: Лиценце
     items:
-      - label: UI licenca
+      - label: UI лиценца
         file: licenses/ui.md
-      - label: Licenca backend-a
+      - label: Бекенд лиценца
         file: licenses/backend.md
-      - label: Licenca ugovora
+      - label: Лиценца за уговоре
         file: licenses/contracts.md
-      - label: Zvanične adrese ugovora
+      - label: Званичне адресе уговора
         file: licenses/official-contracts.md

@@ -1,5 +1,5 @@
 sections:
-  - title: Общие
+  - title: Общее
     items:
       - label: Добро пожаловать
         file: index.md
@@ -13,9 +13,9 @@ sections:
         file: features/beyond-likes.md
       - label: Авторизация
         file: features/authorization.md
-      - label: Управление контентом
+      - label: Контроль контента
         file: features/content-control.md
-      - label: Многоязычность
+      - label: Многоязычный
         file: features/multi-lingual.md
       - label: Расширенный формат контента
         file: features/content-format.md
@@ -25,13 +25,13 @@ sections:
     items:
       - label: Токен SAVVA
         file: tokenomics/savva-token.md
-      - label: Постоянные пожертвования
+      - label: Продолжающаяся жертва
         file: tokenomics/sacrifice.md
       - label: Стейкинг
         file: tokenomics/staking.md
       - label: Стейк для публикации
         file: tokenomics/stake-to-post.md
-      - label: Фонды публикаций
+      - label: Средства для поста
         file: tokenomics/post-funds.md
       - label: Подписки в стиле Patreon
         file: tokenomics/patreon.md
@@ -61,7 +61,7 @@ sections:
         file: core-concepts/user-profile.md
       - label: Контракт конфигурации
         file: core-concepts/config-contract.md
-      - label: Оркестрация подключений
+      - label: Оркестрация подключения
         file: core-concepts/connection-orchestration.md
   - title: Руководство по установке
     items:
@@ -69,6 +69,8 @@ sections:
         file: installation/index.md
       - label: Требования
         file: installation/prerequisites.md
+      - label: Установка Docker-узла
+        file: installation/docker-setup.md
       - label: Настройка бэкенд-сервера
         file: installation/backend-setup.md
       - label: Настройка веб-интерфейса

@@ -70,6 +70,8 @@ sections:
         file: installation/index.md
       - label: Prerequisites
         file: installation/prerequisites.md
+      - label: Docker Node Installation
+        file: installation/docker-setup.md
       - label: Backend Server Setup
         file: installation/backend-setup.md
       - label: UI Website Setup

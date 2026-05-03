@@ -4,7 +4,7 @@
   "core-concepts/index.md": "b0c25ccb40847affcecbd805a81d552bcf5bceb2081c24d3c3379bfd91ffb7c4",
   "getting-started.md": "3249a86adcee7286e9994ec908c92fd979a679dd980c6c47ac89bc08f4a1e86d",
   "index.md": "112d9fcd7baa0934935c9dc58310ba7486b6dc998bf5e1940ca0e75ff1af70d7",
-  "sidebar.yaml": "3ae4bc10cd4bb3b771f75c4059e33ccbaffcb562652c2e8bd183f593faddc78e",
+  "sidebar.yaml": "95006b121ecd1306dabd7f753e3bd446a8bbba043484a07ab2457dc3f82a14e3",
   "core-concepts/auth.md": "4ab265a20d38ef433c503a1335a76748787ece0446dc8b490a3994e5cc12aec2",
   "core-concepts/showing-posts.md": "bc16a41e33c7d807a7e69397b597ebf3674eb142410a527472ff1440504656fb",
   "core-concepts/config-contract.md": "d0390a3d46e6bd6cc6a50b6caa979b608876d04fb9cb174bd67cc2652275e960",
@@ -40,5 +40,6 @@
   "installation/index.md": "bbcbea98ee31a65e44c7d93525ac4418a52b1e4948ba8efab2b82ece0cb6dfee",
   "installation/prerequisites.md": "bacd3e4c7b75a41bc0e848f6bf9b6c79c79bcc094b658f2bedcd174c8c356a2a",
   "installation/troubleshooting.md": "6ff9f9390890446e225c03ede478d54037fa4dcc51103da025b70e56463f38f9",
-  "installation/ui-setup.md": "76f4059b4e68d4eb5f549c56ae59715173ca863f30fa82c1213b4904618b1c61"
+  "installation/ui-setup.md": "76f4059b4e68d4eb5f549c56ae59715173ca863f30fa82c1213b4904618b1c61",
+  "installation/docker-setup.md": "d47e51e1acc822d7dec6c4c152afaaf87d6ac075cae0d7629a576cf88da1def8"
 }

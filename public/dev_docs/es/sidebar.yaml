@@ -23,7 +23,7 @@ sections:
         file: features/encrypted-content.md
   - title: Tokenómica
     items:
-      - label: Token SAVVA
+      - label: SAVVA Token
         file: tokenomics/savva-token.md
       - label: Sacrificio continuo
         file: tokenomics/sacrifice.md
@@ -33,7 +33,7 @@ sections:
         file: tokenomics/stake-to-post.md
       - label: Fondos para publicaciones
         file: tokenomics/post-funds.md
-      - label: Suscripciones al estilo Patreon
+      - label: Suscripciones estilo Patreon
         file: tokenomics/patreon.md
       - label: NFTs
         file: tokenomics/nfts.md
@@ -43,17 +43,17 @@ sections:
         file: tokenomics/governance.md
   - title: Conceptos clave
     items:
-      - label: Resumen
+      - label: Descripción general
         file: core-concepts/index.md
-      - label: Inicialización de la app y conexión con el backend
+      - label: Inicialización de la aplicación y conexión al backend
         file: core-concepts/app-init.md
-      - label: Trabajando con dominios
+      - label: Trabajar con dominios
         file: core-concepts/domain.md
       - label: Autenticación
         file: core-concepts/auth.md
       - label: Mostrar publicaciones
         file: core-concepts/showing-posts.md
-      - label: Publicar contenido
+      - label: Publicar publicaciones
         file: core-concepts/publishing-posts.md
       - label: Publicaciones cifradas
         file: core-concepts/encrypted-posts.md
@@ -61,25 +61,27 @@ sections:
         file: core-concepts/user-profile.md
       - label: Contrato de configuración
         file: core-concepts/config-contract.md
-      - label: Orquestación de conexiones
+      - label: Orquestación de conexión
         file: core-concepts/connection-orchestration.md
   - title: Guía de instalación
     items:
-      - label: Resumen
+      - label: Descripción general
         file: installation/index.md
       - label: Requisitos previos
         file: installation/prerequisites.md
+      - label: Instalación de nodo Docker
+        file: installation/docker-setup.md
       - label: Configuración del servidor backend
         file: installation/backend-setup.md
-      - label: Configuración del sitio web de la UI
+      - label: Configuración del sitio web (UI)
         file: installation/ui-setup.md
       - label: Configuración
         file: installation/configuration.md
-      - label: Resolución de problemas
+      - label: Solución de problemas
         file: installation/troubleshooting.md
   - title: Licencias
     items:
-      - label: Licencia de la UI
+      - label: Licencia de la interfaz
         file: licenses/ui.md
       - label: Licencia del backend
         file: licenses/backend.md
