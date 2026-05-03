@@ -236,15 +236,12 @@ export default function PostPage() {
   const [isSwitchingChain, setIsSwitchingChain] = createSignal(false);
   async function switchToChainAndOpenPost(targetChain) {
     if (!targetChain?.rpc || isSwitchingChain()) return;
-    const id = identifier();
     setIsSwitchingChain(true);
     try {
       await app.initializeOrSwitch({
         backendLink: targetChain.rpc,
         domain: app.config?.()?.siteDomain || "",
-        noNavigate: true,
       });
-      navigate(`/post/${id}`, { replace: true });
     } catch (e) {
       console.error("[PostPage] switchToChainAndOpenPost failed", e);
       pushErrorToast(e, { context: "Failed to switch blockchain" });

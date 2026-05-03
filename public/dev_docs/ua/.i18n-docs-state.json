@@ -37,10 +37,10 @@
   "core-concepts/encrypted-posts.md": "0c73dc11003c057571a3037a9e8cee0965bd0ec846947cca7037ef2a225235f7",
   "installation/backend-setup.md": "28a10a8a8d6af1d814a7661f69c02379901157ee8cc4ce723d4fb5b54f3a2631",
   "installation/configuration.md": "4d6579e1bc1a2a0c94a53146bdac4e2f1644d291ae1a55ec856e4b66ca881e02",
-  "installation/index.md": "2734ffd9c98c29abdbf2febe0dc62db4fc1eec3132a3234396c961a58bd374df",
-  "installation/nginx.conf.example": "732d1e9495646dd5ca75a3f60f883879904ec8ec7348e1928be1bfaa92fd3c83",
+  "installation/index.md": "bbcbea98ee31a65e44c7d93525ac4418a52b1e4948ba8efab2b82ece0cb6dfee",
+  "installation/nginx.conf.example": "2eda9fc5c3e7b70215fcbabcbc120ca72ea5d0bc7799fa389800e6d5b73885fb",
   "installation/prerequisites.md": "bacd3e4c7b75a41bc0e848f6bf9b6c79c79bcc094b658f2bedcd174c8c356a2a",
   "installation/savva.yml.example": "476b4ccdd3076c77d65bb1293de604f04db578f678b50995f66e199abb186251",
-  "installation/troubleshooting.md": "cb3b1f696c3ee72b3b60ec7f802cf973d2175b2297ef5f16145a03fdf029a901",
-  "installation/ui-setup.md": "eb2eb022d776d5437c4f32b228be84528111b6dc443e2ec5e82bac0c0cb138bf"
+  "installation/troubleshooting.md": "6ff9f9390890446e225c03ede478d54037fa4dcc51103da025b70e56463f38f9",
+  "installation/ui-setup.md": "968da6c8120b00b7211056ffd9d5964f5ca04cd71949d0a3fabd0bb6143d2c1b"
 }

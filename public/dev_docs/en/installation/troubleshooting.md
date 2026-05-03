@@ -209,6 +209,78 @@ sudo iptables -L -n
 sudo netstat -tlnp | grep :443
 ```
 
+## SEO / Discovery Issues
+
+### `/robots.txt` returns 404 (or nginx default)
+
+**Symptom**: `curl -s https://yourdomain.com/robots.txt` returns nginx's default 404 page or a stub instead of a real `User-agent: ...` body.
+
+**Solutions**:
+```bash
+# 1. Confirm the SEO discovery rewrites are in your server block,
+#    ABOVE the `location /` block:
+#       location = /robots.txt   { rewrite ^ /api/robots.txt?domain=$default_domain last; }
+#       location = /sitemap.xml  { rewrite ^ /api/sitemap.xml?domain=$default_domain last; }
+#       location ~ ^/sitemap-.*\.xml$ { rewrite ^(/sitemap-[^?]+) /api$1?domain=$default_domain last; }
+sudo nano /etc/nginx/sites-available/yourdomain.com
+
+# 2. Confirm the backend serves the endpoint directly.
+curl -s http://localhost:7000/api/robots.txt?domain=yourdomain.com | head
+# Empty/404 here means the backend is too old - upgrade savva-backend
+# to a version that ships /api/robots.txt and /api/sitemap*.xml.
+
+# 3. Confirm $default_domain matches a key under `domains:` in /etc/savva.yml.
+grep -A1 "^domains:" /etc/savva.yml
+grep "set \$default_domain" /etc/nginx/sites-available/yourdomain.com
+```
+
+### Bot path returns the SPA shell instead of rendered HTML
+
+**Symptom**: `curl -sA "Googlebot" https://yourdomain.com/` returns the small `index.html` SPA bundle instead of a rendered page with `<title>`, `og:*`, and post body.
+
+**Solutions**:
+```bash
+# 1. Make sure the bot detection regex in `location /` matches the modern
+#    list (googlebot|bingbot|...|gptbot|claudebot|perplexitybot|...).
+#    The 2018-era regex misses every AI crawler.
+
+# 2. Make sure the rewrite uses the new form WITH `last`:
+#       rewrite (.*) /api/render$1?domain=$default_domain&prerender&$args last;
+#    NOT the older form with $scheme://$host$uri or `break`. The backend
+#    no longer accepts the old shape, and `break` skips the /api proxy.
+
+# 3. Confirm the backend renders directly.
+curl -s "http://localhost:7000/api/render/?domain=yourdomain.com&prerender" | head
+```
+
+### Human path returns rendered HTML instead of the SPA
+
+**Symptom**: A normal browser hits the bot path and sees the prerendered HTML instead of the SolidJS app.
+
+**Solutions**:
+- The bot regex is too greedy (e.g. matches `mozilla` as a substring). The `~*` regex must use word-bounded vendor names — copy the regex from `nginx.conf.example` verbatim.
+- Static-asset bypass is missing. Confirm `if ($uri ~ \.[a-zA-Z0-9]+$) { set $prerender 0; }` is present so JS bundles, images, and fonts don't get prerendered.
+
+### Link unfurls show wrong title / image / no preview
+
+**Symptom**: Pasting a SAVVA URL into Telegram, X, Discord, or Slack shows a stale title, the wrong author, no thumbnail, or an awkwardly cropped image.
+
+**Solutions**:
+- Confirm the unfurler's UA is in the bot regex (e.g. `telegrambot|twitterbot|facebookexternalhit|discordbot|slackbot|whatsapp`).
+- Edits invalidate the per-URL cache server-side, but third-party unfurlers cache aggressively. Force a refresh:
+  - **Facebook / WhatsApp / Instagram**: paste the URL into <https://developers.facebook.com/tools/debug/> and click "Scrape Again".
+  - **X / Twitter**: <https://cards-dev.twitter.com/validator>.
+  - **Telegram / Discord**: usually clear within minutes; appending a harmless query string (e.g. `?v=2`) bypasses the cache for a one-off test.
+
+### Sitemap missing pages
+
+**Symptom**: `/sitemap.xml` exists but doesn't list a post, profile, NPO, or tag page you expect.
+
+**Solutions**:
+- Sitemaps regenerate on a cycle; very recent posts may not be in the latest snapshot yet. Wait one cycle and re-check.
+- Confirm the post is public — drafts and private content are intentionally excluded.
+- Confirm your domain key in `/etc/savva.yml` actually owns the content. Sitemaps are per-domain.
+
 ## Performance Issues
 
 ### Slow Page Load

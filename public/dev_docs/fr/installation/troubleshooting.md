@@ -2,11 +2,11 @@
 
 Problèmes courants et leurs solutions.
 
-## Problèmes de backend
+## Problèmes du backend
 
 ### Le backend ne démarre pas
 
-**Symptôme**: Le service ne démarre pas
+**Symptôme** : Le service ne parvient pas à démarrer
 
 **Solutions**:
 ```bash
@@ -27,7 +27,7 @@ sudo lsof -i :8080
 
 ### Erreurs de connexion à la base de données
 
-**Symptôme**: `connection refused` or `authentication failed`
+**Symptôme** : `connection refused` ou `authentication failed`
 
 **Solutions**:
 ```bash
@@ -45,9 +45,9 @@ sudo nano /etc/postgresql/14/main/pg_hba.conf
 sudo systemctl restart postgresql
 ```
 
-### Problèmes de connexion à IPFS
+### Problèmes de connexion IPFS
 
-**Symptôme**: Impossible de téléverser/récupérer depuis IPFS
+**Symptôme** : Impossible d'uploader/récupérer depuis IPFS
 
 **Solutions**:
 ```bash
@@ -64,19 +64,19 @@ curl http://localhost:5001/api/v0/version
 
 ### Utilisation élevée de la mémoire
 
-**Symptôme**: Le backend consomme trop de mémoire
+**Symptôme** : Le backend consomme trop de mémoire
 
 **Solutions**:
 - Vérifier les paramètres du pool de connexions
-- Rechercher des fuites de mémoire dans les logs
+- Chercher des fuites mémoire dans les logs
 - Redémarrer le service périodiquement
 - Envisager d'augmenter la RAM du serveur
 
-## Problèmes d'interface utilisateur
+## Problèmes d'interface (UI)
 
-### Page blanche / écran blanc
+### Page blanche / écran vide
 
-**Symptôme**: La page se charge mais n'affiche rien
+**Symptôme** : La page se charge mais n'affiche rien
 
 **Solutions**:
 ```bash
@@ -96,9 +96,9 @@ npm run build
 sudo cp -r dist/* /var/www/savva-ui/
 ```
 
-### Connexion à l'API échouée
+### Échec de connexion à l'API
 
-**Symptôme**: L'interface ne peut pas se connecter au backend
+**Symptôme** : L'UI ne peut pas se connecter au backend
 
 **Solutions**:
 ```bash
@@ -117,13 +117,13 @@ curl -I https://api.yourdomain.com
 
 ### Portefeuille Web3 non connecté
 
-**Symptôme**: Impossible de connecter MetaMask ou d'autres portefeuilles
+**Symptôme** : Impossible de connecter MetaMask ou d'autres wallets
 
 **Solutions**:
 - **Assurer HTTPS** : Web3 nécessite une connexion sécurisée
-- **Vérifier l'extension de portefeuille** : Est-elle installée et déverrouillée ?
-- **Incompatibilité de réseau** : Le portefeuille est-il sur la mauvaise chaîne ?
-- **Vérifier les en-têtes CSP** : Ils peuvent bloquer l'injection du portefeuille
+- **Vérifier l'extension du wallet** : Est-elle installée et déverrouillée ?
+- **Mauvaise chaîne** : Le wallet est-il sur le mauvais réseau ?
+- **Vérifier les en-têtes CSP** : Ils peuvent bloquer l'injection du wallet
 
 ```bash
 # Check Content-Security-Policy header
@@ -132,7 +132,7 @@ curl -I https://yourdomain.com | grep -i content-security
 
 ### Erreurs de build
 
-**Symptôme**: `npm run build` échoue
+**Symptôme** : `npm run build` échoue
 
 **Solutions**:
 ```bash
@@ -155,7 +155,7 @@ NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 ### Erreurs de certificat SSL
 
-**Symptôme**: HTTPS ne fonctionne pas ou avertissements de certificat
+**Symptôme** : HTTPS ne fonctionne pas ou avertissements de certificat
 
 **Solutions**:
 ```bash
@@ -174,7 +174,7 @@ openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 
 ### Problèmes de résolution DNS
 
-**Symptôme**: Le domaine ne se résout pas
+**Symptôme** : Le domaine ne se résout pas
 
 **Solutions**:
 ```bash
@@ -191,7 +191,7 @@ dig A yourdomain.com +short
 
 ### Pare-feu bloquant les connexions
 
-**Symptôme**: Impossible d'accéder aux services à distance
+**Symptôme** : Impossible d'accéder aux services à distance
 
 **Solutions**:
 ```bash
@@ -209,22 +209,94 @@ sudo iptables -L -n
 sudo netstat -tlnp | grep :443
 ```
 
+## SEO / Découverte
+
+### `/robots.txt` renvoie 404 (ou le défaut nginx)
+
+**Symptôme** : `curl -s https://yourdomain.com/robots.txt` retourne la page 404 par défaut de nginx ou un stub au lieu d'un vrai corps `User-agent: ...`.
+
+**Solutions**:
+```bash
+# 1. Confirm the SEO discovery rewrites are in your server block,
+#    ABOVE the `location /` block:
+#       location = /robots.txt   { rewrite ^ /api/robots.txt?domain=$default_domain last; }
+#       location = /sitemap.xml  { rewrite ^ /api/sitemap.xml?domain=$default_domain last; }
+#       location ~ ^/sitemap-.*\.xml$ { rewrite ^(/sitemap-[^?]+) /api$1?domain=$default_domain last; }
+sudo nano /etc/nginx/sites-available/yourdomain.com
+
+# 2. Confirm the backend serves the endpoint directly.
+curl -s http://localhost:7000/api/robots.txt?domain=yourdomain.com | head
+# Empty/404 here means the backend is too old - upgrade savva-backend
+# to a version that ships /api/robots.txt and /api/sitemap*.xml.
+
+# 3. Confirm $default_domain matches a key under `domains:` in /etc/savva.yml.
+grep -A1 "^domains:" /etc/savva.yml
+grep "set \$default_domain" /etc/nginx/sites-available/yourdomain.com
+```
+
+### Le chemin pour les bots renvoie le shell SPA au lieu du HTML rendu
+
+**Symptôme** : `curl -sA "Googlebot" https://yourdomain.com/` renvoie le petit bundle `index.html` de la SPA au lieu d'une page rendue contenant `<title>`, `og:*` et le corps de l'article.
+
+**Solutions**:
+```bash
+# 1. Make sure the bot detection regex in `location /` matches the modern
+#    list (googlebot|bingbot|...|gptbot|claudebot|perplexitybot|...).
+#    The 2018-era regex misses every AI crawler.
+
+# 2. Make sure the rewrite uses the new form WITH `last`:
+#       rewrite (.*) /api/render$1?domain=$default_domain&prerender&$args last;
+#    NOT the older form with $scheme://$host$uri or `break`. The backend
+#    no longer accepts the old shape, and `break` skips the /api proxy.
+
+# 3. Confirm the backend renders directly.
+curl -s "http://localhost:7000/api/render/?domain=yourdomain.com&prerender" | head
+```
+
+### Le chemin pour un utilisateur humain renvoie du HTML rendu au lieu de la SPA
+
+**Symptôme** : Un navigateur normal accède au chemin destiné aux bots et voit le HTML pré-rendu au lieu de l'app SolidJS.
+
+**Solutions**:
+- Le regex pour les bots est trop permissif (ex. correspond à `mozilla` en tant que sous-chaîne). Le regex `~*` doit utiliser des noms de fournisseurs délimités par des mots — copiez le regex depuis `nginx.conf.example` tel quel.
+- Le contournement des assets statiques est manquant. Confirmez que `if ($uri ~ \.[a-zA-Z0-9]+$) { set $prerender 0; }` est présent afin que les bundles JS, images et polices ne soient pas pré-rendus.
+
+### Les aperçus (unfurls) affichent un mauvais titre / image / pas d'aperçu
+
+**Symptôme** : Coller une URL SAVVA dans Telegram, X, Discord ou Slack affiche un titre périmé, le mauvais auteur, pas de vignette, ou une image mal recadrée.
+
+**Solutions**:
+- Confirmer que l'UA de l'unfurler est dans le regex des bots (ex. `telegrambot|twitterbot|facebookexternalhit|discordbot|slackbot|whatsapp`).
+- Les modifications invalident le cache par URL côté serveur, mais les unfurlers tiers mettent en cache agressivement. Forcer un rafraîchissement :
+  - **Facebook / WhatsApp / Instagram** : collez l'URL dans <https://developers.facebook.com/tools/debug/> et cliquez sur "Scrape Again".
+  - **X / Twitter** : <https://cards-dev.twitter.com/validator>.
+  - **Telegram / Discord** : se corrigent généralement en quelques minutes ; ajouter une chaîne de requête innocente (ex. `?v=2`) contourne le cache pour un test ponctuel.
+
+### Sitemap manquant de pages
+
+**Symptôme** : `/sitemap.xml` existe mais n'inclut pas un article, un profil, une organisation NPO, ou une page de tag que vous attendez.
+
+**Solutions**:
+- Les sitemaps se régénèrent périodiquement ; les posts très récents peuvent ne pas encore apparaître dans la dernière snapshot. Attendez un cycle et revérifiez.
+- Confirmez que le post est public — les brouillons et le contenu privé sont exclus volontairement.
+- Vérifiez que la clé de domaine dans `/etc/savva.yml` possède bien le contenu. Les sitemaps sont par domaine.
+
 ## Problèmes de performance
 
-### Chargement lent des pages
+### Chargement de page lent
 
-**Symptôme**: L'interface met du temps à se charger
+**Symptôme** : L'UI met du temps à se charger
 
 **Solutions**:
 - Activer la compression Gzip dans Nginx
 - Mettre en place un CDN (Cloudflare, etc.)
 - Vérifier les temps de réponse du backend
-- Optimiser les requêtes vers la base de données
-- Activer le cache navigateur
+- Optimiser les requêtes base de données
+- Activer la mise en cache côté navigateur
 
-### Utilisation élevée du CPU
+### Utilisation CPU élevée
 
-**Symptôme**: Le CPU du serveur à 100%
+**Symptôme** : CPU du serveur à 100%
 
 **Solutions**:
 ```bash
@@ -243,7 +315,7 @@ sudo journalctl -u savva-backend -n 100
 
 ### Performance de la base de données
 
-**Symptôme**: Requêtes lentes
+**Symptôme** : Requêtes lentes
 
 **Solutions**:
 ```sql
@@ -263,30 +335,30 @@ REINDEX DATABASE savva;
 ## Messages d'erreur courants
 
 ### "connection refused"
-- Le service n'est pas en cours d'exécution
-- Le pare-feu bloque le port
-- Mauvais hôte/port dans la configuration
+- Service non démarré
+- Pare-feu bloquant le port
+- Mauvais hôte/port dans la config
 
 ### "authentication failed"
-- Mauvais mot de passe dans la configuration
+- Mauvais mot de passe dans la config
 - L'utilisateur n'a pas les permissions
-- Vérifier les droits dans la base de données
+- Vérifier les grants de la base de données
 
-### "CORS policy" errors
-- Le CORS du backend n'est pas configuré
-- Origine incorrecte dans allowed_origins
-- Requête preflight échouée
+### Erreurs de "CORS policy"
+- CORS du backend non configuré
+- Mauvaise origine dans allowed_origins
+- Requête preflight échouant
 
-### "network error" in UI
-- Le backend n'est pas accessible
-- Mauvaise URL d'API dans la configuration UI
+### "network error" dans l'UI
+- Backend inaccessible
+- Mauvaise URL API dans la config de l'UI
 - Problèmes de certificat SSL
 
 ## Obtenir de l'aide
 
 Si les problèmes persistent :
 
-1. **Vérifier les logs**:
+1. **Vérifier les logs** :
    ```bash
    # Backend logs
    sudo journalctl -u savva-backend -n 100 -f
@@ -298,18 +370,18 @@ Si les problèmes persistent :
    # Press F12 → Console
    ```
 
-2. **Rassembler les informations**:
+2. **Rassembler les informations** :
    - Messages d'erreur
    - Spécifications du serveur
    - Numéros de version
    - Configuration (sanitisée)
 
-3. **Support communautaire**:
+3. **Support communautaire** :
    - Issues GitHub
    - Forums de la communauté SAVVA
    - Documentation développeur
 
-4. **Vérifier les mises à jour**:
+4. **Vérifier les mises à jour** :
    ```bash
    # Backend
    cd savva-backend
@@ -324,4 +396,4 @@ Si les problèmes persistent :
 
 ---
 
-*Ce guide de dépannage sera étendu à mesure que d'autres problèmes seront documentés.*
+*Ce guide de dépannage sera étendu au fur et à mesure que d'autres problèmes seront documentés.*

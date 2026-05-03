@@ -4,7 +4,6 @@ import { parse } from "yaml";
 import { configureEndpoints, httpBase, wsUrl } from "../net/endpoints.js";
 import { loadSiteConfig } from "../utils/loadSiteConfig.js";
 import { getWsClient, whenWsOpen } from "../net/wsRuntime.js";
-import { navigate } from "../routing/smartRouter.js";
 import dbg from "../utils/debug.js";
 
 // ----- tiny safe wrapper so we always print, even if dbg API shape changes -----
@@ -130,7 +129,6 @@ export function useAppOrchestrator({ auth, i18n }) {
     setLoading(true);
     setError(null);
     const isSwitching = !!newSettings;
-    const skipNavigateHome = !!newSettings?.noNavigate;
 
     try {
       const prevCfg = config() || {};
@@ -305,12 +303,9 @@ export function useAppOrchestrator({ auth, i18n }) {
         dwarn("ws:open:timeout", {});
       }
 
-      // 8) Navigate home after successful switch
-      if (isSwitching) {
-        const current = (typeof window !== "undefined" ? window.location.hash.slice(1) : "/") || "/";
-        dlog("nav:post-switch", { current, target: "/" });
-        if (!skipNavigateHome && current !== "/") navigate("/");
-      }
+      // 8) URL is intentionally preserved after a switch - the user stays on
+      //    the page they were on. Pages render an empty state if the content
+      //    doesn't exist on the new chain/domain.
 
       dlog("switch:done", nextCfg);
     } catch (e) {

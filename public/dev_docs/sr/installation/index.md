@@ -1,32 +1,33 @@
 # Vodič za instalaciju - Pregled
 
-Ovaj vodič će vas provesti kroz podešavanje sopstvene SAVVA mreže od nule. Prateći ove instrukcije, moći ćete da pokrenete potpunu SAVVA instancu sa backend serverom i frontend korisničkim interfejsom.
+Ovaj vodič će vas provesti kroz podešavanje sopstvene SAVVA mreže od nule. Prateći ove instrukcije, moći ćete da pokrenete kompletnu SAVVA instancu sa backend serverom i frontend korisničkim interfejsom.
 
 ## Šta ćete postaviti
 
-Potpuna SAVVA mreža se sastoji od:
+Kompletna SAVVA mreža se sastoji od:
 
-1. **Backend Server** - API server zasnovan na Go-u koji obrađuje:
-   - Autentifikaciju korisnika i sesije
-   - Skladištenje i dohvat objava
-   - Integraciju sa IPFS-om
-   - Upravljanje bazom podataka
-   - WebSocket veze
-   - Interakciju sa blockchain-om
+1. **Backend Server** - API server napisan u Go-u koji se bavi:
+   - Autentifikacijom korisnika i sesijama
+   - Čuvanjem i dohvatom objava
+   - Integracijom sa IPFS-om
+   - Upravljaњем bazom podataka
+   - WebSocket konekcijama
+   - Interakcijom sa blockchain-om
 
-2. **UI Website** - Frontend baziran na SolidJS koji obezbeđuje:
+2. **UI Website** - Frontend zasnovan na SolidJS koji obezbeđuje:
    - Korisnički interfejs za kreiranje i pregled sadržaja
    - Integraciju Web3 novčanika
    - Otpremanje fajlova na IPFS
-   - Interakcije sa smart kontraktima
-   - Višejezičnu podršku
+   - Interakcije sa pametnim ugovorima
+   - Podršku za više jezika
+   - SEO sloj: serverom renderovani HTML za pretraživače (Google, Bing, Yandex, Baidu, DuckDuckGo, Apple), AI crawlere (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, ...), i alate za prikazivanje linkova (Telegram, X, Facebook, Discord, Slack, WhatsApp, ...), sa per-domen `robots.txt` i sitemap fajlovima
 
-3. Smart kontrakti:
-   - SAVVA Token kontrakt
-   - Staking kontrakt
-   - Governance kontrakt
-   - Content NFT kontrakt
-   - I ostali...
+3. **Pametni ugovori** :
+   - SAVVA Token ugovor
+   - Staking ugovor
+   - Governance ugovor
+   - Content NFT ugovor
+   - I drugi...
 
 ## Tok instalacije
 
@@ -44,27 +45,27 @@ Potpuna SAVVA mreža se sastoji od:
 
 ## Pregled zahteva
 
-- **Server**: Linux server (preporučeno Ubuntu 20.04+)
+- **Server**: Linux server (preporučuje se Ubuntu 20.04+)
 - **Baza podataka**: PostgreSQL 14+ (ili upravljana baza podataka)
-- **IPFS**: Lokalni IPFS čvor + eksterni pinning servis sa javnim gateway-om
-- **Web server**: Nginx ili Apache
+- **IPFS**: Lokalni IPFS čvor + eksterni pinning servis sa javnim gateway-jem
+- **Web Server**: Nginx ili Apache
 - **Domen**: Naziv domena sa SSL sertifikatom
-- **Blockchain**: RPC pristup Ethereum-kompatibilnoj mreži (preporučeno WSS)
+- **Blockchain**: RPC pristup mreži kompatibilnoj sa Ethereum-om (preporučeno WSS)
 
-## Poštovanje licence
+## Usklađenost sa licencom
 
-**Važno**: Prilikom postavljanja SAVVA, morate se pridržavati GPL-3.0 licence sa SAVVA dodatnim uslovima:
+**Važno**: Prilikom postavljanja SAVVA, morate poštovati licencu GPL-3.0 sa SAVVA dodatnim uslovima:
 
-- Morate koristiti oficijalne SAVVA blockchain kontrakte
-- **Ne smete** kreirati alternativne tokene
-- **Ne smete** menjati ili zamenjivati oficijalne SAVVA kontrakte
-- **Možete** uvesti dodatne kontrakte u sistem
+- Vi **morate** koristiti zvanične SAVVA blockchain ugovore
+- Vi **ne smete** praviti alternativne tokene
+- Vi **ne smete** menjati ili zamenjivati zvanične SAVVA ugovore
+- Vi **možete** uvesti dodatne ugovore u sistem
 
-Pogledajte [UI licencu](../licenses/ui.md) i [Backend licencu](../licenses/backend.md) za detalje.
+Pogledajte [UI License](../licenses/ui.md) i [Backend License](../licenses/backend.md) za detalje.
 
 ## Podrška
 
 Ako naiđete na probleme:
-- Proverite [Uputstva za rešavanje problema](troubleshooting.md)
-- Pregledajte backend i UI repozitorijume
+- Proverite [Troubleshooting](troubleshooting.md)
+- Pregledajte repozitorijume backend-a i UI-a
 - Pridružite se SAVVA zajednici na https://savva.app

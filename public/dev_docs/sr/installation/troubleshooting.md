@@ -1,10 +1,10 @@
 # Otklanjanje problema
 
-Uobičajeni problemi i njihova rešenja.
+Česti problemi i njihova rešenja.
 
-## Problemi na backendu
+## Problemi sa backend-om
 
-### Backend se neće pokrenuti
+### Backend neće da se pokrene
 
 **Simptom**: Servis ne uspeva da se pokrene
 
@@ -25,9 +25,9 @@ sudo lsof -i :8080
 ./savva-backend --validate-config
 ```
 
-### Greške pri konekciji sa bazom podataka
+### Greške pri konekciji ka bazi
 
-**Simptom**: `connection refused` or `authentication failed`
+**Simptom**: `connection refused` ili `authentication failed`
 
 **Rešenja**:
 ```bash
@@ -45,9 +45,9 @@ sudo nano /etc/postgresql/14/main/pg_hba.conf
 sudo systemctl restart postgresql
 ```
 
-### Problemi sa konekcijom na IPFS
+### Problemi sa konekcijom ka IPFS-u
 
-**Simptom**: Ne može da otpremi/učita sa IPFS-a
+**Simptom**: Ne može da se otpremi/preuzme sa IPFS-a
 
 **Rešenja**:
 ```bash
@@ -62,17 +62,17 @@ ipfs daemon &
 curl http://localhost:5001/api/v0/version
 ```
 
-### Visoka potrošnja memorije
+### Velika upotreba memorije
 
 **Simptom**: Backend troši previše memorije
 
 **Rešenja**:
-- Pregledajte podešavanja konekcionog pool-a
-- Proverite zapise za curenje memorije
-- Poništavajte servis periodično
-- Razmotrite povećanje RAM-a na serveru
+- Pregledajte podešavanja connection pool-a
+- Proverite logove na tragove curenja memorije
+- Periodično restartujte servis
+- Razmislite o povećanju RAM-a servera
 
-## Problemi sa UI
+## Problemi sa UI-jem
 
 ### Prazna stranica / beli ekran
 
@@ -96,9 +96,9 @@ npm run build
 sudo cp -r dist/* /var/www/savva-ui/
 ```
 
-### Veza sa API-jem nije uspela
+### Konekcija ka API-ju nije uspela
 
-**Simptom**: UI se ne može povezati na backend
+**Simptom**: UI ne može da se poveže na backend
 
 **Rešenja**:
 ```bash
@@ -120,17 +120,17 @@ curl -I https://api.yourdomain.com
 **Simptom**: Ne može da se poveže MetaMask ili drugi novčanici
 
 **Rešenja**:
-- **Ensure HTTPS**: Web3 zahteva sigurnu vezu
-- **Check wallet extension**: Da li je ekstenzija instalirana i otključana?
-- **Network mismatch**: Novčanik je na pogrešnom lancu?
-- **Check CSP headers**: Mogu blokirati injektovanje novčanika
+- **Obavezno HTTPS**: Web3 zahteva sigurnu vezu
+- **Proverite ekstenziju novčanika**: Da li je instalirana i otključana?
+- **Neusklađenost mreže**: Novčanik na pogrešnom lancu?
+- **Proverite CSP zaglavlja**: Mogu blokirati injektovanje novčanika
 
 ```bash
 # Check Content-Security-Policy header
 curl -I https://yourdomain.com | grep -i content-security
 ```
 
-### Greške pri buildovanju
+### Greške pri izgradnji (build)
 
 **Simptom**: `npm run build` ne uspeva
 
@@ -191,7 +191,7 @@ dig A yourdomain.com +short
 
 ### Firewall blokira konekcije
 
-**Simptom**: Ne može da se pristupi servisima na daljinu
+**Simptom**: Ne može da se pristupi servisima sa udaljenih lokacija
 
 **Rešenja**:
 ```bash
@@ -209,17 +209,89 @@ sudo iptables -L -n
 sudo netstat -tlnp | grep :443
 ```
 
+## SEO / problemi sa otkrivanjem
+
+### `/robots.txt` vraća 404 (ili nginx podrazumevani)
+
+**Simptom**: `curl -s https://yourdomain.com/robots.txt` vraća nginx-ovu podrazumevanu 404 stranicu ili stub umesto stvarnog sadržaja `User-agent: ...`.
+
+**Rešenja**:
+```bash
+# 1. Confirm the SEO discovery rewrites are in your server block,
+#    ABOVE the `location /` block:
+#       location = /robots.txt   { rewrite ^ /api/robots.txt?domain=$default_domain last; }
+#       location = /sitemap.xml  { rewrite ^ /api/sitemap.xml?domain=$default_domain last; }
+#       location ~ ^/sitemap-.*\.xml$ { rewrite ^(/sitemap-[^?]+) /api$1?domain=$default_domain last; }
+sudo nano /etc/nginx/sites-available/yourdomain.com
+
+# 2. Confirm the backend serves the endpoint directly.
+curl -s http://localhost:7000/api/robots.txt?domain=yourdomain.com | head
+# Empty/404 here means the backend is too old - upgrade savva-backend
+# to a version that ships /api/robots.txt and /api/sitemap*.xml.
+
+# 3. Confirm $default_domain matches a key under `domains:` in /etc/savva.yml.
+grep -A1 "^domains:" /etc/savva.yml
+grep "set \$default_domain" /etc/nginx/sites-available/yourdomain.com
+```
+
+### Putanja za bot vraća SPA shell umesto renderovanog HTML-a
+
+**Simptom**: `curl -sA "Googlebot" https://yourdomain.com/` vraća mali `index.html` SPA bundle umesto renderovane stranice sa `<title>`, `og:*` i sadržajem posta.
+
+**Rešenja**:
+```bash
+# 1. Make sure the bot detection regex in `location /` matches the modern
+#    list (googlebot|bingbot|...|gptbot|claudebot|perplexitybot|...).
+#    The 2018-era regex misses every AI crawler.
+
+# 2. Make sure the rewrite uses the new form WITH `last`:
+#       rewrite (.*) /api/render$1?domain=$default_domain&prerender&$args last;
+#    NOT the older form with $scheme://$host$uri or `break`. The backend
+#    no longer accepts the old shape, and `break` skips the /api proxy.
+
+# 3. Confirm the backend renders directly.
+curl -s "http://localhost:7000/api/render/?domain=yourdomain.com&prerender" | head
+```
+
+### Putanja za ljude vraća renderovan HTML umesto SPA-e
+
+**Simptom**: Normalni pregledač pogađa bot putanju i vidi prerenderovan HTML umesto SolidJS aplikacije.
+
+**Rešenja**:
+- Regex za botove je previše gulest (npr. poklapa se sa `mozilla` kao podnizom). `~*` regex mora koristiti ograničene nazive dobavljača — kopirajte regex iz `nginx.conf.example` bez izmena.
+- Nedostaje zaobilaženje statičkih fajlova. Potvrdite da je prisutno `if ($uri ~ \.[a-zA-Z0-9]+$) { set $prerender 0; }` tako da se JS bundle-i, slike i fontovi ne prerenderuju.
+
+### Pregled linka prikazuje pogrešan naslov / sliku / nema pregleda
+
+**Simptom**: Lepljenje SAVVA URL-a u Telegram, X, Discord ili Slack prikazuje zastareli naslov, pogrešnog autora, nema thumbnail ili slika je nepravilno isečena.
+
+**Rešenja**:
+- Potvrdite da je UA unfurlera u bot regexu (npr. `telegrambot|twitterbot|facebookexternalhit|discordbot|slackbot|whatsapp`).
+- Izmene poništavaju keš po URL-u server-side, ali treće strane keširaju agresivno. Primorajte osvežavanje:
+  - **Facebook / WhatsApp / Instagram**: nalepite URL u <https://developers.facebook.com/tools/debug/> i kliknite "Scrape Again".
+  - **X / Twitter**: <https://cards-dev.twitter.com/validator>.
+  - **Telegram / Discord**: obično se očisti u roku od nekoliko minuta; dodavanje bezopasnog query stringa (npr. `?v=2`) zaobilazi keš za jednokratni test.
+
+### Sitemap nema stranice
+
+**Simptom**: `/sitemap.xml` postoji ali ne navodi post, profil, NPO ili tag stranicu koju očekujete.
+
+**Rešenja**:
+- Sitemap-ovi se regenerišu ciklički; vrlo nedavni postovi možda još nisu u poslednjem snimku. Sačekajte jedan ciklus i proverite ponovo.
+- Potvrdite da je post javan — draftovi i privatni sadržaji su namerno izuzeti.
+- Potvrdite da vaš domen kao ključ u `/etc/savva.yml` zaista poseduje sadržaj. Sitemap-ovi su po domenu.
+
 ## Problemi sa performansama
 
 ### Sporo učitavanje stranice
 
-**Simptom**: UI se sporo učitava
+**Simptom**: UI se dugo učitava
 
 **Rešenja**:
 - Omogućite Gzip kompresiju u Nginx-u
-- Podesite CDN (Cloudflare, itd.)
+- Postavite CDN (Cloudflare, itd.)
 - Proverite vreme odgovora backenda
-- Optimizujte upite ka bazi podataka
+- Optimizujte upite baze podataka
 - Omogućite keširanje u pregledaču
 
 ### Visoka upotreba CPU-a
@@ -263,7 +335,7 @@ REINDEX DATABASE savva;
 ## Uobičajene poruke o grešci
 
 ### "connection refused"
-- Servis ne radi
+- Servis nije pokrenut
 - Firewall blokira port
 - Pogrešan host/port u konfiguraciji
 
@@ -273,20 +345,20 @@ REINDEX DATABASE savva;
 - Proverite grant-ove u bazi
 
 ### "CORS policy" greške
-- Backend nema podešen CORS
+- Backend CORS nije konfigurisan
 - Pogrešan origin u allowed_origins
-- Preflight zahtev ne uspeva
+- Preflight zahtev ne prolazi
 
-### "network error" u UI
+### "network error" u UI-ju
 - Backend nije dostupan
 - Pogrešan API URL u UI konfiguraciji
 - Problemi sa SSL sertifikatom
 
-## Dobijanje pomoći
+## Traženje pomoći
 
-Ako problemi i dalje postoje:
+Ako se problemi nastave:
 
-1. **Proverite zapise**:
+1. **Proverite logove**:
    ```bash
    # Backend logs
    sudo journalctl -u savva-backend -n 100 -f
@@ -324,4 +396,4 @@ Ako problemi i dalje postoje:
 
 ---
 
-*Ovaj vodič za otklanjanje problema biće proširen kako budu dokumentovani novi problemi.*
+*Ovaj vodič za otklanjanje problema biće proširen kako se budu beležili novi problemi.*

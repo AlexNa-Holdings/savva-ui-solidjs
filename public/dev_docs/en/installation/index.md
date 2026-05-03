@@ -20,6 +20,7 @@ A complete SAVVA network consists of:
    - IPFS file uploads
    - Smart contract interactions
    - Multi-language support
+   - SEO surface: server-rendered HTML for search engines (Google, Bing, Yandex, Baidu, DuckDuckGo, Apple), AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, ...), and link unfurlers (Telegram, X, Facebook, Discord, Slack, WhatsApp, ...), with per-domain `robots.txt` and sitemaps
 
 3. **Smart Contracts** :
    - SAVVA Token contract
