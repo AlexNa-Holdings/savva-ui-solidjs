@@ -96,17 +96,17 @@ Un exemple complet de configuration est disponible :
 
 ```bash
 # Download the example configuration
-wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/public/dev_docs/en/installation/savva.yml.example
+wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/public/dev_docs/_shared/installation/savva.yml.example
 
 # Or view it locally at:
-# public/dev_docs/en/installation/savva.yml.example
+# public/dev_docs/_shared/installation/savva.yml.example
 
 # Copy to system location
 sudo cp savva.yml.example /etc/savva.yml
 sudo chmod 600 /etc/savva.yml  # Protect configuration file
 ```
 
-**Voir l'exemple complet** : [savva.yml.example](savva.yml.example)
+**Voir l'exemple complet** : [savva.yml.example](/docs/_shared/installation/savva.yml.example)
 
 ### Paramètres de configuration
 

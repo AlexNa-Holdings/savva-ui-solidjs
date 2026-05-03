@@ -144,16 +144,16 @@ SAVVA requiere una configuración completa de Nginx que gestione:
 
 ```bash
 # Download the example configuration
-wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/public/dev_docs/en/installation/nginx.conf.example
+wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/public/dev_docs/_shared/installation/nginx.conf.example
 
 # Or view it locally at:
-# public/dev_docs/en/installation/nginx.conf.example
+# public/dev_docs/_shared/installation/nginx.conf.example
 
 # Edit with your domain and paths
 nano nginx.conf.example
 ```
 
-**Ver el ejemplo completo**: [nginx.conf.example](nginx.conf.example)
+**Ver el ejemplo completo**: [nginx.conf.example](/docs/_shared/installation/nginx.conf.example)
 
 **Características clave incluidas:**
 1. Redirección HTTP a HTTPS

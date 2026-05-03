@@ -35,12 +35,10 @@
   "tokenomics/stake-to-post.md": "1adc5bfedc077a3b0de706d741e09aaf9df94d62fcf986a5aa90da857b289966",
   "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319",
   "core-concepts/encrypted-posts.md": "0c73dc11003c057571a3037a9e8cee0965bd0ec846947cca7037ef2a225235f7",
-  "installation/backend-setup.md": "28a10a8a8d6af1d814a7661f69c02379901157ee8cc4ce723d4fb5b54f3a2631",
+  "installation/backend-setup.md": "8ce80dc0bb091895451ae3ea80f9ab9e75d213fccecd36221edc3a1029b9eadb",
   "installation/configuration.md": "4d6579e1bc1a2a0c94a53146bdac4e2f1644d291ae1a55ec856e4b66ca881e02",
   "installation/index.md": "bbcbea98ee31a65e44c7d93525ac4418a52b1e4948ba8efab2b82ece0cb6dfee",
-  "installation/nginx.conf.example": "2eda9fc5c3e7b70215fcbabcbc120ca72ea5d0bc7799fa389800e6d5b73885fb",
   "installation/prerequisites.md": "bacd3e4c7b75a41bc0e848f6bf9b6c79c79bcc094b658f2bedcd174c8c356a2a",
-  "installation/savva.yml.example": "476b4ccdd3076c77d65bb1293de604f04db578f678b50995f66e199abb186251",
   "installation/troubleshooting.md": "6ff9f9390890446e225c03ede478d54037fa4dcc51103da025b70e56463f38f9",
-  "installation/ui-setup.md": "968da6c8120b00b7211056ffd9d5964f5ca04cd71949d0a3fabd0bb6143d2c1b"
+  "installation/ui-setup.md": "7f331ba18bcf6c4d78a8c9266f6e81fc44630f39d14a18fe72320b897f389581"
 }

@@ -144,16 +144,16 @@ Preuzmite kompletnu Nginx konfiguraciju (šablon):
 
 ```bash
 # Download the example configuration
-wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/public/dev_docs/en/installation/nginx.conf.example
+wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/public/dev_docs/_shared/installation/nginx.conf.example
 
 # Or view it locally at:
-# public/dev_docs/en/installation/nginx.conf.example
+# public/dev_docs/_shared/installation/nginx.conf.example
 
 # Edit with your domain and paths
 nano nginx.conf.example
 ```
 
-Pogledajte kompletan primer: [nginx.conf.example](nginx.conf.example)
+Pogledajte kompletan primer: [nginx.conf.example](/docs/_shared/installation/nginx.conf.example)
 
 Ključne funkcije koje su uključene:
 1. Preusmeravanje HTTP na HTTPS
