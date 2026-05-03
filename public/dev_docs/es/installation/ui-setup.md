@@ -1,15 +1,15 @@
-# Configuración del sitio UI
+# Configuración del sitio web UI
 
 Esta guía cubre la instalación y el despliegue del frontend SAVVA UI.
 
-## Resumen
+## Visión general
 
-La UI de SAVVA es una aplicación de una sola página basada en SolidJS que ofrece:
+La SAVVA UI es una aplicación de una sola página basada en SolidJS que proporciona:
 - Interfaz de creación y navegación de contenido
-- Integración con monederos Web3
+- Integración con wallets Web3
 - Subidas de archivos a IPFS
-- Interacciones con contratos inteligentes
-- Soporte multidioma
+- Interacciones con smart contracts
+- Soporte multilingüe
 
 ## 1. Clonar el repositorio
 
@@ -85,7 +85,7 @@ DEPLOY_PORT=22
 
 ### Configuración adicional
 
-La UI obtiene automáticamente las direcciones de los contratos de la blockchain desde el endpoint `/info` del backend, que lee desde el contrato Config.
+La UI obtiene automáticamente las direcciones de los contratos de blockchain desde el endpoint `/info` del backend, que lee desde el contrato Config.
 
 No se necesitan direcciones de contrato codificadas en la configuración de la UI.
 
@@ -100,7 +100,7 @@ npm run dev
 # Access at http://localhost:5173
 ```
 
-### Compilación para producción
+### Compilación de producción
 
 ```bash
 # Build for production
@@ -125,22 +125,22 @@ npm run release
 # 6. Deploy via SCP (if configured)
 ```
 
-## 5. Desplegar en producción
+## 5. Desplegar a producción
 
-### Opción A: Hospedaje de archivos estáticos
+### Opción A: Hosting de archivos estáticos
 
 La carpeta compilada `dist/` contiene archivos estáticos que pueden ser servidos por cualquier servidor web.
 
-#### Usando Nginx (Recomendado)
+#### Usando Nginx (recomendado)
 
-SAVVA requiere una configuración completa de Nginx que gestione:
+SAVVA requiere una configuración completa de Nginx que maneje:
 - Servicio de archivos estáticos de la UI
-- Proxy del API del backend en `/api`
-- Prerenderizado para bots y discovery SEO (`/robots.txt`, `/sitemap*.xml`)
+- Proxy del backend API en `/api`
+- Prerenderizado para bots y descubrimiento (`/robots.txt`, `/sitemap*.xml`)
 - Endpoint de configuración dinámica
-- Soporte para WebSocket
+- Soporte de WebSocket
 
-**Descarga la plantilla completa de configuración de Nginx:**
+**Descargar la plantilla completa de configuración de Nginx:**
 
 ```bash
 # Download the example configuration
@@ -153,36 +153,36 @@ wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/publi
 nano nginx.conf.example
 ```
 
-**Ver el ejemplo completo**: [nginx.conf.example](/docs/_shared/installation/nginx.conf.example)
+**Ver el ejemplo completo**: [nginx.conf.example](/dev_docs/_shared/installation/nginx.conf.example)
 
 **Características clave incluidas:**
-1. Redirección HTTP a HTTPS
-2. Configuración SSL/TLS (Certificados de origen de Cloudflare o Let's Encrypt)
-3. Endpoint `/default_connect.json` - configuración dinámica **requerida** para la UI (`.yaml` también soportado como fallback)
-4. Prerenderizado para bots - HTML renderizado en el servidor para motores de búsqueda, crawlers de IA y link unfurlers (Google, Bing, Yandex, Baidu, DuckDuckGo, Apple; GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Applebot-Extended, CCBot, Bytespider, Amazonbot, ...; Telegram, X, Facebook, Discord, Slack, WhatsApp, iMessage, LinkedIn, Reddit, Pinterest)
-5. Rutas de descubrimiento SEO - `/robots.txt`, `/sitemap.xml` y `/sitemap-*.xml` proxied al backend por dominio
+1. Redirección de HTTP a HTTPS
+2. Configuración SSL/TLS (Cloudflare Origin Certificates o Let's Encrypt)
+3. Endpoint `/default_connect.json` - configuración dinámica **requerida** para la UI (también se soporta `.yaml` como fallback)
+4. Prerenderizado para bots - HTML renderizado en el servidor para motores de búsqueda, rastreadores de IA y servicios de unfurling (Google, Bing, Yandex, Baidu, DuckDuckGo, Apple; GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Applebot-Extended, CCBot, Bytespider, Amazonbot, ...; Telegram, X, Facebook, Discord, Slack, WhatsApp, iMessage, LinkedIn, Reddit, Pinterest)
+5. Rutas de descubrimiento SEO - `/robots.txt`, `/sitemap.xml` y `/sitemap-*.xml` proxieadas al backend por dominio
 6. Proxy `/api` - reenvía las solicitudes API al backend en el puerto 7000
-7. Soporte WebSocket - para funciones en tiempo real
-8. Servicio de archivos estáticos con routing SPA
+7. Soporte de WebSocket - para funcionalidades en tiempo real
+8. Servicio de archivos estáticos con enrutamiento SPA
 9. Caché inteligente - `index.html` nunca cacheado, assets cacheados por 1 año
 
-#### Qué ofrece la superficie SEO
+#### Qué proporciona esta superficie SEO
 
-Con esta configuración, el backend sirve a los crawlers una versión HTML completamente renderizada de cada página (cuerpo del post, autor, fechas de publicación/actualización, etiquetas, datos estructurados, etiquetas Open Graph con dimensiones de imagen correctas) mientras que los usuarios humanos siguen recibiendo la rápida SPA de SolidJS. Los sitemaps por dominio y el `robots.txt` son generados por el backend, por lo que cada dominio en tu nodo obtiene su propia superficie de descubrimiento, política para crawlers de IA y URLs canónicas.
+Con esta configuración, el backend sirve a los crawlers una versión HTML totalmente renderizada de cada página (cuerpo del post, autor, fechas de publicación/actualización, etiquetas, datos estructurados, meta Open Graph con dimensiones de imagen correctas) mientras que los humanos siguen recibiendo la rápida SPA de SolidJS. Los sitemaps por dominio y `robots.txt` son generados por el backend, por lo que cada dominio en tu nodo obtiene su propia superficie de descubrimiento, política para crawlers de IA y URLs canónicas.
 
 Para que esto funcione, tres cosas deben ser ciertas:
 
-1. El backend (`savva-backend`) está en una versión que incluye los endpoints `/api/render`, `/api/robots.txt` y `/api/sitemap*.xml`.
+1. El backend (`savva-backend`) está en una versión que provee los endpoints `/api/render`, `/api/robots.txt` y `/api/sitemap*.xml`.
 2. Tu dominio tiene una entrada bajo `domains:` en `/etc/savva.yml`, y su clave coincide exactamente con el valor `set $default_domain "..."` en esta configuración de Nginx.
-3. El enrutamiento de Nginx que sigue está en su lugar. (La configuración por defecto con la que muchas implementaciones antiguas empezaron tiene una expresión regular de bots de la era 2018 que no detecta a los crawlers de IA, no tiene rewrites para `/robots.txt` o `/sitemap.xml`, y un patrón de rewrite obsoleto `/api/render/$scheme://$host$uri` que el backend ya no acepta. Si estás actualizando desde una configuración más antigua, reemplaza esas tres partes.)
+3. El enrutamiento de Nginx que se muestra a continuación está en su lugar. (La configuración por defecto que muchas implementaciones antiguas usaron tiene una regex de bots de 2018 que no detecta a los crawlers de IA, no tiene rewrites para `/robots.txt` o `/sitemap.xml`, y un patrón `rewrite` obsoleto `/api/render/$scheme://$host$uri` que el backend ya no acepta. Si estás actualizando desde una configuración vieja, reemplaza esas tres piezas.)
 
 ### Entendiendo default_connect.json
 
-La UI requiere un endpoint `/default_connect.json` que le indique dónde encontrar el backend, qué cadena(s) sirve y la pasarela IPFS (también soporta `/default_connect.yaml` como fallback). Esto se configura directamente en Nginx.
+La UI requiere un endpoint `/default_connect.json` que indique dónde encontrar el backend, qué cadena(s) sirve y la puerta de enlace IPFS (también soporta `/default_connect.yaml` como fallback). Esto se configura directamente en Nginx.
 
-La UI acepta dos esquemas — elige el que coincida con tu despliegue. El nuevo formato `chains` se recomienda para sitios nuevos y multicadena; el formato legado `backendLink` aún funciona.
+La UI acepta dos esquemas — elige el que coincida con tu despliegue. El nuevo formato `chains` es preferido para sitios nuevos y multichain; el formato legado `backendLink` aún funciona.
 
-**Nuevo formato (multicadena):**
+**Formato nuevo (multi-chain):**
 
 ```nginx
 set $default_domain "yourdomain.com";
@@ -212,9 +212,9 @@ location = /default_connect.json {
 }
 ```
 
-La UI obtiene esta configuración al arrancar. El valor `domain` debe coincidir con una clave bajo `domains:` en tu `/etc/savva.yml`, y también es lo que los rewrites SEO pasan al backend como `?domain=` para que pueda resolver qué configuración de dominio renderizar.
+La UI obtiene esta configuración al arrancar. El valor `domain` debe coincidir con una clave bajo `domains:` en tu `/etc/savva.yml`, y también es lo que las reescrituras SEO pasan al backend como `?domain=` para que pueda resolver qué configuración de dominio renderizar.
 
-Personalizar la configuración:
+**Personaliza la configuración:**
 
 Edita estas variables clave en el archivo descargado:
 
@@ -234,9 +234,9 @@ ssl_certificate     /etc/ssl/cloudflare/yourdomain.com.crt;
 ssl_certificate_key /etc/ssl/cloudflare/yourdomain.com.key;
 ```
 
-Luego actualiza el `chainId` / `rpc` (o las variables legadas `set $default_backend` / `set $default_ipfs`) dentro del bloque `/default_connect.json` para que coincidan con tu cadena.
+Luego actualiza el `chainId` / `rpc` (o el legado `set $default_backend` / `set $default_ipfs`) dentro del bloque `/default_connect.json` para que coincida con tu cadena.
 
-Desplegar archivos y habilitar el sitio:
+**Desplegar archivos y habilitar el sitio:**
 
 ```bash
 # Create web directory
@@ -312,9 +312,9 @@ curl https://yourdomain.com
 # Should return HTML with SAVVA UI content
 ```
 
-### Pruebas rápidas de la superficie SEO
+### Pruebas básicas de la superficie SEO
 
-Después de recargar Nginx, verifica que los bots, crawlers y archivos de descubrimiento lleguen al backend correctamente. Reemplaza `yourdomain.com` por tu nombre de host real.
+Después de recargar Nginx, verifica que los bots, crawlers y archivos de descubrimiento lleguen correctamente al backend. Reemplaza `yourdomain.com` por tu hostname real.
 
 ```bash
 # 1. Bot path returns rendered HTML (post body, title, OG tags), NOT the SPA shell.
@@ -338,22 +338,22 @@ curl -sA "Mozilla/5.0 Chrome/120" https://yourdomain.com/ | head -5
 # Expect: SPA shell (small index.html), NOT bot-rendered HTML.
 ```
 
-Si alguno de estos devuelve la SPA shell cuando no debería (o viceversa), las causas más comunes son:
+Si cualquiera de estas devuelve la SPA shell cuando no debería (o viceversa), las causas más comunes son:
 
-- El backend aún no ejecuta una versión que incluya `/api/render`, `/api/robots.txt` y `/api/sitemap*.xml`.
+- El backend aún no está ejecutando una versión que provea `/api/render`, `/api/robots.txt` y `/api/sitemap*.xml`.
 - El valor `set $default_domain "..."` en tu configuración de Nginx no coincide con una clave bajo `domains:` en `/etc/savva.yml`.
 - Tu upstream `/api` no es accesible desde el host de Nginx (`curl -s http://localhost:7000/api/info` desde el host de Nginx debería devolver JSON).
 
 Abrir en el navegador:
 - Navega a `https://yourdomain.com`
-- La UI debería cargarse y conectarse al backend
+- La UI debería cargar y conectarse al backend
 - Revisa la consola del navegador por errores
 
-## 7. Configuración posterior al despliegue
+## 7. Configuración post-despliegue
 
 ### Actualizar CORS del backend
 
-Asegúrate de que el backend permita tu dominio UI:
+Asegúrate de que el backend permita tu dominio de UI:
 
 ```yaml
 # In backend config.yaml
@@ -363,12 +363,12 @@ cors:
     - "https://www.yourdomain.com"
 ```
 
-### Configurar CDN (Opcional)
+### Configurar CDN (opcional)
 
-Para mejor rendimiento, considera usar un CDN:
+Para un mejor rendimiento, considera usar un CDN:
 
 - **Cloudflare**: Añade el sitio a Cloudflare, actualiza DNS
-- **AWS CloudFront**: Crea una distribución apuntando al origin
+- **AWS CloudFront**: Crea una distribución apuntando al origen
 - **Otros CDNs**: Sigue la documentación del proveedor
 
 ### Configurar monitorización
@@ -382,7 +382,7 @@ Añade monitorización para tiempo de actividad y errores:
 
 ## Solución de problemas
 
-### Fallo en la compilación
+### La compilación falla
 
 ```bash
 # Clear cache and reinstall
@@ -395,7 +395,7 @@ node --version  # Should be v18+
 
 ### Problemas de conexión con el backend
 
-- Revisa `VITE_BACKEND_URL` en `.env`
+- Comprueba `VITE_BACKEND_URL` en `.env`
 - Verifica la configuración CORS del backend
 - Revisa la consola del navegador por errores
 - Prueba la salud del backend: `curl https://api.yourdomain.com/api/info`
@@ -404,12 +404,12 @@ node --version  # Should be v18+
 
 - Revisa la consola del navegador por errores de JavaScript
 - Verifica que todos los assets se carguen correctamente
-- Revisa la configuración de Nginx para el routing SPA
+- Comprueba la configuración de Nginx para el enrutamiento SPA
 - Asegúrate de que la directiva `try_files` esté configurada correctamente
 
-### El monedero Web3 no se conecta
+### La cartera Web3 no se conecta
 
-- Comprueba que HTTPS esté habilitado (requerido para Web3)
+- Comprueba si HTTPS está habilitado (requerido para Web3)
 - Verifica que la URL RPC de la blockchain sea accesible
-- Comprueba que la extensión del monedero esté instalada en el navegador
+- Comprueba que la extensión de wallet del navegador esté instalada
 - Revisa las cabeceras de Content Security Policy

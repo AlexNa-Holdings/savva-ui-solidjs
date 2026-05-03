@@ -153,7 +153,7 @@ wget https://raw.githubusercontent.com/savva-network/savva-ui-solidjs/main/publi
 nano nginx.conf.example
 ```
 
-**View the complete example**: [nginx.conf.example](/docs/_shared/installation/nginx.conf.example)
+**View the complete example**: [nginx.conf.example](/dev_docs/_shared/installation/nginx.conf.example)
 
 **Key features included:**
 1. HTTP to HTTPS redirect

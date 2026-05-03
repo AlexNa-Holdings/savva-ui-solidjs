@@ -35,10 +35,10 @@
   "tokenomics/stake-to-post.md": "1adc5bfedc077a3b0de706d741e09aaf9df94d62fcf986a5aa90da857b289966",
   "tokenomics/staking.md": "4fff1e238e8fdf53610b6034a7050c930e87407192ec48f4f652083d83f87319",
   "core-concepts/encrypted-posts.md": "0c73dc11003c057571a3037a9e8cee0965bd0ec846947cca7037ef2a225235f7",
-  "installation/backend-setup.md": "8ce80dc0bb091895451ae3ea80f9ab9e75d213fccecd36221edc3a1029b9eadb",
+  "installation/backend-setup.md": "5a67c8713bcfcbd8edb29c449f0a86ce71f5448e2ad6d7ca4a723dfa6f890884",
   "installation/configuration.md": "4d6579e1bc1a2a0c94a53146bdac4e2f1644d291ae1a55ec856e4b66ca881e02",
   "installation/index.md": "bbcbea98ee31a65e44c7d93525ac4418a52b1e4948ba8efab2b82ece0cb6dfee",
   "installation/prerequisites.md": "bacd3e4c7b75a41bc0e848f6bf9b6c79c79bcc094b658f2bedcd174c8c356a2a",
   "installation/troubleshooting.md": "6ff9f9390890446e225c03ede478d54037fa4dcc51103da025b70e56463f38f9",
-  "installation/ui-setup.md": "7f331ba18bcf6c4d78a8c9266f6e81fc44630f39d14a18fe72320b897f389581"
+  "installation/ui-setup.md": "76f4059b4e68d4eb5f549c56ae59715173ca863f30fa82c1213b4904618b1c61"
 }

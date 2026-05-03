@@ -62,6 +62,7 @@ server {
 		text/html              html htm;
 		application/javascript js;
 		text/css               css;
+		text/plain             example conf;
 	}
 
 	# ---- SEO discovery -------------------------------------------------

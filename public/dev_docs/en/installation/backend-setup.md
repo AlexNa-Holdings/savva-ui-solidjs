@@ -106,7 +106,7 @@ sudo cp savva.yml.example /etc/savva.yml
 sudo chmod 600 /etc/savva.yml  # Protect configuration file
 ```
 
-**View the complete example**: [savva.yml.example](/docs/_shared/installation/savva.yml.example)
+**View the complete example**: [savva.yml.example](/dev_docs/_shared/installation/savva.yml.example)
 
 ### Configuration Parameters
 
