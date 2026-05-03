@@ -7,17 +7,29 @@ import DocsContent from "../docs/DocsContent.jsx";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 
 const trim = (s) => String(s || "").replace(/^\/+|\/+$/g, "");
+const hasExt = (s) => /\.[a-z0-9]+$/i.test(s);
+
+// URLs are extension-less for markdown docs (so they're shareable on nginx
+// configs that 404 on URLs ending in a file extension). Append `.md` here
+// when the route doesn't already carry an extension.
 const fileFromRoute = (route) => {
   if (!String(route || "").startsWith("/docs")) return "index.md";
-  const rest = String(route).slice("/docs".length);
-  return trim(rest) || "index.md";
+  const rest = trim(String(route).slice("/docs".length));
+  if (!rest) return "index.md";
+  return hasExt(rest) ? rest : `${rest}.md`;
 };
 
 export default function Docs() {
   const app = useApp();
   const { route, navigate } = useHashRouter();
   const file = createMemo(() => fileFromRoute(route()));
-  const onPick = (rel) => navigate(`/docs/${trim(rel || "index.md")}`);
+  const onPick = (rel) => {
+    const cleaned = trim(rel || "index.md");
+    if (cleaned === "index.md") return navigate("/docs");
+    // Strip `.md` so the URL is shareable; keep other extensions verbatim.
+    const target = cleaned.replace(/\.md$/i, "");
+    navigate(`/docs/${target}`);
+  };
   const title = createMemo(() => app.t("docs.title"));
 
   return (
