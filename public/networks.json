@@ -14,10 +14,10 @@
     }
   },
   {
-    "api": "https://pls.savva.app/api",
+    "api": "https://monad.savva.app/api",
     "domain": "paris.camp",
     "url": "https://paris.camp",
-    "chainId": 369,
+    "chainId": 143,
     "note": {
       "en": "Art, music, and culture community for creators and supporters",
       "ru": "Сообщество искусства, музыки и культуры для авторов и ценителей",
@@ -28,10 +28,10 @@
     }
   },
   {
-    "api": "https://pls.savva.app/api",
+    "api": "https://monad.savva.app/api",
     "domain": "pacta-civitas.org",
     "url": "https://pacta-civitas.org",
-    "chainId": 369,
+    "chainId": 143,
     "note": {
       "en": "Community of free individuals responsible for their words and actions",
       "ru": "Сообщество свободных людей, ответственных за свои слова и поступки",
