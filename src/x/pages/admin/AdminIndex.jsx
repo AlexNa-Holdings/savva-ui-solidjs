@@ -11,6 +11,10 @@ const SECTIONS = [
     titleKey: "admin.page.section.communication",
     pages: [{ key: "broadcast", titleKey: "admin.broadcast.navTitle" }],
   },
+  {
+    titleKey: "admin.page.section.diagnostics",
+    pages: [{ key: "logs", titleKey: "admin.logs.navTitle" }],
+  },
 ];
 
 export default function AdminIndex(props) {

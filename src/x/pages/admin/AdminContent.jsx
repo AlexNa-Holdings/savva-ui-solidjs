@@ -2,6 +2,7 @@
 import { Switch, Match } from "solid-js";
 import DomainConfigPage from "./DomainConfigPage.jsx";
 import BroadcastPage from "./BroadcastPage.jsx";
+import LogsPage from "./LogsPage.jsx";
 
 export default function AdminContent(props) {
   return (
@@ -11,6 +12,9 @@ export default function AdminContent(props) {
       </Match>
       <Match when={props.pageKey === "broadcast"}>
         <BroadcastPage />
+      </Match>
+      <Match when={props.pageKey === "logs"}>
+        <LogsPage />
       </Match>
     </Switch>
   );
