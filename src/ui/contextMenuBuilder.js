@@ -1,17 +1,34 @@
 // src/x/ui/contextMenuBuilder.js
 import { pushToast } from "./toast.js";
 import { getPostContentBaseCid } from "../ipfs/utils.js";
+import { ipfs } from "../ipfs/index.js";
 import { listRemovePost, listPinPost, listUnpinPost } from "../blockchain/adminCommands.js";
 import { dbg } from "../utils/debug.js";
 import AnnounceIcon from "../x/ui/icons/AnnounceIcon.jsx";
 
-// Clipboard helper
-function copyToClipboard(text, label, t) {
-  if (!text) return;
-  navigator.clipboard
-    .writeText(text)
-    .then(() => pushToast({ type: "success", message: t("clipboard.copied", { label }) }))
-    .catch((err) => console.error(`Failed to copy ${label}:`, err));
+// Resolve the best IPFS gateway available (local node if enabled, else first remote, else public).
+function bestIpfsGateway() {
+  try {
+    const app = typeof window !== "undefined" ? window.__app : null;
+    if (app) {
+      if (app.localIpfsEnabled?.() && app.localIpfsGateway?.()) return app.localIpfsGateway();
+      const remote = app.remoteIpfsGateways?.()[0];
+      if (remote) return remote;
+    }
+  } catch {}
+  return "https://ipfs.io/";
+}
+
+// Open a CID / IPFS path in a new tab via the active IPFS gateway.
+function openInGateway(cidPath, label) {
+  if (!cidPath) return;
+  const url = ipfs.buildUrl(bestIpfsGateway(), cidPath);
+  if (!url) return;
+  try {
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch (err) {
+    console.error(`Failed to open ${label}:`, err);
+  }
 }
 
 // Dispatch to AdminActionsBridge
@@ -96,16 +113,16 @@ export function getPostAdminItems(post, t) {
   // Utilities
   items.push(
     {
-      label: t("postcard.copySavvaCid"),
-      onClick: () => copyToClipboard(savvaCid, "SAVVA CID", t),
+      label: t("postcard.openSavvaCid"),
+      onClick: () => openInGateway(savvaCid, "SAVVA CID"),
     },
     {
-      label: t("postcard.copyDescriptorCid"),
-      onClick: () => copyToClipboard(descriptorPath, "Descriptor Path", t),
+      label: t("postcard.openDescriptorCid"),
+      onClick: () => openInGateway(descriptorPath, "Descriptor Path"),
     },
     {
-      label: t("postcard.copyDataCid"),
-      onClick: () => copyToClipboard(dataCid, "Data CID", t),
+      label: t("postcard.openDataCid"),
+      onClick: () => openInGateway(dataCid, "Data CID"),
     }
   );
 

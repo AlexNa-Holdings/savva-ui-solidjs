@@ -90,7 +90,13 @@ async function fetchInfo(base) {
 
 async function tryLoadYaml(url) {
   dlog("assets:tryLoadYaml", { url });
-  const res = await fetch(url, { cache: "no-store" });
+  let res;
+  try {
+    res = await fetch(url, { cache: "no-store" });
+  } catch (e) {
+    dwarn("assets:tryLoadYaml:network_error", { url, error: String(e) });
+    return null;
+  }
   if (!res.ok) {
     dlog("assets:tryLoadYaml:miss", { url, status: res.status });
     return null;
