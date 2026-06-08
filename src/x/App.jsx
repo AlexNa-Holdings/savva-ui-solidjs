@@ -93,7 +93,7 @@ export default function App() {
 
   const currentView = createMemo(() => {
     const r = route();
-    if (r.startsWith("/post/")) return "post";
+    if (r.startsWith("/post/") || r.startsWith("/content/")) return "post";
     if (r.startsWith("/settings")) return "settings";
     if (r.startsWith("/docs")) return "docs";
     if (r.startsWith("/profile-edit/")) return "profile-edit";
