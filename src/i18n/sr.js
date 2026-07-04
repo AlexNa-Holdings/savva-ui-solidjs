@@ -125,6 +125,8 @@ export default {
   "buyburn.actions.retry": "Pokušaj ponovo",
   "buyburn.actions.transferGain": "Prenesi u Buy & Burn",
   "buyburn.connectTitle": "Povežite novčanik",
+  "buyburn.contract.label": "Adresa Buy & Burn ugovora",
+  "buyburn.contract.note": "Na ovu adresu šaljite samo {savva} ili {base} tokene. Svi drugi poslati tokeni će biti izgubljeni.",
   "buyburn.description": "SAVVA platforma nudi mnoge usluge za promociju objavljenog sadržaja. Svi domaći tokeni prikupljeni za ove usluge se akumuliraju u Buy&Burn ugovoru. Ovaj ugovor ima samo jednu funkciju: kupuje SAVVA tokene na berzi i zatim ih sve spaljuje. Ovaj proces povećava cenu SAVVA tokena i smanjuje njihovu ukupnu ponudu.",
   "buyburn.error.load": "Ne možemo da učitamo Buy & Burn podatke.",
   "buyburn.installDescription": "Instalirajte kompatibilno proširenje novčanika (na primer MetaMask) da biste koristili Buy & Burn.",

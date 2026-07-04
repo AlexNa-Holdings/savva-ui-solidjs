@@ -5,6 +5,7 @@ import { configuredHttp } from "../../blockchain/contracts.js";
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import Spinner from "../ui/Spinner.jsx";
+import Address from "../ui/Address.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import {
   connectWallet,
@@ -28,6 +29,8 @@ export default function BuyBurnPage() {
   const pv = () => app.info()?.protocol_version ?? 1;
   const savvaTokenAddress = createMemo(() => app.info()?.savva_contracts?.SavvaToken?.address || "");
   const baseTokenSymbol = createMemo(() => app.desiredChain()?.nativeCurrency?.symbol || "PLS");
+  const savvaTokenSymbol = createMemo(() => app.desiredChain()?.savvaTokenSymbol || "SAVVA");
+  const buyBurnAddress = createMemo(() => app.info()?.savva_contracts?.BuyBurn?.address || "");
 
   const statsSource = createMemo(() => {
     const info = app.info();
@@ -324,6 +327,18 @@ export default function BuyBurnPage() {
                     {isProcessing() ? t("common.working") : t("buyburn.actions.buy")}
                   </button>
                 </div>
+
+                <Show when={buyBurnAddress()}>
+                  <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-2">
+                    <div class="text-xs uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                      {t("buyburn.contract.label")}
+                    </div>
+                    <Address address={buyBurnAddress()} format="full" />
+                    <p class="text-xs text-[hsl(var(--muted-foreground))]">
+                      {t("buyburn.contract.note", { savva: savvaTokenSymbol(), base: baseTokenSymbol() })}
+                    </p>
+                  </div>
+                </Show>
 
                 <div class="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--accent)/0.08)] p-4 space-y-4">
                   <div class="space-y-2">

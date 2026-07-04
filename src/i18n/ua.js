@@ -125,6 +125,8 @@ export default {
   "buyburn.actions.retry": "Повторити",
   "buyburn.actions.transferGain": "Перевести до Buy & Burn",
   "buyburn.connectTitle": "Підключіть гаманець",
+  "buyburn.contract.label": "Адреса контракту Buy & Burn",
+  "buyburn.contract.note": "Надсилайте на цю адресу лише токени {savva} або {base}. Будь-які інші токени буде втрачено.",
   "buyburn.description": "Платформа SAVVA надає безліч сервісів для просування опублікованого контенту. Всі нативні токени, зібрані за ці послуги, накопичуються в контракті Buy&Burn. Цей контракт має одну функцію: купувати токени SAVVA на біржі та спалювати всі отримані токени. Цей процес підвищує ціну токенів SAVVA та зменшує їх загальну кількість.",
   "buyburn.error.load": "Не вдалося завантажити дані Buy & Burn.",
   "buyburn.installDescription": "Встановіть сумісне розширення гаманця (наприклад, MetaMask), щоб використовувати Buy & Burn.",

@@ -125,6 +125,8 @@ export default {
   "buyburn.actions.retry": "Réessayer",
   "buyburn.actions.transferGain": "Transférer vers Buy & Burn",
   "buyburn.connectTitle": "Connectez votre portefeuille",
+  "buyburn.contract.label": "Adresse du contrat Buy & Burn",
+  "buyburn.contract.note": "N'envoyez que des tokens {savva} ou {base} à cette adresse. Tout autre token envoyé sera perdu.",
   "buyburn.description": "La plateforme SAVVA offre de nombreux services pour promouvoir le contenu publié. Tous les tokens natifs collectés pour ces services sont accumulés dans le contrat Buy&Burn. Ce contrat a une seule fonction : acheter des tokens SAVVA sur l'échange puis brûler tous les tokens SAVVA reçus. Ce processus augmente le prix des tokens SAVVA et réduit leur offre totale.",
   "buyburn.error.load": "Impossible de charger les données Buy & Burn.",
   "buyburn.installDescription": "Installez une extension de portefeuille compatible (par exemple MetaMask) pour utiliser Buy & Burn.",
