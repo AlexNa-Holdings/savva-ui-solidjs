@@ -333,7 +333,7 @@ export default function DomainConfigPage() {
       const domain = domainName();
       const base = httpBase();
       const url = `${base}ipfs-assets?domain=${encodeURIComponent(domain)}`;
-      const res = await fetch(url, { method: "GET", credentials: "include", cache: "no-store" });
+      const res = await fetch(url, { method: "POST", credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(text || `${res.status} ${res.statusText}`);

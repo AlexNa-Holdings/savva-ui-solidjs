@@ -126,7 +126,7 @@ export function useAppAuth() {
   async function logout() {
     dbg?.log?.("auth", "logout:start");
     try {
-      await fetch(`${httpBase()}logout`, { credentials: "include" });
+      await fetch(`${httpBase()}logout`, { method: "POST", credentials: "include" });
     } catch {
       // non-fatal
     }
