@@ -12,7 +12,7 @@ Evo kako funkcioniše proces upravljanja:
 
 * `Implementacija odobrenih predloga:` Ako predlog dobije dovoljnu podršku kroz proces glasanja, on se sprovodi, a Config parametri se ažuriraju u skladu sa tim. To znači da se pravila i podešavanja platforme mogu prilagoditi kako bi odgovarala rastućim potrebama i željama SAVVA zajednice.
 
-Kreiranje predloga unutar sistema upravljanja SAVVA platforme ima cenu u vidu PLS tokena. Kada korisnici pokrenu predlog, potrebno je da plate određenu količinu PLS tokena kao deo procesa kreiranja predloga. Važno je da PLS tokeni korišćeni za kreiranje predloga nisu zadržani od strane platforme ili bilo koje centralizovane entitete.
+Kreiranje predloga unutar sistema upravljanja SAVVA platforme ima cenu u vidu MON tokena. Kada korisnici pokrenu predlog, potrebno je da plate određenu količinu MON tokena kao deo procesa kreiranja predloga. Važno je da MON tokeni korišćeni za kreiranje predloga nisu zadržani od strane platforme ili bilo koje centralizovane entitete.
 
 Umesto toga, ovi tokeni se prenose na ugovor za kupovinu i sagorevanje, doprinoseći kontinuiranom mehanizmu 'kupovine i sagorevanja' unutar platforme. Ugovor za 'kupovinu i sagorevanje' sistematski kupuje SAVVA tokene i potom ih sagoreva, smanjujući ukupnu ponudu tokena. Ovaj proces stvara oskudicu i vrednost za SAVVA token, što koristi celom ekosistemu.
 

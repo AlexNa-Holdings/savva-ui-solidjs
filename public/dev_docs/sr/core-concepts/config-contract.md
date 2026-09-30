@@ -27,12 +27,12 @@ Sledeća tabela detaljno prikazuje globalne parametre koje trenutno upravlja `Co
 | `winnerShare` | Uint | procenat | Udeo nagrade runde iz fonda u procentima. |
 | `minFundToShare` | Uint | SAVVA | Minimalni iznos fonda potreban za deljenje nagrada, u SAVVA tokenima. |
 | `staking_withdraw_delay` | Uint | sekunde | Period hlađenja za staking u sekundama. |
-| `contentNFT_mintPrice` | Uint | PLS | Cena za mintovanje sadržajnog NFT-a. |
-| `pulsex_slippage` | Uint | procenat | Tolerancija na klizanje za PulseX zamene (rezerva/minimalni iznos). |
+| `contentNFT_mintPrice` | Uint | MON | Cena za mintovanje sadržajnog NFT-a. |
+| `dex_slippage` | Uint | procenat | Tolerancija na klizanje za DEX zamene (rezerva/minimalni iznos). |
 | `min_staked_to_post` | Uint | SAVVA | Minimalni ulog SAVVA potreban za postavljanje sadržaja. |
-| `sac_min_deposit` | Uint | PLS | Minimalni depozit za fazu žrtvovanja. |
+| `sac_min_deposit` | Uint | MON | Minimalni depozit za fazu žrtvovanja. |
 | `patron_payment_period` | Uint | sekunde | Trajanje perioda plaćanja donatora u sekundama. |
-| `gov_proposal_price` | Uint | PLS | Cena za kreiranje novog predloga za upravljanje. |
+| `gov_proposal_price` | Uint | MON | Cena za kreiranje novog predloga za upravljanje. |
 | `nft_auction_max_duration` | Uint | sekunde | Maksimalno trajanje za NFT aukciju u sekundama. |
 | `nft_auction_min_increment` | Uint | procenat | Minimalno povećanje ponude za NFT aukciju u procentima. |
 | `nft_auction_max_increment` | Uint | procenat | Maksimalno povećanje ponude za NFT aukciju u procentima. |
@@ -54,6 +54,6 @@ Sledeća tabela detaljno prikazuje globalne parametre koje trenutno upravlja `Co
 | `contract_buyBurn` | Adresa | | Adresa ugovora za kupovinu i spaljivanje. |
 | `contract_listMarket` | Adresa | | Adresa ugovora za tržište lista. |
 | `contract_authorOfTheMonth` | Adresa | | Adresa ugovora za autora meseca. |
-| `pulsex_factory` | Adresa | | PulseX fabrika ugovora za kupovinu i spaljivanje. |
-| `pulsex_router` | Adresa | | PulseX ruter ugovora za kupovinu i spaljivanje. |
-| `WPLS` | Adresa | | Adresa ugovora za Wrapped PLS (WPLS). |
+| `dex_factory` | Adresa | | DEX fabrika ugovora za kupovinu i spaljivanje. |
+| `dex_router` | Adresa | | DEX ruter ugovora za kupovinu i spaljivanje. |
+| `WETH` | Adresa | | Adresa ugovora za Wrapped MON (WMON). |

@@ -202,7 +202,7 @@ Vous avez besoin d'accès à un réseau blockchain compatible Ethereum. SAVVA pr
 Nous recommandons d'utiliser **AllNodes** ou des fournisseurs de nœuds gérés similaires :
 
 1. **AllNodes** (https://www.allnodes.com)
-   - Prend en charge PulseChain, Ethereum et d'autres chaînes EVM
+   - Prend en charge Monad, Ethereum et d'autres chaînes EVM
    - Points de terminaison HTTPS et WSS
    - Haute disponibilité et redondance
    - Forfaits à partir d'environ 20 $/mois
@@ -215,7 +215,7 @@ Nous recommandons d'utiliser **AllNodes** ou des fournisseurs de nœuds gérés 
 
 **Étapes de configuration** :
 1. Créez un compte chez le fournisseur choisi
-2. Créez un nouveau nœud/point de terminaison pour votre chaîne (par ex., PulseChain)
+2. Créez un nouveau nœud/point de terminaison pour votre chaîne (par ex., Monad)
 3. Récupérez les URLs des points de terminaison HTTPS et WSS
 4. Configurez le backend pour utiliser le point de terminaison WSS pour des performances optimales
 
@@ -228,19 +228,19 @@ Exécutez votre propre nœud blockchain pour un contrôle maximal :
 - **Stockage** : SSD de 500 Go ou plus (augmente avec le temps)
 - **Temps de synchronisation** : plusieurs heures à plusieurs jours selon la chaîne
 
-Pour PulseChain :
+Pour Monad :
 ```bash
-# Example: Running a PulseChain node with go-pulse
-# See official PulseChain documentation for detailed setup
+# Example: Running a Monad node
+# See official Monad documentation for detailed setup
 ```
 
 **Exigences réseau** :
 - URL du point de terminaison RPC (HTTPS ou WSS)
 - **Recommandé** : point de terminaison WSS pour un traitement d'événements plus rapide
 - Clé privée pour le déploiement des contrats (si vous déployez sur un réseau neuf)
-- Tokens natifs pour les frais de gaz (PLS pour PulseChain, ETH pour Ethereum, etc.)
+- Tokens natifs pour les frais de gaz (MON pour Monad, ETH pour Ethereum, etc.)
 
-**Remarque** : Tous les contrats intelligents nécessaires à SAVVA sont déjà déployés sur PulseChain. Voir [Official Contract Addresses](../licenses/official-contracts.md) pour la liste complète.
+**Remarque** : Tous les contrats intelligents nécessaires à SAVVA sont déjà déployés sur Monad. Voir [Official Contract Addresses](../licenses/official-contracts.md) pour la liste complète.
 
 ## Configuration réseau
 

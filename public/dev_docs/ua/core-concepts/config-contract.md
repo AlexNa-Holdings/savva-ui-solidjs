@@ -27,12 +27,12 @@
 | `winnerShare` | Uint | відсотки | Частка призу раунду фонду в відсотках. |
 | `minFundToShare` | Uint | SAVVA | Мінімальна сума фонду, необхідна для розподілу призів, в токенах SAVVA. |
 | `staking_withdraw_delay` | Uint | секунди | Період охолодження стейкінгу в секундах. |
-| `contentNFT_mintPrice` | Uint | PLS | Ціна на карбування NFT контенту. |
-| `pulsex_slippage` | Uint | відсотки | Допустиме відхилення для обміну PulseX (резерв/мінімальна сума). |
+| `contentNFT_mintPrice` | Uint | MON | Ціна на карбування NFT контенту. |
+| `dex_slippage` | Uint | відсотки | Допустиме відхилення для обміну DEX (резерв/мінімальна сума). |
 | `min_staked_to_post` | Uint | SAVVA | Мінімальна сума стейкованих SAVVA, необхідна для публікації контенту. |
-| `sac_min_deposit` | Uint | PLS | Мінімальний депозит для фази жертви. |
+| `sac_min_deposit` | Uint | MON | Мінімальний депозит для фази жертви. |
 | `patron_payment_period` | Uint | секунди | Тривалість періоду виплат патронів в секундах. |
-| `gov_proposal_price` | Uint | PLS | Ціна на створення нової пропозиції з управління. |
+| `gov_proposal_price` | Uint | MON | Ціна на створення нової пропозиції з управління. |
 | `nft_auction_max_duration` | Uint | секунди | Максимальна тривалість аукціону NFT в секундах. |
 | `nft_auction_min_increment` | Uint | відсотки | Мінімальне збільшення ставки для аукціону NFT в відсотках. |
 | `nft_auction_max_increment` | Uint | відсотки | Максимальне збільшення ставки для аукціону NFT в відсотках. |
@@ -54,6 +54,6 @@
 | `contract_buyBurn` | Address | | Адреса контракту Buy & Burn. |
 | `contract_listMarket` | Address | | Адреса контракту List Market. |
 | `contract_authorOfTheMonth` | Address | | Адреса контракту Автор місяця. |
-| `pulsex_factory` | Address | | Контракт фабрики PulseX для Buy & Burn. |
-| `pulsex_router` | Address | | Контракт маршрутизатора PulseX для Buy & Burn. |
-| `WPLS` | Address | | Адреса контракту Wrapped PLS (WPLS). |
+| `dex_factory` | Address | | Контракт фабрики DEX для Buy & Burn. |
+| `dex_router` | Address | | Контракт маршрутизатора DEX для Buy & Burn. |
+| `WETH` | Address | | Адреса контракту Wrapped MON (WMON). |

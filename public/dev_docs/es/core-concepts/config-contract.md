@@ -27,12 +27,12 @@ La siguiente tabla detalla los parámetros globales que actualmente gestiona el 
 | `winnerShare` | Uint | porcientos | La porción del premio de la ronda del fondo en porcientos. |
 | `minFundToShare` | Uint | SAVVA | La cantidad mínima del fondo requerida para repartir premios, en tokens SAVVA. |
 | `staking_withdraw_delay` | Uint | segundos | El período de enfriamiento (cooldown) de staking en segundos. |
-| `contentNFT_mintPrice` | Uint | PLS | El precio para acuñar un NFT de contenido. |
-| `pulsex_slippage` | Uint | porcientos | La tolerancia de deslizamiento para swaps en PulseX (reserva/importe mínimo). |
+| `contentNFT_mintPrice` | Uint | MON | El precio para acuñar un NFT de contenido. |
+| `dex_slippage` | Uint | porcientos | La tolerancia de deslizamiento para swaps en DEX (reserva/importe mínimo). |
 | `min_staked_to_post` | Uint | SAVVA | La cantidad mínima de SAVVA en stake requerida para publicar contenido. |
-| `sac_min_deposit` | Uint | PLS | El depósito mínimo para la fase de sacrificio. |
+| `sac_min_deposit` | Uint | MON | El depósito mínimo para la fase de sacrificio. |
 | `patron_payment_period` | Uint | segundos | La duración de un período de pago de patrocinador en segundos. |
-| `gov_proposal_price` | Uint | PLS | El precio para crear una nueva propuesta de gobernanza. |
+| `gov_proposal_price` | Uint | MON | El precio para crear una nueva propuesta de gobernanza. |
 | `nft_auction_max_duration` | Uint | segundos | La duración máxima para una subasta de NFT en segundos. |
 | `nft_auction_min_increment` | Uint | porcientos | El incremento mínimo de puja para una subasta de NFT en porcientos. |
 | `nft_auction_max_increment` | Uint | porcientos | El incremento máximo de puja para una subasta de NFT en porcientos. |
@@ -54,6 +54,6 @@ La siguiente tabla detalla los parámetros globales que actualmente gestiona el 
 | `contract_buyBurn` | Address | | Dirección del contrato de Buy & Burn. |
 | `contract_listMarket` | Address | | Dirección del contrato de List Market. |
 | `contract_authorOfTheMonth` | Address | | Dirección del contrato Author of the Month. |
-| `pulsex_factory` | Address | | Contrato factory de PulseX para Buy & Burn. |
-| `pulsex_router` | Address | | Contrato router de PulseX para Buy & Burn. |
-| `WPLS` | Address | | Dirección del contrato Wrapped PLS (WPLS). |
+| `dex_factory` | Address | | Contrato factory de DEX para Buy & Burn. |
+| `dex_router` | Address | | Contrato router de DEX para Buy & Burn. |
+| `WETH` | Address | | Dirección del contrato Wrapped MON (WMON). |

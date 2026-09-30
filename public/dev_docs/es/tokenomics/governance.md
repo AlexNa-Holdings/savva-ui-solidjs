@@ -12,7 +12,7 @@ Así funciona el proceso de gobernanza:
 
 * `Implementation of Approved Proposals:` Si una propuesta recibe el apoyo suficiente a través del proceso de votación, se promulga y los parámetros del Config se actualizan en consecuencia. Esto significa que las reglas y configuraciones de la plataforma pueden adaptarse para alinearse con las necesidades y deseos cambiantes de la comunidad SAVVA.
 
-Crear una propuesta dentro del sistema de gobernanza de la plataforma SAVVA tiene un costo en forma de tokens PLS. Cuando los usuarios inician una propuesta, deben pagar una cierta cantidad de tokens PLS como parte del proceso de creación de la propuesta. Es importante destacar que los tokens PLS utilizados para crear propuestas no son retenidos por la plataforma ni por ninguna entidad centralizada.
+Crear una propuesta dentro del sistema de gobernanza de la plataforma SAVVA tiene un costo en forma de tokens MON. Cuando los usuarios inician una propuesta, deben pagar una cierta cantidad de tokens MON como parte del proceso de creación de la propuesta. Es importante destacar que los tokens MON utilizados para crear propuestas no son retenidos por la plataforma ni por ninguna entidad centralizada.
 
 En su lugar, estos tokens se transfieren al contrato de compra y quema, contribuyendo al mecanismo continuo de compra y quema dentro de la plataforma. El contrato de compra y quema adquiere sistemáticamente tokens SAVVA y los quema posteriormente, reduciendo la oferta total de tokens. Este proceso crea escasez y valor para el token SAVVA, beneficiando a todo el ecosistema.
 

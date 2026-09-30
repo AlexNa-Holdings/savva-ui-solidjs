@@ -202,7 +202,7 @@ Necesitas acceso a una red blockchain compatible con Ethereum. SAVVA soporta con
 Recomendamos usar **AllNodes** u otros proveedores de nodos gestionados:
 
 1. **AllNodes** (https://www.allnodes.com)
-   - Soporta PulseChain, Ethereum y otras cadenas EVM
+   - Soporta Monad, Ethereum y otras cadenas EVM
    - Endpoints HTTPS y WSS
    - Alta disponibilidad y redundancia
    - Planes desde ~$20/mes
@@ -215,7 +215,7 @@ Recomendamos usar **AllNodes** u otros proveedores de nodos gestionados:
 
 **Pasos de configuración**:
 1. Crea una cuenta en el proveedor elegido
-2. Crea un nuevo nodo/endpoint para tu cadena (p. ej., PulseChain)
+2. Crea un nuevo nodo/endpoint para tu cadena (p. ej., Monad)
 3. Obtén las URLs de endpoint HTTPS y WSS
 4. Configura el backend para usar el endpoint WSS para un rendimiento óptimo
 
@@ -228,19 +228,19 @@ Ejecuta tu propio nodo blockchain para máximo control:
 - **Almacenamiento**: SSD de 500GB+ (crece con el tiempo)
 - **Tiempo de sincronización**: Varias horas o días según la cadena
 
-Para PulseChain:
+Para Monad:
 ```bash
-# Example: Running a PulseChain node with go-pulse
-# See official PulseChain documentation for detailed setup
+# Example: Running a Monad node
+# See official Monad documentation for detailed setup
 ```
 
 **Requisitos de red**:
 - URL del endpoint RPC (HTTPS o WSS)
 - **Recomendado**: endpoint WSS para procesamiento de eventos más rápido
 - Clave privada para desplegar contratos (si vas a desplegar en una red nueva)
-- Tokens nativos para tarifas de gas (PLS para PulseChain, ETH para Ethereum, etc.)
+- Tokens nativos para tarifas de gas (MON para Monad, ETH para Ethereum, etc.)
 
-**Nota**: Todos los contratos inteligentes necesarios de SAVVA ya están desplegados en PulseChain. Consulta [Official Contract Addresses](../licenses/official-contracts.md) para la lista completa.
+**Nota**: Todos los contratos inteligentes necesarios de SAVVA ya están desplegados en Monad. Consulta [Official Contract Addresses](../licenses/official-contracts.md) para la lista completa.
 
 ## Configuración de red
 

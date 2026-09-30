@@ -27,12 +27,12 @@ Le tableau suivant détaille les paramètres globaux actuellement gérés par le
 | `winnerShare` | Uint | pourcent | La part du prix du tour dans le fonds en pourcent. |
 | `minFundToShare` | Uint | SAVVA | Le montant minimum de fonds requis pour partager des prix, en jetons SAVVA. |
 | `staking_withdraw_delay` | Uint | secondes | La période de refroidissement du staking en secondes. |
-| `contentNFT_mintPrice` | Uint | PLS | Le prix pour frapper un NFT de contenu. |
-| `pulsex_slippage` | Uint | pourcent | La tolérance de glissement pour les échanges PulseX (réserve/montant min). |
+| `contentNFT_mintPrice` | Uint | MON | Le prix pour frapper un NFT de contenu. |
+| `dex_slippage` | Uint | pourcent | La tolérance de glissement pour les échanges DEX (réserve/montant min). |
 | `min_staked_to_post` | Uint | SAVVA | Le montant minimum de SAVVA staké requis pour publier du contenu. |
-| `sac_min_deposit` | Uint | PLS | Le dépôt minimum pour la phase de sacrifice. |
+| `sac_min_deposit` | Uint | MON | Le dépôt minimum pour la phase de sacrifice. |
 | `patron_payment_period` | Uint | secondes | La durée d'une période de paiement de mécène en secondes. |
-| `gov_proposal_price` | Uint | PLS | Le prix pour créer une nouvelle proposition de gouvernance. |
+| `gov_proposal_price` | Uint | MON | Le prix pour créer une nouvelle proposition de gouvernance. |
 | `nft_auction_max_duration` | Uint | secondes | La durée maximale d'une enchère NFT en secondes. |
 | `nft_auction_min_increment` | Uint | pourcent | L'augmentation minimale des enchères pour une enchère NFT en pourcent. |
 | `nft_auction_max_increment` | Uint | pourcent | L'augmentation maximale des enchères pour une enchère NFT en pourcent. |
@@ -54,6 +54,6 @@ Le tableau suivant détaille les paramètres globaux actuellement gérés par le
 | `contract_buyBurn` | Address | | Adresse du contrat d'achat et de brûlage. |
 | `contract_listMarket` | Address | | Adresse du contrat de marché de liste. |
 | `contract_authorOfTheMonth` | Address | | Adresse du contrat de l'Auteur du Mois. |
-| `pulsex_factory` | Address | | Contrat de la fabrique PulseX pour l'achat et le brûlage. |
-| `pulsex_router` | Address | | Contrat du routeur PulseX pour l'achat et le brûlage. |
-| `WPLS` | Address | | Adresse du contrat Wrapped PLS (WPLS). |
+| `dex_factory` | Address | | Contrat de la fabrique DEX pour l'achat et le brûlage. |
+| `dex_router` | Address | | Contrat du routeur DEX pour l'achat et le brûlage. |
+| `WETH` | Address | | Adresse du contrat Wrapped MON (WMON). |

@@ -210,7 +210,7 @@ SAVVA publica snapshots diarios de PostgreSQL en [savva.app/public_files/](https
 
 ```
 savva-db-backup-monad-2026-05-03.sql.gz
-savva-db-backup-pls-2026-05-03.sql.gz
+savva-db-backup-monad-2026-05-03.sql.gz
 ```
 
 Elige la cadena que estás indexando (`monad` es la predeterminada en esta guía) y la fecha más reciente. El volcado es SQL gzippado plano — restaúralo con `psql`:

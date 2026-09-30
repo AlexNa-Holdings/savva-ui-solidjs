@@ -210,7 +210,7 @@ SAVVA publie des snapshots PostgreSQL quotidiens sur [savva.app/public_files/](h
 
 ```
 savva-db-backup-monad-2026-05-03.sql.gz
-savva-db-backup-pls-2026-05-03.sql.gz
+savva-db-backup-monad-2026-05-03.sql.gz
 ```
 
 Choisissez la chaîne que vous indexez (`monad` est la valeur par défaut dans ce guide) et la date la plus récente. Le dump est un SQL gzippé plain — restaurez-le avec `psql` :

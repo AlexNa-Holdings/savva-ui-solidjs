@@ -210,7 +210,7 @@ SAVVA публікує щоденні знімки PostgreSQL на [savva.app/pu
 
 ```
 savva-db-backup-monad-2026-05-03.sql.gz
-savva-db-backup-pls-2026-05-03.sql.gz
+savva-db-backup-monad-2026-05-03.sql.gz
 ```
 
 Виберіть ланцюжок, який ви індексуєте (`monad` — за замовчуванням у цьому посібнику) і останню дату. Дамп — це звичайний gzipped SQL — відновіть його за допомогою `psql`:

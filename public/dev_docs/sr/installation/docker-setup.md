@@ -210,7 +210,7 @@ SAVVA objavljuje dnevne PostgreSQL snimke na [savva.app/public_files/](https://s
 
 ```
 savva-db-backup-monad-2026-05-03.sql.gz
-savva-db-backup-pls-2026-05-03.sql.gz
+savva-db-backup-monad-2026-05-03.sql.gz
 ```
 
 Izaberite mrežu koju indeksirate (`monad` je podrazumevana u ovom vodiču) i najnoviji datum. Dump je običan gzip-ovan SQL — obnovite ga sa `psql`:

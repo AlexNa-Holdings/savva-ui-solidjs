@@ -12,7 +12,7 @@ Here's how the governance process works:
 
 * `Implementation of Approved Proposals:` If a proposal receives sufficient support through the voting process, it is enacted, and the Config parameters are updated accordingly. This means that the platform's rules and settings can be adapted to align with the evolving needs and desires of the SAVVA community.
 
-Creating a proposal within the SAVVA platform's governance system comes with a price in the form of PLS tokens. When users initiate a proposal, they are required to pay a certain amount of PLS tokens as part of the proposal creation process. Importantly, the PLS tokens used for creating proposals are not retained by the platform or any centralized entity.
+Creating a proposal within the SAVVA platform's governance system comes with a price in the form of MON tokens. When users initiate a proposal, they are required to pay a certain amount of MON tokens as part of the proposal creation process. Importantly, the MON tokens used for creating proposals are not retained by the platform or any centralized entity.
 
 Instead, these tokens are transferred to the buy and burn contract, contributing to the ongoing 'buy and burn' mechanism within the platform. The 'buy and burn' contract systematically acquires SAVVA tokens and subsequently burns them, reducing the overall token supply. This process creates scarcity and value for the SAVVA token, benefiting the entire ecosystem.
 

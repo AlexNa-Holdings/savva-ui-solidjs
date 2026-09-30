@@ -246,7 +246,7 @@ domains:
 # /etc/savva.yml - SAVVA Backend Configuration
 
 # Blockchain
-blockchain-rpc: wss://pls-rpc.example.com:8546/your-api-key
+blockchain-rpc: wss://monad-rpc.example.com:8546/your-api-key
 initial-block: 20110428
 
 # Contracts (use official addresses)

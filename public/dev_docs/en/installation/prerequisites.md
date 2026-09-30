@@ -202,7 +202,7 @@ You need access to an Ethereum-compatible blockchain network. SAVVA supports bot
 We recommend using **AllNodes** or similar managed node providers:
 
 1. **AllNodes** (https://www.allnodes.com)
-   - Supports PulseChain, Ethereum, and other EVM chains
+   - Supports Monad, Ethereum, and other EVM chains
    - Both HTTPS and WSS endpoints
    - High availability and redundancy
    - Plans start at ~$20/month
@@ -215,7 +215,7 @@ We recommend using **AllNodes** or similar managed node providers:
 
 **Setup Steps**:
 1. Create an account with your chosen provider
-2. Create a new node/endpoint for your chain (e.g., PulseChain)
+2. Create a new node/endpoint for your chain (e.g., Monad)
 3. Get both HTTPS and WSS endpoint URLs
 4. Configure backend to use WSS endpoint for optimal performance
 
@@ -228,19 +228,19 @@ Run your own blockchain node for maximum control:
 - **Storage**: 500GB+ SSD (grows over time)
 - **Sync Time**: Several hours to days depending on chain
 
-For PulseChain:
+For Monad:
 ```bash
-# Example: Running a PulseChain node with go-pulse
-# See official PulseChain documentation for detailed setup
+# Example: Running a Monad node
+# See official Monad documentation for detailed setup
 ```
 
 **Network Requirements**:
 - RPC endpoint URL (HTTPS or WSS)
 - **Recommended**: WSS endpoint for faster event processing
 - Private key for deploying contracts (if deploying new network)
-- Native tokens for gas fees (PLS for PulseChain, ETH for Ethereum, etc.)
+- Native tokens for gas fees (MON for Monad, ETH for Ethereum, etc.)
 
-**Note**: All necessary SAVVA smart contracts are already deployed on PulseChain. See [Official Contract Addresses](../licenses/official-contracts.md) for the complete list.
+**Note**: All necessary SAVVA smart contracts are already deployed on Monad. See [Official Contract Addresses](../licenses/official-contracts.md) for the complete list.
 
 ## Network Configuration
 

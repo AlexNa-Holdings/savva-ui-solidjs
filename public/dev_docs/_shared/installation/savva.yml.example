@@ -9,7 +9,7 @@ initial-block: 20110428
 
 # Smart Contracts
 contracts:
-  # Main Config contract address (already deployed on PulseChain)
+  # Main Config contract address (already deployed on Monad)
   Config: 0x4ED8321722ACB984aB6B249C4AE74a58CAD7E4e8
 
 # Database Configuration

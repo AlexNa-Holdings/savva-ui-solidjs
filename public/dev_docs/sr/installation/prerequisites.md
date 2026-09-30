@@ -202,7 +202,7 @@ Preporučeno: Koristite WSS za produkciju da omogućite:
 Preporučujemo korišćenje **AllNodes** ili sličnih upravljanih provajdera čvorova:
 
 1. **AllNodes** (https://www.allnodes.com)
-   - Podržava PulseChain, Ethereum i druge EVM lance
+   - Podržava Monad, Ethereum i druge EVM lance
    - I HTTPS i WSS endpoint-ovi
    - Visoka dostupnost i redundancija
    - Planovi počinju od ~20$/mesečno
@@ -215,7 +215,7 @@ Preporučujemo korišćenje **AllNodes** ili sličnih upravljanih provajdera čv
 
 Koraci podešavanja:
 1. Napravite nalog kod odabranog provajdera
-2. Kreirajte novi node/endpoint za vaš lanac (npr. PulseChain)
+2. Kreirajte novi node/endpoint za vaš lanac (npr. Monad)
 3. Nabavite i HTTPS i WSS URL-ove endpoint-a
 4. Konfigurišite backend da koristi WSS endpoint za optimalne performanse
 
@@ -228,19 +228,19 @@ Pokrenite sopstveni blockchain čvor za maksimalnu kontrolu:
 - **Skladište**: 500GB+ SSD (povećava se vremenom)
 - **Vreme sinhronizacije**: Nekoliko sati do nekoliko dana u zavisnosti od lanca
 
-Za PulseChain:
+Za Monad:
 ```bash
-# Example: Running a PulseChain node with go-pulse
-# See official PulseChain documentation for detailed setup
+# Example: Running a Monad node
+# See official Monad documentation for detailed setup
 ```
 
 Zahtevi mreže:
 - RPC endpoint URL (HTTPS ili WSS)
 - **Preporučeno**: WSS endpoint za brže procesiranje događaja
 - Privatni ključ za deploy ugovora (ako se deploy-uju novi ugovori)
-- Nativni tokeni za gas naknade (PLS za PulseChain, ETH za Ethereum, itd.)
+- Nativni tokeni za gas naknade (MON za Monad, ETH za Ethereum, itd.)
 
-Napomena: Svi neophodni SAVVA pametni ugovori su već deploy-ovani na PulseChain. Pogledajte [Zvanične adrese ugovora](../licenses/official-contracts.md) za kompletan spisak.
+Napomena: Svi neophodni SAVVA pametni ugovori su već deploy-ovani na Monad. Pogledajte [Zvanične adrese ugovora](../licenses/official-contracts.md) za kompletan spisak.
 
 ## Mrežna konfiguracija
 

@@ -1,18 +1,18 @@
 ## Sacrifice en cours
 
-La plateforme SAVVA introduit une fonctionnalité innovante appelée « Sacrifice en cours », conçue pour promouvoir et soutenir la liberté d'expression. Ce mécanisme fonctionne sur un cycle hebdomadaire, permettant aux individus d'exprimer leur soutien en sacrifiant des tokens PLS.
+La plateforme SAVVA introduit une fonctionnalité innovante appelée « Sacrifice en cours », conçue pour promouvoir et soutenir la liberté d'expression. Ce mécanisme fonctionne sur un cycle hebdomadaire, permettant aux individus d'exprimer leur soutien en sacrifiant des tokens MON.
 
 Voici comment fonctionne le processus de « Sacrifice en cours » :
 
-1. Sacrifice hebdomadaire : Chaque semaine, les utilisateurs ont la possibilité de contribuer des tokens PLS en signe de soutien à la liberté d'expression au sein de la plateforme. Cela représente un engagement collectif à favoriser un environnement ouvert et inclusif.
+1. Sacrifice hebdomadaire : Chaque semaine, les utilisateurs ont la possibilité de contribuer des tokens MON en signe de soutien à la liberté d'expression au sein de la plateforme. Cela représente un engagement collectif à favoriser un environnement ouvert et inclusif.
 
 2. Création de tokens : À la fin de chaque semaine, le système initiera un processus de création de tokens, générant un total de `240 000` nouveaux tokens SAVVA.
 
-3. Distribution des tokens : La moitié des tokens nouvellement créés sera distribuée aux participants ayant sacrifié leurs tokens PLS durant cette semaine. Cette allocation récompense ceux qui soutiennent activement les principes de la plateforme.
+3. Distribution des tokens : La moitié des tokens nouvellement créés sera distribuée aux participants ayant sacrifié leurs tokens MON durant cette semaine. Cette allocation récompense ceux qui soutiennent activement les principes de la plateforme.
 
 4. Contrat de staking : L'autre moitié des tokens créés sera transférée à un contrat de staking, contribuant à l'écosystème de la plateforme et facilitant potentiellement des récompenses supplémentaires pour les participants via le staking.
 
-Tous les tokens PLS collectés en tant que sacrifices seront transférés à une adresse d'origine « sans attente ». Cette action transparente garantit que les tokens PLS sacrifiés ne sont pas utilisés à des fins spécifiques et souligne l'engagement de la plateforme envers l'intégrité.
+Tous les tokens MON collectés en tant que sacrifices seront transférés à une adresse d'origine « sans attente ». Cette action transparente garantit que les tokens MON sacrifiés ne sont pas utilisés à des fins spécifiques et souligne l'engagement de la plateforme envers l'intégrité.
 
 Le mécanisme de « Sacrifice en cours » sur la plateforme SAVVA illustre un effort collectif pour défendre et promouvoir les valeurs de liberté d'expression et d'inclusivité. Il récompense non seulement les participants, mais contribue également à la durabilité et à la croissance continue de la plateforme, tout en maintenant transparence et équité dans la distribution et l'utilisation des tokens.
 

@@ -202,7 +202,7 @@ sudo certbot --nginx -d yourdomain.com
 Рекомендуємо використовувати **AllNodes** або подібних керованих провайдерів нод:
 
 1. **AllNodes** (https://www.allnodes.com)
-   - Підтримує PulseChain, Ethereum та інші EVM-ланцюги
+   - Підтримує Monad, Ethereum та інші EVM-ланцюги
    - Надає і HTTPS, і WSS кінцеві точки
    - Висока доступність і надлишковість
    - Плани починаються приблизно від $20/місяць
@@ -215,7 +215,7 @@ sudo certbot --nginx -d yourdomain.com
 
 **Кроки налаштування**:
 1. Створіть акаунт у обраному провайдера  
-2. Створіть нову ноду/endpoint для вашого ланцюга (наприклад, PulseChain)  
+2. Створіть нову ноду/endpoint для вашого ланцюга (наприклад, Monad)  
 3. Отримайте як HTTPS, так і WSS URL кінцевих точок  
 4. Налаштуйте бекенд для використання WSS-ендпоінту для оптимальної продуктивності
 
@@ -228,19 +228,19 @@ sudo certbot --nginx -d yourdomain.com
 - **Сховище**: SSD 500 ГБ+ (зростає з часом)  
 - **Час синхронізації**: від кількох годин до кількох днів залежно від ланцюга
 
-Для PulseChain:
+Для Monad:
 ```bash
-# Example: Running a PulseChain node with go-pulse
-# See official PulseChain documentation for detailed setup
+# Example: Running a Monad node
+# See official Monad documentation for detailed setup
 ```
 
 **Мережеві вимоги**:
 - URL RPC-ендпоінту (HTTPS або WSS)  
 - **Рекомендовано**: WSS-ендпоінт для швидшої обробки подій  
 - Приватний ключ для розгортання контрактів (якщо розгортаєте нові контракти)  
-- Нативні токени для комісій (PLS для PulseChain, ETH для Ethereum тощо)
+- Нативні токени для комісій (MON для Monad, ETH для Ethereum тощо)
 
-**Примітка**: всі необхідні смарт-контракти SAVVA вже розгорнуті на PulseChain. Див. [Офіційні адреси контрактів](../licenses/official-contracts.md) для повного списку.
+**Примітка**: всі необхідні смарт-контракти SAVVA вже розгорнуті на Monad. Див. [Офіційні адреси контрактів](../licenses/official-contracts.md) для повного списку.
 
 ## Конфігурація мережі
 

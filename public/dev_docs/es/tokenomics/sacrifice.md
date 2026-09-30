@@ -1,18 +1,18 @@
 ## Sacrificio continuo
 
-La plataforma SAVVA introduce una característica innovadora conocida como 'Sacrificio continuo', diseñada para promover y apoyar la libertad de expresión. Este mecanismo opera en un ciclo semanal, permitiendo a las personas expresar su apoyo sacrificando tokens PLS.
+La plataforma SAVVA introduce una característica innovadora conocida como 'Sacrificio continuo', diseñada para promover y apoyar la libertad de expresión. Este mecanismo opera en un ciclo semanal, permitiendo a las personas expresar su apoyo sacrificando tokens MON.
 
 Así es como funciona el proceso de 'Sacrificio continuo':
 
-1. Sacrificio semanal: Cada semana, los usuarios tienen la oportunidad de contribuir con tokens PLS como forma de apoyo a la libertad de expresión dentro de la plataforma. Esto representa un compromiso colectivo para fomentar un entorno abierto e inclusivo.
+1. Sacrificio semanal: Cada semana, los usuarios tienen la oportunidad de contribuir con tokens MON como forma de apoyo a la libertad de expresión dentro de la plataforma. Esto representa un compromiso colectivo para fomentar un entorno abierto e inclusivo.
 
 2. Acuñación de tokens: Al final de cada semana, el sistema iniciará un proceso de acuñación de tokens, generando un total de `240,000` nuevos tokens SAVVA.
 
-3. Distribución de tokens: La mitad de los tokens recién acuñados se distribuirá entre los participantes que sacrificaron sus tokens PLS durante esa semana. Esta asignación recompensa a quienes apoyan activamente los principios de la plataforma.
+3. Distribución de tokens: La mitad de los tokens recién acuñados se distribuirá entre los participantes que sacrificaron sus tokens MON durante esa semana. Esta asignación recompensa a quienes apoyan activamente los principios de la plataforma.
 
 4. Contrato de staking: La mitad restante de los tokens acuñados se transferirá a un contrato de staking, contribuyendo al ecosistema de la plataforma y potencialmente facilitando recompensas adicionales para los participantes a través del staking.
 
-Todos los tokens PLS que se hayan recolectado como sacrificios serán transferidos a una dirección de origen con 'sin expectativa'. Esta acción transparente asegura que los tokens PLS sacrificados no se utilicen para ningún propósito específico y subraya el compromiso de la plataforma con la integridad.
+Todos los tokens MON que se hayan recolectado como sacrificios serán transferidos a una dirección de origen con 'sin expectativa'. Esta acción transparente asegura que los tokens MON sacrificados no se utilicen para ningún propósito específico y subraya el compromiso de la plataforma con la integridad.
 
 El mecanismo de 'Sacrificio continuo' en la plataforma SAVVA ejemplifica un esfuerzo colectivo para defender y promover los valores de la libertad de expresión y la inclusión. No solo recompensa a los participantes, sino que también contribuye a la sostenibilidad y el crecimiento continuo de la plataforma, todo ello manteniendo la transparencia y la equidad en la distribución y el uso de los tokens.
 

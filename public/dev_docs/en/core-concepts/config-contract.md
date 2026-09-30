@@ -27,12 +27,12 @@ The following table details the global parameters currently managed by the `Conf
 | `winnerShare` | Uint | percents | The round prize's share of the fund in percents. |
 | `minFundToShare` | Uint | SAVVA | The minimum fund amount required to share prizes, in SAVVA tokens. |
 | `staking_withdraw_delay` | Uint | seconds | The staking cooldown period in seconds. |
-| `contentNFT_mintPrice` | Uint | PLS | The price to mint a content NFT. |
-| `pulsex_slippage` | Uint | percents | The slippage tolerance for PulseX swaps (reserve/amount min). |
+| `contentNFT_mintPrice` | Uint | MON | The price to mint a content NFT. |
+| `dex_slippage` | Uint | percents | The slippage tolerance for DEX swaps (reserve/amount min). |
 | `min_staked_to_post` | Uint | SAVVA | The minimum staked SAVVA amount required to post content. |
-| `sac_min_deposit` | Uint | PLS | The minimum deposit for the sacrifice phase. |
+| `sac_min_deposit` | Uint | MON | The minimum deposit for the sacrifice phase. |
 | `patron_payment_period` | Uint | seconds | The duration of a patron payment period in seconds. |
-| `gov_proposal_price` | Uint | PLS | The price to create a new governance proposal. |
+| `gov_proposal_price` | Uint | MON | The price to create a new governance proposal. |
 | `nft_auction_max_duration` | Uint | seconds | The maximum duration for an NFT auction in seconds. |
 | `nft_auction_min_increment` | Uint | percents | The minimum bid increment for an NFT auction in percents. |
 | `nft_auction_max_increment` | Uint | percents | The maximum bid increment for an NFT auction in percents. |
@@ -54,6 +54,6 @@ The following table details the global parameters currently managed by the `Conf
 | `contract_buyBurn` | Address | | Buy & Burn contract address. |
 | `contract_listMarket` | Address | | List Market contract address. |
 | `contract_authorOfTheMonth` | Address | | Author of the Month contract address. |
-| `pulsex_factory` | Address | | PulseX factory contract for Buy & Burn. |
-| `pulsex_router` | Address | | PulseX router contract for Buy & Burn. |
-| `WPLS` | Address | | Wrapped PLS (WPLS) contract address. |
+| `dex_factory` | Address | | DEX (Uniswap V2-compatible) factory contract for Buy & Burn. |
+| `dex_router` | Address | | DEX (Uniswap V2-compatible) router contract for Buy & Burn. |
+| `WETH` | Address | | Wrapped native token contract address (WMON on Monad). |

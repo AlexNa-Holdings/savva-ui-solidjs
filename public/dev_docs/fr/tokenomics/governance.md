@@ -12,7 +12,7 @@ Voici comment fonctionne le processus de gouvernance :
 
 * `Mise en œuvre des propositions approuvées :` Si une proposition reçoit un soutien suffisant lors du vote, elle est mise en œuvre et les paramètres du contrat Config sont mis à jour en conséquence. Cela signifie que les règles et réglages de la plateforme peuvent être adaptés pour correspondre aux besoins et souhaits évolutifs de la communauté SAVVA.
 
-La création d’une proposition dans le système de gouvernance de la plateforme SAVVA a un coût en tokens PLS. Lorsque les utilisateurs initient une proposition, ils doivent payer une certaine quantité de tokens PLS dans le cadre du processus de création de proposition. Il est important de noter que les tokens PLS utilisés pour créer des propositions ne sont pas conservés par la plateforme ni par une entité centralisée.
+La création d’une proposition dans le système de gouvernance de la plateforme SAVVA a un coût en tokens MON. Lorsque les utilisateurs initient une proposition, ils doivent payer une certaine quantité de tokens MON dans le cadre du processus de création de proposition. Il est important de noter que les tokens MON utilisés pour créer des propositions ne sont pas conservés par la plateforme ni par une entité centralisée.
 
 Au lieu de cela, ces tokens sont transférés au contrat d’achat et de brûlage, contribuant au mécanisme continu de « buy and burn » au sein de la plateforme. Le contrat « buy and burn » acquiert systématiquement des tokens SAVVA puis les brûle, réduisant ainsi l’offre totale de tokens. Ce processus crée une rareté et une valeur pour le token SAVVA, au bénéfice de tout l’écosystème.
 
