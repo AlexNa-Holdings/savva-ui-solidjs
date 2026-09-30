@@ -85,6 +85,17 @@ server {
 	# Humans get the SPA shell (index.html). Recognised bots/crawlers/
 	# unfurlers get server-rendered HTML from /api/render.
 	location / {
+		try_files $uri $uri/ @savva_page;
+	}
+
+	# Everything after /@ is a username, including dots. ^~ prevents
+	# regex static-file locations from interpreting its suffix as an extension.
+	location ^~ /@ {
+		try_files $uri @savva_page;
+	}
+
+	# Shared page handling preserves bot rendering for profile routes too.
+	location @savva_page {
 		set $prerender 0;
 
 		# Search engines, social unfurlers, AI crawlers. Keep this list
@@ -105,8 +116,8 @@ server {
 			set $prerender 0;
 		}
 
-		# Static assets (JS bundles, images, fonts) bypass - not pages.
-		if ($uri ~ \.[a-zA-Z0-9]+$) {
+		# Static assets bypass rendering, but /@ names may contain dots.
+		if ($uri ~ "^/(?!@).*\.[a-zA-Z0-9]+$") {
 			set $prerender 0;
 		}
 
