@@ -1,4 +1,4 @@
-// src/pages/profile/TagList.jsx
+// src/x/profile/TagList.jsx
 import { For, Show } from "solid-js";
 import Spinner from "../ui/Spinner.jsx";
 
@@ -9,19 +9,22 @@ export default function TagList(props) {
   const isSelected = (tag) => selectedTags().includes(tag);
 
   return (
-    <div class="space-y-2">
+    <div class="flex flex-wrap gap-2 md:flex-col md:flex-nowrap md:max-h-[50vh] md:overflow-y-auto">
       <Show when={!props.loading} fallback={<Spinner class="w-5 h-5" />}>
         <For each={tags()}>
           {(tag) => (
             <button
+              type="button"
               onClick={() => props.onTagToggle?.(tag)}
-              class="w-full text-left px-3 py-1.5 text-sm rounded-md border truncate"
+              class="md:w-full text-left px-3 py-1 text-sm rounded-md border truncate"
               classList={{
                 "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] border-[hsl(var(--primary))]": isSelected(tag),
                 "bg-transparent border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]": !isSelected(tag)
               }}
+              aria-pressed={isSelected(tag) ? "true" : "false"}
+              title={tag}
             >
-              #{tag}
+              {tag}
             </button>
           )}
         </For>

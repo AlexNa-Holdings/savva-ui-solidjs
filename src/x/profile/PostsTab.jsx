@@ -1,27 +1,25 @@
 // src/x/profile/PostsTab.jsx
-import { createSignal, createResource, createMemo, For, Show, Switch, Match } from "solid-js";
+import { createSignal, createResource, createMemo, For } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import ContentFeed from "../feed/ContentFeed.jsx";
 import ViewModeToggle, { viewMode } from "../ui/ViewModeToggle.jsx";
 import { toChecksumAddress } from "../../blockchain/utils.js";
-import TagList from "./TagList.jsx";
 import { useDomainCategories } from "../../hooks/useDomainCategories.js";
 import useUserProfile, { selectField } from "../profile/userProfileStore";
 import { loadNsfwPreference } from "../preferences/storage.js";
 
-async function fetchUserTags(params) {
-  const { app, user_addr, lang } = params;
+async function fetchUserCategories({ app, user_addr, lang }) {
   if (!app.wsMethod || !user_addr || !lang) return [];
   try {
-    const getTags = app.wsMethod("get-user-tags");
-    const res = await getTags({
+    const getCats = app.wsMethod("get-user-categories");
+    const res = await getCats({
       domain: app.selectedDomainName(),
-      user_addr: user_addr,
+      user_addr,
       locale: lang,
     });
-    return Array.isArray(res) ? res.sort() : [];
+    return Array.isArray(res) ? res.map(String) : [];
   } catch (e) {
-    console.error("Failed to fetch user tags:", e);
+    console.error("Failed to fetch user categories:", e);
     return [];
   }
 }
@@ -32,7 +30,8 @@ export default function PostsTab(props) {
   const lang = () => app.lang();
   const user = () => props.user;
 
-  const [selectedTags, setSelectedTags] = createSignal([]);
+  // Tag selection is owned by ProfilePage (the tag list lives in the left column)
+  const selectedTags = () => props.selectedTags || [];
   const [selectedCategory, setSelectedCategory] = createSignal("ALL");
 
   const { dataStable: profile } = useUserProfile();
@@ -49,14 +48,24 @@ export default function PostsTab(props) {
     return pref === "s" || pref === "w";
   };
 
-  const [tagsResource] = createResource(() => ({
+  const [userCategories] = createResource(() => ({
     app,
     user_addr: user()?.address,
     lang: lang()
-  }), fetchUserTags);
+  }), fetchUserCategories);
 
-  const categoriesResource = useDomainCategories(app);
-  const categoriesWithAll = createMemo(() => ["ALL", ...(categoriesResource() || [])]);
+  const domainCategories = useDomainCategories(app);
+
+  // Only categories the user actually has posts in; keep the domain's ordering,
+  // append any user categories the domain list doesn't know about.
+  const categoriesWithAll = createMemo(() => {
+    const mine = userCategories() || [];
+    const mineSet = new Set(mine);
+    const ordered = (domainCategories() || []).filter((c) => mineSet.has(c));
+    const orderedSet = new Set(ordered);
+    const extra = mine.filter((c) => !orderedSet.has(c)).sort();
+    return ["ALL", ...ordered, ...extra];
+  });
 
   const contentList = app.wsMethod ? app.wsMethod("content-list") : null;
   const feedResetKey = createMemo(() => `${selectedCategory()}|${selectedTags().join(',')}`);
@@ -91,16 +100,7 @@ export default function PostsTab(props) {
     }
   }
 
-  const handleTagToggle = (tag) => {
-    setSelectedTags(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(tag)) newSet.delete(tag);
-      else newSet.add(tag);
-      return Array.from(newSet);
-    });
-  };
-
-  const RightPanel = () => (
+  return (
     <section class="w-full">
       <div class="mb-3 flex flex-wrap items-center gap-3">
         <ViewModeToggle size="md" />
@@ -126,27 +126,5 @@ export default function PostsTab(props) {
         isActivated={true}
       />
     </section>
-  );
-
-  return (
-    <Switch>
-      <Match when={!tagsResource.loading && tagsResource()?.length > 0}>
-        <div class="grid grid-cols-[180px_minmax(0,1fr)] gap-6 items-start">
-          <aside class="sticky top-[120px]">
-            <h4 class="text-sm font-semibold mb-2">{t("profile.tabs.tags")}</h4>
-            <TagList
-              tags={tagsResource()}
-              loading={tagsResource.loading}
-              selectedTags={selectedTags()}
-              onTagToggle={handleTagToggle}
-            />
-          </aside>
-          <RightPanel />
-        </div>
-      </Match>
-      <Match when={true}>
-        <RightPanel />
-      </Match>
-    </Switch>
   );
 }

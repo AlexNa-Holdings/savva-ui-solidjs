@@ -1,5 +1,5 @@
 // src/x/pages/ProfilePage.jsx
-import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, For } from "solid-js";
+import { createMemo, createResource, createSignal, Show, Switch, Match, createEffect, For, on } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { useApp } from "../../context/AppContext.jsx";
 import { useHashRouter, navigate } from "../../routing/smartRouter.js";
@@ -16,6 +16,7 @@ import Address from "../ui/Address.jsx";
 import { ipfs } from "../../ipfs/index.js";
 import { PostsIcon, SubscribersIcon, SubscriptionsIcon, WalletIcon, HistoryIcon } from "../ui/icons/ProfileIcons.jsx";
 import PostsTab from "../profile/PostsTab.jsx";
+import UserTagsPanel from "../profile/UserTagsPanel.jsx";
 import SubscribersTab from "../profile/SubscribersTab.jsx";
 import SubscriptionsTab from "../profile/SubscriptionsTab.jsx";
 import WalletTab from "../profile/WalletTab.jsx";
@@ -92,6 +93,13 @@ export default function ProfilePage() {
   );
 
   const [activeTab, setActiveTab] = createSignal("posts");
+
+  // Post tag filter — lives here because the tag list renders under the section menu
+  const [selectedTags, setSelectedTags] = createSignal([]);
+  const toggleTag = (tag) =>
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]));
+  const viewedAddress = createMemo(() => (userResource()?.address || "").toLowerCase());
+  createEffect(on(viewedAddress, () => setSelectedTags([]), { defer: true }));
 
   const isBanned = createMemo(() => !!userResource()?.banned);
 
@@ -404,6 +412,7 @@ export default function ProfilePage() {
               {/* Tabs */}
               <div class="mt-4 md:mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)]">
                 <div class="grid gap-3 md:grid-cols-[14rem_minmax(0,1fr)] items-start">
+                  <div class="flex flex-col gap-3 min-w-0">
                   <nav
                     class="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible border border-[hsl(var(--border))] rounded-lg p-2"
                     aria-label={t("profile.tabs.navAria") || "Profile sections"}
@@ -432,6 +441,15 @@ export default function ProfilePage() {
                     }}</For>
                   </nav>
 
+                    <Show when={activeTab() === "posts"}>
+                      <UserTagsPanel
+                        userAddress={user()?.address}
+                        selectedTags={selectedTags()}
+                        onTagToggle={toggleTag}
+                      />
+                    </Show>
+                  </div>
+
                   <div class="py-4 px-4 border border-[hsl(var(--border))] rounded-lg min-h-[200px] space-y-4 bg-[hsl(var(--background))]">
                     <div class="flex items-center gap-2 text-lg font-semibold">
                       <Show when={activeTabDef()}>
@@ -450,7 +468,7 @@ export default function ProfilePage() {
                     <div>
                       <Switch>
                         <Match when={activeTab() === "posts"}>
-                          <PostsTab user={user()} />
+                          <PostsTab user={user()} selectedTags={selectedTags()} />
                         </Match>
                         <Match when={activeTab() === "subscribers"}>
                           <SubscribersTab user={user()} />

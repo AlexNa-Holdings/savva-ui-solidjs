@@ -15,6 +15,11 @@ export default function ContentFeed(props) {
   const [hasMore, setHasMore] = createSignal(true);
   const [loading, setLoading] = createSignal(false);
   const [hasLoadedOnce, setHasLoadedOnce] = createSignal(false);
+  // After a resetOn change, keep showing the old items (dimmed) until the first
+  // new page arrives, so the page doesn't collapse and jump.
+  const [replacing, setReplacing] = createSignal(false);
+  // Incremented on every reset; responses from an older generation are dropped.
+  let generation = 0;
 
   // Accept either prop name; default to true if not provided.
   const isActive = () => (props.isActivated ?? props.isActive ?? true);
@@ -81,6 +86,7 @@ export default function ContentFeed(props) {
     }
 
     setLoading(true);
+    const gen = generation;
     try {
       const nextPage = page() + 1;
       const size = props.pageSize || 12;
@@ -93,19 +99,28 @@ export default function ContentFeed(props) {
       // Pass nsfwPref through if your fetchPage accepts it (3rd arg). Safe no-op otherwise.
       const chunk = (await props.fetchPage?.(nextPage, size, nsfwPref())) ?? [];
       dbg.log("ContentFeed", "page result length", chunk.length);
+      if (gen !== generation) return; // filters changed while this request was in flight
 
       if (!chunk.length) setHasMore(false);
 
+      const replace = replacing();
       setItems((prev) => {
-        const next = prev.concat(chunk);
+        const next = replace ? chunk : prev.concat(chunk);
         props.onItemsChange?.(next);
         return next;
       });
+      setReplacing(false);
 
       setPage(nextPage);
     } catch (e) {
       dbg.log("ContentFeed", "loadMore error", e);
+      if (gen === generation && replacing()) {
+        setItems([]);
+        props.onItemsChange?.([]);
+        setReplacing(false);
+      }
     } finally {
+      if (gen !== generation) return;
       setLoading(false);
       setHasLoadedOnce(true); // mark only after a real attempt
       dbg.log("ContentFeed", "loadMore() finished", {
@@ -190,8 +205,14 @@ export default function ContentFeed(props) {
       (val) => {
         dbg.log("ContentFeed:resetOn", { val });
 
-        setItems([]);
-        props.onItemsChange?.([]);
+        generation++;
+        if (items().length > 0 && isActive() && ready()) {
+          setReplacing(true);
+        } else {
+          setItems([]);
+          props.onItemsChange?.([]);
+          setReplacing(false);
+        }
         setPage(0);
         setHasMore(true);
         setLoading(false);
@@ -210,8 +231,14 @@ export default function ContentFeed(props) {
 
   return (
     <div class="w-full">
-      <PostListView items={items()} mode={props.mode} isRailVisible={props.isRailVisible} />
-      <Show when={loading()}>
+      <div
+        class="transition-opacity duration-150"
+        classList={{ "opacity-50 pointer-events-none": replacing() }}
+        aria-busy={replacing() ? "true" : "false"}
+      >
+        <PostListView items={items()} mode={props.mode} isRailVisible={props.isRailVisible} />
+      </div>
+      <Show when={loading() && !replacing()}>
         <div class="py-4 text-sm text-[hsl(var(--muted-foreground))] text-center">
           {t("common.loading")}
         </div>
