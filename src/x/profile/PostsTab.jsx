@@ -87,8 +87,8 @@ export default function PostsTab(props) {
     const cat = selectedCategory();
     if (cat && cat !== "ALL") params.category = `${lang()}:${cat}`;
 
-    const tags = selectedTags();
-    if (tags.length > 0) params.tags = tags.map(tag => `${lang()}:${tag}`);
+    const tag = selectedTags()[0];
+    if (tag) params.tag = `${lang()}:${tag}`;
 
     try {
       const res = await contentList(params);

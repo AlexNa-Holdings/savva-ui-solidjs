@@ -94,10 +94,10 @@ export default function ProfilePage() {
 
   const [activeTab, setActiveTab] = createSignal("posts");
 
-  // Post tag filter — lives here because the tag list renders under the section menu
+  // Post tag filter — lives here because the tag list renders under the section menu.
+  // Single-select: content-list filters by one tag; clicking the selected tag clears it.
   const [selectedTags, setSelectedTags] = createSignal([]);
-  const toggleTag = (tag) =>
-    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]));
+  const toggleTag = (tag) => setSelectedTags((prev) => (prev[0] === tag ? [] : [tag]));
   const viewedAddress = createMemo(() => (userResource()?.address || "").toLowerCase());
   createEffect(on(viewedAddress, () => setSelectedTags([]), { defer: true }));
 
