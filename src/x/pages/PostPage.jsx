@@ -52,7 +52,7 @@ import { setEncryptedPostContext, clearEncryptedPostContext } from "../../ipfs/e
 import { swManager } from "../crypto/serviceWorkerManager.js";
 import { loadNsfwPreference } from "../preferences/storage.js";
 import { getSavvaContract } from "../../blockchain/contracts.js";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendWithApprovalAsActor } from "../../blockchain/npoMulticall.js";
 import { connectWallet } from "../../blockchain/wallet.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { toHex, stringToBytes } from "viem";
@@ -983,18 +983,10 @@ export default function PostPage() {
         needsApproval: allowance < priceWei,
       });
 
-      if (allowance < priceWei) {
-        pushToast({ type: "info", message: t("post.purchase.approving") || "Approving SAVVA token...", autohideMs: 0, id: "purchase_approve" });
-
-        const MAX_UINT = (1n << 256n) - 1n;
-        await sendAsActor(app, {
-          contractName: "SavvaToken",
-          functionName: "approve",
-          args: [purchaseContract.address, MAX_UINT],
-        });
-
-        app.dismissToast?.("purchase_approve");
-      }
+      const MAX_UINT = (1n << 256n) - 1n;
+      const approveSpec = allowance < priceWei
+        ? { contractName: "SavvaToken", functionName: "approve", args: [purchaseContract.address, MAX_UINT] }
+        : null;
 
       // Step 3: Build metadata and call buy
       const metadata = {
@@ -1031,13 +1023,13 @@ export default function PostPage() {
           }
         }
 
-        await sendAsActor(app, {
+        await sendWithApprovalAsActor(app, approveSpec, {
           contractName: "SavvaPurchase",
           functionName: "buy",
           args: [info.purchaseToken, priceWei, authorAddress, amountOutMin, metadataBytes],
         });
       } else {
-        await sendAsActor(app, {
+        await sendWithApprovalAsActor(app, approveSpec, {
           contractName: "SavvaPurchase",
           functionName: "buy",
           args: [info.purchaseToken, priceWei, authorAddress, metadataBytes],

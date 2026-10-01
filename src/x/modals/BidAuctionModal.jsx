@@ -10,7 +10,7 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { maxUint256, formatUnits } from "viem";
 import { dbg } from "../../utils/debug.js";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendWithApprovalAsActor } from "../../blockchain/npoMulticall.js";
 
 export default function BidAuctionModal(props) {
   const app = useApp();
@@ -136,7 +136,7 @@ export default function BidAuctionModal(props) {
     }
 
     setIsSubmitting(true);
-    let approveToastId, bidToastId;
+    let bidToastId;
 
     try {
       const savvaToken = await getSavvaContract(app, "SavvaToken");
@@ -147,22 +147,9 @@ export default function BidAuctionModal(props) {
       const allowance = await savvaToken.read.allowance([actorAddr, auctionContract.address]);
       const bidAmount = bidAmountWei();
 
-      if (allowance < bidAmount) {
-        // Request approval
-        approveToastId = pushToast({
-          type: "info",
-          message: t("nft.auction.bid.toast.approving") || "Approving token spend…",
-          autohideMs: 0,
-        });
-
-        await sendAsActor(app, {
-          contractName: "SavvaToken",
-          functionName: "approve",
-          args: [auctionContract.address, maxUint256],
-        });
-
-        app.dismissToast?.(approveToastId);
-      }
+      const approveSpec = allowance < bidAmount
+        ? { contractName: "SavvaToken", functionName: "approve", args: [auctionContract.address, maxUint256] }
+        : null;
 
       // Place bid
       bidToastId = pushToast({
@@ -171,7 +158,7 @@ export default function BidAuctionModal(props) {
         autohideMs: 0,
       });
 
-      await sendAsActor(app, {
+      await sendWithApprovalAsActor(app, approveSpec, {
         contractName: "NFTAuction",
         functionName: "placeBid",
         args: [props.tokenId, bidAmount, tokenAddress],
@@ -197,7 +184,6 @@ export default function BidAuctionModal(props) {
       });
       dbg.error?.("BidAuctionModal:submit", err);
     } finally {
-      if (approveToastId) app.dismissToast?.(approveToastId);
       if (bidToastId) app.dismissToast?.(bidToastId);
       setIsSubmitting(false);
     }

@@ -12,7 +12,7 @@ import { getSavvaContract } from "../../blockchain/contracts.js";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
 import { maxUint256 } from "viem";
 import { dbg } from "../../utils/debug.js";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendAsActor, sendWithApprovalAsActor } from "../../blockchain/npoMulticall.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -488,7 +488,7 @@ export default function PostNftCard(props) {
     }
 
     setBuyingNft(true);
-    let approveToastId, buyToastId;
+    let buyToastId;
 
     try {
       const savvaToken = await getSavvaContract(app, "SavvaToken");
@@ -499,22 +499,9 @@ export default function PostNftCard(props) {
       const priceBigInt = BigInt(price);
       const allowance = await savvaToken.read.allowance([actorAddr, marketplace.address]);
 
-      if (allowance < priceBigInt) {
-        // Request approval
-        approveToastId = pushToast({
-          type: "info",
-          message: app.t("nft.market.buy.toast.approving") || "Approving token spend…",
-          autohideMs: 0,
-        });
-
-        await sendAsActor(app, {
-          contractName: "SavvaToken",
-          functionName: "approve",
-          args: [marketplace.address, maxUint256],
-        });
-
-        app.dismissToast?.(approveToastId);
-      }
+      const approveSpec = allowance < priceBigInt
+        ? { contractName: "SavvaToken", functionName: "approve", args: [marketplace.address, maxUint256] }
+        : null;
 
       // Buy NFT
       buyToastId = pushToast({
@@ -523,7 +510,7 @@ export default function PostNftCard(props) {
         autohideMs: 0,
       });
 
-      await sendAsActor(app, {
+      await sendWithApprovalAsActor(app, approveSpec, {
         contractName: "NFTMarketplace",
         functionName: "buy",
         args: [tokenId, priceBigInt],
@@ -543,7 +530,6 @@ export default function PostNftCard(props) {
       });
       dbg.error?.("PostNftCard:buy", err);
     } finally {
-      if (approveToastId) app.dismissToast?.(approveToastId);
       if (buyToastId) app.dismissToast?.(buyToastId);
       setBuyingNft(false);
     }

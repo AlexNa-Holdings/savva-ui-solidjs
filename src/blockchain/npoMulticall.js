@@ -144,6 +144,13 @@ export async function sendBatchAsActor(app, specs) {
   return sendBatchViaNpoMulticall(app, list);
 }
 
+// Optional approve followed by the spending call. NPO non-admin members get their token
+// allowances reset to 0 at the end of every multicall (SavvaNPO.sol), so in NPO mode the
+// approve MUST live in the same multicall as the call that spends it.
+export async function sendWithApprovalAsActor(app, approveSpec, spec) {
+  return sendBatchAsActor(app, [approveSpec, spec]);
+}
+
 async function sendBatchViaNpoMulticall(app, specs) {
   const { t } = app;
   const toastId = pushToast({ type: "info", message: t("npo.multicall.pending"), autohideMs: 0 });

@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import Modal from "./Modal.jsx";
 import AmountInput from "../ui/AmountInput.jsx";
 import * as chain from "../../blockchain/contracts.js";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendWithApprovalAsActor } from "../../blockchain/npoMulticall.js";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { keccak256, toHex, formatUnits } from "viem";
 import { dbg } from "../../utils/debug.js";
@@ -137,17 +137,18 @@ export default function NewPromoModal(props){
       const days = Math.max(1, Math.min(90, Number(validDays())));
       const validTill = BigInt(nowSec + days*86400);
 
+      let approveSpec = null;
       if (savvaWei() > 0n) {
         const savva = await chain.getSavvaContract(app, "SavvaToken");
-        await sendAsActor(app, {
+        approveSpec = {
           target: savva.address,
           abi: ERC20_MIN_ABI,
           functionName: "approve",
           args: [promo.address, MAX_UINT256],
-        });
+        };
       }
 
-      await sendAsActor(app, {
+      await sendWithApprovalAsActor(app, approveSpec, {
         contractName: "Promo",
         functionName: "createPromoCode",
         args: [savvaWei(), promoHash(), validTill],

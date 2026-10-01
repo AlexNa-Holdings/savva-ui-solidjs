@@ -7,7 +7,7 @@ import Spinner from "../ui/Spinner.jsx";
 import TokenValue from "../ui/TokenValue.jsx";
 import { getTokenInfo } from "../../blockchain/tokenMeta.jsx";
 import { parseUnits } from "viem";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendWithApprovalAsActor } from "../../blockchain/npoMulticall.js";
 import { pushToast } from "../../ui/toast.js";
 import Modal from "../modals/Modal.jsx";
 
@@ -139,7 +139,7 @@ export default function IncreaseStakingModal(props) {
     if (msg) { setErr(msg); return; }
 
     setIsProcessing(true);
-    let pendingToastId, approveToastId, stakeToastId;
+    let pendingToastId, stakeToastId;
     try {
       pendingToastId = pushToast({ type: "info", message: t("wallet.stake.toast.pending"), autohideMs: 0 });
 
@@ -149,17 +149,12 @@ export default function IncreaseStakingModal(props) {
       const spender = staking.address;
       const current = await token.read.allowance([owner, spender]);
 
-      if (current < v) {
-        approveToastId = pushToast({ type: "info", message: t("wallet.stake.toast.approving"), autohideMs: 0 });
-        await sendAsActor(app, {
-          contractName: "SavvaToken",
-          functionName: "approve",
-          args: [spender, MAX_UINT],
-        });
-      }
+      const approveSpec = current < v
+        ? { contractName: "SavvaToken", functionName: "approve", args: [spender, MAX_UINT] }
+        : null;
 
       stakeToastId = pushToast({ type: "info", message: t("wallet.stake.toast.staking"), autohideMs: 0 });
-      await sendAsActor(app, {
+      await sendWithApprovalAsActor(app, approveSpec, {
         contractName: "Staking",
         functionName: "stake",
         args: [v],
@@ -172,7 +167,6 @@ export default function IncreaseStakingModal(props) {
       log("Stake: tx failed", eTx?.message || eTx);
     } finally {
       if (pendingToastId) app.dismissToast?.(pendingToastId);
-      if (approveToastId) app.dismissToast?.(approveToastId);
       if (stakeToastId) app.dismissToast?.(stakeToastId);
       setIsProcessing(false);
     }

@@ -8,7 +8,7 @@ import { parseUnits, formatUnits } from "viem";
 import { getConfigParam } from "../../blockchain/config.js";
 import Spinner from "../ui/Spinner.jsx";
 import { pushToast, pushErrorToast } from "../../ui/toast.js";
-import { sendAsActor } from "../../blockchain/npoMulticall.js";
+import { sendWithApprovalAsActor } from "../../blockchain/npoMulticall.js";
 import Modal from "./Modal.jsx";
 import { useProfileByCid, selectField } from "../profile/userProfileStore.js";
 import { loadPredefinedAmounts } from "../preferences/storage.js";
@@ -112,7 +112,7 @@ export default function ContributeModal(props) {
     }
 
     setIsProcessing(true);
-    let mainToastId, approveToastId, contribToastId;
+    let mainToastId, contribToastId;
 
     try {
       mainToastId = pushToast({ type: "info", message: t("post.fund.toast.pending"), autohideMs: 0 });
@@ -123,19 +123,14 @@ export default function ContributeModal(props) {
       const spender = fundContract.address;
       const allowance = await tokenContract.read.allowance([owner, spender]);
 
-      if (allowance < amountWei()) {
-        approveToastId = pushToast({ type: "info", message: t("post.fund.toast.approving"), autohideMs: 0 });
-        await sendAsActor(app, {
-          contractName: "SavvaToken",
-          functionName: "approve",
-          args: [spender, MAX_UINT],
-        });
-      }
+      const approveSpec = allowance < amountWei()
+        ? { contractName: "SavvaToken", functionName: "approve", args: [spender, MAX_UINT] }
+        : null;
 
       contribToastId = pushToast({ type: "info", message: t("post.fund.toast.contributing"), autohideMs: 0 });
 
       const { author, domain, guid } = props.post;
-      await sendAsActor(app, {
+      await sendWithApprovalAsActor(app, approveSpec, {
         contractName: "ContentFund",
         functionName: "contribute",
         args: [author.address, domain, guid, amountWei()],
@@ -148,7 +143,6 @@ export default function ContributeModal(props) {
       pushErrorToast(error, { context: t("post.fund.toast.error") });
     } finally {
       if (mainToastId) app.dismissToast?.(mainToastId);
-      if (approveToastId) app.dismissToast?.(approveToastId);
       if (contribToastId) app.dismissToast?.(contribToastId);
       setIsProcessing(false);
     }
