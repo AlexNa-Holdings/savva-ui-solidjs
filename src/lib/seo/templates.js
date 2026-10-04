@@ -10,6 +10,12 @@ export function titlePost(postTitle, author, siteName) {
   return join([left, siteName], " | ");
 }
 
+// "{PostTitle} · {ChapterTitle}" — used for chapter deep links (?chapter=N).
+// Mirrors backend seo.ChapterTitle.
+export function formatChapterTitle(postTitle, chapterTitle) {
+  return join([postTitle, chapterTitle], " · ");
+}
+
 export function titleProfile(displayName, handle, siteName) {
   const left = handle ? `${displayName} (@${handle})` : displayName;
   return join([left, siteName], " | ");

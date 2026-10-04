@@ -2,6 +2,7 @@
 import { Show, createMemo } from "solid-js";
 import { useApp } from "../../context/AppContext.jsx";
 import { TelegramIcon, XIcon, FacebookIcon } from "../ui/icons/SocialIcons.jsx";
+import { formatChapterTitle } from "../../lib/seo/templates.js";
 
 export default function PostShare(props) {
   const app = useApp();
@@ -18,16 +19,22 @@ export default function PostShare(props) {
 
     // Get current language
     const currentLang = props.currentLang || "";
+    const chapter = props.chapterIndex || 0;
 
     // Check if post has multiple languages
     const locales = post.savva_content?.locales || post.content?.locales || {};
     const localeCount = Object.keys(locales).length;
 
-    // Build the full URL without hash for shareable links
+    // Build the full URL without hash for shareable links.
+    // On the prologue we share the post itself; on a chapter we share a deep link
+    // to that chapter, always pinned to the language being read.
     const baseUrl = window.location.origin;
-    const langParam = (localeCount > 1 && currentLang) ? `?lang=${currentLang}` : "";
+    const params = new URLSearchParams();
+    if (currentLang && (chapter > 0 || localeCount > 1)) params.set("lang", currentLang);
+    if (chapter > 0) params.set("chapter", String(chapter));
+    const query = params.toString();
 
-    return `${baseUrl}/post/${id}${langParam}`;
+    return `${baseUrl}/post/${id}${query ? `?${query}` : ""}`;
   });
 
   const encodedUrl = createMemo(() => encodeURIComponent(postUrl()));
@@ -40,6 +47,9 @@ export default function PostShare(props) {
     const contentLocales = post.savva_content?.locales || post.content?.locales;
     const title = contentLocales?.[currentLang]?.title || "";
 
+    if (title && props.chapterIndex > 0 && props.chapterTitle) {
+      return formatChapterTitle(title, props.chapterTitle);
+    }
     return title || t("post.share.defaultTitle") || "Check out this post";
   });
 

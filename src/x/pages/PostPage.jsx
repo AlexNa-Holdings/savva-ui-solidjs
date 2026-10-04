@@ -13,7 +13,7 @@ import { getPostContentBaseCid, resolvePostCidPath } from "../../ipfs/utils.js";
 import { rehypeRewriteLinks } from "../../docs/rehype-rewrite-links.js";
 import { useMeta } from "../../lib/seo/headManager.js";
 import { buildCanonical, getSiteName, ipfsPublicUrl, truncateDescription } from "../../lib/seo/canonical.js";
-import { titlePost } from "../../lib/seo/templates.js";
+import { titlePost, formatChapterTitle } from "../../lib/seo/templates.js";
 
 import ClosePageButton from "../ui/ClosePageButton.jsx";
 import Spinner from "../ui/Spinner.jsx";
@@ -73,14 +73,35 @@ const getLangFromUrl = (route) => {
   return params.get("lang");
 };
 
-const updateUrlWithLang = (route, lang) => {
+// ?chapter=N deep-links to chapter N (1-based); absent or 0 means the prologue.
+const getChapterFromUrl = (route) => {
+  const queryString = route().split("?")[1];
+  if (!queryString) return 0;
+  const n = parseInt(new URLSearchParams(queryString).get("chapter") || "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+// Chapter pages are language-specific, so their canonical always carries ?lang.
+const buildPostCanonical = (app, shortCid, lang, chapter) => {
+  const base = buildCanonical(app, `/post/${shortCid}`, lang);
+  if (!base || !(chapter > 0)) return base;
+  const url = new URL(base);
+  if (lang) url.searchParams.set("lang", lang);
+  url.searchParams.set("chapter", String(chapter));
+  return url.toString();
+};
+
+// Merge `updates` into the current query string; null/empty values remove the param.
+const updateUrlParams = (route, updates) => {
   const [path, queryString] = route().split("?");
   const params = new URLSearchParams(queryString || "");
 
-  if (lang) {
-    params.set("lang", lang);
-  } else {
-    params.delete("lang");
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null || value === undefined || value === "") {
+      params.delete(key);
+    } else {
+      params.set(key, String(value));
+    }
   }
 
   const newQuery = params.toString();
@@ -347,7 +368,6 @@ export default function PostPage() {
 
   const [details] = createResource(postResource, (p) => fetchPostDetails(p, app));
   const [postLang, setPostLang] = createSignal(null);
-  const [selectedChapterIndex, setSelectedChapterIndex] = createSignal(0);
 
   // ---- Encryption state ----
   const userAddress = createMemo(() => app.authorizedUser?.()?.address || "");
@@ -729,19 +749,14 @@ export default function PostPage() {
     return true;
   });
 
-  const [mainContent, { refetch: refetchMainContent }] = createResource(
-    () => {
-      if (!readyToFetchContent()) return null;
-      return { details: details(), lang: postLang(), chapterIndex: selectedChapterIndex(), postSecretKey: postSecretKey() };
-    },
-    (params) => params ? fetchMainContent(params.details, app, params.lang, params.chapterIndex, params.postSecretKey) : ""
-  );
-
   // normalize to short CID
   createEffect(() => {
     const p = post();
     const id = identifier();
-    if (p && id.startsWith("0x") && p.short_cid) navigate(`/post/${p.short_cid}`, { replace: true });
+    if (p && id.startsWith("0x") && p.short_cid) {
+      const query = route().split("?")[1]; // keep ?lang / ?chapter deep links
+      navigate(`/post/${p.short_cid}${query ? `?${query}` : ""}`, { replace: true });
+    }
   });
 
   const bannedFlags = () => {
@@ -774,7 +789,7 @@ export default function PostPage() {
     // Only update URL with lang param if post has multiple languages
     const locales = availableLocales();
     if (locales.length > 1) {
-      updateUrlWithLang(route, newLang);
+      updateUrlParams(route, { lang: newLang });
     }
   };
 
@@ -786,37 +801,6 @@ export default function PostPage() {
     const contentLocales = p?.savva_content?.locales || p?.content?.locales;
     const loc = contentLocales?.[postLang()] || details()?.descriptor?.locales?.[postLang()];
     return (loc?.title || "").trim();
-  });
-
-  // SEO meta — runs whenever post / lang / title resolves. Encrypted posts
-  // get noindex,nofollow even after meta hydrates (matches backend policy).
-  useMeta(() => {
-    const p = post();
-    if (!p) return null;
-    const t = title();
-    if (!t) return null;
-    const lang = postLang() || uiLang();
-    const contentLocales = p.savva_content?.locales || p.content?.locales;
-    const loc = contentLocales?.[lang] || contentLocales?.en || Object.values(contentLocales || {})[0];
-    const author = p.author || {};
-    const authorName = author.display_name || author.name || author.address || "";
-    const siteName = getSiteName(app);
-    const shortCid = p.short_cid || p.savva_cid;
-    const thumb = p.savva_content?.thumbnail || p.content?.thumbnail;
-    const image = thumb
-      ? ipfsPublicUrl(app, resolvePostCidPath(p, thumb))
-      : ipfsPublicUrl(app, author.avatar);
-    return {
-      title: titlePost(t, authorName, siteName),
-      description: truncateDescription(loc?.text_preview),
-      canonical: shortCid ? buildCanonical(app, `/post/${shortCid}`, lang) : "",
-      image,
-      ogType: "article",
-      twitterCard: "summary_large_image",
-      siteName,
-      locale: lang,
-      robots: isEncryptedPost() || p.banned || p.author_banned ? "noindex,nofollow" : "index,follow",
-    };
   });
 
   const chapters = createMemo(() => {
@@ -857,6 +841,61 @@ export default function PostPage() {
     return [];
   });
 
+  // The URL is the source of truth for the open chapter, so chapters can be deep-linked.
+  // An index past the end of this language's chapter list falls back to the prologue.
+  const selectedChapterIndex = createMemo(() => {
+    const idx = getChapterFromUrl(route);
+    return idx <= chapters().length ? idx : 0;
+  });
+
+  const selectChapter = (index) => {
+    if (index === selectedChapterIndex()) return;
+    const updates = { chapter: index > 0 ? index : null };
+    // A chapter link is language-specific, so pin the language when opening one.
+    if (index > 0 && postLang()) updates.lang = postLang();
+    updateUrlParams(route, updates);
+  };
+
+  const selectedChapterTitle = createMemo(() => {
+    const idx = selectedChapterIndex();
+    if (idx === 0) return "";
+    return chapters()[idx - 1]?.title || `${tLang(postLang(), "post.chapters.chapter")} ${idx}`;
+  });
+
+  // SEO meta — runs whenever post / lang / title resolves. Encrypted posts
+  // get noindex,nofollow even after meta hydrates (matches backend policy).
+  useMeta(() => {
+    const p = post();
+    if (!p) return null;
+    const postTitle = title();
+    if (!postTitle) return null;
+    const chapter = selectedChapterIndex();
+    const chapterTitle = selectedChapterTitle();
+    const t = chapter > 0 && chapterTitle ? formatChapterTitle(postTitle, chapterTitle) : postTitle;
+    const lang = postLang() || uiLang();
+    const contentLocales = p.savva_content?.locales || p.content?.locales;
+    const loc = contentLocales?.[lang] || contentLocales?.en || Object.values(contentLocales || {})[0];
+    const author = p.author || {};
+    const authorName = author.display_name || author.name || author.address || "";
+    const siteName = getSiteName(app);
+    const shortCid = p.short_cid || p.savva_cid;
+    const thumb = p.savva_content?.thumbnail || p.content?.thumbnail;
+    const image = thumb
+      ? ipfsPublicUrl(app, resolvePostCidPath(p, thumb))
+      : ipfsPublicUrl(app, author.avatar);
+    return {
+      title: titlePost(t, authorName, siteName),
+      description: truncateDescription(loc?.text_preview),
+      canonical: shortCid ? buildPostCanonical(app, shortCid, lang, chapter) : "",
+      image,
+      ogType: "article",
+      twitterCard: "summary_large_image",
+      siteName,
+      locale: lang,
+      robots: isEncryptedPost() || p.banned || p.author_banned ? "noindex,nofollow" : "index,follow",
+    };
+  });
+
   const postSpecificGateways = createMemo(() => details()?.descriptor?.gateways || []);
   const ipfsBaseUrl = createMemo(() => {
     const d = details();
@@ -872,6 +911,15 @@ export default function PostPage() {
   });
 
   const markdownPlugins = createMemo(() => [[rehypeRewriteLinks, { base: ipfsBaseUrl() }]]);
+
+  const [mainContent, { refetch: refetchMainContent }] = createResource(
+    () => {
+      if (!readyToFetchContent()) return null;
+      return { details: details(), lang: postLang(), chapterIndex: selectedChapterIndex(), postSecretKey: postSecretKey() };
+    },
+    (params) => params ? fetchMainContent(params.details, app, params.lang, params.chapterIndex, params.postSecretKey) : ""
+  );
+
   const localizedMainContent = createMemo(() => mainContent() || "");
   const contextMenuItems = createMemo(() => (post() ? getPostAdminItems(post(), t) : []));
   const postForTags = createMemo(() => post());
@@ -1350,7 +1398,7 @@ export default function PostPage() {
                                     })))
                                   ]}
                                   selectedIndex={selectedChapterIndex()}
-                                  onSelect={setSelectedChapterIndex}
+                                  onSelect={selectChapter}
                                 />
                               </div>
                             </Show>
@@ -1366,7 +1414,7 @@ export default function PostPage() {
                                   })))
                                 ]}
                                 currentIndex={selectedChapterIndex()}
-                                onSelect={setSelectedChapterIndex}
+                                onSelect={selectChapter}
                               />
                             </Show>
 
@@ -1392,7 +1440,7 @@ export default function PostPage() {
                     </div>
 
                     {/* Right rail always visible */}
-                    <PostRightPanel post={post()} details={details} onOpenContributeModal={openContributeModal} currentLang={postLang()} />
+                    <PostRightPanel post={post()} details={details} onOpenContributeModal={openContributeModal} currentLang={postLang()} chapterIndex={selectedChapterIndex()} chapterTitle={selectedChapterTitle()} />
                   </div>
                 </div>
               </article>

@@ -23,7 +23,7 @@ export default function PostRightPanel(props) {
                     <PostFundCard post={props.post} />
                 </Show>
                 <Show when={props.post}>
-                    <PostShare post={props.post} currentLang={props.currentLang} />
+                    <PostShare post={props.post} currentLang={props.currentLang} chapterIndex={props.chapterIndex} chapterTitle={props.chapterTitle} />
                 </Show>
             </div>
         </StickyClamp>
