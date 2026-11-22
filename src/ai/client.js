@@ -24,6 +24,21 @@ function parseJsonStrict(s) {
   throw new Error("Bad JSON from AI");
 }
 
+// Clean up a plain-text model answer: tolerate models that still reply with
+// {"text":"..."} or wrap the whole answer in a ``` fence the source didn't have.
+function unwrapPlainText(content, source = "") {
+  let out = String(content || "").trim();
+  if (out.startsWith("{") && out.endsWith("}")) {
+    try {
+      const j = JSON.parse(out);
+      if (j && typeof j.text === "string") return j.text.trim();
+    } catch {}
+  }
+  const fence = out.match(/^```[\w-]*\n([\s\S]*?)\n?```$/);
+  if (fence && !String(source).trim().startsWith("```")) out = fence[1].trim();
+  return out;
+}
+
 // ---- Provider callers ----
 
 function buildProviderError({ res, body, url }) {
@@ -388,19 +403,22 @@ export function createAiClient(explicitCfg) {
    * @returns {Promise<string>} - Translated text
    */
   async function translateText(sourceLang, targetLang, text) {
+    // Plain-text output (no JSON wrapper): long Markdown bodies regularly broke
+    // JSON escaping or got truncated mid-string, failing with "Bad JSON from AI".
+    const src = String(text || "");
     const sys = [
       "You are a professional translator.",
-      `Translate from ${sourceLang} to ${targetLang}.`,
+      `Translate the user's message from ${sourceLang} to ${targetLang}.`,
       "Preserve the meaning, tone, and style.",
       "Preserve ALL Markdown formatting, code blocks, links, and URLs exactly.",
-      'Respond ONLY with strict JSON: {"text":"..."}',
+      "Output ONLY the translated text itself: no preface, no notes, no quotes,",
+      "and do not wrap the whole answer in a code block.",
     ].join(" ");
     const content = await chat([
       { role: "system", content: sys },
-      { role: "user", content: String(text || "") },
+      { role: "user", content: src },
     ]);
-    const j = parseJsonStrict(content);
-    return String(j?.text || "");
+    return unwrapPlainText(content, src);
   }
 
   return {
