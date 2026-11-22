@@ -259,9 +259,15 @@ function sanitizeUrl(u) {
   if (!u) return "";
   try {
     const url = new URL(u, window.location.origin);
+    // Never show credentials (e.g. Gemini's ?key=...) in user-visible errors.
+    for (const k of [...url.searchParams.keys()]) {
+      if (/key|token|secret|auth/i.test(k)) url.searchParams.set(k, "***");
+    }
     return url.pathname + (url.search || "");
   } catch (e) {
-    return String(u).replace(/^https?:\/\/[^/]+/, "");
+    return String(u)
+      .replace(/^https?:\/\/[^/]+/, "")
+      .replace(/([?&][^=&]*(?:key|token|secret|auth)[^=&]*=)[^&]*/gi, "$1***");
   }
 }
 
